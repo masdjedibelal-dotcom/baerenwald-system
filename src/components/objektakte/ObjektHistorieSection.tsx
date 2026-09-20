@@ -1,8 +1,8 @@
 'use client'
 
+import { MockBadge, MockBtn, MockCard, MockChip, MockEmpty, MockSelect } from '@/components/mock-ui'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { MockBadge, MockChip, MockEmpty, MockCard } from '@/components/mock-ui'
 import { DateInput } from '@/components/ui/DateInput'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import type { ObjektHistorieRow } from '@/lib/objektakte/types'
@@ -12,9 +12,10 @@ import { rechnungStatusDisplay } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { cn, formatDatum } from '@/lib/utils'
 import type { VorgangPhase } from '@/lib/vorgang/types'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 const PHASE_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung', 'bestand'] as const
-type PhaseFilter = (typeof PHASE_FILTERS)[number]
+type HistoriePhaseTab = (typeof PHASE_FILTERS)[number]
 
 /** Datum · Titel · Einheit · Anlage · Gewerk · Status · Kosten */
 const HISTORIE_LIST_COLS =
@@ -68,12 +69,12 @@ export function ObjektHistorieSection({
   rows: ObjektHistorieRow[]
   einheiten?: Array<{ id: string; bezeichnung: string }>
   anlagen?: Array<{ id: string; bezeichnung: string }>
-  initialPhase?: PhaseFilter
+  initialPhase?: HistoriePhaseTab
   initialAnlageId?: string | null
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
-  const [phase, setPhase] = useState<PhaseFilter>(initialPhase ?? 'alle')
+  const [phase, setPhase] = useState<HistoriePhaseTab>(initialPhase ?? 'alle')
   const [einheitId, setEinheitId] = useState('')
   const [anlageId, setAnlageId] = useState(initialAnlageId?.trim() || '')
   const [gewerk, setGewerk] = useState('')
@@ -130,11 +131,7 @@ export function ObjektHistorieSection({
         className={isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row'}
         style={isMobile ? undefined : { gridTemplateColumns: HISTORIE_LIST_COLS }}
       >
-        <button
-          type="button"
-          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
-          onClick={() => openRow(r)}
-        >
+        <MockBtn className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'} type="button" onClick={() => openRow(r)}>
           {isMobile ? (
             <>
               <div className="ap-mobile-card__top">
@@ -176,7 +173,7 @@ export function ObjektHistorieSection({
               </span>
             </>
           )}
-        </button>
+        </MockBtn>
       </div>
     )
   }
@@ -203,52 +200,40 @@ export function ObjektHistorieSection({
           {einheiten.length ? (
             <label className="block">
               <span className="lbl">Einheit</span>
-              <select
-                className="input w-full list-filter-select"
-                value={einheitId}
-                onChange={(e) => setEinheitId(e.target.value)}
-              >
+              <MockSelect className="w-full list-filter-select" value={einheitId} onChange={(e) => setEinheitId(e.target.value)}>
                 <option value="">Alle</option>
                 {einheiten.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.bezeichnung}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </label>
           ) : null}
           {anlagen.length ? (
             <label className="block">
               <span className="lbl">Anlage</span>
-              <select
-                className="input w-full list-filter-select"
-                value={anlageId}
-                onChange={(e) => setAnlageId(e.target.value)}
-              >
+              <MockSelect className="w-full list-filter-select" value={anlageId} onChange={(e) => setAnlageId(e.target.value)}>
                 <option value="">Alle</option>
                 {anlagen.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.bezeichnung}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </label>
           ) : null}
           {gewerke.length ? (
             <label className="block">
               <span className="lbl">Gewerk</span>
-              <select
-                className="input w-full list-filter-select"
-                value={gewerk}
-                onChange={(e) => setGewerk(e.target.value)}
-              >
+              <MockSelect className="w-full list-filter-select" value={gewerk} onChange={(e) => setGewerk(e.target.value)}>
                 <option value="">Alle</option>
                 {gewerke.map((g) => (
                   <option key={g} value={g}>
                     {displayGewerk(g)}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </label>
           ) : null}
           <label className="block">
@@ -301,7 +286,7 @@ export function ObjektHistorieSection({
                 ? ` · davon ${ohneAngabe} Maßnahme${ohneAngabe === 1 ? '' : 'n'} ohne Kostenangabe`
                 : ''}
             </span>
-            <strong>{summe > 0 ? `${summe.toLocaleString('de-DE')} €` : '—'}</strong>
+            <strong>{summe > 0 ? `${formatEuro(summe, { decimals: 0 })}` : '—'}</strong>
           </div>
         </>
       )}

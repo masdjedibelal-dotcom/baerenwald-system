@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type GeschwisterPos = {
@@ -69,33 +70,37 @@ export async function ensureAngebotHandwerkerGewerkId(
     gewerkName: string
   }
 ): Promise<void> {
-  const { data: auftrag } = await supabase
+  const { data: auftrag, error } = await supabase
     .from('auftraege')
     .select('angebot_id')
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (error) logDbError('lib/auftraege/auftrag-position-handwerker-erbe:auftraege', error)
   const angebotId = auftrag?.angebot_id ? String(auftrag.angebot_id).trim() : ''
   if (!angebotId) return
 
   let gewerkId: string | null = null
   const slug = input.gewerkSlug?.trim()
   if (slug) {
-    const { data: gw } = await supabase.from('gewerke').select('id').eq('slug', slug).maybeSingle()
+    const { data: gw, error } = await supabase.from('gewerke').select('id').eq('slug', slug).maybeSingle()
+    if (error) logDbError('lib/auftraege/auftrag-position-handwerker-erbe:gewerke', error)
     gewerkId = gw?.id ? String(gw.id) : null
   }
   if (!gewerkId) {
     const name = input.gewerkName.trim()
     if (name) {
-      const { data: gw } = await supabase.from('gewerke').select('id').eq('name', name).maybeSingle()
+      const { data: gw, error } = await supabase.from('gewerke').select('id').eq('name', name).maybeSingle()
+      if (error) logDbError('lib/auftraege/auftrag-position-handwerker-erbe:gewerke', error)
       gewerkId = gw?.id ? String(gw.id) : null
     }
   }
   if (!gewerkId) return
 
-  await supabase
+  const { error: __dbErr1 } = await supabase
     .from('angebot_handwerker')
     .update({ gewerk_id: gewerkId })
     .eq('angebot_id', angebotId)
     .eq('handwerker_id', input.handwerkerId)
     .is('gewerk_id', null)
+  if (__dbErr1) logDbError('lib/auftraege/auftrag-position-handwerker-erbe:angebot_handwerker', __dbErr1)
 }

@@ -1,9 +1,9 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { Edit2 } from 'lucide-react'
-
 export type PropertyRowProps = {
   label: string
   value: ReactNode
@@ -56,37 +56,24 @@ export function PropertyRow({
 
   if (editable && onSave && editing) {
     return (
-      <div className="group -mx-3 rounded-md px-3 py-2">
+      <div className="group -mx-3 rounded-field px-3 py-2">
         <div className="mb-1 text-xs text-bw-text-muted">{label}</div>
         {type === 'select' && options?.length ? (
-          <select
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            onBlur={handleSave}
-            className="input text-sm"
-          >
+          <MockSelect value={val} onChange={(e) => setVal(e.target.value)} onBlur={handleSave} className="text-sm">
             {options.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
-          </select>
+          </MockSelect>
         ) : (
-          <input
-            ref={inputRef}
-            type={type === 'number' ? 'number' : type}
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={(e) => {
+          <MockInput ref={inputRef} type={type === 'number' ? 'number' : type} value={val} onChange={(e) => setVal(e.target.value)} onBlur={handleSave} onKeyDown={(e) => {
               if (e.key === 'Enter') void handleSave()
               if (e.key === 'Escape') {
                 setVal(displayString(value))
                 setEditing(false)
               }
-            }}
-            className="input text-sm"
-          />
+            }} className="text-sm" />
         )}
         <div className="mt-1 text-xs text-bw-text-muted">Enter speichern · ESC abbrechen</div>
       </div>
@@ -119,7 +106,7 @@ export function PropertyRow({
         )}
       </span>
       {editable && (onSave || onEdit) ? (
-        <Edit2 className="property-edit ml-2 h-3 w-3 shrink-0" aria-hidden />
+        <MockIcon n="pencil" ctx="default" className="property-edit ml-2 h-3 w-3 shrink-0" aria-hidden />
       ) : null}
     </div>
   )

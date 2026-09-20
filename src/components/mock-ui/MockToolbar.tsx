@@ -1,9 +1,9 @@
 'use client'
 
-import type { ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-
+import type { ReactNode } from 'react'
 export function MockToolbar({
   query,
   onQueryChange,
@@ -23,12 +23,7 @@ export function MockToolbar({
     <div className="toolbar">
       <div className="input" style={{ flex: 1, maxWidth: 360 }}>
         <MockIcon ctx="default" n="search" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          placeholder={placeholder}
-        />
+        <MockInput type="text" value={query} onChange={(e) => onQueryChange(e.target.value)} placeholder={placeholder} />
       </div>
       <div style={{ flex: 1 }} />
       {onFilterClick ? (

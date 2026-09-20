@@ -1,7 +1,9 @@
+import { formatEuro } from '@/lib/format/geld-datum'
 /**
  * Shared-DB: HV-Glocke nach Rechnungsversand.
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 function portalVorgangLink(leadId: string): string {
@@ -30,11 +32,12 @@ export async function notifyPortalRechnungGesendetFromCrm(input: {
 
   const auftragId = String(input.auftragId ?? '').trim()
   if (auftragId) {
-    const { data: auf } = await supabaseAdmin
+    const { data: auf, error } = await supabaseAdmin
       .from('auftraege')
       .select('id, titel, lead_id, kunde_id')
       .eq('id', auftragId)
       .maybeSingle()
+    if (error) logDbError('lib/portal/notify-portal-rechnung-gesendet:auftraege', error)
     if (auf) {
       leadId = String(auf.lead_id ?? '').trim() || null
       titel = String(auf.titel ?? '').trim() || titel
@@ -43,11 +46,12 @@ export async function notifyPortalRechnungGesendetFromCrm(input: {
   }
 
   if (leadId) {
-    const { data: lead } = await supabaseAdmin
+    const { data: lead, error } = await supabaseAdmin
       .from('leads')
       .select('id, auftraggeber_kunde_id, kunde_id')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('lib/portal/notify-portal-rechnung-gesendet:leads', error)
     const ag = String(lead?.auftraggeber_kunde_id ?? '').trim()
     if (ag) orgKundeId = ag
     else if (!orgKundeId) {
@@ -58,11 +62,12 @@ export async function notifyPortalRechnungGesendetFromCrm(input: {
   if (!orgKundeId) return
 
   // Nur Organisations-Portal
-  const { data: kunde } = await supabaseAdmin
+  const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
     .select('id, portal_modus')
     .eq('id', orgKundeId)
     .maybeSingle()
+  if (error) logDbError('lib/portal/notify-portal-rechnung-gesendet:kunden', error)
   const modus = String(kunde?.portal_modus ?? '')
     .trim()
     .toLowerCase()
@@ -73,7 +78,7 @@ export async function notifyPortalRechnungGesendetFromCrm(input: {
     ? portalVorgangLink(leadId)
     : `/portal?section=vorgaenge`
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error: error2 } = await supabaseAdmin
     .from('hv_notifications')
     .select('id')
     .eq('kunde_id', orgKundeId)
@@ -82,6 +87,7 @@ export async function notifyPortalRechnungGesendetFromCrm(input: {
     .ilike('titel', `%${nr}%`)
     .gte('created_at', since)
     .limit(1)
+  if (error2) logDbError('lib/portal/notify-portal-rechnung-gesendet:hv_notifications', error2)
   if ((existing ?? []).length > 0) return
 
   const brutto =
@@ -90,10 +96,7 @@ export async function notifyPortalRechnungGesendetFromCrm(input: {
       : null
   const bruttoLabel =
     brutto != null
-      ? new Intl.NumberFormat('de-DE', {
-          style: 'currency',
-          currency: 'EUR',
-        }).format(brutto)
+      ? formatEuro(brutto, { style: 'currency' })
       : null
 
   const notifTitel = `Rechnung ${nr}`
@@ -101,15 +104,16 @@ export async function notifyPortalRechnungGesendetFromCrm(input: {
     ? `Rechnung ${nr} zu „${titel}“ (${bruttoLabel}) liegt im Portal unter Dokumente.`
     : `Rechnung ${nr} zu „${titel}“ liegt im Portal unter Dokumente.`
 
-  const { error } = await supabaseAdmin.from('hv_notifications').insert({
+  const { error: error3 } = await supabaseAdmin.from('hv_notifications').insert({
     kunde_id: orgKundeId,
     typ: 'rechnung',
     titel: notifTitel,
     body,
     link,
   })
-  if (error) {
-    console.warn('[notifyPortalRechnungGesendetFromCrm] hv_notifications:', error.message)
+  if (error3) logDbError('lib/portal/notify-portal-rechnung-gesendet:hv_notifications', error3)
+  if (error3) {
+    console.warn('[notifyPortalRechnungGesendetFromCrm] hv_notifications:', error3.message)
   } else {
     const { schedulePortalWebPushForOrgKunde } = await import(
       '@/lib/portal/send-portal-web-push'

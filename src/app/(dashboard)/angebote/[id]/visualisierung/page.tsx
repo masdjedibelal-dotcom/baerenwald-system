@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { AngebotVisualisierungClient } from '@/components/angebote/AngebotVisualisierungClient'
@@ -18,6 +19,7 @@ export default async function AngebotVisualisierungPage({
     .select('*, kunden(id, name)')
     .eq('id', params.id)
     .maybeSingle()
+  if (error) logDbError('app/angebote/[id]/visualisierung/page:angebote', error)
 
   if (error || !data) notFound()
 

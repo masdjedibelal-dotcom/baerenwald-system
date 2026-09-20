@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendAngebotNachfassMailForRow } from '@/lib/angebote/send-angebot-nachfass-mail'
 import { erinnerungReferenzAm } from '@/lib/angebot-einfach'
@@ -38,6 +39,7 @@ export async function runAngebotNachfassCron(): Promise<{
     )
     .eq('status_einfach', 'gesendet')
     .is('nachgefasst_am', null)
+  if (error) logDbError('app/angebote/nachfass-cron:angebote', error)
 
   if (error) return { ok: true, bearbeitet: 0, details: [error.message] }
 

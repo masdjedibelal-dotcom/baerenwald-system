@@ -1,6 +1,5 @@
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import type { ReactNode } from 'react'
-import { confirmDelete } from '@/components/ui/confirm-delete'
-
 export type EntityMenuType =
   | 'anfrage'
   | 'angebot'
@@ -83,7 +82,7 @@ export type EntityLike = {
 
 /** Kanonische Portal-Link-Labels — überall gleich. */
 export function portalLinkMenuLabel(type: EntityMenuType): string {
-  if (type === 'handwerker') return 'Handwerker-Link versenden'
+  if (type === 'handwerker') return 'Partner-Link versenden'
   if (type === 'partner') return 'Partner-Link versenden'
   return 'Kundenportal-Link versenden'
 }
@@ -195,7 +194,7 @@ export function buildEntityMenu(
           icon: 'trash',
           label: h.deleteMenuLabel ?? 'Löschen',
           danger: true,
-          onClick: () => confirmDelete(String(label), h.onDelete!),
+          onClick: () => openDeleteConfirm(String(label), h.onDelete!),
         })
       }
     }
@@ -300,7 +299,7 @@ export function buildEntityMenu(
         icon: 'trash',
         label: h.deleteMenuLabel ?? 'Löschen',
         danger: true,
-        onClick: () => confirmDelete(String(label), h.onDelete!),
+        onClick: () => openDeleteConfirm(String(label), h.onDelete!),
       })
     }
   }

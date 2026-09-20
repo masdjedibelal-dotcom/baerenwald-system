@@ -1,10 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import Link from 'next/link'
 import type { ProjektKontext, ProjektKetteKind } from '@/lib/crm/projekt-kontext-types'
 import { RECHNUNG_STATUS_LABELS } from '@/lib/rechnung-config'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'

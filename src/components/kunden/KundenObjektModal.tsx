@@ -1,14 +1,25 @@
 'use client'
+import { MockField, MockFormSection, MockInput } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
+import { z } from 'zod'
 import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { createKundenObjekt, updateKundenObjekt } from '@/app/actions/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenObjekt } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
+import { parseForm, useFieldErrors } from '@/lib/validation/form-schema'
+
+/* FORM_VALIDATION: kunden-objekt */
+const kundenObjektSchema = z.object({
+  titel: z.string().trim().min(1, 'Objektname ist Pflicht.'),
+  strasse: z.string().trim().min(1, 'Straße ist Pflicht.'),
+  hausnummer: z.string().trim().min(1, 'Hausnummer ist Pflicht.'),
+  plz: z.string().trim().min(1, 'PLZ ist Pflicht.'),
+  ort: z.string().trim().min(1, 'Ort ist Pflicht.'),
+})
 
 /**
  * Objekt anlegen/bearbeiten — nur Objektdaten.
@@ -37,6 +48,7 @@ export function KundenObjektModal({
   overlayClassName?: string
 }) {
   const [pending, startTransition] = useTransition()
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [titel, setTitel] = useState('')
   const [strasse, setStrasse] = useState('')
   const [hausnummer, setHausnummer] = useState('')
@@ -45,7 +57,6 @@ export function KundenObjektModal({
   const [baujahr, setBaujahr] = useState('')
   const [gesamtflaeche, setGesamtflaeche] = useState('')
   const [meldeSlug, setMeldeSlug] = useState('')
-  const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [slugWarnOpen, setSlugWarnOpen] = useState(false)
 
@@ -72,10 +83,10 @@ export function KundenObjektModal({
       setGesamtflaeche('')
       setMeldeSlug('')
     }
-    setErr(null)
+    clearFieldErrors()
     setDirty(false)
     setSlugWarnOpen(false)
-  }, [open, editObjekt])
+  }, [open, editObjekt, clearFieldErrors])
 
   function mark<T>(setter: (v: T) => void, v: T) {
     setter(v)
@@ -94,15 +105,12 @@ export function KundenObjektModal({
 
   function speichern() {
     setSlugWarnOpen(false)
-    setErr(null)
-    if (!strasse.trim()) {
-      setErr('Straße ist Pflicht.')
+    const parsed = parseForm(kundenObjektSchema, { titel, strasse, hausnummer, plz, ort })
+    if (!parsed.ok) {
+      applyFieldErrors(parsed.fieldErrors)
       return
     }
-    if (!hausnummer.trim()) {
-      setErr('Hausnummer ist Pflicht.')
-      return
-    }
+
     const hinweisParts: string[] = []
     if (baujahr.trim()) hinweisParts.push(`Baujahr: ${baujahr.trim()}`)
     if (gesamtflaeche.trim()) hinweisParts.push(`Gesamtfläche: ${gesamtflaeche.trim()} m²`)
@@ -125,7 +133,8 @@ export function KundenObjektModal({
       if (editObjekt) {
         const r = await updateKundenObjekt(editObjekt.id, kundeId, payload)
         if (!r.ok) {
-          setErr(r.message)
+          applyFieldErrors({ _form: r.message })
+          toast.systemError(r)
           return
         }
         onSaved({
@@ -137,7 +146,7 @@ export function KundenObjektModal({
           ort: ort.trim() || null,
           einheiten_hinweis: payload.einheiten_hinweis,
         })
-        toast.success('Gespeichert')
+        toast.success(TOAST.gespeichert)
         setDirty(false)
         onClose()
         return
@@ -145,20 +154,17 @@ export function KundenObjektModal({
 
       const r = await createKundenObjekt(kundeId, payload)
       if (!r.ok) {
-        setErr(r.message)
+        applyFieldErrors({ _form: r.message })
+        toast.systemError(r)
         return
       }
 
       onSaved(r.objekt)
-      toast.success('Objekt angelegt')
+      toast.success(TOAST.objekt_angelegt)
       setDirty(false)
       onClose()
     })
   }
-
-  const canSave =
-    Boolean(titel.trim() && strasse.trim() && hausnummer.trim() && plz.trim() && ort.trim()) &&
-    !pending
 
   return (
     <>
@@ -172,89 +178,81 @@ export function KundenObjektModal({
       dirty={dirty}
       size="lg"
       onConfirm={requestSpeichern}
-      confirmDisabled={!canSave}
+      confirmDisabled={pending}
       confirmBusy={pending}
       className="kunde-create-sheet"
     >
       <div className="kunde-create">
-        {err ? <p className="kunde-create__err">{err}</p> : null}
+        {fieldErrors._form ? (
+          <p className="field-error" role="alert">
+            {fieldErrors._form}
+          </p>
+        ) : null}
 
         <MockFormSection title="Objektdaten" icon="building">
-          <MockField label="Objektname" required full>
-            <input
-              className="input"
+          <MockField label="Objektname" required full name="titel" error={fieldErrors.titel}>
+            <MockInput
               value={titel}
-              onChange={(e) => mark(setTitel, e.target.value)}
+              onChange={(e) => {
+                clearField('titel')
+                mark(setTitel, e.target.value)
+              }}
               placeholder="z.B. Wohnanlage Lindenhof"
             />
           </MockField>
-          <MockField label="Straße" required>
-            <input
-              className="input"
+          <MockField label="Straße" required name="strasse" error={fieldErrors.strasse}>
+            <MockInput
               value={strasse}
-              onChange={(e) => mark(setStrasse, e.target.value)}
+              onChange={(e) => {
+                clearField('strasse')
+                mark(setStrasse, e.target.value)
+              }}
               placeholder="Lindenstraße"
             />
           </MockField>
-          <MockField label="Hausnummer" required>
-            <input
-              className="input"
+          <MockField label="Hausnummer" required name="hausnummer" error={fieldErrors.hausnummer}>
+            <MockInput
               value={hausnummer}
-              onChange={(e) => mark(setHausnummer, e.target.value)}
+              onChange={(e) => {
+                clearField('hausnummer')
+                mark(setHausnummer, e.target.value)
+              }}
               placeholder="14"
             />
           </MockField>
-          <MockField label="PLZ" required>
-            <input
-              className="input"
+          <MockField label="PLZ" required name="plz" error={fieldErrors.plz}>
+            <MockInput
               value={plz}
-              onChange={(e) => mark(setPlz, e.target.value)}
+              onChange={(e) => {
+                clearField('plz')
+                mark(setPlz, e.target.value)
+              }}
               placeholder="80802"
               inputMode="numeric"
             />
           </MockField>
-          <MockField label="Ort" required>
-            <input
-              className="input"
+          <MockField label="Ort" required name="ort" error={fieldErrors.ort}>
+            <MockInput
               value={ort}
-              onChange={(e) => mark(setOrt, e.target.value)}
+              onChange={(e) => {
+                clearField('ort')
+                mark(setOrt, e.target.value)
+              }}
               placeholder="München"
             />
           </MockField>
           <MockField label="Baujahr">
-            <input
-              className="input"
-              value={baujahr}
-              onChange={(e) => mark(setBaujahr, e.target.value)}
-              placeholder="1998"
-              inputMode="numeric"
-            />
+            <MockInput value={baujahr} onChange={(e) => mark(setBaujahr, e.target.value)} placeholder="1998" inputMode="numeric" />
           </MockField>
           <MockField label="Gesamtfläche (m²)">
-            <input
-              className="input"
-              value={gesamtflaeche}
-              onChange={(e) => mark(setGesamtflaeche, e.target.value)}
-              placeholder="1.240"
-              inputMode="decimal"
-            />
+            <MockInput value={gesamtflaeche} onChange={(e) => mark(setGesamtflaeche, e.target.value)} placeholder="1.240" inputMode="decimal" />
           </MockField>
           <MockField label="Verwaltung" full>
-            <input
-              className="input"
-              value={verwaltungName?.trim() || '—'}
-              readOnly
-              disabled
-            />
+            <MockInput value={verwaltungName?.trim() || '—'} readOnly disabled />
           </MockField>
           {isEdit ? (
             <MockField label="Melde-Slug (URL)" full>
-              <input
-                className="input"
-                value={meldeSlug}
-                onChange={(e) => mark(setMeldeSlug, e.target.value)}
-                placeholder="z. B. lindenhof-14"
-              />
+              <MockInput value={meldeSlug} onChange={(e) => mark(setMeldeSlug, e.target.value)} placeholder="z. B. lindenhof-14" />
             </MockField>
           ) : null}
         </MockFormSection>
@@ -264,7 +262,7 @@ export function KundenObjektModal({
             style={{
               fontSize: 'var(--fs-meta)',
               color: 'var(--text-3)',
-              margin: '4px 0 0',
+              margin: 'var(--sp-row) 0 0',
               lineHeight: 1.45,
             }}
           >
@@ -275,32 +273,25 @@ export function KundenObjektModal({
       </div>
     </EditorSheet>
 
-    {slugWarnOpen ? (
-      <MockModal
-        open
-        icon="alert-triangle"
-        title="Melde-Slug ändern?"
-        sub="Gedruckte Aushänge werden ungültig."
-        size="sm"
-        onClose={() => setSlugWarnOpen(false)}
-        footer={
-          <>
-            <MockBtn kind="ghost" onClick={() => setSlugWarnOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn kind="danger" icon="check" onClick={speichern} disabled={pending}>
-              Slug ändern
-            </MockBtn>
-          </>
-        }
-      >
-        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
-          Gedruckte Aushänge mit der alten Adresse funktionieren danach nicht mehr — neue Aushänge
-          drucken.
-        </div>
-      </MockModal>
-    ) : null}
+    <ConfirmPopup
+      open={slugWarnOpen}
+      onClose={() => {
+        if (!pending) setSlugWarnOpen(false)
+      }}
+      title="Melde-Slug ändern?"
+      danger
+      busy={pending}
+      confirmLabel={pending ? 'Wird geändert…' : 'Slug ändern'}
+      onConfirm={speichern}
+    >
+      <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+        Gedruckte Aushänge werden ungültig.
+      </p>
+      <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+        Gedruckte Aushänge mit der alten Adresse funktionieren danach nicht mehr — neue Aushänge
+        drucken.
+      </div>
+    </ConfirmPopup>
     </>
   )
 }

@@ -5,6 +5,7 @@
  * @see handwerks-plattform/src/app/api/internal/sync-lead-phase/route.ts
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AuftragStatus } from '@/lib/types'
 
@@ -119,6 +120,7 @@ export async function syncPortalLeadStatusAfterAngebotGesendet(input: {
     if (patch.status) update.status = patch.status
 
     const { error: upErr } = await supabaseAdmin.from('leads').update(update).eq('id', leadId)
+    if (upErr) logDbError('lib/portal/sync-portal-lead-status:leads', upErr)
     if (upErr) {
       console.error('[syncPortalLeadStatus] Angebot Lead-Update:', upErr.message)
     }
@@ -163,6 +165,7 @@ export async function syncPortalLeadStatusAfterAuftragChange(input: {
         .select('lead_id')
         .eq('id', input.auftragId)
         .maybeSingle()
+      if (error) logDbError('lib/portal/sync-portal-lead-status:auftraege', error)
       if (error) {
         console.warn('[syncPortalLeadStatus] Auftrag laden:', error.message)
         return
@@ -176,6 +179,7 @@ export async function syncPortalLeadStatusAfterAuftragChange(input: {
       .select('id, auftraggeber_kunde_id, hv_meldung_status')
       .eq('id', leadId)
       .maybeSingle()
+    if (leadErr) logDbError('lib/portal/sync-portal-lead-status:leads', leadErr)
 
     if (leadErr) {
       console.warn('[syncPortalLeadStatus] Lead laden:', leadErr.message)
@@ -197,6 +201,7 @@ export async function syncPortalLeadStatusAfterAuftragChange(input: {
     }
 
     const { error: upErr } = await supabaseAdmin.from('leads').update(update).eq('id', leadId)
+    if (upErr) logDbError('lib/portal/sync-portal-lead-status:leads', upErr)
     if (upErr) {
       console.error('[syncPortalLeadStatus] Lead-Update:', upErr.message)
     }

@@ -27,9 +27,9 @@ export const ANGEBOT_HANDWERKER_HW_DOKUMENT_SELECT = `
 `.trim()
 
 export const PARTNER_HW_DOKUMENT_CRM_LABEL = {
-  unterlage: 'Handwerker · Angebot',
-  unterlageNr: (nr: number) => `Handwerker · Unterlage ${nr}`,
-  rechnung: 'Handwerker · Rechnung',
+  unterlage: 'Partner · Angebot',
+  unterlageNr: (nr: number) => `Partner · Unterlage ${nr}`,
+  rechnung: 'Partner · Rechnung',
 } as const
 
 export function partnerHwDokumentListenName(

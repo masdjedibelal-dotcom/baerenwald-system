@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailHandwerkerLeistungZuweisung } from '@/lib/mail-templates'
@@ -65,9 +66,10 @@ export async function sendAuftragHandwerkerZuweisungMail(input: {
     .select('id, name, email, firma, aktiv')
     .eq('id', handwerkerId)
     .maybeSingle()
+  if (hwErr) logDbError('lib/auftraege/send-auftrag-handwerker-zuweisung-mail:handwerker', hwErr)
 
-  if (hwErr || !hw) return { ok: false, message: hwErr?.message ?? 'Handwerker nicht gefunden' }
-  if (hw.aktiv === false) return { ok: false, message: 'Handwerker ist nicht aktiv' }
+  if (hwErr || !hw) return { ok: false, message: hwErr?.message ?? 'Partner nicht gefunden' }
+  if (hw.aktiv === false) return { ok: false, message: 'Partner ist nicht aktiv' }
 
   const hwEmail = (hw.email as string | null)?.trim() || ''
   const defaultTo = hwEmail ? [hwEmail] : []
@@ -78,6 +80,7 @@ export async function sendAuftragHandwerkerZuweisungMail(input: {
     .select('id, titel, start_datum, end_datum, kunden(plz)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (aErr) logDbError('lib/auftraege/send-auftrag-handwerker-zuweisung-mail:auftraege', aErr)
 
   if (aErr || !auftrag) return { ok: false, message: aErr?.message ?? 'Auftrag nicht gefunden' }
 

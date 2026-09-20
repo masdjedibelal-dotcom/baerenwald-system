@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useRouter } from 'next/navigation'
 import { useCallback, useMemo, useState } from 'react'
 import { KI_BEREICHE, KI_BEREICH_ORDER, KI_PHASEN } from '@/lib/ki/constants'
@@ -103,7 +105,7 @@ export function KiAnalyticsClient({ analysen }: Props) {
 
   const finish = useCallback(() => {
     setProgress(null)
-    router.refresh()
+    afterServerActionRefresh()
   }, [router])
 
   async function refreshZahlen(keys = KI_BEREICH_ORDER) {
@@ -181,25 +183,20 @@ export function KiAnalyticsClient({ analysen }: Props) {
       {!isEmpty ? <KiJourneyBand meta={meta} onJump={jumpToPhase} /> : null}
 
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="rounded-card border border-status-cancel-bg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
           {error}
         </p>
       ) : null}
 
       {isEmpty ? (
-        <div className="rounded-xl border border-dashed border-bw-border bg-bw-bg px-4 py-12 text-center">
+        <div className="rounded-sheet border border-dashed border-bw-border bg-bw-bg px-4 py-12 text-center">
           <p className="text-sm font-medium text-bw-text">Noch keine Auswertung gespeichert</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             Eure CRM-Daten sind da — klickt auf „Zahlen“, um die erste Auswertung zu erstellen.
           </p>
-          <button
-            type="button"
-            onClick={() => void refreshBeides()}
-            disabled={loading}
-            className="mt-4 rounded-lg bg-bw-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-          >
+          <MockBtn className="mt-4 rounded-button bg-bw-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50" type="button" onClick={() => void refreshBeides()} disabled={loading}>
             Erste Auswertung starten
-          </button>
+          </MockBtn>
         </div>
       ) : (
         KI_PHASEN.map((phase) => {

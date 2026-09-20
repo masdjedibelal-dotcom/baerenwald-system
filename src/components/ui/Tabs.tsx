@@ -1,15 +1,16 @@
 'use client'
 
-import type { LucideIcon } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockTabs, type MockTabItem } from '@/components/mock-ui/MockTabs'
+import type { MockIconName } from '@/lib/mock-icons'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
 
 export interface TabItem {
   id: string
   label: string
   count?: number
-  icon?: LucideIcon
+  icon?: MockIconName | string
 }
 
 interface TabsProps {
@@ -18,6 +19,7 @@ interface TabsProps {
   defaultTab?: string
 }
 
+/** Thin-Wrapper — Tabs-Chrome über MockTabs. */
 export function Tabs({ tabs, children, defaultTab }: TabsProps) {
   const [active, setActive] = useState(defaultTab ?? tabs[0]?.id ?? '')
   const activeIndex = Math.max(
@@ -25,27 +27,25 @@ export function Tabs({ tabs, children, defaultTab }: TabsProps) {
     tabs.findIndex((t) => t.id === active)
   )
 
+  const items: MockTabItem[] = tabs.map((tab) => {
+    return {
+      id: tab.id,
+      label: tab.label,
+      count: tab.count,
+      iconNode: tab.icon ? <MockIcon n={tab.icon} ctx="tab" size={16} className="opacity-70" /> : undefined,
+    }
+  })
+
   return (
     <div>
-      <div className="tabs" role="tablist">
-        {tabs.map((tab) => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={active === tab.id}
-              onClick={() => setActive(tab.id)}
-              className={cn('tab', active === tab.id && 'active')}
-            >
-              {Icon ? <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden /> : null}
-              {tab.label}
-              {tab.count !== undefined ? <span className="tab-count">{tab.count}</span> : null}
-            </button>
-          )
-        })}
-      </div>
+      <MockTabs
+        items={items}
+        value={active}
+        onChange={setActive}
+        className="tabs"
+        tabClassName="tab"
+        showIcons={false}
+      />
       <div className="animate-fade-in">{children[activeIndex]}</div>
     </div>
   )

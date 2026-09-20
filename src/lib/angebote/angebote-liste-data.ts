@@ -1,4 +1,5 @@
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { createClient } from '@/lib/supabase-server'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import { buildAngebotIdsMitAuftrag } from '@/lib/crm/pipeline-liste-filter'
 import { buildAngebotIdsMitRechnung } from '@/lib/crm/projekt-pipeline'
@@ -39,15 +40,9 @@ export async function loadAngeboteListe(): Promise<{
   error: string | null
 }> {
   const [angeboteRes, auftragRes, rechnungRes] = await Promise.all([
-    withCrmReadFallback(async (db) =>
-      db.from('angebote').select(ANGEBOTE_LISTE_SELECT).order('created_at', { ascending: false }).limit(100)
-    ),
-    withCrmReadFallback(async (db) =>
-      db.from('auftraege').select('angebot_id').not('angebot_id', 'is', null)
-    ),
-    withCrmReadFallback(async (db) =>
-      db.from('rechnungen').select('angebot_id').not('angebot_id', 'is', null)
-    ),
+    await (() => { const db = createClient(); return db.from('angebote').select(ANGEBOTE_LISTE_SELECT).order('created_at', { ascending: false }).limit(100) })(),
+    await (() => { const db = createClient(); return db.from('auftraege').select('angebot_id').not('angebot_id', 'is', null) })(),
+    await (() => { const db = createClient(); return db.from('rechnungen').select('angebot_id').not('angebot_id', 'is', null) })(),
   ])
 
   if (angeboteRes.error) {

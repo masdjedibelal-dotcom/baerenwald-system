@@ -1,5 +1,7 @@
 'use client'
 
+import { MockField, MockFormSection, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocalTransition } from '@/components/ui/action-busy'
@@ -8,7 +10,6 @@ import {
   type HandwerkerFormInput,
 } from '@/app/(dashboard)/handwerker/actions'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { toast } from '@/components/ui/app-toast'
 import {
   composeHandwerkerAdresse,
@@ -19,6 +20,7 @@ import {
   validateHandwerkerStammPflicht,
 } from '@/lib/handwerker-stammdaten'
 import type { Handwerker } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -139,7 +141,7 @@ export function PartnerEditSheet({
     }
     if (!tel.trim()) {
       setErr('Telefon ist Pflicht.')
-      toast.error('Telefon ist Pflicht.')
+      toast.error(TOAST.telefon_ist_pflicht)
       return
     }
 
@@ -183,14 +185,14 @@ export function PartnerEditSheet({
       const r = await updateHandwerker(handwerker.id, input)
       if (!r.ok) {
         setErr(r.message)
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Gespeichert')
+      toast.success(TOAST.gespeichert)
       setDirty(false)
       onSaved?.()
       onClose()
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -198,8 +200,8 @@ export function PartnerEditSheet({
     <EditorSheet
       open={open}
       onClose={onClose}
-      title="Handwerker bearbeiten"
-      crumb="Handwerker >"
+      title="Partner bearbeiten"
+      crumb="Partner >"
       context="detail"
       dirty={dirty}
       size="lg"
@@ -213,128 +215,62 @@ export function PartnerEditSheet({
 
         <MockFormSection title="Betrieb" icon="tool">
           <MockField label="Firmenname" required full>
-            <input
-              className="input"
-              value={firma}
-              onChange={(e) => mark(() => setFirma(e.target.value))}
-              placeholder="Max Sanitär GmbH"
-              autoComplete="organization"
-              autoFocus={focus === 'stamm'}
-            />
+            <MockInput value={firma} onChange={(e) => mark(() => setFirma(e.target.value))} placeholder="Max Sanitär GmbH" autoComplete="organization" autoFocus={focus === 'stamm'} />
           </MockField>
           {gewerkeOptionen.length > 0 ? (
             <MockField label="Gewerk" full>
-              <select
-                className="input"
-                value={gewerkSlug}
-                onChange={(e) => mark(() => setGewerkSlug(e.target.value))}
-                aria-label="Gewerk"
-              >
+              <MockSelect value={gewerkSlug} onChange={(e) => mark(() => setGewerkSlug(e.target.value))} aria-label="Gewerk">
                 <option value="">Gewerk wählen…</option>
                 {gewerkeOptionen.map((g) => (
                   <option key={g.id} value={g.slug}>
                     {g.name}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </MockField>
           ) : null}
         </MockFormSection>
 
         <MockFormSection title="Ansprechpartner" icon="user" columns={2}>
           <MockField label="Vorname">
-            <input
-              className="input"
-              value={vorname}
-              onChange={(e) => mark(() => setVorname(e.target.value))}
-              autoComplete="given-name"
-            />
+            <MockInput value={vorname} onChange={(e) => mark(() => setVorname(e.target.value))} autoComplete="given-name" />
           </MockField>
           <MockField label="Nachname">
-            <input
-              className="input"
-              value={nachname}
-              onChange={(e) => mark(() => setNachname(e.target.value))}
-              autoComplete="family-name"
-            />
+            <MockInput value={nachname} onChange={(e) => mark(() => setNachname(e.target.value))} autoComplete="family-name" />
           </MockField>
           <MockField label="Telefon" required>
-            <input
-              className="input"
-              type="tel"
-              value={tel}
-              onChange={(e) => mark(() => setTel(e.target.value))}
-              autoComplete="tel"
-            />
+            <MockInput type="tel" value={tel} onChange={(e) => mark(() => setTel(e.target.value))} autoComplete="tel" />
           </MockField>
           <MockField label="E-Mail">
-            <input
-              className="input"
-              type="email"
-              value={mail}
-              onChange={(e) => mark(() => setMail(e.target.value))}
-              autoComplete="email"
-            />
+            <MockInput type="email" value={mail} onChange={(e) => mark(() => setMail(e.target.value))} autoComplete="email" />
           </MockField>
         </MockFormSection>
 
         <MockFormSection title="Adresse" icon="map-pin" columns={2}>
           <MockField label="Straße" full>
-            <input
-              className="input"
-              value={strasse}
-              onChange={(e) => mark(() => setStrasse(e.target.value))}
-              autoComplete="street-address"
-            />
+            <MockInput value={strasse} onChange={(e) => mark(() => setStrasse(e.target.value))} autoComplete="street-address" />
           </MockField>
           <MockField label="Hausnummer">
-            <input
-              className="input"
-              value={hausnummer}
-              onChange={(e) => mark(() => setHausnummer(e.target.value))}
-            />
+            <MockInput value={hausnummer} onChange={(e) => mark(() => setHausnummer(e.target.value))} />
           </MockField>
           <MockField label="PLZ">
-            <input
-              className="input"
-              value={plz}
-              onChange={(e) => mark(() => setPlz(e.target.value))}
-              autoComplete="postal-code"
-            />
+            <MockInput value={plz} onChange={(e) => mark(() => setPlz(e.target.value))} autoComplete="postal-code" />
           </MockField>
           <MockField label="Ort">
-            <input
-              className="input"
-              value={ort}
-              onChange={(e) => mark(() => setOrt(e.target.value))}
-              autoComplete="address-level2"
-            />
+            <MockInput value={ort} onChange={(e) => mark(() => setOrt(e.target.value))} autoComplete="address-level2" />
           </MockField>
         </MockFormSection>
 
         <div id="hw-edit-bank">
           <MockFormSection title="Bank & Steuer" icon="building">
             <MockField label="IBAN" full>
-              <input
-                className="input"
-                value={iban}
-                onChange={(e) => mark(() => setIban(e.target.value))}
-                autoFocus={focus === 'bank'}
-              />
+              <MockInput value={iban} onChange={(e) => mark(() => setIban(e.target.value))} autoFocus={focus === 'bank'} />
             </MockField>
             <MockField label="USt-ID" full>
-              <input
-                className="input"
-                value={ustid}
-                onChange={(e) => mark(() => setUstid(e.target.value))}
-              />
+              <MockInput value={ustid} onChange={(e) => mark(() => setUstid(e.target.value))} />
             </MockField>
             <MockField label="Steuernummer" full>
-              <input
-                className="input"
-                value={steuernummer}
-                onChange={(e) => mark(() => setSteuernummer(e.target.value))}
-              />
+              <MockInput value={steuernummer} onChange={(e) => mark(() => setSteuernummer(e.target.value))} />
             </MockField>
           </MockFormSection>
         </div>

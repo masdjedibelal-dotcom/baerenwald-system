@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomBytes } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -10,12 +11,14 @@ export async function ensureKundenTokenForAuftrag(auftragId: string): Promise<st
     .select('kunden_token')
     .eq('id', auftragId)
     .maybeSingle()
+  if (selErr) logDbError('lib/projekt/kunden-token:auftraege', selErr)
   if (selErr || !row) return null
   const existing = row.kunden_token as string | null | undefined
   if (existing && String(existing).length > 0) return String(existing)
 
   const token = randomBytes(32).toString('hex')
   const { error: upErr } = await supabaseAdmin.from('auftraege').update({ kunden_token: token }).eq('id', auftragId)
+  if (upErr) logDbError('lib/projekt/kunden-token:auftraege', upErr)
   if (upErr) return null
   return token
 }

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { resolveObjektVorgangKosten } from '@/lib/objektakte/resolve-objekt-vorgang-kosten'
 import type { ObjektHistoriePayload, ObjektHistorieRow } from '@/lib/objektakte/types'
@@ -113,15 +114,17 @@ export async function loadObjektHistorie(
   const supabase = createClient()
   const metaByLead = await loadLeadHistorieMeta(supabase, leadIds)
 
-  const { data: angebote } = await supabase
+  const { data: angebote, error: error2 } = await supabase
     .from('angebote')
     .select('id, lead_id, status, gesamt_fix, gesamt_min, gesamt_max')
     .in('lead_id', leadIds)
+  if (error2) logDbError('lib/objektakte/load-objekt-historie:angebote', error2)
 
-  const { data: auftraege } = await supabase
+  const { data: auftraege, error: error3 } = await supabase
     .from('auftraege')
     .select('id, lead_id, angebot_id, status')
     .in('lead_id', leadIds)
+  if (error3) logDbError('lib/objektakte/load-objekt-historie:auftraege', error3)
 
   const auftragIds = (auftraege ?? []).map((a) => String(a.id)).filter(Boolean)
   const angebotIds = (angebote ?? []).map((a) => String(a.id)).filter(Boolean)

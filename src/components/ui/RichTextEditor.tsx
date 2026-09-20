@@ -1,31 +1,24 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import {
-  Bold,
-  Italic,
-  List,
-  ListOrdered,
-  RemoveFormatting,
-  Underline,
-} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { normalizeEditorHtml, serializeEditorHtml } from '@/lib/rich-text'
 
 type ToolbarBtn = {
-  icon: typeof Bold
+  icon: string
   label: string
   command: string
   value?: string
 }
 
 const TOOLBAR: ToolbarBtn[] = [
-  { icon: Bold, label: 'Fett', command: 'bold' },
-  { icon: Italic, label: 'Kursiv', command: 'italic' },
-  { icon: Underline, label: 'Unterstrichen', command: 'underline' },
-  { icon: List, label: 'Aufzählung', command: 'insertUnorderedList' },
-  { icon: ListOrdered, label: 'Nummerierung', command: 'insertOrderedList' },
-  { icon: RemoveFormatting, label: 'Formatierung entfernen', command: 'removeFormat' },
+  { icon: 'text-caption', label: 'Fett', command: 'bold' },
+  { icon: 'text-caption', label: 'Kursiv', command: 'italic' },
+  { icon: 'text-caption', label: 'Unterstrichen', command: 'underline' },
+  { icon: 'list', label: 'Aufzählung', command: 'insertUnorderedList' },
+  { icon: 'list-numbers', label: 'Nummerierung', command: 'insertOrderedList' },
+  { icon: 'text-caption', label: 'Formatierung entfernen', command: 'removeFormat' },
 ]
 
 export type RichTextEditorProps = {
@@ -96,13 +89,13 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(fu
   return (
     <div
       className={cn(
-        'rich-text-editor overflow-hidden rounded-lg border border-bw-border bg-white',
+        'rich-text-editor overflow-hidden rounded-card border border-bw-border bg-white',
         disabled && 'opacity-60 pointer-events-none',
         className
       )}
     >
       <div className="rich-text-toolbar flex flex-wrap items-center gap-0.5 border-b border-bw-border bg-bw-bg px-1.5 py-1">
-        {TOOLBAR.map(({ icon: Icon, label, command, value: cmdVal }) => (
+        {TOOLBAR.map(({ icon, label, command, value: cmdVal }) => (
           <button
             key={command}
             type="button"
@@ -113,7 +106,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(fu
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => runCommand(command, cmdVal)}
           >
-            <Icon className="h-4 w-4" aria-hidden />
+            <MockIcon n={icon} ctx="btn" size={16} />
           </button>
         ))}
       </div>

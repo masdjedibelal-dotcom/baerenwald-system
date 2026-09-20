@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { openPortalAsKunde, openPortalAsHandwerker } from '@/app/(dashboard)/impersonation/actions'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 type Props = {
   kundeId?: string | null
@@ -45,37 +47,30 @@ export function PortalLoginIconButton({
         : await openPortalAsKunde(kid!)
       if (!r.ok) {
         popup?.close()
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       if (popup) popup.location.href = r.url
       else window.location.assign(r.url)
     } catch {
       popup?.close()
-      toast.error('Portal konnte nicht geöffnet werden.')
+      toast.error(TOAST.portal_konnte_nicht_geoeffnet_werden)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <button
-      type="button"
-      className={cn(
+    <MockBtn className={cn(
         withLabel ? 'vgid-portal__login' : 'qa-btn portal-login-icon',
         className
-      )}
-      aria-label={label}
-      title={label}
-      disabled={busy}
-      onClick={() => void open()}
-    >
+      )} type="button" aria-label={label} title={label} disabled={busy} onClick={() => void open()}>
       <MockIcon
         ctx={withLabel ? 'btn' : 'row'}
         n="log-in"
         size={withLabel ? 15 : 18}
       />
       {withLabel ? <span>Login</span> : null}
-    </button>
+    </MockBtn>
   )
 }

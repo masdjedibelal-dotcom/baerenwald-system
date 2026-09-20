@@ -1,8 +1,8 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidateKundeDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import type { KundeAnsprechpartner } from '@/lib/types'
 
 export type SaveAnsprechpartnerInput = {
@@ -30,26 +30,22 @@ async function requireAuth() {
 async function syncKundeLegacyAnsprechpartnerFeld(kundeId: string): Promise<void> {
   const kid = kundeId.trim()
   if (!kid) return
-  const { data: primary } = await withCrmReadFallback(async (db) =>
-    db
+  const { data: primary } = await (() => { const db = createClient(); return db
       .from('kunden_ansprechpartner')
       .select('name')
       .eq('kunde_id', kid)
       .eq('ist_primaer', true)
       .order('sort_order', { ascending: true })
       .limit(1)
-      .maybeSingle()
-  )
+      .maybeSingle() })()
   const name =
     primary && typeof primary === 'object' && 'name' in primary
       ? String((primary as { name?: string | null }).name ?? '').trim() || null
       : null
-  await withCrmReadFallback(async (db) =>
-    db
+  await (() => { const db = createClient(); return db
       .from('kunden')
       .update({ ansprechpartner: name, updated_at: new Date().toISOString() })
-      .eq('id', kid)
-  )
+      .eq('id', kid) })()
 }
 
 export async function listKundenAnsprechpartner(
@@ -57,15 +53,13 @@ export async function listKundenAnsprechpartner(
 ): Promise<KundeAnsprechpartner[]> {
   const id = kundeId.trim()
   if (!id) return []
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db
+  const { data, error } = await (() => { const db = createClient(); return db
       .from('kunden_ansprechpartner')
       .select('*')
       .eq('kunde_id', id)
       .order('ist_primaer', { ascending: false })
       .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
-  )
+      .order('name', { ascending: true }) })()
   if (error) {
     console.warn('[listKundenAnsprechpartner]', error.message)
     return []
@@ -92,9 +86,7 @@ export async function saveKundenAnsprechpartner(
   const istPrimaer = Boolean(input.ist_primaer)
 
   if (istPrimaer) {
-    await withCrmReadFallback(async (db) =>
-      db.from('kunden_ansprechpartner').update({ ist_primaer: false }).eq('kunde_id', kid)
-    )
+    await (() => { const db = createClient(); return db.from('kunden_ansprechpartner').update({ ist_primaer: false }).eq('kunde_id', kid) })()
   }
 
   if (ansprechpartnerId?.trim()) {
@@ -107,21 +99,18 @@ export async function saveKundenAnsprechpartner(
       updated_at: new Date().toISOString(),
     }
     if (istPrimaer) patch.sort_order = 0
-    const { error } = await withCrmReadFallback(async (db) =>
-      db
+    const { error } = await (() => { const db = createClient(); return db
         .from('kunden_ansprechpartner')
         .update(patch)
         .eq('id', ansprechpartnerId.trim())
-        .eq('kunde_id', kid)
-    )
+        .eq('kunde_id', kid) })()
     if (error) return { ok: false, message: error.message }
     await syncKundeLegacyAnsprechpartnerFeld(kid)
-    revalidatePath(`/kunden/${kid}`)
+    revalidateKundeDetail(kid)
     return { ok: true, id: ansprechpartnerId.trim() }
   }
 
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db
+  const { data, error } = await (() => { const db = createClient(); return db
       .from('kunden_ansprechpartner')
       .insert({
         kunde_id: kid,
@@ -133,11 +122,10 @@ export async function saveKundenAnsprechpartner(
         sort_order: istPrimaer ? 0 : 100,
       })
       .select('id')
-      .single()
-  )
+      .single() })()
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen.' }
   await syncKundeLegacyAnsprechpartnerFeld(kid)
-  revalidatePath(`/kunden/${kid}`)
+  revalidateKundeDetail(kid)
   return { ok: true, id: String((data as { id: string }).id) }
 }
 
@@ -151,12 +139,10 @@ export async function deleteKundenAnsprechpartner(
   const aid = ansprechpartnerId.trim()
   if (!kid || !aid) return { ok: false, message: 'IDs fehlen.' }
 
-  const { error } = await withCrmReadFallback(async (db) =>
-    db.from('kunden_ansprechpartner').delete().eq('id', aid).eq('kunde_id', kid)
-  )
+  const { error } = await (() => { const db = createClient(); return db.from('kunden_ansprechpartner').delete().eq('id', aid).eq('kunde_id', kid) })()
   if (error) return { ok: false, message: error.message }
   await syncKundeLegacyAnsprechpartnerFeld(kid)
-  revalidatePath(`/kunden/${kid}`)
+  revalidateKundeDetail(kid)
   return { ok: true }
 }
 
@@ -173,14 +159,12 @@ export async function findKundeOderAnsprechpartnerByEmail(
   const mail = email.trim().toLowerCase()
   if (!mail || !mail.includes('@')) return { ok: false }
 
-  const { data: apRaw } = await withCrmReadFallback(async (db) =>
-    db
+  const { data: apRaw } = await (() => { const db = createClient(); return db
       .from('kunden_ansprechpartner')
       .select('id, kunde_id, email')
       .ilike('email', mail)
       .limit(1)
-      .maybeSingle()
-  )
+      .maybeSingle() })()
   const ap = apRaw as { id: string; kunde_id: string; email: string | null } | null
   if (ap?.kunde_id) {
     return {
@@ -191,9 +175,7 @@ export async function findKundeOderAnsprechpartnerByEmail(
     }
   }
 
-  const { data: kundeRaw } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('id, email').ilike('email', mail).limit(1).maybeSingle()
-  )
+  const { data: kundeRaw } = await (() => { const db = createClient(); return db.from('kunden').select('id, email').ilike('email', mail).limit(1).maybeSingle() })()
   const kunde = kundeRaw as { id: string; email: string | null } | null
   if (kunde?.id) {
     return {
@@ -258,13 +240,11 @@ export async function listKundenDuplikatVorschlaege(limit = 40): Promise<
     grund: string
   }>
 > {
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db
+  const { data, error } = await (() => { const db = createClient(); return db
       .from('kunden')
       .select('id, name, vorname, nachname, email, telefon')
       .order('created_at', { ascending: false })
-      .limit(400)
-  )
+      .limit(400) })()
   if (error || !data?.length) return []
 
   type Row = {

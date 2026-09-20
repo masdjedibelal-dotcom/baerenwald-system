@@ -1,18 +1,26 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { DateInput } from '@/components/ui/DateInput'
+
+import { MockBtn, MockInput, MockTable, MockEmpty } from '@/components/mock-ui'
+import { logDbError } from '@/lib/errors/log-db-error'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useRef, useState } from 'react'
-import { CheckCircle2, FileText, Trash2, Upload } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
+<<<<<<< Updated upstream
+=======
 import { confirmDelete } from '@/components/ui/confirm-delete'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import type { AuftragCompliancePartner } from '@/lib/auftraege/auftrag-compliance-partners'
 import type { ComplianceDokumentTyp, Gewerk, PartnerDokument } from '@/lib/types'
 import {
   ablehnenPartnerDokument,
   deletePartnerDokument,
   freigebenPartnerDokument,
-  replacePartnerDokumentForTyp,
+  replaceHandwerkerDokumentForTyp,
   signPartnerDokumentUrl,
   updatePartnerDokument,
 } from '@/app/(dashboard)/handwerker/actions'
@@ -38,6 +46,7 @@ import {
   type ComplianceDokumentStatus,
 } from '@/lib/handwerker/compliance-katalog'
 import { cn, formatDatum, formatPreis } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 const BUCKET = 'partner-dokumente'
 
@@ -46,20 +55,20 @@ function safeFileName(name: string): string {
 }
 
 function complianceStatusPill(status: ComplianceDokumentStatus): string {
-  if (status === 'ok') return 'bg-emerald-50 text-emerald-800 border-emerald-200'
+  if (status === 'ok') return 'bg-[var(--bw-green-bg)] text-[var(--bw-success)] border-[color-mix(in_srgb,var(--bw-success)_35%,var(--border))]'
   if (status === 'warnung' || status === 'in_pruefung') {
-    return 'bg-amber-50 text-amber-900 border-amber-200'
+    return 'bg-[var(--yel-bg)] text-[var(--yel-tx)] border-[color-mix(in_srgb,var(--yel-tx)_35%,var(--border))]'
   }
   if (status === 'abgelaufen' || status === 'abgelehnt') {
-    return 'bg-red-50 text-red-800 border-red-200'
+    return 'bg-[var(--red-bg)] text-[var(--red-tx)] border-[color-mix(in_srgb,var(--red-tx)_35%,var(--border))]'
   }
   return 'bg-bw-bg-soft text-bw-text-muted border-bw-border'
 }
 
 function partnerDocStatusPill(status: string | null | undefined): string {
-  if (partnerDokumentIstFreigegeben(status)) return 'bg-emerald-50 text-emerald-800 border-emerald-200'
-  if ((status ?? '').toLowerCase() === 'abgelehnt') return 'bg-red-50 text-red-800 border-red-200'
-  return 'bg-amber-50 text-amber-900 border-amber-200'
+  if (partnerDokumentIstFreigegeben(status)) return 'bg-[var(--bw-green-bg)] text-[var(--bw-success)] border-[color-mix(in_srgb,var(--bw-success)_35%,var(--border))]'
+  if ((status ?? '').toLowerCase() === 'abgelehnt') return 'bg-[var(--red-bg)] text-[var(--red-tx)] border-[color-mix(in_srgb,var(--red-tx)_35%,var(--border))]'
+  return 'bg-[var(--yel-bg)] text-[var(--yel-tx)] border-[color-mix(in_srgb,var(--yel-tx)_35%,var(--border))]'
 }
 
 export function AuftragPartnerCompliancePanel({
@@ -188,9 +197,9 @@ export function AuftragPartnerCompliancePanel({
   function freigeben(docId: string) {
     startTransition(async () => {
       const r = await freigebenPartnerDokument(docId, handwerkerId)
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Dokument bestätigt')
+        toast.success(TOAST.dokument_bestaetigt)
         onChanged()
       }
     })
@@ -201,9 +210,9 @@ export function AuftragPartnerCompliancePanel({
     if (grund == null) return
     startTransition(async () => {
       const r = await ablehnenPartnerDokument(docId, handwerkerId, grund)
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Abgelehnt — neu hochladen')
+        toast.success(TOAST.abgelehnt_neu_hochladen)
         onChanged()
       }
     })
@@ -212,7 +221,7 @@ export function AuftragPartnerCompliancePanel({
   async function openDatei(stored: string | null | undefined) {
     const r = await signPartnerDokumentUrl(stored)
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     window.open(r.url, '_blank', 'noopener,noreferrer')
@@ -227,6 +236,7 @@ export function AuftragPartnerCompliancePanel({
         upsert: false,
         contentType: file.type || undefined,
       })
+      if (upErr) logDbError('components/auftraege/AuftragPartnerCompliancePanel:query', upErr)
       if (upErr) throw new Error(upErr.message)
 
       const existing = dokumentFuerTyp(projektDocs, typ.slug)
@@ -237,7 +247,7 @@ export function AuftragPartnerCompliancePanel({
         gueltigBis = d.toISOString().slice(0, 10)
       }
 
-      const ins = await replacePartnerDokumentForTyp({
+      const ins = await replaceHandwerkerDokumentForTyp({
         handwerker_id: handwerkerId,
         auftrag_id: auftragId,
         typ: typ.slug,
@@ -253,7 +263,7 @@ export function AuftragPartnerCompliancePanel({
       toast.success(`${customBezeichnung?.trim() || typ.bezeichnung} hochgeladen`)
       onChanged()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploadingTyp(null)
     }
@@ -264,21 +274,21 @@ export function AuftragPartnerCompliancePanel({
       const r = await updatePartnerDokument(docId, handwerkerId, {
         gueltig_bis: value.trim() || null,
       })
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else onChanged()
     })
   }
 
   function removeDoc(docId: string, titel: string) {
-    confirmDelete(
+    openDeleteConfirm(
       `„${titel}“ löschen?`,
       async () => {
         const r = await deletePartnerDokument(docId, handwerkerId)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Gelöscht')
+        toast.success(TOAST.geloescht)
         onChanged()
       }
     )
@@ -293,45 +303,43 @@ export function AuftragPartnerCompliancePanel({
           <h3 className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
             Leistungen
           </h3>
-          <div className="dok-table-wrap overflow-x-auto">
-            <table className="dok-table text-[length:var(--fs-text)]">
-              <thead>
-                <tr>
-                  <th>Leistung</th>
-                  <th>Gewerk</th>
-                  <th>Status</th>
-                  <th className="text-right">VK</th>
-                  <th>Zeitraum</th>
-                </tr>
-              </thead>
-              <tbody>
-                {partner.leistungen.map((pos) => {
-                  const ls = normalizeLeistungStatus(pos.leistung_status)
-                  return (
-                    <tr key={pos.id}>
-                      <td className="font-medium text-bw-text">{pos.leistung_name}</td>
-                      <td className="text-bw-text-muted">{pos.gewerk_name}</td>
-                      <td>
-                        <span className={cn('leistung-status-badge', leistungStatusBadgeClass(ls))}>
-                          {leistungStatusLabel(ls)}
-                        </span>
-                      </td>
-                      <td className="text-right tabular-nums">
-                        {formatPreis(pos.preis_fix ?? null, null, null)}
-                      </td>
-                      <td className="whitespace-nowrap text-[length:var(--fs-meta)] text-bw-text-muted">
-                        {pos.start_datum ? formatDatum(pos.start_datum) : '—'}
-                        {pos.end_datum ? ` → ${formatDatum(pos.end_datum)}` : ''}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <MockTable wrapClassName="dok-table-wrap overflow-x-auto" className="dok-table text-[length:var(--fs-text)]">
+            <thead>
+              <tr>
+                <th>Leistung</th>
+                <th>Gewerk</th>
+                <th>Status</th>
+                <th className="text-right">VK</th>
+                <th>Zeitraum</th>
+              </tr>
+            </thead>
+            <tbody>
+              {partner.leistungen.map((pos) => {
+                const ls = normalizeLeistungStatus(pos.leistung_status)
+                return (
+                  <tr key={pos.id}>
+                    <td className="font-medium text-bw-text">{pos.leistung_name}</td>
+                    <td className="text-bw-text-muted">{pos.gewerk_name}</td>
+                    <td>
+                      <span className={cn('leistung-status-badge', leistungStatusBadgeClass(ls))}>
+                        {leistungStatusLabel(ls)}
+                      </span>
+                    </td>
+                    <td className="text-right tabular-nums">
+                      {formatPreis(pos.preis_fix ?? null, null, null)}
+                    </td>
+                    <td className="whitespace-nowrap text-[length:var(--fs-meta)] text-bw-text-muted">
+                      {pos.start_datum ? formatDatum(pos.start_datum) : '—'}
+                      {pos.end_datum ? ` → ${formatDatum(pos.end_datum)}` : ''}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </MockTable>
         </section>
       ) : (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine einzelnen Leistungen zugewiesen.</p>
+        <MockEmpty title="Keine einzelnen Leistungen zugewiesen." />
       )}
 
       <section>
@@ -341,8 +349,8 @@ export function AuftragPartnerCompliancePanel({
           </h3>
           <span
             className={cn(
-              'rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
-              pflichtOk ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'
+              'rounded-pill border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+              pflichtOk ? 'border-[color-mix(in_srgb,var(--bw-success)_35%,var(--border))] bg-[var(--bw-green-bg)] text-[var(--bw-success)]' : 'border-[color-mix(in_srgb,var(--yel-tx)_35%,var(--border))] bg-[var(--yel-bg)] text-[var(--yel-tx)]'
             )}
           >
             {fortschritt.pflicht > 0
@@ -352,11 +360,11 @@ export function AuftragPartnerCompliancePanel({
         </div>
 
         {offeneTypen.length === 0 ? (
-          <p className="rounded-lg border border-bw-border bg-bw-bg-soft/40 px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
+          <p className="rounded-card border border-bw-border bg-bw-bg-soft/40 px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
             Alle Pflichtnachweise sind hochgeladen und bestätigt.
           </p>
         ) : (
-          <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
+          <ul className="divide-y divide-bw-border rounded-card border border-bw-border">
             {offeneTypen.map((typ) => {
               const doc = dokumentFuerTyp(projektDocs, typ.slug)
               const status = complianceDokumentStatus(typ, doc)
@@ -388,7 +396,7 @@ export function AuftragPartnerCompliancePanel({
                     ) : null}
                     <span
                       className={cn(
-                        'mt-1 inline-flex rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                        'mt-1 inline-flex rounded-pill border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                         complianceStatusPill(status)
                       )}
                     >
@@ -418,17 +426,16 @@ export function AuftragPartnerCompliancePanel({
                         e.target.value = ''
                       }}
                     />
-                    <Button
+                    <MockBtn
                       type="button"
-                      variant="secondary"
-                      size="sm"
+                      kind="secondary" sm
                       className="h-8 gap-1 text-[length:var(--fs-meta)]"
                       disabled={busy}
                       onClick={() => typRefs.current[typ.slug]?.click()}
                     >
-                      <Upload className="h-3.5 w-3.5" aria-hidden />
+                      <MockIcon n="upload" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                       {uploading ? '…' : doc ? 'Ersetzen' : 'Hochladen'}
-                    </Button>
+                    </MockBtn>
                   </div>
                 </li>
               )
@@ -437,20 +444,13 @@ export function AuftragPartnerCompliancePanel({
         )}
 
         {indTyp ? (
-          <div className="mt-3 space-y-2 rounded-lg border border-dashed border-bw-border p-3">
+          <div className="mt-3 space-y-2 rounded-card border border-dashed border-bw-border p-3">
             <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{indTyp.bezeichnung}</p>
             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
               Frei benennbarer Nachweis — z. B. SiGeKo-Unterweisung, Gerüstfreigabe.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <input
-                type="text"
-                className="input flex-1 py-1.5 text-[length:var(--fs-text)]"
-                value={individuellTitel}
-                onChange={(e) => setIndividuellTitel(e.target.value)}
-                placeholder="Bezeichnung des Nachweises"
-                disabled={busy}
-              />
+              <MockInput type="text" className="flex-1 py-1.5 text-[length:var(--fs-text)]" value={individuellTitel} onChange={(e) => setIndividuellTitel(e.target.value)} placeholder="Bezeichnung des Nachweises" disabled={busy} />
               <input
                 ref={individuellRef}
                 type="file"
@@ -469,17 +469,16 @@ export function AuftragPartnerCompliancePanel({
                   e.target.value = ''
                 }}
               />
-              <Button
+              <MockBtn
                 type="button"
-                variant="secondary"
-                size="sm"
+                kind="secondary" sm
                 className="h-8 gap-1 text-[length:var(--fs-meta)]"
                 disabled={busy}
                 onClick={() => individuellRef.current?.click()}
               >
-                <Upload className="h-3.5 w-3.5" aria-hidden />
+                <MockIcon n="upload" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                 Individuell hochladen
-              </Button>
+              </MockBtn>
             </div>
           </div>
         ) : null}
@@ -490,58 +489,113 @@ export function AuftragPartnerCompliancePanel({
           Hochgeladene Dokumente
         </h3>
         {hochgeladeneZeilen.length === 0 ? (
-          <p className="rounded-lg border border-bw-border bg-bw-bg-soft/40 px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
+          <p className="rounded-card border border-bw-border bg-bw-bg-soft/40 px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
             Noch keine Dokumente hochgeladen.
           </p>
         ) : (
-          <div className="dok-table-wrap overflow-x-auto">
-            <table className="dok-table text-[length:var(--fs-text)]">
-              <thead>
-                <tr>
-                  <th>Dokument</th>
-                  <th>Status</th>
-                  <th>Gültig bis</th>
-                  <th>Hochgeladen</th>
-                  <th className="text-right">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hochgeladeneZeilen.map(({ typ, doc, key }) => {
-                  const compStatus = typ ? complianceDokumentStatus(typ, doc) : 'ok'
-                  const titel = doc.bezeichnung || typ?.bezeichnung || 'Dokument'
-                  const needsOk = doc.status && !partnerDokumentIstFreigegeben(doc.status)
+          <MockTable wrapClassName="dok-table-wrap overflow-x-auto" className="dok-table text-[length:var(--fs-text)]">
+            <thead>
+              <tr>
+                <th>Dokument</th>
+                <th>Status</th>
+                <th>Gültig bis</th>
+                <th>Hochgeladen</th>
+                <th className="text-right">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hochgeladeneZeilen.map(({ typ, doc, key }) => {
+                const compStatus = typ ? complianceDokumentStatus(typ, doc) : 'ok'
+                const titel = doc.bezeichnung || typ?.bezeichnung || 'Dokument'
+                const needsOk = doc.status && !partnerDokumentIstFreigegeben(doc.status)
 
-                  return (
-                    <tr key={key}>
-                      <td className="font-medium text-bw-text">
-                        {titel}
-                        {typ && !istEigeneUnterlageTyp(typ.slug) ? (
-                          <span className="mt-0.5 block text-[length:var(--fs-meta)] font-normal text-bw-text-muted">
-                            {typ.bezeichnung}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td>
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
-                            partnerDocStatusPill(doc.status)
-                          )}
-                        >
-                          {partnerDokumentIstFreigegeben(doc.status) ? (
-                            <>
-                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden />
-                              Bestätigt
-                            </>
-                          ) : (
-                            partnerDokumentStatusLabel(doc.status)
-                          )}
+                return (
+                  <tr key={key}>
+                    <td className="font-medium text-bw-text">
+                      {titel}
+                      {typ && !istEigeneUnterlageTyp(typ.slug) ? (
+                        <span className="mt-0.5 block text-[length:var(--fs-meta)] font-normal text-bw-text-muted">
+                          {typ.bezeichnung}
                         </span>
-                        {compStatus === 'warnung' || compStatus === 'abgelaufen' ? (
-                          <span className="mt-0.5 block text-[length:var(--fs-meta)] text-amber-800">
-                            {compStatus === 'abgelaufen' ? 'Abgelaufen' : 'Läuft bald ab'}
-                          </span>
+                      ) : null}
+                    </td>
+                    <td>
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-pill border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                          partnerDocStatusPill(doc.status)
+                        )}
+                      >
+                        {partnerDokumentIstFreigegeben(doc.status) ? (
+                          <>
+                            <MockIcon n="circle-check-filled" ctx="default" className="h-3.5 w-3.5 shrink-0 text-[var(--bw-success)]" aria-hidden />
+                            Bestätigt
+                          </>
+                        ) : (
+                          partnerDokumentStatusLabel(doc.status)
+                        )}
+                      </span>
+                      {compStatus === 'warnung' || compStatus === 'abgelaufen' ? (
+                        <span className="mt-0.5 block text-[length:var(--fs-meta)] text-[var(--yel-tx)]">
+                          {compStatus === 'abgelaufen' ? 'Abgelaufen' : 'Läuft bald ab'}
+                        </span>
+                      ) : null}
+                      {doc.status === 'abgelehnt' && doc.ablehnung_grund ? (
+                        <span className="mt-0.5 block text-[length:var(--fs-meta)] text-status-cancel-text">
+                          {doc.ablehnung_grund}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td>
+                      <DateInput className="py-1 text-[length:var(--fs-meta)] w-[9rem]" defaultValue={doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''} key={`${doc.id}-${doc.gueltig_bis ?? ''}`} disabled={busy} onBlur={(e) => {
+                          const v = e.target.value
+                          const cur = doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''
+                          if (v !== cur) saveGueltigBis(doc.id, v)
+                        }} />
+                    </td>
+                    <td className="whitespace-nowrap text-[length:var(--fs-meta)] text-bw-text-muted">
+                      {doc.hochgeladen_am ? formatDatum(doc.hochgeladen_am) : '—'}
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <MockBtn className="inline-flex h-8 w-8 items-center justify-center rounded-button border border-bw-border" type="button" disabled={busy} title="Dokument ansehen" onClick={() => void openDatei(doc.datei_url)}>
+                          <MockIcon n="file-text" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                        </MockBtn>
+                        {needsOk ? (
+                          <>
+                            <MockBtn
+                              type="button"
+                              kind="primary" sm
+                              className="h-8 gap-1 px-2 text-[length:var(--fs-meta)]"
+                              disabled={busy}
+                              onClick={() => freigeben(doc.id)}
+                            >
+                              <MockIcon n="circle-check-filled" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                              Bestätigen
+                            </MockBtn>
+                            <MockBtn
+                              type="button"
+                              kind="ghost" sm
+                              className="h-8 text-[length:var(--fs-meta)] text-status-cancel-text"
+                              disabled={busy}
+                              onClick={() => ablehnen(doc.id, titel)}
+                            >
+                              Ablehnen
+                            </MockBtn>
+                          </>
                         ) : null}
+<<<<<<< Updated upstream
+                        <MockBtn className="icon-btn text-status-cancel-text" type="button" disabled={busy} title="Löschen" onClick={() => removeDoc(doc.id, titel)}>
+                          <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                        </MockBtn>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </MockTable>
+=======
                         {doc.status === 'abgelehnt' && doc.ablehnung_grund ? (
                           <span className="mt-0.5 block text-[length:var(--fs-meta)] text-status-cancel-text">
                             {doc.ablehnung_grund}
@@ -578,27 +632,25 @@ export function AuftragPartnerCompliancePanel({
                           </button>
                           {needsOk ? (
                             <>
-                              <Button
+                              <MockBtn
                                 type="button"
-                                variant="primary"
-                                size="sm"
+                                kind="primary" sm
                                 className="h-8 gap-1 px-2 text-[length:var(--fs-meta)]"
                                 disabled={busy}
                                 onClick={() => freigeben(doc.id)}
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
                                 Bestätigen
-                              </Button>
-                              <Button
+                              </MockBtn>
+                              <MockBtn
                                 type="button"
-                                variant="ghost"
-                                size="sm"
+                                kind="ghost" sm
                                 className="h-8 text-[length:var(--fs-meta)] text-status-cancel-text"
                                 disabled={busy}
                                 onClick={() => ablehnen(doc.id, titel)}
                               >
                                 Ablehnen
-                              </Button>
+                              </MockBtn>
                             </>
                           ) : null}
                           <button
@@ -618,6 +670,7 @@ export function AuftragPartnerCompliancePanel({
               </tbody>
             </table>
           </div>
+>>>>>>> Stashed changes
         )}
       </section>
     </div>

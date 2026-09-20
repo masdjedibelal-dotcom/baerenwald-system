@@ -40,7 +40,7 @@ function AuthCallbackInner() {
       aria-live="polite"
       aria-label="Anmeldung wird abgeschlossen"
     >
-      <div className="crm-login__busy-card">
+      <div className="crm-login__busy">
         <div className="crm-login__brand-mark" aria-hidden>
           <BrandLogo variant="green" height={22} priority />
         </div>
@@ -63,7 +63,7 @@ export default function AuthCallbackPage() {
           aria-busy="true"
           aria-label="Anmeldung wird abgeschlossen"
         >
-          <div className="crm-login__busy-card">
+          <div className="crm-login__busy">
             <div className="crm-login__brand-mark" aria-hidden>
               <BrandLogo variant="green" height={22} priority />
             </div>

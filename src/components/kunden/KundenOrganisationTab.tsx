@@ -1,12 +1,13 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockFormSection, MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
+import { C } from '@/lib/tokens/colors'
 
 import { useEffect, useRef, useState } from 'react'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockModal } from '@/components/mock-ui/MockModal'
 import { saveKundeOrganisation } from '@/app/actions/kunden-organisation'
 import { FreigabeRegelnEditor } from '@/components/org/FreigabeRegelnEditor'
 import {
@@ -18,6 +19,7 @@ import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { suggestOrgKennungFromName } from '@/lib/org/slug'
 import { toast } from '@/components/ui/app-toast'
 import type { FreigabeModus, Kunde } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 type Props = {
   kunde: Pick<
@@ -127,7 +129,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         setErr(r.message)
         return
       }
-      toast.success('Organisationseinstellungen gespeichert')
+      toast.success(TOAST.organisationseinstellungen_gespeichert)
       onSaved?.()
     })
   }
@@ -137,7 +139,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
       await navigator.clipboard.writeText(text)
       toast.success(`${label} kopiert`)
     } catch {
-      toast.error('Kopieren fehlgeschlagen')
+      toast.error(TOAST.kopieren_fehlgeschlagen)
     }
   }
 
@@ -150,11 +152,11 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
       fd.set('filename', file.name || 'org-logo.png')
       const res = await fetch('/api/einstellungen/logo', { method: 'POST', body: fd })
       const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
-      if (!res.ok || !json.url) {
+if (!res.ok || !json.url) {
         throw new Error(json.error || 'Upload fehlgeschlagen')
       }
       setOrgLogoUrl(json.url)
-      toast.success('Logo hochgeladen')
+      toast.success(TOAST.logo_hochgeladen)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Upload fehlgeschlagen'
       setErr(msg)
@@ -176,7 +178,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
           </MockBtn>
         }
       >
-        <p className="mb-4 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
+        <p className="mb-4 text-fs-meta leading-relaxed" style={{ color: 'var(--text-3)' }}>
           Auftraggeber-Modus für Hausverwaltungen: Melde-Links und Freigabe-Workflow für das
           Auftraggeber-Portal.
         </p>
@@ -184,17 +186,10 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         <MockFormSection title="Organisation" icon="building">
           <MockField label="Org-Kennung (URL-Slug)" required full>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                className="txt"
-                style={{ flex: 1 }}
-                placeholder="z. B. musterverwaltung"
-                value={orgKennung}
-                onChange={(e) => setOrgKennung(e.target.value)}
-                disabled={pending}
-              />
-              <button type="button" className="link" onClick={vorschlagKennung} disabled={pending}>
+              <MockInput className="txt" style={{ flex: 1 }} placeholder="z. B. musterverwaltung" value={orgKennung} onChange={(e) => setOrgKennung(e.target.value)} disabled={pending} />
+              <MockBtn className="link" type="button" onClick={vorschlagKennung} disabled={pending}>
                 Vorschlag
-              </button>
+              </MockBtn>
             </div>
           </MockField>
 
@@ -203,13 +198,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
             full
             hint="Erscheint in den Portalen (HV, Melde, Mieter) — nicht nur der CRM-Kundenname."
           >
-            <input
-              className="txt"
-              placeholder="z. B. Muster Hausverwaltung GmbH"
-              value={orgAnzeigename}
-              onChange={(e) => setOrgAnzeigename(e.target.value)}
-              disabled={pending}
-            />
+            <MockInput className="txt" placeholder="z. B. Muster Hausverwaltung GmbH" value={orgAnzeigename} onChange={(e) => setOrgAnzeigename(e.target.value)} disabled={pending} />
           </MockField>
 
           <MockField label="Logo" full>
@@ -219,7 +208,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
                   width: 64,
                   height: 64,
                   borderRadius: 10,
-                  border: '0.5px solid var(--border)',
+                  border: '0.0.3125remrem solid var(--border)',
                   background: 'var(--bg-soft)',
                   display: 'flex',
                   alignItems: 'center',
@@ -265,7 +254,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
                     disabled={pending || logoUploading}
                     onClick={() => setOrgLogoUrl('')}
                   >
-                    Entfernen
+                    Löschen
                   </MockBtn>
                 ) : null}
               </div>
@@ -273,28 +262,14 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
           </MockField>
 
           <MockField label="Impressum-URL (Mieter)" required full>
-            <input
-              className="txt"
-              placeholder="www.ihre-verwaltung.de/impressum"
-              value={impressumUrl}
-              onChange={(e) => setImpressumUrl(e.target.value)}
-              disabled={pending}
-              autoComplete="url"
-            />
+            <MockInput className="txt" placeholder="www.ihre-verwaltung.de/impressum" value={impressumUrl} onChange={(e) => setImpressumUrl(e.target.value)} disabled={pending} autoComplete="url" />
           </MockField>
           <MockField label="Datenschutz-URL (Mieter)" required full>
-            <input
-              className="txt"
-              placeholder="www.ihre-verwaltung.de/datenschutz"
-              value={datenschutzUrl}
-              onChange={(e) => setDatenschutzUrl(e.target.value)}
-              disabled={pending}
-              autoComplete="url"
-            />
+            <MockInput className="txt" placeholder="www.ihre-verwaltung.de/datenschutz" value={datenschutzUrl} onChange={(e) => setDatenschutzUrl(e.target.value)} disabled={pending} autoComplete="url" />
           </MockField>
           <p
-            className="text-[12px] leading-relaxed"
-            style={{ color: 'var(--text-3)', margin: '0 0 8px', gridColumn: '1 / -1' }}
+            className="text-fs-meta leading-relaxed"
+            style={{ color: 'var(--text-3)', margin: '0 0 0.5rem', gridColumn: '1 / -1' }}
           >
             Beide Links sind Pflicht für Melde-Link, QR und Aushang. www.… reicht — https:// wird
             ergänzt.
@@ -302,7 +277,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
 
           <MockField label="Melde-Link (Organisation)" full>
             {!legalReady ? (
-              <p className="text-[12px] leading-relaxed" style={{ color: 'var(--text-3)', margin: 0 }}>
+              <p className="text-fs-meta leading-relaxed" style={{ color: 'var(--text-3)', margin: 0 }}>
                 {ORG_MELDE_LEGAL_REQUIRED_HINT}
               </p>
             ) : meldeBasisLink ? (
@@ -348,7 +323,7 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
                 </a>
               </div>
             ) : (
-              <p className="text-[12px]" style={{ color: 'var(--text-3)', margin: 0 }}>
+              <p className="text-fs-meta" style={{ color: 'var(--text-3)', margin: 0 }}>
                 Nach gültiger Org-Kennung erscheint hier der Melde-Link.
               </p>
             )}
@@ -371,38 +346,31 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         />
 
         {err ? (
-          <p className="mt-3 text-sm" style={{ color: 'var(--red-tx, #b91c1c)' }}>
+          <p className="mt-3 text-sm" style={{ color: `var(--red-tx, ${C.redTx2})` }}>
             {err}
           </p>
         ) : null}
       </MockCard>
 
-      {aushangWarnOpen ? (
-        <MockModal
-          open
-          icon="alert-triangle"
-          title="Org-Kennung ändern?"
-          sub="Gedruckte Aushänge werden ungültig."
-          size="sm"
-          onClose={() => setAushangWarnOpen(false)}
-          footer={
-            <>
-              <MockBtn kind="ghost" onClick={() => setAushangWarnOpen(false)}>
-                Abbrechen
-              </MockBtn>
-              <div style={{ flex: 1 }} />
-              <MockBtn kind="danger" icon="check" onClick={speichern} disabled={pending}>
-                Kennung ändern
-              </MockBtn>
-            </>
-          }
-        >
-          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
-            Gedruckte Aushänge mit der alten Adresse funktionieren danach nicht mehr — neue Aushänge
-            drucken.
-          </div>
-        </MockModal>
-      ) : null}
+      <ConfirmPopup
+        open={aushangWarnOpen}
+        onClose={() => {
+          if (!pending) setAushangWarnOpen(false)
+        }}
+        title="Org-Kennung ändern?"
+        danger
+        busy={pending}
+        confirmLabel={pending ? 'Wird geändert…' : 'Kennung ändern'}
+        onConfirm={speichern}
+      >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Gedruckte Aushänge werden ungültig.
+        </p>
+        <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          Gedruckte Aushänge mit der alten Adresse funktionieren danach nicht mehr — neue Aushänge
+          drucken.
+        </div>
+      </ConfirmPopup>
     </>
   )
 }

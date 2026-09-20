@@ -1,14 +1,18 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockFormSection, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { saveFormularTemplate } from '@/app/(dashboard)/formulare/actions'
 import type { FormularFeld, FormularTemplate } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 const TYP_OPTS: { value: NonNullable<FormularTemplate['phase']>; label: string }[] = [
   { value: 'abnahme', label: 'Abnahme' },
@@ -127,11 +131,11 @@ export function FormularCreateSheet({
         setErr(res.message)
         return
       }
-      toast.success('Formular angelegt')
+      toast.success(TOAST.formular_angelegt)
       setDirty(false)
       onClose()
       router.push(`/formulare/${res.id}/bearbeiten`)
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -153,31 +157,22 @@ export function FormularCreateSheet({
 
         <MockFormSection>
           <MockField label="Formularname" required full>
-            <input
-              className="input"
-              value={name}
-              onChange={(e) => {
+            <MockInput value={name} onChange={(e) => {
                 setName(e.target.value)
                 markDirty()
-              }}
-              placeholder="Abnahmeprotokoll Standard"
-            />
+              }} placeholder="Abnahmeprotokoll Standard" />
           </MockField>
           <MockField label="Typ" full>
-            <select
-              className="input"
-              value={phase}
-              onChange={(e) => {
+            <MockSelect value={phase} onChange={(e) => {
                 setPhase(e.target.value as NonNullable<FormularTemplate['phase']>)
                 markDirty()
-              }}
-            >
+              }}>
               {TYP_OPTS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </MockField>
         </MockFormSection>
 
@@ -192,7 +187,7 @@ export function FormularCreateSheet({
                 key={f.key}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '28px 1fr 140px 36px',
+                  gridTemplateColumns: '1.75rem 1fr 8.75rem 2.25rem',
                   gap: 8,
                   alignItems: 'end',
                 }}
@@ -208,43 +203,27 @@ export function FormularCreateSheet({
                   {i + 1}
                 </div>
                 <MockField label="Feldbezeichnung">
-                  <input
-                    className="input"
-                    value={f.label}
-                    onChange={(e) => patchFeld(f.key, { label: e.target.value })}
-                    placeholder="Bezeichnung"
-                  />
+                  <MockInput value={f.label} onChange={(e) => patchFeld(f.key, { label: e.target.value })} placeholder="Bezeichnung" />
                 </MockField>
                 <MockField label="Typ">
-                  <select
-                    className="input"
-                    value={f.typ}
-                    onChange={(e) =>
-                      patchFeld(f.key, { typ: e.target.value as FormularFeld['typ'] })
-                    }
-                  >
+                  <MockSelect value={f.typ} onChange={(e) =>
+                      patchFeld(f.key, { typ: e.target.value as FormularFeld['typ'] })}>
                     {FELD_TYP_OPTS.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
                     ))}
-                  </select>
+                  </MockSelect>
                 </MockField>
-                <button
-                  type="button"
-                  className="qa-btn"
-                  title="Entfernen"
-                  aria-label="Feld entfernen"
-                  onClick={() => removeFeld(f.key)}
-                >
+                <MockBtn className="qa-btn" type="button" title="Löschen" aria-label="Feld löschen" onClick={() => removeFeld(f.key)}>
                   <MockIcon ctx="default" n="trash" size={14} />
-                </button>
+                </MockBtn>
               </div>
             ))}
           </div>
-          <button type="button" className="btn ghost sm" style={{ marginTop: 12 }} onClick={addFeld}>
+          <MockBtn kind="ghost" sm type="button" style={{ marginTop: 12 }} onClick={addFeld}>
             + Feld hinzufügen
-          </button>
+          </MockBtn>
         </div>
       </div>
     </EditorSheet>

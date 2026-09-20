@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type {
   KiVizPromptHistoryEntry,
@@ -47,6 +48,7 @@ export async function loadKiVisualisierung(id: string): Promise<KiVisualisierung
     .select('*')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/visualize/queries:ki_visualisierungen', error)
   if (error || !data) return null
   return rowToViz(data as Record<string, unknown>)
 }
@@ -57,6 +59,7 @@ export async function loadKiVisualisierungenForAngebot(angebotId: string): Promi
     .select('*')
     .eq('angebot_id', angebotId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('lib/visualize/queries:ki_visualisierungen', error)
   if (error) return []
   return (data ?? []).map((r) => rowToViz(r as Record<string, unknown>))
 }
@@ -73,6 +76,7 @@ export async function createKiVisualisierung(angebotId: string): Promise<KiVisua
     })
     .select('*')
     .single()
+  if (error) logDbError('lib/visualize/queries:ki_visualisierungen', error)
   if (error || !data) throw new Error(error?.message ?? 'Session anlegen fehlgeschlagen')
   return rowToViz(data as Record<string, unknown>)
 }
@@ -87,6 +91,7 @@ export async function updateKiVisualisierung(
     .eq('id', id)
     .select('*')
     .single()
+  if (error) logDbError('lib/visualize/queries:ki_visualisierungen', error)
   if (error || !data) return null
   return rowToViz(data as Record<string, unknown>)
 }
@@ -108,19 +113,21 @@ export async function linkVisualisierungToAngebot(
   angebotId: string,
   visualisierungId: string
 ): Promise<void> {
-  const { data: angebot } = await supabaseAdmin
+  const { data: angebot, error } = await supabaseAdmin
     .from('angebote')
     .select('visualisierung_ids')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('lib/visualize/queries:angebote', error)
 
   const existing = Array.isArray(angebot?.visualisierung_ids)
     ? (angebot!.visualisierung_ids as string[])
     : []
   if (existing.includes(visualisierungId)) return
 
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('angebote')
     .update({ visualisierung_ids: [...existing, visualisierungId] })
     .eq('id', angebotId)
+  if (__dbErr1) logDbError('lib/visualize/queries:angebote', __dbErr1)
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -9,8 +11,12 @@ import {
   AbnahmeProgressBar,
   countAbgenommeneLeistungen,
 } from '@/components/auftraege/AbnahmeBegehListe'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+import { SkeletonCard } from '@/components/ui/Skeleton'
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import {
@@ -30,6 +36,8 @@ import {
 import { heuteYmd } from '@/lib/angebot-einfach'
 import { formatDatum } from '@/lib/utils'
 import type { AuftragPosition } from '@/lib/types'
+import { C } from '@/lib/tokens/colors'
+import { TOAST } from '@/lib/copy'
 
 type Step = 'loading' | 'hw' | 'frage' | 'checkliste'
 
@@ -103,10 +111,10 @@ export function AuftragAbschliessenSheet({
       .run('Auftrag wird abgeschlossen…', async () => {
         const r = await updateAuftragStatusFromUi(auftragId, 'abgeschlossen')
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Auftrag abgeschlossen')
+        toast.success(TOAST.auftrag_abgeschlossen)
         onClose()
         onDone?.()
         onNachRechnung?.()
@@ -127,7 +135,7 @@ export function AuftragAbschliessenSheet({
             sendToKunde,
           })
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
           if (r.sendWarning) {
@@ -159,7 +167,7 @@ export function AuftragAbschliessenSheet({
             status: 'ok' as const,
           }))
     if (!readyPunkte.some((p) => p.status === 'ok' || p.status === 'mangel')) {
-      toast.error('Mindestens eine Leistung für die Abnahme auswählen.')
+      toast.error(TOAST.mindestens_eine_leistung_fuer_die_abnahme_auswae_2)
       return
     }
     setPendingKind(sendToKunde ? 'send' : 'save')
@@ -183,7 +191,7 @@ export function AuftragAbschliessenSheet({
             sendToKunde,
           })
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
           if (r.sendWarning) {
@@ -216,7 +224,10 @@ export function AuftragAbschliessenSheet({
         size="md"
         manageHistory={false}
       >
-        <p className="text-[length:var(--fs-text)] text-[var(--text-2)] m-0">Wird geladen…</p>
+        <div className="space-y-3" role="status" aria-busy="true" aria-label="Wird geladen">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </EditorSheet>
     )
   }
@@ -229,48 +240,79 @@ export function AuftragAbschliessenSheet({
         title="Auftrag abschließen"
         size="lg"
         manageHistory={false}
+<<<<<<< Updated upstream
+        secondary={{
+          label: 'Speichern',
+          disabled: pending,
+          busy: pending && pendingKind === 'save',
+          onClick: () => speichernMitHwProtokoll(false),
+        }}
+        primary={{
+          label: 'Senden',
+          disabled: pending,
+          busy: pending && pendingKind === 'send',
+          onClick: () => speichernMitHwProtokoll(true),
+        }}
+=======
         footer={
           <div className="sheet-footer-actions zahlplan-editor-footer">
-            <Button
+            <MockBtn
               type="button"
-              variant="ghost"
+              kind="ghost"
               disabled={pending}
               onClick={abschliessenOhneAbnahme}
             >
               Ohne Abnahme
-            </Button>
-            <Button
+            </MockBtn>
+            <MockBtn
               type="button"
-              variant="secondary"
+              kind="secondary"
               disabled={pending}
               loading={pending && pendingKind === 'save'}
               onClick={() => speichernMitHwProtokoll(false)}
             >
               Speichern
-            </Button>
-            <Button
+            </MockBtn>
+            <MockBtn
               type="button"
-              variant="primary"
+              kind="primary"
               disabled={pending}
               loading={pending && pendingKind === 'send'}
               onClick={() => speichernMitHwProtokoll(true)}
             >
               Senden
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         <div className="space-y-5">
           <p className="m-0 text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed">
-            Handwerker-Protokoll vorhanden — optional übernehmen. Auftrag kann auch ohne
+            Partner-Protokoll vorhanden — optional übernehmen. Auftrag kann auch ohne
             Abnahme geschlossen werden.
           </p>
           {hwProtokolle.map((p) => (
             <HwProtokollVorschau key={p.id} protokoll={p} />
           ))}
-          <Button type="button" variant="secondary" onClick={openAbnahmeWizard}>
+<<<<<<< Updated upstream
+          <div className="flex flex-wrap gap-2">
+            <MockBtn
+              type="button"
+              kind="ghost"
+              disabled={pending}
+              onClick={abschliessenOhneAbnahme}
+            >
+              Ohne Abnahme
+            </MockBtn>
+            <MockBtn type="button" kind="secondary" onClick={openAbnahmeWizard}>
+              Eigenes Abnahmeprotokoll erstellen
+            </MockBtn>
+          </div>
+=======
+          <MockBtn type="button" kind="secondary" onClick={openAbnahmeWizard}>
             Eigenes Abnahmeprotokoll erstellen
-          </Button>
+          </MockBtn>
+>>>>>>> Stashed changes
         </div>
       </EditorSheet>
     )
@@ -284,21 +326,34 @@ export function AuftragAbschliessenSheet({
         title="Auftrag abschließen"
         size="md"
         manageHistory={false}
+<<<<<<< Updated upstream
+        secondary={{
+          label: 'Ohne Abnahme',
+          disabled: pending,
+          onClick: abschliessenOhneAbnahme,
+        }}
+        primary={{
+          label: 'Abnahme erstellen',
+          disabled: pending,
+          onClick: openAbnahmeWizard,
+        }}
+=======
         footer={
           <div className="sheet-footer-actions zahlplan-editor-footer">
-            <Button
+            <MockBtn
               type="button"
-              variant="secondary"
+              kind="secondary"
               disabled={pending}
               onClick={abschliessenOhneAbnahme}
             >
               Ohne Abnahme
-            </Button>
-            <Button type="button" variant="primary" disabled={pending} onClick={openAbnahmeWizard}>
+            </MockBtn>
+            <MockBtn type="button" kind="primary" disabled={pending} onClick={openAbnahmeWizard}>
               Abnahme erstellen
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
           Abnahme ist optional. Du kannst den Auftrag direkt abschließen oder ein
@@ -316,28 +371,43 @@ export function AuftragAbschliessenSheet({
       size="lg"
       manageHistory={false}
       dirty={!pending}
+<<<<<<< Updated upstream
+      secondary={{
+        label: 'Speichern',
+        disabled: pending,
+        busy: pending && pendingKind === 'save',
+        onClick: () => speichernMitAbnahme(false),
+      }}
+      primary={{
+        label: 'Senden',
+        disabled: pending,
+        busy: pending && pendingKind === 'send',
+        onClick: () => speichernMitAbnahme(true),
+      }}
+=======
       footer={
         <div className="sheet-footer-actions zahlplan-editor-footer">
-          <Button
+          <MockBtn
             type="button"
-            variant="secondary"
+            kind="secondary"
             disabled={pending}
             loading={pending && pendingKind === 'save'}
             onClick={() => speichernMitAbnahme(false)}
           >
             Speichern
-          </Button>
-          <Button
+          </MockBtn>
+          <MockBtn
             type="button"
-            variant="primary"
+            kind="primary"
             disabled={pending}
             loading={pending && pendingKind === 'send'}
             onClick={() => speichernMitAbnahme(true)}
           >
             Senden
-          </Button>
+          </MockBtn>
         </div>
       }
+>>>>>>> Stashed changes
     >
       <div className="space-y-5">
         <AbnahmeProgressBar done={progress.done} total={progress.total || positionen.length} />
@@ -370,17 +440,11 @@ export function AuftragAbschliessenSheet({
         </div>
         <label className="block">
           <span className="lt-field-lbl">Notizen</span>
-          <Textarea
-            long
-            plain
-            value={notizen}
-            onChange={(e) => setNotizen(e.target.value)}
-            placeholder="Optional"
-          />
+          <MockTextarea value={notizen} onChange={(e) => setNotizen(e.target.value)} placeholder="Optional" rows={14} className="resize-y py-2 ta--long" />
         </label>
-        <Button type="button" variant="ghost" size="sm" onClick={openAbnahmeWizard}>
+        <MockBtn type="button" kind="ghost" sm onClick={openAbnahmeWizard}>
           Vollständiges Protokoll mit Unterschriften…
-        </Button>
+        </MockBtn>
       </div>
     </EditorSheet>
   )
@@ -426,7 +490,7 @@ function HwProtokollVorschau({
       </div>
 
       {p.pdfUrl ? (
-        <div className="overflow-hidden rounded-[var(--radius-md,8px)] border border-[var(--border)] bg-[var(--surface-2,#f6f6f4)]">
+        <div className={`overflow-hidden rounded-[var(--radius-md,8px)] border border-[var(--border)] bg-[var(--surface-2,${C.bgSoft})]`}>
           <iframe
             title={`Abnahmeprotokoll ${p.handwerkerName}`}
             src={p.pdfUrl}
@@ -478,7 +542,7 @@ function HwProtokollVorschau({
               </ul>
             </div>
           ) : (
-            <p className="m-0 text-[length:var(--fs-meta)] text-[var(--text-3)]">Keine offenen Mängel</p>
+            <p className="m-0 text-[length:var(--fs-meta)] text-[var(--text-3)]">Offene Mängel: keine</p>
           )}
           {p.notizen?.trim() ? (
             <p className="m-0 text-[length:var(--fs-text)] text-[var(--text-2)] whitespace-pre-wrap">

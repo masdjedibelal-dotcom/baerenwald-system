@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateRechnungDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 
 /** Spec §9 RateDrawer — Reklamation ohne Statuswechsel. */
@@ -14,6 +20,7 @@ export async function setRechnungReklamation(
     .select('id, status, beleg_typ')
     .eq('id', rechnungId)
     .maybeSingle()
+  if (loadErr) logDbError('app/rechnungen/reklamation-actions:rechnungen', loadErr)
   if (loadErr || !rec) return { ok: false, message: 'Rechnung nicht gefunden.' }
   if (String(rec.beleg_typ ?? 'rechnung') === 'gutschrift') {
     return { ok: false, message: 'Gutschriften können nicht reklamiert werden.' }
@@ -36,18 +43,24 @@ export async function setRechnungReklamation(
         updated_at: new Date().toISOString(),
       }
 
-  const { error } = await supabase.from('rechnungen').update(patch).eq('id', rechnungId)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('rechnungen').update(patch).eq('id', rechnungId)
+  if (error2) logDbError('app/rechnungen/reklamation-actions:rechnungen', error2)
+  if (error2) return { ok: false, message: error2.message }
 
+<<<<<<< Updated upstream
+  revalidateRechnungDetail(rechnungId)
+=======
   revalidatePath('/rechnungen')
   revalidatePath(`/rechnungen/${rechnungId}`)
-  const { data: withAuftrag } = await supabase
+>>>>>>> Stashed changes
+  const { data: withAuftrag, error: error3 } = await supabase
     .from('rechnungen')
     .select('auftrag_id')
     .eq('id', rechnungId)
     .maybeSingle()
+  if (error3) logDbError('app/rechnungen/reklamation-actions:rechnungen', error3)
   if (withAuftrag?.auftrag_id) {
-    revalidatePath(`/auftraege/${withAuftrag.auftrag_id}`)
+    revalidateAuftragDetail(withAuftrag.auftrag_id)
   }
   return { ok: true }
 }

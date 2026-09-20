@@ -1,6 +1,6 @@
 'use client'
 
-import { RefreshCw } from 'lucide-react'
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
 import type { KiPhase } from '@/lib/ki/constants'
 
@@ -28,30 +28,32 @@ export function KiPhaseSection({
           <h2 className="text-base font-semibold text-bw-text">{phase.label}</h2>
           {summary ? <p className="mt-0.5 max-w-2xl text-sm text-muted">{summary}</p> : null}
         </div>
-        <button
+        <MockBtn
           type="button"
+          kind="secondary"
+          sm
+          loading={loading}
           onClick={() => onRefreshPhase(phase.id)}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-bw-border px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-bw-bg hover:text-bw-text disabled:opacity-50"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden />
           Phase aktualisieren
-        </button>
+        </MockBtn>
       </div>
 
       {hasData ? (
         children
       ) : (
-        <div className="rounded-xl border border-dashed border-bw-border bg-bw-bg/50 px-4 py-8 text-center">
+        <div className="rounded-sheet border border-dashed border-bw-border bg-bw-bg/50 px-4 py-8 text-center">
           <p className="text-sm text-muted">Noch keine Daten für diese Phase.</p>
-          <button
+          <MockBtn
             type="button"
-            onClick={() => onRefreshPhase(phase.id)}
+            kind="ghost"
+            sm
             disabled={loading}
-            className="mt-2 text-sm font-medium text-bw-primary hover:underline"
+            onClick={() => onRefreshPhase(phase.id)}
+            className="mt-2 text-sm font-medium text-bw-primary"
           >
             Phase jetzt berechnen
-          </button>
+          </MockBtn>
         </div>
       )}
     </section>

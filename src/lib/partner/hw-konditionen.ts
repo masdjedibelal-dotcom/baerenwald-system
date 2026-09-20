@@ -93,8 +93,8 @@ export function hwKonditionenArtLabel(art: HwKonditionenArt): string {
 
 export function hwKonditionenArtBadgeClass(art: HwKonditionenArt): string {
   return art === 'gegenvorschlag'
-    ? 'bg-amber-100 text-amber-950'
-    : 'bg-emerald-100 text-emerald-900'
+    ? 'bg-status-contact-bg text-status-contact-text'
+    : 'bg-status-order-bg text-status-order-text'
 }
 
 export function hwKonditionDelta(ek: number | null, hw: number): number | null {

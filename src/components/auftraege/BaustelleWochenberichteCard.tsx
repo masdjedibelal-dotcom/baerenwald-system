@@ -1,13 +1,20 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { useTransition } from '@/components/ui/action-busy'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { Download, FileText, Plus, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   createAuftragWochenbericht,
   deleteAuftragWochenbericht,
@@ -19,6 +26,7 @@ import type { AuftragWochenbericht } from '@/lib/auftraege/baustelle-types'
 import { isoKalenderwoche } from '@/lib/auftraege/kalenderwoche'
 import { formatDatum } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
+import { TOAST } from '@/lib/copy'
 
 export function BaustelleWochenberichteCard({
   auftragId,
@@ -60,10 +68,10 @@ export function BaustelleWochenberichteCard({
         ausblick: ausblick || null,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Wochenbericht angelegt')
+      toast.success(TOAST.wochenbericht_angelegt)
       setFazit('')
       setAusblick('')
       onChanged()
@@ -76,9 +84,9 @@ export function BaustelleWochenberichteCard({
         fazit: nextFazit,
         ausblick: nextAusblick,
       })
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Wochenbericht gespeichert')
+        toast.success(TOAST.wochenbericht_gespeichert)
         setEditDrafts((prev) => {
           const next = { ...prev }
           delete next[w.id]
@@ -90,10 +98,10 @@ export function BaustelleWochenberichteCard({
   }
 
   function remove(id: string) {
-    confirmDelete('Wochenbericht löschen?', async () => {
+    openDeleteConfirm('Wochenbericht löschen?', async () => {
       const r = await deleteAuftragWochenbericht(id, auftragId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         throw new Error(r.message)
       }
       onChanged()
@@ -104,10 +112,10 @@ export function BaustelleWochenberichteCard({
     startTransition(async () => {
       const r = await generateUndSpeichereWochenberichtPdf(w.id, auftragId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Wochenbericht-PDF erstellt')
+      toast.success(TOAST.wochenbericht_pdf_erstellt)
       onChanged()
     })
   }
@@ -116,40 +124,35 @@ export function BaustelleWochenberichteCard({
     startTransition(async () => {
       const r = await generateUndSpeichereRegieSammelPdf(auftragId, w.kalenderwoche, w.jahr)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Regiebericht-PDF erstellt')
+      toast.success(TOAST.regiebericht_pdf_erstellt)
       onChanged()
     })
   }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-bw-border bg-bw-bg/40 p-3 space-y-3">
+      <div className="rounded-card border border-bw-border bg-bw-bg/40 p-3 space-y-3">
         <p className="text-[length:var(--fs-text)] font-medium text-bw-text">Neuer Wochenbericht</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input
-            label="Kalenderwoche"
-            type="number"
-            min={1}
-            max={53}
-            value={kw}
-            onChange={(e) => setKw(Number(e.target.value) || 1)}
-          />
-          <Input
-            label="Jahr"
-            type="number"
-            value={jahr}
-            onChange={(e) => setJahr(Number(e.target.value) || new Date().getFullYear())}
-          />
+          <MockField label="Kalenderwoche"><MockInput type="number" min={1} max={53} value={kw} onChange={(e) => setKw(Number(e.target.value) || 1)} /></MockField>
+          <MockField label="Jahr"><MockInput type="number" value={jahr} onChange={(e) => setJahr(Number(e.target.value) || new Date().getFullYear())} /></MockField>
         </div>
+<<<<<<< Updated upstream
+        <MockField label="Wochenzusammenfassung"><RichTextEditor value={typeof (fazit) === 'string' ? (fazit) : ''} onChange={(__v) => setFazit(__v)} minHeight={120} aria-label="Wochenzusammenfassung" /></MockField>
+        <MockField label="Ausblick"><RichTextEditor value={typeof (ausblick) === 'string' ? (ausblick) : ''} onChange={(__v) => setAusblick(__v)} minHeight={120} aria-label="Ausblick" /></MockField>
+        <MockBtn type="button" kind="secondary" sm className="gap-1" disabled={pending} onClick={create}>
+          <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" />
+=======
         <Textarea label="Wochenzusammenfassung" value={fazit} onChange={(e) => setFazit(e.target.value)} rows={2} />
         <Textarea label="Ausblick" value={ausblick} onChange={(e) => setAusblick(e.target.value)} rows={2} />
-        <Button type="button" variant="secondary" size="sm" className="gap-1" disabled={pending} onClick={create}>
+        <MockBtn type="button" kind="secondary" sm className="gap-1" disabled={pending} onClick={create}>
           <Plus className="h-3.5 w-3.5" />
+>>>>>>> Stashed changes
           Wochenbericht anlegen
-        </Button>
+        </MockBtn>
       </div>
 
       {wochenberichte.length ? (
@@ -161,13 +164,9 @@ export function BaustelleWochenberichteCard({
             const dirty =
               draft.fazit !== (w.fazit ?? '') || draft.ausblick !== (w.ausblick ?? '')
             return (
-              <div key={w.id} className="rounded-lg border border-bw-border">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-bw-hover/50"
-                  onClick={() => setExpandedId(open ? null : w.id)}
-                >
-                  <FileText className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
+              <div key={w.id} className="rounded-button border border-bw-border">
+                <MockBtn fullWidth className="flex items-center gap-3 px-3 py-2.5 text-left hover:bg-bw-hover/50" type="button" onClick={() => setExpandedId(open ? null : w.id)}>
+                  <MockIcon n="file-text" ctx="default" className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="text-[length:var(--fs-text)] font-medium text-bw-text">
                       Wochenbericht {wn} — KW {w.kalenderwoche}/{w.jahr}
@@ -176,27 +175,16 @@ export function BaustelleWochenberichteCard({
                       {formatDatum(w.von_datum)} – {formatDatum(w.bis_datum)}
                     </p>
                   </div>
-                </button>
+                </MockBtn>
                 {open ? (
                   <div className="space-y-3 border-t border-bw-border px-3 py-3">
-                    <Textarea
-                      label="Wochenzusammenfassung"
-                      value={draft.fazit}
-                      onChange={(e) => setDraft(w, { fazit: e.target.value })}
-                      rows={3}
-                    />
-                    <Textarea
-                      label="Ausblick"
-                      value={draft.ausblick}
-                      onChange={(e) => setDraft(w, { ausblick: e.target.value })}
-                      rows={2}
-                    />
+                    <MockField label="Wochenzusammenfassung"><RichTextEditor value={typeof (draft.fazit) === 'string' ? (draft.fazit) : ''} onChange={(__v) => setDraft(w, { fazit: __v })} minHeight={120} aria-label="Wochenzusammenfassung" /></MockField>
+                    <MockField label="Ausblick"><RichTextEditor value={typeof (draft.ausblick) === 'string' ? (draft.ausblick) : ''} onChange={(__v) => setDraft(w, { ausblick: __v })} minHeight={120} aria-label="Ausblick" /></MockField>
                     {dirty ? (
                       <div className="flex flex-wrap gap-2">
-                        <Button
+                        <MockBtn
                           type="button"
-                          variant="ghost"
-                          size="sm"
+                          kind="ghost" sm
                           disabled={pending}
                           onClick={() =>
                             setEditDrafts((prev) => {
@@ -207,40 +195,37 @@ export function BaustelleWochenberichteCard({
                           }
                         >
                           Abbrechen
-                        </Button>
-                        <Button
+                        </MockBtn>
+                        <MockBtn
                           type="button"
-                          variant="primary"
-                          size="sm"
+                          kind="primary" sm
                           disabled={pending}
                           onClick={() => saveText(w, draft.fazit, draft.ausblick)}
                         >
                           Speichern
-                        </Button>
+                        </MockBtn>
                       </div>
                     ) : null}
                     <div className="flex flex-wrap gap-2">
-                      <Button
+                      <MockBtn
                         type="button"
-                        variant="primary"
-                        size="sm"
+                        kind="primary" sm
                         className="gap-1"
                         disabled={pending || dirty}
                         onClick={() => generatePdf(w)}
                       >
-                        <Download className="h-3.5 w-3.5" />
+                        <MockIcon n="download" ctx="default" className="h-3.5 w-3.5" />
                         PDF erstellen
-                      </Button>
-                      <Button
+                      </MockBtn>
+                      <MockBtn
                         type="button"
-                        variant="secondary"
-                        size="sm"
+                        kind="secondary" sm
                         className="gap-1"
                         disabled={pending || dirty}
                         onClick={() => generateRegiePdf(w)}
                       >
                         Regiebericht KW
-                      </Button>
+                      </MockBtn>
                       <a
                         href={`/api/auftraege/${auftragId}/wochenbericht/${w.id}`}
                         target="_blank"
@@ -259,9 +244,13 @@ export function BaustelleWochenberichteCard({
                           Gespeichertes PDF
                         </a>
                       ) : null}
-                      <Button type="button" variant="ghost" size="sm" onClick={() => remove(w.id)}>
+                      <MockBtn type="button" kind="ghost" sm onClick={() => remove(w.id)}>
+<<<<<<< Updated upstream
+                        <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" />
+=======
                         <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+>>>>>>> Stashed changes
+                      </MockBtn>
                     </div>
                   </div>
                 ) : null}

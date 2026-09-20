@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -31,6 +37,7 @@ async function assertAngebotEditable(angebotId: string) {
     .select('id, status, positionen')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/angebot-positionen-steuerung-actions:angebote', error)
 
   if (error || !data) return { ok: false as const, message: 'Angebot nicht gefunden', supabase: null }
   if (!angebotDarfImWizardBearbeitetWerden(String(data.status))) {
@@ -105,21 +112,24 @@ async function persistAngebotPositionen(
       updated_at: new Date().toISOString(),
     })
     .eq('id', angebotId)
+  if (error) logDbError('app/angebote/angebot-positionen-steuerung-actions:angebote', error)
 
   if (error) return { ok: false, message: error.message }
 
-  const { data: auftrag } = await supabase
+  const { data: auftrag, error: error2 } = await supabase
     .from('auftraege')
     .select('id')
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (error2) logDbError('app/angebote/angebot-positionen-steuerung-actions:auftraege', error2)
 
   if (auftrag?.id) {
-    const { data: angebotHw } = await supabaseAdmin
+    const { data: angebotHw, error } = await supabaseAdmin
       .from('angebote')
       .select('angebot_handwerker(*)')
       .eq('id', angebotId)
       .maybeSingle()
+    if (error) logDbError('app/angebote/angebot-positionen-steuerung-actions:angebote', error)
 
     const sync = await syncAngebotPositionenZuAuftrag({
       auftragId: String(auftrag.id),
@@ -127,11 +137,10 @@ async function persistAngebotPositionen(
       angebotHandwerker: angebotHw?.angebot_handwerker ?? [],
     })
     if (!sync.ok) return sync
-    revalidatePath(`/auftraege/${auftrag.id}`)
+    revalidateAuftragDetail(auftrag.id)
   }
 
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
+  revalidateAngebotDetail(angebotId)
   return { ok: true }
 }
 
@@ -317,7 +326,7 @@ export async function bulkDeleteAngebotPositionen(
 }
 
 /**
- * Handwerker an Angebots-Positionen zuweisen (Partner-EK + angebot_handwerker),
+ * Partner an Angebots-Positionen zuweisen (Partner-EK + angebot_handwerker),
  * analog zu Auftrag `zuweiseHandwerkerAnPositionenV3`.
  */
 export async function zuweiseHandwerkerAnAngebotPositionen(input: {
@@ -336,7 +345,7 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
   const ids = Array.from(new Set(input.positionIds.map((id) => id.trim()).filter(Boolean)))
   const hwId = input.handwerkerId.trim()
   if (!ids.length || !hwId) {
-    return { ok: false, message: 'Positionen und Handwerker erforderlich.' }
+    return { ok: false, message: 'Positionen und Partner erforderlich.' }
   }
 
   const { data: hw, error: hwErr } = await gate.supabase!
@@ -344,12 +353,17 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
     .select('id, name, firma')
     .eq('id', hwId)
     .maybeSingle()
+  if (hwErr) logDbError('app/angebote/angebot-positionen-steuerung-actions:handwerker', hwErr)
+<<<<<<< Updated upstream
+  if (hwErr || !hw) return { ok: false, message: 'Partner nicht gefunden.' }
+=======
   if (hwErr || !hw) return { ok: false, message: 'Handwerker nicht gefunden.' }
+>>>>>>> Stashed changes
 
   const hwName =
     (hw.firma as string | null)?.trim() ||
     (hw.name as string | null)?.trim() ||
-    'Handwerker'
+    'Partner'
 
   const ekGlobal =
     input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto >= 0
@@ -429,12 +443,13 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
   const zuweisungIds: string[] = []
 
   for (const gewerkId of gewerkIds) {
-    const { data: existingRows } = await gate.supabase!
+    const { data: existingRows, error } = await gate.supabase!
       .from('angebot_handwerker')
       .select('id, status')
       .eq('angebot_id', input.angebotId)
       .eq('gewerk_id', gewerkId)
       .eq('handwerker_id', hwId)
+    if (error) logDbError('app/angebote/angebot-positionen-steuerung-actions:angebot_handwerker', error)
 
     const existing = (existingRows ?? []).find((r) => {
       const st = String(r.status ?? '').toLowerCase()
@@ -443,10 +458,11 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
 
     if (existing?.id) {
       if (notiz) {
-        await gate.supabase!
+        const { error: __dbErr1 } = await gate.supabase!
           .from('angebot_handwerker')
           .update({ aufgabe_notiz: notiz })
           .eq('id', existing.id)
+        if (__dbErr1) logDbError('app/angebote/angebot-positionen-steuerung-actions:angebot_handwerker', __dbErr1)
       }
       zuweisungIds.push(String(existing.id))
       continue
@@ -463,14 +479,15 @@ export async function zuweiseHandwerkerAnAngebotPositionen(input: {
       })
       .select('id')
       .single()
+    if (insErr) logDbError('app/angebote/angebot-positionen-steuerung-actions:angebot_handwerker', insErr)
 
     if (insErr || !inserted?.id) {
-      return { ok: false, message: insErr?.message ?? 'Handwerker-Zuweisung konnte nicht angelegt werden.' }
+      return { ok: false, message: insErr?.message ?? 'Partner-Zuweisung konnte nicht angelegt werden.' }
     }
     zuweisungIds.push(String(inserted.id))
   }
 
-  revalidatePath(`/angebote/${input.angebotId}`)
+  revalidateAngebotDetail(input.angebotId)
   return { ok: true, updated, zuweisungIds }
 }
 
@@ -505,6 +522,6 @@ export async function sendAngebotLeistungenAnHandwerkerV3(input: {
     gesendet++
   }
 
-  revalidatePath(`/angebote/${input.angebotId}`)
+  revalidateAngebotDetail(input.angebotId)
   return { ok: true, gesendet }
 }

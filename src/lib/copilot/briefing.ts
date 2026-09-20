@@ -9,6 +9,8 @@ import {
 } from '@/lib/copilot/tools'
 import { getAbfahrtszeit, kalenderTerminStartIso } from '@/lib/copilot/maps'
 import { getWetter } from '@/lib/copilot/wetter'
+import { formatWochentagDatumLang } from '@/lib/utils'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 function formatUhrzeit(uhrzeit: string | null): string {
   if (!uhrzeit) return '—'
@@ -25,12 +27,7 @@ export async function buildBriefing(): Promise<string> {
     getWetter(),
   ])
 
-  const now = new Date().toLocaleDateString('de-DE', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    timeZone: 'Europe/Berlin',
-  })
+  const now = formatWochentagDatumLang(new Date(), { withYear: false })
 
   let msg = `🌲 <b>Guten Morgen Belal!</b>\n${now}\n\n`
 
@@ -78,7 +75,7 @@ export async function buildBriefing(): Promise<string> {
   }
 
   if (handwerker.length > 0) {
-    msg += `👷 <b>Handwerker warten (${handwerker.length}):</b>\n`
+    msg += `👷 <b>Partner warten (${handwerker.length}):</b>\n`
     for (const h of handwerker) {
       const hw = h.handwerker as { name?: string | null } | null
       const ang = h.angebote as { leistungsumfang?: string | null } | null
@@ -89,7 +86,7 @@ export async function buildBriefing(): Promise<string> {
 
   if (rechnungen.length > 0) {
     const gesamt = rechnungen.reduce((sum, r) => sum + (Number(r.brutto) || 0), 0)
-    msg += `💶 <b>Offene Rechnungen: ${gesamt.toLocaleString('de-DE')} €</b>\n`
+    msg += `💶 <b>Offene Rechnungen: ${formatEuro(gesamt, { decimals: 0 })}</b>\n`
   }
 
   msg += `\n<i>Guten Start ins Projekt!</i>`

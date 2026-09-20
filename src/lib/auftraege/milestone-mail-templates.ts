@@ -1,4 +1,5 @@
 import type { Kunde } from '@/lib/types'
+import { buildSubject } from '@/lib/mail/build-subject'
 
 export type MeilensteinVorlageId =
   | 'beginn'
@@ -13,14 +14,15 @@ function vorname(name: string): string {
   return t.split(/\s+/)[0] ?? t
 }
 
-export function meilensteinVorlagenFuerKunde(kunde: Kunde): Record<
-  MeilensteinVorlageId,
-  { betreff: string; text: string }
-> {
+export function meilensteinVorlagenFuerKunde(
+  kunde: Kunde,
+  projektTitel?: string | null
+): Record<MeilensteinVorlageId, { betreff: string; text: string }> {
   const vn = vorname(kunde.name)
+  const objekt = projektTitel
   return {
     beginn: {
-      betreff: 'Ihre Arbeiten haben begonnen',
+      betreff: buildSubject({ objekt, ereignis: 'Arbeiten begonnen' }),
       text: `Guten Tag ${vn},
 
 wir möchten Sie informieren, dass die Arbeiten an Ihrem Projekt heute begonnen haben.
@@ -31,7 +33,7 @@ Mit freundlichen Grüßen
 Bärenwald München`,
     },
     zwischenstand: {
-      betreff: 'Zwischenstand Ihres Projekts',
+      betreff: buildSubject({ objekt, ereignis: 'Zwischenstand' }),
       text: `Guten Tag ${vn},
 
 kurzes Update zu Ihrem Projekt: [Bitte ergänzen]
@@ -40,7 +42,7 @@ Mit freundlichen Grüßen
 Bärenwald München`,
     },
     meilenstein: {
-      betreff: 'Wichtiger Meilenstein erreicht',
+      betreff: buildSubject({ objekt, ereignis: 'Meilenstein erreicht' }),
       text: `Guten Tag ${vn},
 
 wir möchten Sie informieren, dass ein wichtiger Meilenstein in Ihrem Projekt erreicht wurde.
@@ -51,7 +53,7 @@ Mit freundlichen Grüßen
 Bärenwald München`,
     },
     verzoegerung: {
-      betreff: 'Kurze Information zu Ihrem Projekt',
+      betreff: buildSubject({ objekt, ereignis: 'Verzögerung' }),
       text: `Guten Tag ${vn},
 
 wir möchten Sie informieren, dass es zu einer kleinen Verzögerung kommt.
@@ -66,7 +68,7 @@ Mit freundlichen Grüßen
 Bärenwald München`,
     },
     individuell: {
-      betreff: 'Update zu Ihrem Auftrag',
+      betreff: buildSubject({ objekt, ereignis: 'Projekt-Update' }),
       text: `Guten Tag ${vn},
 
 [Bitte Nachricht formulieren]

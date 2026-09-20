@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-actions'
@@ -32,6 +38,7 @@ export async function loadAngebotKorrekturWizardBootstrap(auftragId: string): Pr
     .select('id, angebot_id, lead_id, status, start_datum, end_datum')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/angebot-korrektur-actions:auftraege', error)
 
   if (error || !auftrag) return { ok: false, message: 'Auftrag nicht gefunden' }
   if ((auftrag.status ?? '') === 'storniert') {
@@ -53,10 +60,11 @@ export async function loadAngebotKorrekturWizardBootstrap(auftragId: string): Pr
   const start = String(auftrag.start_datum ?? '').trim().slice(0, 10)
   const end = String(auftrag.end_datum ?? '').trim().slice(0, 10)
 
-  const { data: rechnungen } = await supabase
+  const { data: rechnungen, error: error2 } = await supabase
     .from('rechnungen')
     .select('id, status, rechnung_art, beleg_typ, richtung')
     .eq('auftrag_id', id)
+  if (error2) logDbError('app/auftraege/angebot-korrektur-actions:rechnungen', error2)
 
   const gestellteAbschlaege = (rechnungen ?? []).filter((r) => {
     if (String(r.richtung ?? '') === 'eingehend') return false
@@ -105,11 +113,12 @@ export async function syncAuftragAusAngebotKorrektur(input: {
   const auftragId = input.auftragId.trim()
   const angebotId = input.angebotId.trim()
 
-  const { data: auftrag } = await supabase
+  const { data: auftrag, error } = await supabase
     .from('auftraege')
     .select('id, angebot_id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/angebot-korrektur-actions:auftraege', error)
   if (!auftrag || String(auftrag.angebot_id) !== angebotId) {
     return { ok: false, message: 'Auftrag und Angebot passen nicht zusammen.' }
   }
@@ -119,6 +128,7 @@ export async function syncAuftragAusAngebotKorrektur(input: {
     .select('positionen, zahlungsplan, angebot_handwerker(*)')
     .eq('id', angebotId)
     .maybeSingle()
+  if (aErr) logDbError('app/auftraege/angebot-korrektur-actions:angebote', aErr)
 
   if (aErr || !angebot) return { ok: false, message: 'Angebot nicht gefunden' }
 
@@ -136,7 +146,8 @@ export async function syncAuftragAusAngebotKorrektur(input: {
   if (von) auftragPatch.start_datum = von
   if (bis) auftragPatch.end_datum = bis
   if (Object.keys(auftragPatch).length) {
-    await supabaseAdmin.from('auftraege').update(auftragPatch).eq('id', auftragId)
+    const { error: __dbErr1 } = await supabaseAdmin.from('auftraege').update(auftragPatch).eq('id', auftragId)
+    if (__dbErr1) logDbError('app/auftraege/angebot-korrektur-actions:auftraege', __dbErr1)
   }
 
   const teile: string[] = []
@@ -153,9 +164,8 @@ export async function syncAuftragAusAngebotKorrektur(input: {
     erstellt_von: user.id,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
-  revalidatePath(`/angebote/${angebotId}`)
+  revalidateAuftragDetail(auftragId)
+  revalidateAngebotDetail(angebotId)
   return sync
 }
 

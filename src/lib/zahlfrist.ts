@@ -1,4 +1,5 @@
 /** Mock-Segmente für Zahlfrist / Zahlungsziel (Angebot + Rechnung). */
+import { formatDatum } from '@/lib/utils'
 import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
 export type ZahlfristSeg = '7' | '14' | '30' | 'datum'
 
@@ -18,7 +19,7 @@ export function plusDaysIso(days: number, from = new Date()): string {
 export function formatDateDeYmd(ymd: string): string {
   if (!ymd?.trim()) return '—'
   try {
-    return new Date(`${ymd.trim()}T12:00:00`).toLocaleDateString('de-DE')
+    return formatDatum(`${ymd.trim()}T12:00:00`)
   } catch {
     return ymd
   }

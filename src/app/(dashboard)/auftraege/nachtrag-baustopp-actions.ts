@@ -1,18 +1,25 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { headers } from 'next/headers'
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import { sendEmailHtml } from '@/lib/auftraege/emails'
 import { getMailBranding } from '@/lib/get-mail-branding'
+import { buildSubject } from '@/lib/mail/build-subject'
 import { mailNachtrag } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import type { AngebotPosition, Kunde } from '@/lib/types'
 import { angebotNachtragMarker } from '@/lib/auftraege/nachtrag-utils'
+import { planNachtragStatusWrite } from '@/lib/status/write-nachtrag-status'
 import { getPublicAppUrl } from '@/lib/utils'
+import { formatEuroSpanne, formatDatumZeit } from '@/lib/format/geld-datum'
 
 const DEFAULT_MWST = 19
 
@@ -66,6 +73,7 @@ export async function loadNachtragPublicByToken(token: string): Promise<Nachtrag
     )
     .eq('token', token)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
 
   if (error || !n) return null
 
@@ -109,11 +117,13 @@ export async function loadNachtragPublicByToken(token: string): Promise<Nachtrag
 }
 
 async function mergeNachtragIntoAngebot(auftragId: string, positionenNachtrag: unknown): Promise<void> {
-  const { data: auf } = await supabaseAdmin.from('auftraege').select('angebot_id').eq('id', auftragId).maybeSingle()
+  const { data: auf, error } = await supabaseAdmin.from('auftraege').select('angebot_id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:auftraege', error)
   const angebotId = auf?.angebot_id as string | null
   if (!angebotId) return
 
-  const { data: ang } = await supabaseAdmin.from('angebote').select('positionen').eq('id', angebotId).maybeSingle()
+  const { data: ang, error: error2 } = await supabaseAdmin.from('angebote').select('positionen').eq('id', angebotId).maybeSingle()
+  if (error2) logDbError('app/auftraege/nachtrag-baustopp-actions:angebote', error2)
   if (!ang) return
 
   const existing = normalizeAngebotPositionen(ang.positionen ?? [])
@@ -121,7 +131,7 @@ async function mergeNachtragIntoAngebot(auftragId: string, positionenNachtrag: u
   const merged = [...existing, ...extra]
   const summen = summenAusPositionen(merged, DEFAULT_MWST)
 
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('angebote')
     .update({
       positionen: merged as unknown as Record<string, unknown>[],
@@ -130,6 +140,7 @@ async function mergeNachtragIntoAngebot(auftragId: string, positionenNachtrag: u
       updated_at: new Date().toISOString(),
     })
     .eq('id', angebotId)
+  if (__dbErr1) logDbError('app/auftraege/nachtrag-baustopp-actions:angebote', __dbErr1)
 }
 
 export async function acceptNachtragByToken(token: string): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -149,14 +160,16 @@ export async function acceptNachtragByToken(token: string): Promise<{ ok: true }
 
   const { error: upErr } = await supabaseAdmin
     .from('nachtraege')
-    .update({
-      status: 'akzeptiert',
-      akzeptiert_at: now,
-      kunde_bestaetigt_at: now,
-      kunde_ip: ip,
-    })
+    .update(
+      planNachtragStatusWrite('akzeptiert', {
+        akzeptiert_at: now,
+        kunde_bestaetigt_at: now,
+        kunde_ip: ip,
+      })
+    )
     .eq('id', n.id)
     .eq('token', token)
+  if (upErr) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 
@@ -164,14 +177,14 @@ export async function acceptNachtragByToken(token: string): Promise<{ ok: true }
 
   const summeTxt =
     n.gesamt_min != null && n.gesamt_max != null
-      ? `${n.gesamt_min.toLocaleString('de-DE')} – ${n.gesamt_max.toLocaleString('de-DE')} €`
+      ? `${formatEuroSpanne(n.gesamt_min, n.gesamt_max)}`
       : '—'
 
   await insertAuftragTimelineEvent({
     auftrag_id: payload.auftragId,
     typ: 'nachtrag_akzeptiert',
     titel: 'Nachtrag vom Kunden bestätigt',
-    beschreibung: `${new Date(now).toLocaleString('de-DE')} · ${summeTxt} · IP ${ip}`,
+    beschreibung: `${formatDatumZeit(now)} · ${summeTxt} · IP ${ip}`,
     sichtbar_fuer_kunde: true,
   })
 
@@ -186,10 +199,11 @@ export async function acceptNachtragByToken(token: string): Promise<{ ok: true }
   }
 
   if (!n.handwercher_bestaetigt) {
-    const { data: links } = await supabaseAdmin
+    const { data: links, error } = await supabaseAdmin
       .from('auftrag_handwerker')
       .select('handwerker(email, name)')
       .eq('auftrag_id', payload.auftragId)
+    if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:auftrag_handwerker', error)
 
     for (const row of links ?? []) {
       const hw = row as { handwerker?: { email?: string | null; name?: string } | { email?: string | null; name?: string }[] }
@@ -206,7 +220,7 @@ export async function acceptNachtragByToken(token: string): Promise<{ ok: true }
     }
   }
 
-  revalidatePath(`/auftraege/${payload.auftragId}`)
+  revalidateAuftragDetail(payload.auftragId)
   return { ok: true as const }
 }
 
@@ -241,6 +255,7 @@ export async function createNachtragManuell(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
 
   if (error || !row) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
 
@@ -252,7 +267,7 @@ export async function createNachtragManuell(input: {
     erstellt_von: user.id,
   })
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, id: row.id as string }
 }
 
@@ -265,13 +280,14 @@ export async function findNachtragRowByAngebotId(angebotId: string): Promise<{
   const id = angebotId.trim()
   if (!id) return null
   const marker = angebotNachtragMarker(id)
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('nachtraege')
     .select('id, auftrag_id, status')
     .ilike('beschreibung', `%${marker}%`)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
   if (!data?.id || !data.auftrag_id) return null
   return {
     id: String(data.id),
@@ -299,15 +315,17 @@ export async function applyNachtragsAngebotAnAuftrag(
     .select('id, positionen, status')
     .eq('id', angId)
     .maybeSingle()
+  if (angErr) logDbError('app/auftraege/nachtrag-baustopp-actions:angebote', angErr)
   if (angErr || !ang) return { ok: false, message: angErr?.message ?? 'Angebot nicht gefunden.' }
 
   const { syncAngebotPositionenZuAuftrag } = await import(
     '@/lib/auftraege/sync-angebot-zu-auftrag'
   )
-  const { data: hwRows } = await supabaseAdmin
+  const { data: hwRows, error: error2 } = await supabaseAdmin
     .from('angebot_handwerker')
     .select('id, handwerker_id, gewerk_id, status')
     .eq('angebot_id', angId)
+  if (error2) logDbError('app/auftraege/nachtrag-baustopp-actions:angebot_handwerker', error2)
 
   const sync = await syncAngebotPositionenZuAuftrag({
     auftragId: nachtrag.auftrag_id,
@@ -321,15 +339,17 @@ export async function applyNachtragsAngebotAnAuftrag(
 
   const now = new Date().toISOString()
   if (nachtrag.status !== 'akzeptiert') {
-    await supabaseAdmin
+    const { error: __dbErr2 } = await supabaseAdmin
       .from('nachtraege')
-      .update({
-        status: 'akzeptiert',
-        akzeptiert_at: now,
-        kunde_bestaetigt_at: now,
-      })
+      .update(
+        planNachtragStatusWrite('akzeptiert', {
+          akzeptiert_at: now,
+          kunde_bestaetigt_at: now,
+        })
+      )
       .eq('id', nachtrag.id)
       .eq('auftrag_id', nachtrag.auftrag_id)
+    if (__dbErr2) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', __dbErr2)
   }
 
   await insertAuftragTimelineEvent({
@@ -340,11 +360,8 @@ export async function applyNachtragsAngebotAnAuftrag(
     sichtbar_fuer_kunde: true,
   })
 
-  revalidatePath(`/auftraege/${nachtrag.auftrag_id}`)
-  revalidatePath(`/angebote/${angId}`)
-  revalidatePath('/auftraege')
-  revalidatePath('/angebote')
-
+  revalidateAuftragDetail(nachtrag.auftrag_id)
+  revalidateAngebotDetail(angId)
   return { ok: true, auftragId: nachtrag.auftrag_id }
 }
 
@@ -373,13 +390,14 @@ export async function upsertNachtragEntwurfFromAngebotWizard(input: {
     ? baseDesc
     : [baseDesc, marker].filter(Boolean).join('\n\n')
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error } = await supabaseAdmin
     .from('nachtraege')
     .select('id, status')
     .eq('auftrag_id', input.auftragId)
     .eq('status', 'entwurf')
     .ilike('beschreibung', `%${marker}%`)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
 
   if (existing?.id) {
     const { error } = await supabaseAdmin
@@ -393,12 +411,13 @@ export async function upsertNachtragEntwurfFromAngebotWizard(input: {
       })
       .eq('id', existing.id)
       .eq('auftrag_id', input.auftragId)
+    if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
     if (error) return { ok: false, message: error.message }
-    revalidatePath(`/auftraege/${input.auftragId}`)
+    revalidateAuftragDetail(input.auftragId)
     return { ok: true, id: existing.id as string }
   }
 
-  const { data: row, error } = await supabaseAdmin
+  const { data: row, error: error2 } = await supabaseAdmin
     .from('nachtraege')
     .insert({
       auftrag_id: input.auftragId,
@@ -412,8 +431,9 @@ export async function upsertNachtragEntwurfFromAngebotWizard(input: {
     })
     .select('id')
     .single()
+  if (error2) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error2)
 
-  if (error || !row) return { ok: false, message: error?.message ?? 'Nachtrag speichern fehlgeschlagen' }
+  if (error2 || !row) return { ok: false, message: error2?.message ?? 'Nachtrag speichern fehlgeschlagen' }
 
   await insertAuftragTimelineEvent({
     auftrag_id: input.auftragId,
@@ -423,7 +443,7 @@ export async function upsertNachtragEntwurfFromAngebotWizard(input: {
     erstellt_von: user.id,
   })
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, id: row.id as string }
 }
 
@@ -446,9 +466,10 @@ export async function updateNachtragHandwercherBestaetigt(
     })
     .eq('id', nachtragId)
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -464,9 +485,10 @@ export async function markNachtragGesendet(
 
   const { error } = await supabaseAdmin
     .from('nachtraege')
-    .update({ status: 'gesendet', gesendet_at: new Date().toISOString() })
+    .update(planNachtragStatusWrite('gesendet', { gesendet_at: new Date().toISOString() }))
     .eq('id', nachtragId)
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
 
   if (error) return { ok: false, message: error.message }
 
@@ -479,7 +501,7 @@ export async function markNachtragGesendet(
     sichtbar_fuer_kunde: true,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -501,6 +523,7 @@ export async function sendNachtragEmailAnKunde(
     .eq('id', nachtragId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
 
   if (error || !n) return { ok: false, message: 'Nachtrag nicht gefunden' }
 
@@ -553,7 +576,7 @@ export async function sendNachtragEmailAnKunde(
     email_log_id: mail.emailLogId ?? null,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -573,6 +596,7 @@ export async function sendNachtragErinnerungAnKunde(
     .eq('id', nachtragId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
 
   if (error || !n) return { ok: false, message: 'Nachtrag nicht gefunden' }
   const row = n as Record<string, unknown>
@@ -622,7 +646,7 @@ export async function sendNachtragErinnerungAnKunde(
     email_log_id: mail.emailLogId ?? null,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -645,6 +669,7 @@ export async function createBaustopp(input: {
     .select('end_datum, kunden(name, email)')
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (aErr) logDbError('app/auftraege/nachtrag-baustopp-actions:auftraege', aErr)
 
   if (aErr || !auf) return { ok: false, message: 'Auftrag nicht gefunden' }
 
@@ -664,13 +689,15 @@ export async function createBaustopp(input: {
     kunde_informiert: input.kunde_informiert,
     erstellt_von: uid,
   })
+  if (ins) logDbError('app/auftraege/nachtrag-baustopp-actions:baustopps', ins)
 
   if (ins) return { ok: false, message: ins.message }
 
-  await supabaseAdmin
+  const { error: __dbErr3 } = await supabaseAdmin
     .from('auftraege')
     .update({ end_datum: input.neues_enddatum, updated_at: new Date().toISOString() })
     .eq('id', input.auftragId)
+  if (__dbErr3) logDbError('app/auftraege/nachtrag-baustopp-actions:auftraege', __dbErr3)
 
   const typLabel =
     input.typ === 'witterung'
@@ -696,7 +723,7 @@ export async function createBaustopp(input: {
     const vorname = k.name?.split(/\s+/)[0] ?? k.name ?? 'Kundin'
     await sendEmailHtml({
       to: k.email.trim(),
-      subject: 'Kurze Info zu Ihrem Projekt — Bärenwald München',
+      subject: buildSubject({ ereignis: 'Verzögerung' }),
       typ: 'termin',
       html: `<p>Guten Tag ${vorname},</p>
         <p>aufgrund von <strong>${typLabel}</strong> müssen wir die Arbeiten vorübergehend unterbrechen.</p>
@@ -706,8 +733,7 @@ export async function createBaustopp(input: {
     })
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
-  revalidatePath('/')
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -726,16 +752,18 @@ export async function beendeBaustopp(
     .eq('id', baustoppId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (lErr) logDbError('app/auftraege/nachtrag-baustopp-actions:baustopps', lErr)
 
   if (lErr || !b) return { ok: false, message: 'Baustopp nicht gefunden' }
 
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('baustopps')
     .update({ ende_datum: heute })
     .eq('id', baustoppId)
     .eq('auftrag_id', auftragId)
+  if (error2) logDbError('app/auftraege/nachtrag-baustopp-actions:baustopps', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
 
   const beginn = new Date(String(b.beginn_datum))
   const ende = new Date(heute)
@@ -749,7 +777,6 @@ export async function beendeBaustopp(
     erstellt_von: uid,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/')
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }

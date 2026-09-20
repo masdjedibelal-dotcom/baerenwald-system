@@ -1,15 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { Textarea } from '@/components/ui/Textarea'
+import { MockField, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { erneutOrgFreigabeAnfordernNachAblehnung } from '@/lib/org/hv-lead-actions'
 import type { OrgFreigabeLogRow, OrgFreigabeStatus } from '@/lib/types'
 import { formatDatumZeit } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 export function AngebotOrgFreigabeBanner({
   leadId,
@@ -29,10 +32,11 @@ export function AngebotOrgFreigabeBanner({
   onDone?: () => void
 }) {
   const status = orgFreigabeStatus ?? 'nicht_noetig'
-  if (status === 'nicht_noetig' && !(orgFreigabeLog?.length ?? 0)) return null
-
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [anpassung, setAnpassung] = useState('')
   const [busy, setBusy] = useState(false)
+
+  if (status === 'nicht_noetig' && !(orgFreigabeLog?.length ?? 0)) return null
 
   const badgeStatus =
     status === 'freigegeben' || status === 'nicht_noetig'
@@ -46,7 +50,7 @@ export function AngebotOrgFreigabeBanner({
   async function onErneutAnfordern() {
     const notiz = anpassung.trim()
     if (!notiz) {
-      toast.error('Bitte kurz beschreiben, was angepasst wurde.')
+      applyFieldErrors({ _form: TOAST.bitte_kurz_beschreiben_was_angepasst_wurde })
       return
     }
     if (busy) return
@@ -60,7 +64,7 @@ export function AngebotOrgFreigabeBanner({
         gesamtMax: gesamtMax ?? null,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       if (r.mailOk === false) {
@@ -68,7 +72,7 @@ export function AngebotOrgFreigabeBanner({
         onDone?.()
         return
       }
-      toast.success('Freigabe erneut angefordert')
+      toast.success(TOAST.freigabe_erneut_angefordert)
       setAnpassung('')
       onDone?.()
     } finally {
@@ -101,16 +105,7 @@ export function AngebotOrgFreigabeBanner({
 
       {status === 'abgelehnt' ? (
         <div className="mt-3 space-y-3 border-t border-bw-border pt-3">
-          <Textarea
-            plain
-            label="Was wurde angepasst?"
-            required
-            rows={3}
-            value={anpassung}
-            onChange={(e) => setAnpassung(e.target.value)}
-            placeholder="Kurz für die Hausverwaltung …"
-            disabled={busy}
-          />
+          <MockField label="Was wurde angepasst?" required><MockTextarea required rows={3} value={anpassung} onChange={(e) => setAnpassung(e.target.value)} placeholder="Kurz für die Hausverwaltung …" disabled={busy} className="resize-y py-2 min-h-[120px]" /></MockField>
           <MockBtn
             kind="ghost"
             sm

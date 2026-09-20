@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type HwRechnungStatus = 'eingereicht' | 'bezahlt' | 'abgelehnt'
@@ -112,6 +113,7 @@ export async function loadHwEingangsrechnungen(
     .not('hw_rechnung_pdf_url', 'is', null)
     .order('hw_rechnung_eingereicht_at', { ascending: false, nullsFirst: false })
     .limit(500)
+  if (error) logDbError('lib/rechnungen/load-hw-eingangsrechnungen:angebot_handwerker', error)
 
   if (error) return { rows: [], error: error.message }
 
@@ -123,11 +125,12 @@ export async function loadHwEingangsrechnungen(
 
   const auftragByAngebot = new Map<string, { id: string; titel: string | null }>()
   if (angebotIds.length > 0) {
-    const { data: auftraege } = await supabase
+    const { data: auftraege, error } = await supabase
       .from('auftraege')
       .select('id, angebot_id, titel, created_at')
       .in('angebot_id', angebotIds)
       .order('created_at', { ascending: false })
+    if (error) logDbError('lib/rechnungen/load-hw-eingangsrechnungen:auftraege', error)
     for (const a of auftraege ?? []) {
       const aid = String((a as { angebot_id?: string }).angebot_id ?? '')
       if (!aid || auftragByAngebot.has(aid)) continue
@@ -154,7 +157,7 @@ export async function loadHwEingangsrechnungen(
       angebotId: r.angebot_id,
       auftragId: auf?.id ?? null,
       handwerkerId: r.handwerker_id,
-      handwerkerName: hw?.firma?.trim() || hw?.name?.trim() || 'Handwerker',
+      handwerkerName: hw?.firma?.trim() || hw?.name?.trim() || 'Partner',
       handwerkerEmail: hw?.email?.trim() || null,
       handwerkerTelefon: hw?.telefon?.trim() || null,
       iban: hw?.iban?.trim() || null,

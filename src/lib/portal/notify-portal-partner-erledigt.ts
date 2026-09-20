@@ -3,6 +3,7 @@
  * (nicht schon bei Partner-Submit).
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 function portalVorgangLink(leadId: string): string {
@@ -27,6 +28,7 @@ export async function notifyPortalPartnerErledigtFromCrm(input: {
     .select('id, auftraggeber_kunde_id, situation, bereiche')
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/portal/notify-portal-partner-erledigt:leads', error)
 
   if (error) {
     console.warn('[notifyPortalPartnerErledigtFromCrm] lead:', error.message)
@@ -52,7 +54,7 @@ export async function notifyPortalPartnerErledigtFromCrm(input: {
     : `${input.handwerkerName} — Teilabnahme freigegeben. Weitere Positionen am Auftrag sind noch offen.`
 
   const since = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-  const { data: recent } = await supabaseAdmin
+  const { data: recent, error: error2 } = await supabaseAdmin
     .from('hv_notifications')
     .select('id')
     .eq('kunde_id', kundeId)
@@ -60,6 +62,7 @@ export async function notifyPortalPartnerErledigtFromCrm(input: {
     .ilike('link', `%${leadId}%`)
     .gte('created_at', since)
     .limit(1)
+  if (error2) logDbError('lib/portal/notify-portal-partner-erledigt:hv_notifications', error2)
   if ((recent ?? []).length > 0) return
 
   const { error: insErr } = await supabaseAdmin.from('hv_notifications').insert({
@@ -69,6 +72,7 @@ export async function notifyPortalPartnerErledigtFromCrm(input: {
     body,
     link: portalVorgangLink(leadId),
   })
+  if (insErr) logDbError('lib/portal/notify-portal-partner-erledigt:hv_notifications', insErr)
   if (insErr) {
     console.warn('[notifyPortalPartnerErledigtFromCrm] insert:', insErr.message)
   } else {

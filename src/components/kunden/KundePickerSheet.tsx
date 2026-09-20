@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useEffect, useMemo, useState } from 'react'
 import { listKundenFuerCombobox } from '@/app/(dashboard)/kunden/kunde-combobox-actions'
 import { Combobox } from '@/components/ui/Combobox'
@@ -75,21 +76,12 @@ export function KundePickerSheet({
         <div>
           <p className="kunde-pick__q">Kunde auswählen</p>
           <div className="hw-anfrage-seg" role="group" aria-label="Neu oder Bestand">
-            <button
-              type="button"
-              className="hw-anfrage-seg-btn is-active"
-              disabled
-            >
+            <MockBtn className="hw-anfrage-seg-btn is-active" type="button" disabled>
               Bestand
-            </button>
-            <button
-              type="button"
-              className="hw-anfrage-seg-btn"
-              onClick={() => onNeu?.()}
-              disabled={!onNeu}
-            >
+            </MockBtn>
+            <MockBtn className="hw-anfrage-seg-btn" type="button" onClick={() => onNeu?.()} disabled={!onNeu}>
               Neu
-            </button>
+            </MockBtn>
           </div>
         </div>
 

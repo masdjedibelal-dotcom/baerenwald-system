@@ -3,7 +3,7 @@
 import { Loader2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import type { KiVisualisierung } from '@/lib/visualize/types'
 import { formatDatumZeit } from '@/lib/utils'
 
@@ -90,17 +90,16 @@ export function AngebotWizardVizBlock({
       }
     >
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button
+        <MockBtn
           type="button"
-          variant="secondary"
-          size="sm"
+          kind="secondary" sm
           disabled={disabled}
           onClick={() =>
             window.open(`/angebote/${angebotId}/visualisierung`, '_blank', 'noopener,noreferrer')
           }
         >
           Neue Visualisierung
-        </Button>
+        </MockBtn>
       </div>
 
       {loading ? (

@@ -69,7 +69,7 @@ export function buildDashboardKpiSnapshot(input: {
     lines.push(`- ${z.name}: ${formatEurBetrag(z.netto)} (${z.anteil}%)`)
   }
 
-  lines.push('', '## Top-Handwerker (max. 8)')
+  lines.push('', '## Top-Partner (max. 8)')
   ;(input.rankingHandwerker ?? []).slice(0, 8).forEach((r, i) => {
     lines.push(
       `${i + 1}. ${r.name} · Vorgänge ${r.vorgaenge} · Umsatz ${formatEurBetrag(r.umsatz)}${r.sub ? ` · ${r.sub}` : ''}`

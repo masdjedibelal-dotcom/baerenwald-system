@@ -1,3 +1,4 @@
+import { formatNumber } from '@/lib/format/geld-datum'
 /** Preiskatalog Position + Variante (neue Struktur). */
 
 export const KATALOG_KATEGORIEN = [
@@ -70,10 +71,7 @@ export function katalogVarianteLabel(v: KatalogVariante): string {
 
 export function katalogPreisLabel(v: KatalogVariante): string {
   const n = Number(v.preis) || 0
-  const formatted = n.toLocaleString('de-DE', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })
+  const formatted = formatNumber(n, { minDecimals: 0, maxDecimals: 2 })
   const prefix = v.preis_typ === 'ab' ? 'ab ' : ''
   return `${prefix}${formatted} €`
 }

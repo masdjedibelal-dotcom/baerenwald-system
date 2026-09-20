@@ -1,6 +1,7 @@
 'use client'
 
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { cn } from '@/lib/utils'
 
 type ListPaginationProps = {
@@ -34,27 +35,15 @@ export function ListPagination({
         {from}–{to} von {total}
       </p>
       <div className="list-pagination__controls">
-        <button
-          type="button"
-          className="list-pagination__btn"
-          onClick={onPrev}
-          disabled={pageIndex <= 0}
-          aria-label="Vorherige Seite"
-        >
-          <ChevronLeft className="h-4 w-4" aria-hidden />
-        </button>
+        <MockBtn className="list-pagination__btn" type="button" onClick={onPrev} disabled={pageIndex <= 0} aria-label="Vorherige Seite">
+          <MockIcon n="chevron-left" ctx="default" className="h-4 w-4" aria-hidden />
+        </MockBtn>
         <span className="list-pagination__page">
           Seite {pageIndex + 1} / {totalPages}
         </span>
-        <button
-          type="button"
-          className="list-pagination__btn"
-          onClick={onNext}
-          disabled={pageIndex >= totalPages - 1}
-          aria-label="Nächste Seite"
-        >
-          <ChevronRight className="h-4 w-4" aria-hidden />
-        </button>
+        <MockBtn className="list-pagination__btn" type="button" onClick={onNext} disabled={pageIndex >= totalPages - 1} aria-label="Nächste Seite">
+          <MockIcon n="chevron-right" ctx="default" className="h-4 w-4" aria-hidden />
+        </MockBtn>
       </div>
     </div>
   )

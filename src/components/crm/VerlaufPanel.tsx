@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { MockChip } from '@/components/mock-ui'
+import { MockChip, MockEmpty } from '@/components/mock-ui'
 import { MockVerlaufCard } from '@/components/mock-ui/MockDetailCards'
+import { useMemo, useState } from 'react'
 import { ActionIcon } from '@/components/ui/ActionIcon'
 import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import { VerlaufEreignisModal } from '@/components/crm/VerlaufEreignisModal'
@@ -90,7 +90,7 @@ export function VerlaufPanel({
             </div>
 
             {ordered.length === 0 ? (
-              <p className="text-sm text-bw-text-muted">Keine Einträge in diesem Filter.</p>
+              <MockEmpty title="Keine Einträge in diesem Filter." />
             ) : (
               <div className="akt-feed__list">
                 {ordered.map((item) => {

@@ -1,0 +1,41 @@
+# P5-4 / P5-5 — Allowlist: Kanon-Komponenten dürfen rohe button/input/select/textarea rendern.
+# Ein Pfad-Substring pro Zeile (relativ zu Repo-Root). # = Kommentar.
+# Chips, Tabs, Checkbox-Zeilen, Mock-Primitives, Form-Controls.
+
+src/components/mock-ui/MockPrimitives.tsx
+src/components/mock-ui/MockForm.tsx
+src/components/mock-ui/MockCheckbox.tsx
+src/components/mock-ui/MockSegment.tsx
+src/components/mock-ui/MockTabs.tsx
+src/components/mock-ui/MockEntityRowMenu.tsx
+src/components/mock-ui/MockPopover.tsx
+src/components/mock-ui/MockPager.tsx
+src/components/layout/EntityDetailLayout.tsx
+src/components/mock-ui/MockDetailShell.tsx
+src/components/mock-ui/MockSortHead.tsx
+src/components/mock-ui/MockListBar.tsx
+src/components/mock-ui/MockEmpty.tsx
+src/components/mock-ui/ListBulkBar.tsx
+src/components/mock-ui/MockCard.tsx
+src/components/ui/Tabs.tsx
+src/components/ui/detail-tab-bar.tsx
+src/components/ui/ListRowCheck.tsx
+src/components/ui/ActionSheet.tsx
+src/components/ui/ConfirmPopup.tsx
+src/components/ui/EditorSheet.tsx
+src/components/ui/DateInput.tsx
+src/components/ui/TimeInput.tsx
+src/components/ui/Combobox.tsx
+src/components/ui/RichTextEditor.tsx
+src/components/ui/FotoDropZone.tsx
+src/components/ui/CsvExportModal.tsx
+src/components/einstellungen/EinstellungenTabNav.tsx
+src/components/einstellungen/EinstellungenDetailShell.tsx
+src/components/layout/CrmPageLoading.tsx
+src/components/layout/LoadingSpinner.tsx
+src/components/ui/app-toast.tsx
+src/components/ui/action-busy.tsx
+src/components/ui/ClearableNumberInput.tsx
+src/components/layout/app/AppEntityCard.tsx
+src/components/mock-ui/MockDragHandle.tsx
+src/components/auftraege/AbnahmeprotokollCreateWizard.tsx

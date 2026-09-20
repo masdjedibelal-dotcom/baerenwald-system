@@ -1,10 +1,11 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockBadge, MockChip } from '@/components/mock-ui/MockPrimitives'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
-import { MockBtn, MockBadge, MockChip } from '@/components/mock-ui/MockPrimitives'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { Toggle } from '@/components/ui/Toggle'
 import { toast } from '@/components/ui/app-toast'
@@ -98,29 +99,25 @@ export function KatalogPreislistenClient({
         </div>
       </div>
 
-      <div className="divide-y divide-bw-border rounded-md border border-bw-border bg-white">
+      <div className="divide-y divide-bw-border rounded-field border border-bw-border bg-white">
         {visible.map((p) => {
           const open = openIds[p.id] ?? false
           return (
             <div key={p.id}>
-              <div className="flex w-full items-center gap-2 px-3 py-2.5 text-[13px]">
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left hover:opacity-80"
-                  onClick={() => setOpenIds((s) => ({ ...s, [p.id]: !open }))}
-                >
+              <div className="flex w-full items-center gap-2 px-3 py-2.5 text-fs-text">
+                <MockBtn className="flex min-w-0 flex-1 items-center gap-2 text-left hover:opacity-80" type="button" onClick={() => setOpenIds((s) => ({ ...s, [p.id]: !open }))}>
                   <span className="min-w-0 flex-1 font-medium">{p.titel}</span>
                   <MockBadge kind="fertig">{p.kategorie}</MockBadge>
-                  <span className="text-[11px] text-bw-text-muted">
+                  <span className="text-fs-caption text-bw-text-muted">
                     {p.varianten.length} Variante{p.varianten.length === 1 ? '' : 'n'}
                   </span>
-                </button>
+                </MockBtn>
                 <Toggle
                   checked={p.aktiv}
                   onChange={(v) => {
                     startTransition(async () => {
                       const r = await setKatalogPositionAktiv(p.id, v)
-                      if (!r.ok) toast.error(r.message)
+                      if (!r.ok) toast.systemError(r)
                       else await reload()
                     })
                   }}
@@ -132,11 +129,11 @@ export function KatalogPreislistenClient({
                   {p.varianten.map((v) => (
                     <li
                       key={v.id}
-                      className="flex flex-wrap items-center gap-3 rounded-md border border-bw-border bg-white px-3 py-2"
+                      className="flex flex-wrap items-center gap-3 rounded-field border border-bw-border bg-white px-3 py-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="text-[12px] font-medium">{katalogVarianteLabel(v)}</p>
-                        <p className="text-[11px] text-bw-text-muted">
+                        <p className="text-fs-meta font-medium">{katalogVarianteLabel(v)}</p>
+                        <p className="text-fs-caption text-bw-text-muted">
                           {v.einheit} · {katalogPreisLabel(v)}
                         </p>
                       </div>
@@ -146,7 +143,7 @@ export function KatalogPreislistenClient({
                           onChange={(n) => {
                             startTransition(async () => {
                               const r = await updateKatalogVariantePreis(v.id, n)
-                              if (!r.ok) toast.error(r.message)
+                              if (!r.ok) toast.systemError(r)
                               else await reload()
                             })
                           }}
@@ -157,7 +154,7 @@ export function KatalogPreislistenClient({
                         onChange={(on) => {
                           startTransition(async () => {
                             const r = await setKatalogVarianteAktiv(v.id, on)
-                            if (!r.ok) toast.error(r.message)
+                            if (!r.ok) toast.systemError(r)
                             else await reload()
                           })
                         }}

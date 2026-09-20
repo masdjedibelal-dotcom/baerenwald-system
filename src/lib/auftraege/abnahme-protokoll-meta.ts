@@ -1,6 +1,13 @@
 /** Meta-Felder für Abnahmeprotokoll-Wizard / PDF (Muster-Layout). */
 
-export type AbnahmeErgebnis = 'abgenommen' | 'mit_vorbehalt' | 'verweigert'
+import {
+  ABNAHME_ERGEBNIS_LABEL,
+  type AbnahmeErgebnisKey,
+} from '@/lib/status/status-vokabular'
+
+export type AbnahmeErgebnis = AbnahmeErgebnisKey
+
+export { ABNAHME_ERGEBNIS_LABEL }
 
 export type AbnahmeProtokollMeta = {
   uebergabe_uhrzeit: string
@@ -33,12 +40,6 @@ export type AbnahmeProtokollMeta = {
   signature_hw_url?: string | null
   kunde_unterschrift_name?: string | null
   hw_unterschrift_name?: string | null
-}
-
-export const ABNAHME_ERGEBNIS_LABEL: Record<AbnahmeErgebnis, string> = {
-  abgenommen: 'Die Leistungen werden abgenommen',
-  mit_vorbehalt: 'Die Leistungen werden unter Vorbehalt abgenommen',
-  verweigert: 'Die Abnahme wird verweigert',
 }
 
 export const DEFAULT_ABNAHME_RECHTSHINWEISE = [

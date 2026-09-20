@@ -50,7 +50,7 @@ export function phaseSummary(phase: KiPhase, byBereich: Map<string, KiClusterAna
   if (phase.id === 'qualitaet') {
     const bew = byBereich.get('bewertungen')
     if (!bew || bew.sample_size === 0) {
-      return 'Nach Projektabschluss Handwerker im Auftrag bewerten.'
+      return 'Nach Projektabschluss Partner im Auftrag bewerten.'
     }
     return undefined
   }

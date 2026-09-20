@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { AngebotNeuForm } from '@/components/angebote/AngebotNeuForm'
 import type { Gewerk, Handwerker, Preisliste } from '@/lib/types'
@@ -15,7 +16,6 @@ export default async function VorlageNeuPage() {
       .select('id, name, email, telefon, gewerke, aktiv, firma')
       .eq('aktiv', true),
   ])
-
   return (
     <AngebotNeuForm
       gewerke={(gewerke ?? []) as Gewerk[]}

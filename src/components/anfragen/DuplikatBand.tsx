@@ -1,4 +1,8 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockSelect } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
@@ -9,6 +13,8 @@ import {
   zusammenfuehrenLeadDuplikat,
 } from '@/app/(dashboard)/anfragen/duplikat-actions'
 import { dismissDuplikatBand } from '@/app/(dashboard)/anfragen/actions'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 /** Phase 10: Duplikat-Band im Anfrage-Detail. */
 export function DuplikatBand({
@@ -29,6 +35,7 @@ export function DuplikatBand({
   onForceOpenHandled?: () => void
   onDismissed?: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [kandidaten, setKandidaten] = useState<{ id: string; label: string }[]>([])
@@ -57,7 +64,7 @@ export function DuplikatBand({
   if (alreadyMerged) {
     return (
       <div
-        className="rounded-lg border border-bw-border bg-bw-surface-2/50 px-3 py-2.5 text-[length:var(--fs-text)] text-bw-text"
+        className="rounded-card border border-bw-border bg-bw-surface-2/50 px-3 py-2.5 text-[length:var(--fs-text)] text-bw-text"
         role="status"
       >
         Diese Anfrage wurde zusammengeführt →{' '}
@@ -73,7 +80,7 @@ export function DuplikatBand({
 
   function merge() {
     if (!zielId) {
-      toast.error('Bitte Ziel-Anfrage wählen.')
+      applyFieldErrors({ _form: TOAST.bitte_ziel_anfrage_waehlen })
       return
     }
     startTransition(async () => {
@@ -82,17 +89,17 @@ export function DuplikatBand({
         zielLeadId: zielId,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Zusammengeführt — Duplikat bleibt sichtbar', {
+      toast.success(TOAST.zusammengefuehrt_duplikat_bleibt_sichtbar, {
         action: {
           label: 'Zum Ziel',
           onClick: () => router.push(`/anfragen/${zielId}`),
         },
       })
       setOpen(false)
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -100,19 +107,19 @@ export function DuplikatBand({
     startTransition(async () => {
       const r = await dismissDuplikatBand(leadId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       setOpen(false)
-      onDismissed?.()
-      router.refresh()
+      if (onDismissed) onDismissed()
+      else afterServerActionRefresh()
     })
   }
 
   if (!bandVisible && open) {
     return (
       <div
-        className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[length:var(--fs-text)] text-amber-950"
+        className="rounded-card border border-[color-mix(in_srgb,var(--yel-tx)_40%,var(--border))] bg-[var(--yel-bg)]0/10 px-3 py-2.5 text-[length:var(--fs-text)] text-[var(--yel-tx)]"
         role="status"
       >
         <p className="font-medium">Zusammenführen</p>
@@ -130,34 +137,25 @@ export function DuplikatBand({
 
   return (
     <div
-      className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[length:var(--fs-text)] text-amber-950"
+      className="rounded-card border border-[color-mix(in_srgb,var(--yel-tx)_40%,var(--border))] bg-[var(--yel-bg)]0/10 px-3 py-2.5 text-[length:var(--fs-text)] text-[var(--yel-tx)]"
       role="status"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-medium">Mögliches Duplikat</p>
-          <p className="mt-0.5 text-[length:var(--fs-meta)] text-amber-900/90">
+          <p className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--yel-tx)]">
             Gleiche Tel/Mail oder gleiches Objekt in den letzten 30 Tagen — prüfen und ggf.
             zusammenführen.
           </p>
         </div>
-        <button
-          type="button"
-          className="shrink-0 text-[length:var(--fs-meta)] underline"
-          onClick={dismiss}
-          disabled={pending}
-        >
-          Schließen
-        </button>
+        <MockBtn className="shrink-0 text-[length:var(--fs-meta)] underline" type="button" onClick={dismiss} disabled={pending}>
+          Abbrechen
+        </MockBtn>
       </div>
       {!open ? (
-        <button
-          type="button"
-          className="mt-2 text-[length:var(--fs-meta)] font-semibold underline"
-          onClick={() => setOpen(true)}
-        >
+        <MockBtn className="mt-2 text-[length:var(--fs-meta)] font-semibold underline" type="button" onClick={() => setOpen(true)}>
           Zusammenführen
-        </button>
+        </MockBtn>
       ) : (
         <MergeForm
           kandidaten={kandidaten}
@@ -191,31 +189,22 @@ function MergeForm({
     <div className="mt-2 space-y-2">
       <label className="block text-[length:var(--fs-meta)] font-medium">
         Ziel-Anfrage behalten
-        <select
-          className="mt-1 w-full rounded-md border border-amber-500/30 bg-white px-2 py-1.5 text-[length:var(--fs-text)]"
-          value={zielId}
-          onChange={(e) => setZielId(e.target.value)}
-        >
+        <MockSelect className="mt-1 w-full rounded-field border border-[color-mix(in_srgb,var(--yel-tx)_30%,var(--border))] bg-white px-2 py-1.5 text-[length:var(--fs-text)]" value={zielId} onChange={(e) => setZielId(e.target.value)}>
           <option value="">— wählen —</option>
           {kandidaten.map((k) => (
             <option key={k.id} value={k.id}>
               {k.label}
             </option>
           ))}
-        </select>
+        </MockSelect>
       </label>
       <div className="flex gap-2">
-        <button type="button" className="text-[length:var(--fs-meta)] underline" onClick={onCancel}>
+        <MockBtn className="text-[length:var(--fs-meta)] underline" type="button" onClick={onCancel}>
           Abbrechen
-        </button>
-        <button
-          type="button"
-          className="rounded-md bg-amber-900 px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-white disabled:opacity-50"
-          disabled={pending || !zielId}
-          onClick={onMerge}
-        >
+        </MockBtn>
+        <MockBtn className="rounded-button bg-[var(--yel-tx)] px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-white disabled:opacity-50" type="button" disabled={pending || !zielId} onClick={onMerge}>
           Zusammenführen
-        </button>
+        </MockBtn>
       </div>
     </div>
   )

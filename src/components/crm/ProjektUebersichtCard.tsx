@@ -4,7 +4,7 @@ import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
-import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatDatum, formatPreis } from '@/lib/utils'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
@@ -57,7 +57,7 @@ export function ProjektUebersichtCard({ kontext }: Props) {
                     {a.angebotsnr?.trim() || a.id.slice(0, 8).toUpperCase()}
                   </Link>
                   <span className="flex items-center gap-2">
-                    <AngebotEinfachStatusBadge
+                    <StatusBadge
                       status={resolveStatusEinfach({
                         status: a.status as AngebotStatus,
                         status_einfach: a.status_einfach,

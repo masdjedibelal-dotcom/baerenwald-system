@@ -1,7 +1,9 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type StaffChoiceOption = {
   value: string
@@ -47,12 +49,7 @@ export function StaffChoiceGrid({
       {options.map((o) => {
         const selected = multi ? values?.includes(o.value) : value === o.value
         return (
-          <button
-            key={o.value}
-            type="button"
-            className={cn('funnel-tile', multi && 'multi', selected && 'selected')}
-            onClick={() => (multi ? onToggle?.(o.value) : onChange?.(o.value))}
-          >
+          <MockBtn className={cn('funnel-tile', multi && 'multi', selected && 'selected')} key={o.value} type="button" onClick={() => (multi ? onToggle?.(o.value) : onChange?.(o.value))}>
             <span className="funnel-tile-check" aria-hidden />
             {o.icon ? (
               <span className="funnel-tile-icon-wrap" aria-hidden>
@@ -62,7 +59,7 @@ export function StaffChoiceGrid({
             <p className="funnel-tile-label">{o.label}</p>
             {o.hint ? <p className="funnel-tile-hint">{o.hint}</p> : null}
             {o.tag ? <span className="funnel-tile-tag">{o.tag}</span> : null}
-          </button>
+          </MockBtn>
         )
       })}
     </div>
@@ -71,13 +68,9 @@ export function StaffChoiceGrid({
 
 export function StaffSkipHint({ onSkip }: { onSkip: () => void }) {
   return (
-    <button
-      type="button"
-      className="mt-4 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)] underline-offset-2 hover:text-[var(--text)] hover:underline"
-      onClick={onSkip}
-    >
+    <MockBtn className="mt-4 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)] underline-offset-2 hover:text-[var(--text)] hover:underline" type="button" onClick={onSkip}>
       Weiß ich nicht / überspringen
-    </button>
+    </MockBtn>
   )
 }
 
@@ -122,11 +115,7 @@ export function StaffPreisIndikation({
   komplex?: boolean
 }) {
   const fmt = (n: number) =>
-    new Intl.NumberFormat('de-DE', {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0,
-    }).format(n)
+    formatEuro(n, { style: 'currency' })
 
   const empty = komplex || (min == null && max == null)
   const hasRange = !empty && min != null && max != null && min !== max

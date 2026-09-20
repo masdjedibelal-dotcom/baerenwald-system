@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -29,7 +30,8 @@ export async function POST(
     return NextResponse.json({ error: 'kundeId fehlt' }, { status: 400 })
   }
 
-  const { data: kunde } = await supabase.from('kunden').select('id').eq('id', kundeId).maybeSingle()
+  const {data: kunde, error} = await supabase.from('kunden').select('id').eq('id', kundeId).maybeSingle()
+  if (error) logDbError('app/api/kunden/[kundeId]/dokument/upload/route:kunden', error)
   if (!kunde) {
     return NextResponse.json({ error: 'Kunde nicht gefunden' }, { status: 404 })
   }
@@ -58,6 +60,7 @@ export async function POST(
   const { error: upErr } = await supabaseAdmin.storage
     .from(KUNDEN_DOKUMENTE_BUCKET)
     .upload(path, buf, { contentType: type, upsert: false })
+  if (upErr) logDbError('app/api/kunden/[kundeId]/dokument/upload/route:query', upErr)
 
   if (upErr) {
     const raw = upErr.message ?? ''

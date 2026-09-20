@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -19,11 +25,12 @@ async function resolveNotmassnahmeHandwerkerId(explicit?: string): Promise<strin
   const id = explicit?.trim()
   if (id) return id
 
-  const { data: rows } = await supabaseAdmin
+  const { data: rows, error } = await supabaseAdmin
     .from('handwerker')
     .select('id, gewerke, name')
     .order('name', { ascending: true })
     .limit(40)
+  if (error) logDbError('lib/org/hv-lead-actions:handwerker', error)
 
   const list = rows ?? []
   const sanitaer = list.find((h) => {
@@ -54,6 +61,7 @@ export async function disponiereHavarieNotmassnahme(
     )
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/org/hv-lead-actions:leads', error)
 
   if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden.' }
   if (!leadIstHavarie(lead)) {
@@ -69,13 +77,14 @@ export async function disponiereHavarieNotmassnahme(
   const now = new Date().toISOString()
 
   let auftragId: string
-  const { data: existingAuftrag } = await db
+  const { data: existingAuftrag, error: error2 } = await db
     .from('auftraege')
     .select('id')
     .eq('lead_id', id)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error2) logDbError('lib/org/hv-lead-actions:auftraege', error2)
 
   if (existingAuftrag?.id) {
     auftragId = String(existingAuftrag.id)
@@ -92,6 +101,7 @@ export async function disponiereHavarieNotmassnahme(
       })
       .select('id')
       .single()
+    if (aErr) logDbError('lib/org/hv-lead-actions:auftraege', aErr)
 
     if (aErr || !neu?.id) {
       return { ok: false, message: aErr?.message ?? 'Auftrag konnte nicht angelegt werden.' }
@@ -99,22 +109,24 @@ export async function disponiereHavarieNotmassnahme(
     auftragId = String(neu.id)
   }
 
-  const { data: zuweisung } = await db
+  const { data: zuweisung, error: error3 } = await db
     .from('auftrag_handwerker')
     .select('id')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', hwId)
     .maybeSingle()
+  if (error3) logDbError('lib/org/hv-lead-actions:auftrag_handwerker', error3)
 
   if (!zuweisung?.id) {
-    await db.from('auftrag_handwerker').insert({
+    const { error: __dbErr1 } = await db.from('auftrag_handwerker').insert({
       auftrag_id: auftragId,
       handwerker_id: hwId,
       status: 'zugewiesen',
     })
+    if (__dbErr1) logDbError('lib/org/hv-lead-actions:auftrag_handwerker', __dbErr1)
   }
 
-  await db
+  const { error: __dbErr2 } = await db
     .from('leads')
     .update({
       hv_meldung_status: 'notmassnahme',
@@ -122,6 +134,7 @@ export async function disponiereHavarieNotmassnahme(
       updated_at: now,
     })
     .eq('id', id)
+  if (__dbErr2) logDbError('lib/org/hv-lead-actions:leads', __dbErr2)
 
   await writeAuditEvent({
     entityType: 'lead',
@@ -133,7 +146,7 @@ export async function disponiereHavarieNotmassnahme(
     payload: { handwerker_id: hwId, auftrag_id: auftragId },
   })
 
-  revalidatePath(`/anfragen/${id}`)
+  revalidateLeadDetail(id)
   return { ok: true, auftragId }
 }
 
@@ -150,11 +163,12 @@ export async function schlageKostentraegerVor(
   const kt = kostentraeger?.trim()
   if (!id || !kt) return { ok: false, message: 'Lead oder Kostenträger fehlt.' }
 
-  const { data: lead } = await db
+  const { data: lead, error } = await db
     .from('leads')
     .select('id, auftraggeber_kunde_id, kostentraeger')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/org/hv-lead-actions:leads', error)
 
   if (!lead?.auftraggeber_kunde_id) {
     return { ok: false, message: 'Kein HV-Vorgang.' }
@@ -168,7 +182,8 @@ export async function schlageKostentraegerVor(
   }
   if (versicherungsNr?.trim()) patch.versicherungs_nr = versicherungsNr.trim()
 
-  await db.from('leads').update(patch).eq('id', id)
+  const { error: __dbErr3 } = await db.from('leads').update(patch).eq('id', id)
+  if (__dbErr3) logDbError('lib/org/hv-lead-actions:leads', __dbErr3)
 
   await writeAuditEvent({
     entityType: 'lead',
@@ -180,7 +195,7 @@ export async function schlageKostentraegerVor(
     payload: { von: lead.kostentraeger, nach: kt },
   })
 
-  revalidatePath(`/anfragen/${id}`)
+  revalidateLeadDetail(id)
   return { ok: true }
 }
 
@@ -227,8 +242,8 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
     payload: { angebot_id: input.angebotId, notiz: input.anpassungNotiz.trim() },
   })
 
-  revalidatePath(`/anfragen/${input.leadId.trim()}`)
-  revalidatePath(`/angebote/${input.angebotId.trim()}`)
+  revalidateLeadDetail(input.leadId.trim())
+  revalidateAngebotDetail(input.angebotId.trim())
   return {
     ok: true,
     mailOk: r.mailOk,

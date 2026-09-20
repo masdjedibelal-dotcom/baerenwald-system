@@ -1,10 +1,12 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
-
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
-import { Textarea } from '@/components/ui/Textarea'
 import { saveLeadProjektWasZeilen } from '@/app/(dashboard)/anfragen/actions'
 import {
   neueWasZeilenId,
@@ -20,6 +22,8 @@ import {
   groesseEinheitLabel,
   isMengeEinheitMengeMalEinheitspreis,
 } from '@/lib/dokument-einheiten'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function neueLeereZeile(): ProjektWasZeile {
   return {
@@ -73,6 +77,7 @@ export const LeadProjektWasBlock = forwardRef<LeadProjektWasBlockHandle, Props>(
   { lead, gewerke = [], preislisten = [], onSaved },
   ref
 ) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors } = useFieldErrors()
   const [pending, startTransition] = useTransition()
   const [zeilen, setZeilen] = useState<ProjektWasZeile[]>(() =>
     parseProjektWasZeilen(lead.funnel_daten, {
@@ -96,14 +101,15 @@ export const LeadProjektWasBlock = forwardRef<LeadProjektWasBlockHandle, Props>(
     )
     setOpenId(null)
     setDirty(false)
-  }, [lead.funnel_daten, lead.bereiche, lead.situation, gewerke])
+    clearFieldErrors()
+  }, [lead.funnel_daten, lead.bereiche, lead.situation, gewerke, clearFieldErrors])
 
   const persist = useCallback(
     (next: ProjektWasZeile[], successMsg = 'Gespeichert') => {
       startTransition(async () => {
         const res = await saveLeadProjektWasZeilen(lead.id, next)
         if (!res.ok) {
-          toast.error(res.message)
+          toast.systemError(res)
           return
         }
         setZeilen(next)
@@ -116,9 +122,10 @@ export const LeadProjektWasBlock = forwardRef<LeadProjektWasBlockHandle, Props>(
   )
 
   const patchLocal = useCallback((id: string, patch: Partial<ProjektWasZeile>) => {
+    clearFieldErrors()
     setZeilen((prev) => prev.map((z) => (z.id === id ? { ...z, ...patch } : z)))
     setDirty(true)
-  }, [])
+  }, [clearFieldErrors])
 
   const toggleRelevant = useCallback(
     (id: string, checked: boolean) => {
@@ -162,21 +169,26 @@ export const LeadProjektWasBlock = forwardRef<LeadProjektWasBlockHandle, Props>(
         return
       }
       if (!row.gewerk_id && hatPreisliste) {
-        toast.error('Bitte ein Gewerk wählen.')
+        applyFieldErrors({ _form: TOAST.bitte_ein_gewerk_waehlen })
         return
       }
       if (hatPreisliste && !row.preisliste_id && !row.titel.trim()) {
-        toast.error('Bitte eine Leistung aus der Liste wählen.')
+        applyFieldErrors({ _form: TOAST.bitte_eine_leistung_aus_der_liste_waehlen })
         return
       }
       setOpenId(null)
       if (dirty) persist(zeilen)
     },
-    [zeilen, dirty, persist, hatPreisliste]
+    [zeilen, dirty, persist, hatPreisliste, applyFieldErrors]
   )
 
   return (
     <div className="konkrete-leistungen-block">
+      {fieldErrors._form ? (
+        <p className="field-error" role="alert">
+          {fieldErrors._form}
+        </p>
+      ) : null}
       <div className="props lead-konkrete-props">
         {zeilen.map((z) => (
           <ProjektLeistungAccordion
@@ -297,10 +309,7 @@ function ProjektLeistungAccordion({
         <div className="prop-v lead-prop-beschreibung">
           <span className="lead-prop-desc">{beschreibungAnzeige}</span>
         </div>
-        <ChevronDown
-          className={cn('lead-prop-chevron h-3.5 w-3.5 shrink-0', open && 'open')}
-          aria-hidden
-        />
+        <MockIcon n="chevron-down" ctx="default" className={cn('lead-prop-chevron h-3.5 w-3.5 shrink-0', open && 'open')} aria-hidden />
       </div>
 
       {open ? (
@@ -311,11 +320,7 @@ function ProjektLeistungAccordion({
                 <WizardField
                   label="Gewerk"
                 >
-                  <select
-                    className="input w-full"
-                    value={zeile.gewerk_id ?? ''}
-                    disabled={pending}
-                    onChange={(e) => {
+                  <MockSelect className="w-full" value={zeile.gewerk_id ?? ''} disabled={pending} onChange={(e) => {
                       const gid = e.target.value
                       onPatch({
                         gewerk_id: gid || undefined,
@@ -324,8 +329,7 @@ function ProjektLeistungAccordion({
                         beschreibung: undefined,
                         bereich_key: undefined,
                       })
-                    }}
-                  >
+                    }}>
                     <option value="">Gewerk wählen…</option>
                     {gewerke
                       .filter((g) => g.aktiv !== false)
@@ -334,16 +338,11 @@ function ProjektLeistungAccordion({
                           {g.name}
                         </option>
                       ))}
-                  </select>
+                  </MockSelect>
                 </WizardField>
 
                 <WizardField label="Leistung" required>
-                  <select
-                    className="input w-full"
-                    value={leistungSelectValue}
-                    disabled={pending || !zeile.gewerk_id}
-                    onChange={(e) => applyPreisliste(e.target.value)}
-                  >
+                  <MockSelect className="w-full" value={leistungSelectValue} disabled={pending || !zeile.gewerk_id} onChange={(e) => applyPreisliste(e.target.value)}>
                     <option value="">
                       {zeile.gewerk_id ? 'Leistung wählen…' : 'Zuerst Gewerk wählen…'}
                     </option>
@@ -352,29 +351,18 @@ function ProjektLeistungAccordion({
                         {pl.leistung}
                       </option>
                     ))}
-                  </select>
+                  </MockSelect>
                 </WizardField>
               </>
             ) : (
               <>
                 <WizardField label="Leistung" required>
-                  <input
-                    className="input w-full"
-                    value={zeile.titel}
-                    disabled={pending}
-                    placeholder="z. B. Wandfliesen verlegen"
-                    autoFocus={isNew}
-                    onChange={(e) => onPatch({ titel: e.target.value })}
-                  />
+                  <MockInput className="w-full" value={zeile.titel} disabled={pending} placeholder="z. B. Wandfliesen verlegen" autoFocus={isNew} onChange={(e) => onPatch({ titel: e.target.value })} />
                 </WizardField>
                 <WizardField
                   label="Gewerk"
                 >
-                  <select
-                    className="input w-full"
-                    value={zeile.gewerk_id ?? ''}
-                    disabled={pending}
-                    onChange={(e) => {
+                  <MockSelect className="w-full" value={zeile.gewerk_id ?? ''} disabled={pending} onChange={(e) => {
                       const gid = e.target.value
                       const gewerk = gewerkById(gewerke, gid)
                       const hinweis = gewerk
@@ -385,8 +373,7 @@ function ProjektLeistungAccordion({
                         preisliste_id: undefined,
                         beschreibung: hinweis || undefined,
                       })
-                    }}
-                  >
+                    }}>
                     <option value="">Gewerk wählen…</option>
                     {gewerke
                       .filter((g) => g.aktiv !== false)
@@ -395,55 +382,35 @@ function ProjektLeistungAccordion({
                           {g.name}
                         </option>
                       ))}
-                  </select>
+                  </MockSelect>
                 </WizardField>
               </>
             )}
 
             <WizardField label="Beschreibung" full>
-              <Textarea
-                rows={3}
-                disabled={pending}
-                value={zeile.beschreibung ?? ''}
-                placeholder="z. B. inkl. Untergrund vorbereiten, Material, Endreinigung"
-                onChange={(e) => onPatch({ beschreibung: e.target.value })}
-              />
+              <RichTextEditor value={typeof (zeile.beschreibung ?? '') === 'string' ? (zeile.beschreibung ?? '') : ''} onChange={(__v) => onPatch({ beschreibung: __v })} disabled={pending} placeholder="z. B. inkl. Untergrund vorbereiten, Material, Endreinigung" minHeight={120} aria-label="z. B. inkl. Untergrund vorbereiten, Material, Endreinigung" />
             </WizardField>
 
             <WizardField label="Menge">
               <div className="lead-leistung-menge">
-                <input
-                  className="input min-w-0 flex-1"
-                  type="number"
-                  step="0.5"
-                  min={0.01}
-                  disabled={pending}
-                  value={zeile.menge}
-                  onChange={(e) => {
+                <MockInput className="min-w-0 flex-1" type="number" step="0.5" min={0.01} disabled={pending} value={zeile.menge} onChange={(e) => {
                     const v = Number(e.target.value)
                     onPatch({
                       menge: Number.isFinite(v) && v > 0 ? v : 1,
                     })
-                  }}
-                />
-                <select
-                  className="input shrink-0"
-                  value={zeile.einheit}
-                  disabled={pending}
-                  onChange={(e) => onPatch({ einheit: e.target.value })}
-                >
+                  }} />
+                <MockSelect className="shrink-0" value={zeile.einheit} disabled={pending} onChange={(e) => onPatch({ einheit: e.target.value })}>
                   {POSITION_MENGE_EINHEITEN.map((u) => (
                     <option key={u} value={u}>
                       {groesseEinheitLabel(u)}
                     </option>
                   ))}
-                </select>
+                </MockSelect>
               </div>
             </WizardField>
 
             <label className="lead-leistung-invoice-toggle">
-              <input
-                type="checkbox"
+              <MockCheckbox
                 checked={inRechnung}
                 disabled={pending}
                 onChange={(e) => onToggleRelevant(e.target.checked)}
@@ -452,25 +419,15 @@ function ProjektLeistungAccordion({
             </label>
 
             <div className="lead-leistung-panel-foot">
-              <button
-                type="button"
-                className="btn ghost sm gap-1.5"
-                disabled={pending}
-                onClick={onRemove}
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                Entfernen
-              </button>
+              <MockBtn kind="ghost" sm className="gap-1.5" type="button" disabled={pending} onClick={onRemove}>
+                <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                Löschen
+              </MockBtn>
               <div className="flex-1" />
-              <button
-                type="button"
-                className="btn primary sm gap-1.5"
-                disabled={pending}
-                onClick={onClose}
-              >
-                <Check className="h-3.5 w-3.5" aria-hidden />
+              <MockBtn kind="primary" sm className="gap-1.5" type="button" disabled={pending} onClick={onClose}>
+                <MockIcon n="check" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                 Speichern
-              </button>
+              </MockBtn>
             </div>
           </div>
         </>

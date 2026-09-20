@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createSign, randomBytes } from 'crypto'
 import { getPublicAppUrl } from '@/lib/utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -78,6 +79,7 @@ export async function resolveGscRefreshToken(): Promise<string | null> {
     .select('value')
     .eq('key', GSC_OAUTH_REFRESH_TOKEN_KEY)
     .maybeSingle()
+  if (error) logDbError('lib/ki-hub/sources/gsc-auth:einstellungen', error)
 
   if (error) return null
   const value = data?.value?.trim()
@@ -93,6 +95,7 @@ export async function saveGscOAuthRefreshToken(token: string): Promise<void> {
     },
     { onConflict: 'key' }
   )
+  if (error) logDbError('lib/ki-hub/sources/gsc-auth:einstellungen', error)
   if (error) throw new Error(error.message)
 }
 

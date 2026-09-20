@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateKundeDetail, revalidateKundeObjekt, revalidateLeadList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { OBJEKT_ANLAGE_STATUS, OBJEKT_KONTAKT_ROLLEN, OBJEKT_ANLAGE_WARTUNGSINTERVALL } from '@/lib/objektakte/labels'
 import { resolveObjektVorgangKosten } from '@/lib/objektakte/resolve-objekt-vorgang-kosten'
@@ -22,12 +28,13 @@ import type {
 
 async function assertObjektGehoertKunde(kundeId: string, objektId: string): Promise<boolean> {
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('kunden_objekte')
     .select('id')
     .eq('id', objektId)
     .eq('kunde_id', kundeId)
     .maybeSingle()
+  if (error) logDbError('app/actions/objektakte-actions:kunden_objekte', error)
   return Boolean(data)
 }
 
@@ -38,12 +45,13 @@ async function assertEinheitGehoertObjekt(
 ): Promise<boolean> {
   if (!(await assertObjektGehoertKunde(kundeId, objektId))) return false
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('objekt_einheiten')
     .select('id')
     .eq('id', einheitId)
     .eq('kunde_objekt_id', objektId)
     .maybeSingle()
+  if (error) logDbError('app/actions/objektakte-actions:objekt_einheiten', error)
   return Boolean(data)
 }
 
@@ -65,9 +73,9 @@ function validateBewohnerInput(input: EinheitBewohnerInput): string | null {
 }
 
 function revalidateObjektAkte(kundeId: string, objektId: string) {
-  revalidatePath(`/kunden/${kundeId}`)
-  revalidatePath(`/kunden/${kundeId}/objekte/${objektId}`)
-  revalidatePath('/anfragen')
+  revalidateKundeDetail(kundeId)
+  revalidateKundeObjekt(kundeId, objektId)
+  revalidateLeadList()
 }
 
 function parseFlaeche(value: number | null | undefined): number | null {
@@ -107,6 +115,7 @@ async function insertBewohnerRow(
     .insert(insertRow)
     .select('*, objekt_einheiten(bezeichnung, etage)')
     .single()
+  if (error) logDbError('app/actions/objektakte-actions:einheit_bewohner', error)
 
   if (error && /etage/i.test(error.message)) {
     const retry = await supabase
@@ -176,6 +185,7 @@ export async function createObjektKontakt(
     })
     .select('*')
     .single()
+  if (error) logDbError('app/actions/objektakte-actions:objekt_kontakte', error)
 
   if (error || !data) {
     return { ok: false, message: error?.message ?? 'Kontakt konnte nicht angelegt werden.' }
@@ -212,6 +222,7 @@ export async function updateObjektKontakt(
     .eq('id', kontaktId)
     .eq('kunde_id', kundeId)
     .eq('kunde_objekt_id', objektId)
+  if (error) logDbError('app/actions/objektakte-actions:objekt_kontakte', error)
 
   if (error) return { ok: false, message: error.message }
   revalidateObjektAkte(kundeId, objektId)
@@ -230,6 +241,30 @@ export async function deleteObjektKontakt(
     .eq('id', kontaktId)
     .eq('kunde_id', kundeId)
     .eq('kunde_objekt_id', objektId)
+  if (error) logDbError('app/actions/objektakte-actions:objekt_kontakte', error)
+<<<<<<< Updated upstream
+
+  if (error) return { ok: false, message: error.message }
+  revalidateObjektAkte(kundeId, objektId)
+  return { ok: true }
+}
+
+/** Soft-Delete rückgängig (Undo-Toast). */
+export async function restoreObjektKontakt(
+  kundeId: string,
+  objektId: string,
+  kontaktId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('objekt_kontakte')
+    .update({ aktiv: true, updated_at: new Date().toISOString() })
+    .eq('id', kontaktId)
+    .eq('kunde_id', kundeId)
+    .eq('kunde_objekt_id', objektId)
+  if (error) logDbError('app/actions/objektakte-actions:objekt_kontakte', error)
+=======
+>>>>>>> Stashed changes
 
   if (error) return { ok: false, message: error.message }
   revalidateObjektAkte(kundeId, objektId)
@@ -282,13 +317,14 @@ export async function createObjektMieter(
 
   const supabase = createClient()
 
-  const { data: existing } = await supabase
+  const { data: existing, error } = await supabase
     .from('objekt_einheiten')
     .select('id')
     .eq('kunde_objekt_id', objektId)
     .eq('aktiv', true)
     .ilike('bezeichnung', bezeichnung)
     .maybeSingle()
+  if (error) logDbError('app/actions/objektakte-actions:objekt_einheiten', error)
 
   let einheitId = existing?.id ?? ''
   if (!einheitId) {
@@ -308,16 +344,18 @@ export async function createObjektMieter(
         .from('objekt_einheiten')
         .update(patch)
         .eq('id', einheitId)
+      if (upErr) logDbError('app/actions/objektakte-actions:objekt_einheiten', upErr)
       if (upErr && /etage/i.test(upErr.message) && flaeche != null) {
-        await supabase
+        const { error: __dbErr1 } = await supabase
           .from('objekt_einheiten')
           .update({ wohnflaeche_m2: flaeche, updated_at: new Date().toISOString() })
           .eq('id', einheitId)
+        if (__dbErr1) logDbError('app/actions/objektakte-actions:objekt_einheiten', __dbErr1)
       }
     }
   }
 
-  const { data, error } = await insertBewohnerRow(kundeId, einheitId, {
+  const { data, error: error2 } = await insertBewohnerRow(kundeId, einheitId, {
     name,
     telefon: input.telefon,
     email: input.email,
@@ -325,8 +363,8 @@ export async function createObjektMieter(
     sondereigentum_verwaltung: input.sondereigentum_verwaltung,
     miete_hinweis: input.miete_hinweis,
   })
-  if (error || !data) {
-    return { ok: false, message: error ?? 'Mieter konnte nicht angelegt werden.' }
+  if (error2 || !data) {
+    return { ok: false, message: error2 ?? 'Mieter konnte nicht angelegt werden.' }
   }
 
   revalidateObjektAkte(kundeId, objektId)
@@ -383,6 +421,7 @@ export async function updateEinheitBewohner(
     .update(patch)
     .eq('id', bewohnerId)
     .eq('kunde_id', kundeId)
+  if (error) logDbError('app/actions/objektakte-actions:einheit_bewohner', error)
 
   if (error && /rolle|sondereigentum|miete_hinweis/i.test(error.message)) {
     const legacy: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -413,6 +452,7 @@ export async function deleteEinheitBewohner(
     .update({ aktiv: false, updated_at: new Date().toISOString() })
     .eq('id', bewohnerId)
     .eq('kunde_id', kundeId)
+  if (error) logDbError('app/actions/objektakte-actions:einheit_bewohner', error)
 
   if (error) return { ok: false, message: error.message }
   revalidateObjektAkte(kundeId, objektId)
@@ -454,6 +494,7 @@ export async function assignExistingEigentuemerToEinheit(
     .eq('kunde_id', kundeId)
     .eq('aktiv', true)
     .maybeSingle()
+  if (srcErr) logDbError('app/actions/objektakte-actions:einheit_bewohner', srcErr)
 
   if (srcErr || !source?.id) {
     return { ok: false, message: 'Eigentümer nicht gefunden.' }
@@ -463,12 +504,13 @@ export async function assignExistingEigentuemerToEinheit(
   }
 
   // Quelle muss zu einer Einheit dieses Objekts gehören
-  const { data: srcEinheit } = await supabase
+  const { data: srcEinheit, error: error2 } = await supabase
     .from('objekt_einheiten')
     .select('id')
     .eq('id', String(source.objekt_einheit_id))
     .eq('kunde_objekt_id', objektId)
     .maybeSingle()
+  if (error2) logDbError('app/actions/objektakte-actions:objekt_einheiten', error2)
   if (!srcEinheit?.id) {
     return { ok: false, message: 'Eigentümer gehört nicht zu diesem Objekt.' }
   }
@@ -525,6 +567,7 @@ export async function assignExistingEigentuemerToEinheit(
     .insert(insertRow)
     .select('*, objekt_einheiten(bezeichnung, etage)')
     .single()
+  if (error) logDbError('app/actions/objektakte-actions:einheit_bewohner', error)
 
   if (error && /portal_kunde_id/i.test(error.message)) {
     delete insertRow.portal_kunde_id
@@ -567,16 +610,14 @@ export async function checkPortalEmailRegistered(
     return { ok: true, registered: false, kundeId: null }
   }
 
-  const { withCrmReadFallback } = await import('@/lib/kunden/kunden-db')
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db
+  const { createClient } = await import('@/lib/supabase-server')
+  const { data, error } = await (() => { const db = createClient(); return db
       .from('kunden')
       .select('id, auth_user_id')
       .ilike('email', mail)
       .not('auth_user_id', 'is', null)
       .limit(1)
-      .maybeSingle()
-  )
+      .maybeSingle() })()
 
   if (error) return { ok: false, message: error.message }
   const row = data as { id?: string; auth_user_id?: string | null } | null
@@ -612,6 +653,7 @@ export async function inviteEinheitBewohnerPortal(
     .eq('kunde_id', kundeId)
     .eq('aktiv', true)
     .maybeSingle()
+  if (bErr) logDbError('app/actions/objektakte-actions:einheit_bewohner', bErr)
 
   if (bErr || !bewohner?.id) {
     return { ok: false, message: 'Person nicht gefunden.' }
@@ -627,11 +669,12 @@ export async function inviteEinheitBewohnerPortal(
     return { ok: false, message: 'Einheit nicht gefunden.' }
   }
 
-  const { data: einheit } = await supabase
+  const { data: einheit, error: error2 } = await supabase
     .from('objekt_einheiten')
     .select('bezeichnung')
     .eq('id', einheitId)
     .maybeSingle()
+  if (error2) logDbError('app/actions/objektakte-actions:objekt_einheiten', error2)
 
   const {
     createPortalEinladungToken,
@@ -642,7 +685,7 @@ export async function inviteEinheitBewohnerPortal(
 
   const token = createPortalEinladungToken()
   const expires_at = portalEinladungExpiresAt().toISOString()
-  const { data, error } = await supabase
+  const { data, error: error3 } = await supabase
     .from('portal_einladungen')
     .insert({
       token,
@@ -656,14 +699,15 @@ export async function inviteEinheitBewohnerPortal(
     })
     .select('token')
     .single()
+  if (error3) logDbError('app/actions/objektakte-actions:portal_einladungen', error3)
 
-  if (error) {
-    const missing = /portal_einladungen|does not exist|relation/i.test(error.message)
+  if (error3) {
+    const missing = /portal_einladungen|does not exist|relation/i.test(error3.message)
     return {
       ok: false,
       message: missing
         ? 'Einladungs-Tabelle noch nicht freigeschaltet (Migration).'
-        : error.message,
+        : error3.message,
     }
   }
 
@@ -698,13 +742,14 @@ export async function createObjektEinheit(
   const flaeche = parseFlaeche(input.wohnflaeche_m2 ?? null)
 
   const supabase = createClient()
-  const { data: maxRow } = await supabase
+  const { data: maxRow, error: maxErr } = await supabase
     .from('objekt_einheiten')
     .select('sort_order')
     .eq('kunde_objekt_id', objektId)
     .order('sort_order', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (maxErr) logDbError('app/actions/objektakte-actions:objekt_einheiten', maxErr)
 
   const base = {
     kunde_objekt_id: objektId,
@@ -718,6 +763,7 @@ export async function createObjektEinheit(
     .insert({ ...base, etage })
     .select('*')
     .single()
+  if (error) logDbError('app/actions/objektakte-actions:objekt_einheiten', error)
 
   if (error && /etage/i.test(error.message)) {
     const fallback = await supabase.from('objekt_einheiten').insert(base).select('*').single()
@@ -761,6 +807,7 @@ export async function updateObjektEinheit(
     .update(patch)
     .eq('id', einheitId)
     .eq('kunde_objekt_id', objektId)
+  if (error) logDbError('app/actions/objektakte-actions:objekt_einheiten', error)
 
   if (error && /etage/i.test(error.message)) {
     const withoutEtage = { ...patch }
@@ -801,6 +848,7 @@ export async function deleteObjektEinheit(
     .update({ aktiv: false, updated_at: now })
     .eq('id', einheitId)
     .eq('kunde_objekt_id', objektId)
+  if (error) logDbError('app/actions/objektakte-actions:objekt_einheiten', error)
 
   if (error) return { ok: false, message: error.message }
   revalidateObjektAkte(kundeId, objektId)
@@ -833,13 +881,14 @@ async function loadBewohnerForObjekt(
 ): Promise<EinheitBewohner | null> {
   if (!(await assertObjektGehoertKunde(hvKundeId, objektId))) return null
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('einheit_bewohner')
     .select('*, objekt_einheiten!inner(id, bezeichnung, kunde_objekt_id)')
     .eq('id', bewohnerId)
     .eq('kunde_id', hvKundeId)
     .eq('aktiv', true)
     .maybeSingle()
+  if (error) logDbError('app/actions/objektakte-actions:einheit_bewohner', error)
   if (!data) return null
   const einheit = data.objekt_einheiten as
     | { id: string; bezeichnung: string; kunde_objekt_id: string }
@@ -880,11 +929,12 @@ export async function createPrivatkundeFromBewohner(
 
   const linkId = opts?.linkExistingKundeId?.trim()
   if (linkId) {
-    const { data: existing } = await supabase
+    const { data: existing, error } = await supabase
       .from('kunden')
       .select('id, name, vorname, nachname, typ, email')
       .eq('id', linkId)
       .maybeSingle()
+    if (error) logDbError('app/actions/objektakte-actions:kunden', error)
     if (!existing) {
       return { ok: false, code: 'error', message: 'Kunde nicht gefunden.' }
     }
@@ -899,25 +949,27 @@ export async function createPrivatkundeFromBewohner(
         existingKundeTyp: String(existing.typ ?? ''),
       }
     }
-    const { error } = await supabase
+    const { error: error2 } = await supabase
       .from('einheit_bewohner')
       .update({ portal_kunde_id: linkId, updated_at: new Date().toISOString() })
       .eq('id', bewohnerId)
       .eq('kunde_id', hvKundeId)
-    if (error) return { ok: false, code: 'error', message: error.message }
+    if (error2) logDbError('app/actions/objektakte-actions:einheit_bewohner', error2)
+    if (error2) return { ok: false, code: 'error', message: error2.message }
     revalidateObjektAkte(hvKundeId, objektId)
-    revalidatePath(`/kunden/${linkId}`)
+    revalidateKundeDetail(linkId)
     return { ok: true, kundeId: linkId, created: false }
   }
 
   const email = bewohner.email?.trim() || null
   if (email) {
-    const { data: byMail } = await supabase
+    const { data: byMail, error } = await supabase
       .from('kunden')
       .select('id, name, vorname, nachname, typ, email')
       .ilike('email', email)
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('app/actions/objektakte-actions:kunden', error)
     if (byMail?.id) {
       if (istKundeHausverwaltungTyp(byMail.typ as string)) {
         return {
@@ -963,6 +1015,7 @@ export async function createPrivatkundeFromBewohner(
     })
     .select('id')
     .single()
+  if (createErr) logDbError('app/actions/objektakte-actions:kunden', createErr)
 
   if (createErr || !created?.id) {
     return {
@@ -978,13 +1031,14 @@ export async function createPrivatkundeFromBewohner(
     .update({ portal_kunde_id: newId, updated_at: new Date().toISOString() })
     .eq('id', bewohnerId)
     .eq('kunde_id', hvKundeId)
+  if (linkErr) logDbError('app/actions/objektakte-actions:einheit_bewohner', linkErr)
 
   if (linkErr) {
     return { ok: false, code: 'error', message: linkErr.message }
   }
 
   revalidateObjektAkte(hvKundeId, objektId)
-  revalidatePath(`/kunden/${newId}`)
+  revalidateKundeDetail(newId)
   return { ok: true, kundeId: newId, created: true }
 }
 
@@ -1026,6 +1080,7 @@ export async function loadBewohnerLinksForPrivatkunde(
     .eq('portal_kunde_id', kid)
     .eq('aktiv', true)
     .is('anonymisiert_am', null)
+  if (error) logDbError('app/actions/objektakte-actions:einheit_bewohner', error)
 
   if (error) {
     console.warn('loadBewohnerLinksForPrivatkunde:', error.message)
@@ -1034,10 +1089,11 @@ export async function loadBewohnerLinksForPrivatkunde(
   if (!rows?.length) return []
 
   const einheitIds = [...new Set(rows.map((r) => r.objekt_einheit_id as string).filter(Boolean))]
-  const { data: einheiten } = await supabase
+  const { data: einheiten, error: error2 } = await supabase
     .from('objekt_einheiten')
     .select('id, bezeichnung, kunde_objekt_id')
     .in('id', einheitIds)
+  if (error2) logDbError('app/actions/objektakte-actions:objekt_einheiten', error2)
 
   const objektIds = [
     ...new Set((einheiten ?? []).map((e) => e.kunde_objekt_id as string).filter(Boolean)),
@@ -1085,13 +1141,14 @@ async function assertAnlageGehoertObjekt(
 ): Promise<boolean> {
   if (!(await assertObjektGehoertKunde(kundeId, objektId))) return false
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('objekt_anlagen')
     .select('id')
     .eq('id', anlageId)
     .eq('kunde_objekt_id', objektId)
     .eq('kunde_id', kundeId)
     .maybeSingle()
+  if (error) logDbError('app/actions/objektakte-actions:objekt_anlagen', error)
   return Boolean(data)
 }
 
@@ -1184,8 +1241,7 @@ const ANLAGE_SELECT_WITHOUT_ETAGE =
   '*, gewerke(id, name, slug), objekt_einheiten(bezeichnung)'
 
 async function selectAnlageAfterWrite(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+  supabase: import('@supabase/supabase-js').SupabaseClient,
   id: string
 ): Promise<{ data: ObjektAnlage | null; error: string | null }> {
   const full = await supabase
@@ -1262,13 +1318,14 @@ export async function createObjektAnlage(
   }
 
   const supabase = createClient()
-  const { data: maxRow } = await supabase
+  const { data: maxRow, error } = await supabase
     .from('objekt_anlagen')
     .select('sort_order')
     .eq('kunde_objekt_id', objektId)
     .order('sort_order', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/actions/objektakte-actions:objekt_anlagen', error)
 
   const now = new Date().toISOString()
   const row = {
@@ -1281,6 +1338,7 @@ export async function createObjektAnlage(
     .insert(row)
     .select('id')
     .single()
+  if (insertError) logDbError('app/actions/objektakte-actions:objekt_anlagen', insertError)
 
   let anlageId = inserted?.id ? String(inserted.id) : ''
   let lastError = insertError?.message ?? null
@@ -1347,6 +1405,7 @@ export async function updateObjektAnlage(
     .from('objekt_anlagen')
     .update(patch)
     .eq('id', anlageId)
+  if (error) logDbError('app/actions/objektakte-actions:objekt_anlagen', error)
 
   let lastError = error?.message ?? null
 
@@ -1382,8 +1441,7 @@ export async function deleteObjektAnlage(
   }
 
   const supabase = createClient()
-  const [{ count: leadCount }, { count: angebotCount }, { count: rechnungCount }] =
-    await Promise.all([
+  const [{ count: leadCount }, { count: angebotCount }, { count: rechnungCount }] = await Promise.all([
       supabase
         .from('leads')
         .select('id', { count: 'exact', head: true })
@@ -1397,7 +1455,6 @@ export async function deleteObjektAnlage(
         .select('id', { count: 'exact', head: true })
         .eq('objekt_anlage_id', anlageId),
     ])
-
   const linked = (leadCount ?? 0) + (angebotCount ?? 0) + (rechnungCount ?? 0)
   if (linked > 0) {
     return {
@@ -1408,6 +1465,7 @@ export async function deleteObjektAnlage(
   }
 
   const { error } = await supabase.from('objekt_anlagen').delete().eq('id', anlageId)
+  if (error) logDbError('app/actions/objektakte-actions:objekt_anlagen', error)
   if (error) return { ok: false, message: error.message }
 
   revalidateObjektAkte(kundeId, objektId)
@@ -1429,6 +1487,7 @@ export async function loadObjektAnlageVorgaenge(
     .select('id, created_at, status, anlass, situation, bereiche')
     .eq('objekt_anlage_id', anlageId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/actions/objektakte-actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
 
@@ -1442,7 +1501,6 @@ export async function loadObjektAnlageVorgaenge(
       .in('lead_id', leadIds),
     supabase.from('auftraege').select('id, lead_id, angebot_id, status').in('lead_id', leadIds),
   ])
-
   const auftragIds = (auftraege ?? []).map((a) => String(a.id)).filter(Boolean)
   const angebotIds = (angebote ?? []).map((a) => String(a.id)).filter(Boolean)
   let rechnungen: Array<{
@@ -1547,6 +1605,7 @@ export async function fetchObjektAnlagenForPicker(
     .eq('kunde_objekt_id', oid)
     .neq('status', 'stillgelegt')
     .order('bezeichnung', { ascending: true })
+  if (error) logDbError('app/actions/objektakte-actions:objekt_anlagen', error)
 
   if (error) {
     console.warn('fetchObjektAnlagenForPicker:', error.message)

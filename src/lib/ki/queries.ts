@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { KI_BEREICH_ORDER } from '@/lib/ki/constants'
 import type { KiClusterAnalyseRow } from '@/lib/ki/types'
@@ -11,6 +12,7 @@ export async function loadKiClusterAnalysen(): Promise<KiClusterAnalyseRow[]> {
     .select('*')
     .order('bereich', { ascending: true })
     .order('generiert_am', { ascending: false })
+  if (error) logDbError('lib/ki/queries:ki_cluster_analysen', error)
 
   if (error) {
     console.error('loadKiClusterAnalysen', error.message)

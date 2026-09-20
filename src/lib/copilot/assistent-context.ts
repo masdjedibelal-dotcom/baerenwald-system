@@ -18,7 +18,7 @@ export function buildAssistentContextHint(pathname: string): string {
     auftraege: 'Aufträge',
     rechnungen: 'Rechnungen',
     kunden: 'Kunden',
-    handwerker: 'Partner (Handwerker)',
+    handwerker: 'Partner (Partner)',
     partner: 'Netzwerk-Partner',
     kalender: 'Kalender',
     katalog: 'Preisliste / Katalog',

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { crmRoleFromUser, isBaerenwaldPrimaryStaffEmail } from '@/lib/auth/crm-access'
 import { isStagingAdminEmail } from '@/lib/auth/staging-admin'
@@ -15,11 +16,12 @@ export async function isCrmAdminOrManager(
   const metaRole = crmRoleFromUser(user)
   if (metaRole === 'admin' || metaRole === 'manager') return true
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('user_profiles')
     .select('role')
     .eq('id', user.id)
     .maybeSingle()
+  if (error) logDbError('lib/auth/is-crm-staff:user_profiles', error)
 
   const role = profile?.role as string | undefined
   return role === 'admin' || role === 'manager'
@@ -33,11 +35,12 @@ export async function authUserIsCrmTeam(authUserId: string): Promise<boolean> {
   const id = authUserId?.trim()
   if (!id) return false
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile, error } = await supabaseAdmin
     .from('user_profiles')
     .select('id, email, role')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/auth/is-crm-staff:user_profiles', error)
 
   if (profile?.id) {
     if (isBaerenwaldPrimaryStaffEmail(profile.email as string | null)) return true
@@ -49,7 +52,8 @@ export async function authUserIsCrmTeam(authUserId: string): Promise<boolean> {
   }
 
   try {
-    const { data } = await supabaseAdmin.auth.admin.getUserById(id)
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(id)
+    if (error) logDbError('lib/auth/is-crm-staff:query', error)
     const email = data.user?.email
     if (isBaerenwaldPrimaryStaffEmail(email)) return true
     if (isStagingAdminEmail(email)) return true

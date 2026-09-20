@@ -1,3 +1,4 @@
+import { formatNumber } from '@/lib/format/geld-datum'
 export type HandwerkerBewertungKategorieKey =
   | 'qualitaet'
   | 'termintreue'
@@ -63,8 +64,5 @@ export function durchschnittAusBewertung(w: HandwerkerBewertungWerte): number {
 export function formatHandwerkerBewertung(note: number | null | undefined): string {
   const n = typeof note === 'number' && Number.isFinite(note) ? note : 0
   const clamped = Math.min(5, Math.max(0, n))
-  return clamped.toLocaleString('de-DE', {
-    minimumFractionDigits: clamped % 1 === 0 ? 0 : 1,
-    maximumFractionDigits: 1,
-  })
+  return formatNumber(clamped, { minDecimals: clamped % 1 === 0 ? 0 : 1, maxDecimals: 1 })
 }

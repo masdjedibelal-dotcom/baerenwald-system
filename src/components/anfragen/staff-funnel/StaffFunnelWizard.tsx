@@ -1,12 +1,14 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockFormSection, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { Toggle } from '@/components/ui/Toggle'
 import { Card } from '@/components/ui/Card'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
 import { createAnfrage, searchMieterFuerHv, type MieterSuchTreffer } from '@/app/(dashboard)/anfragen/actions'
 import { getKundeKurz } from '@/app/(dashboard)/angebote/actions'
@@ -51,6 +53,15 @@ import {
   StaffPreisIndikation,
 } from '@/components/anfragen/staff-funnel/StaffFunnelUi'
 import { AnlageTeilPicker } from '@/components/crm/AnlageTeilPicker'
+import { CONFIRM, TOAST } from '@/lib/copy'
+import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
+import type { DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
+
+type StaffFunnelDraft = {
+  state: StaffFunnelState
+  bestandskunde: boolean
+  meldeAbweichend: boolean
+}
 
 const STAFF_KANAL: LeadKanal[] = [
   'telefon',
@@ -81,44 +92,18 @@ function KundenAdresseFields({
     <>
       <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[1fr_7rem]">
         <MockField label="Straße" className="min-w-0">
-          <input
-            className="input"
-            value={state.strasse}
-            onChange={(e) => patch({ strasse: e.target.value })}
-            placeholder="z.B. Lindenstraße"
-            autoComplete="address-line1"
-          />
+          <MockInput value={state.strasse} onChange={(e) => patch({ strasse: e.target.value })} placeholder="z.B. Lindenstraße" autoComplete="address-line1" />
         </MockField>
         <MockField label="Nr." className="min-w-0">
-          <input
-            className="input"
-            value={state.hausnummer}
-            onChange={(e) => patch({ hausnummer: e.target.value })}
-            placeholder="24"
-            autoComplete="address-line2"
-          />
+          <MockInput value={state.hausnummer} onChange={(e) => patch({ hausnummer: e.target.value })} placeholder="24" autoComplete="address-line2" />
         </MockField>
       </div>
       <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <MockField label="PLZ" className="min-w-0">
-          <input
-            className="input"
-            value={state.plz}
-            onChange={(e) => patch({ plz: e.target.value.slice(0, 5) })}
-            placeholder="80796"
-            inputMode="numeric"
-            maxLength={5}
-            autoComplete="postal-code"
-          />
+          <MockInput value={state.plz} onChange={(e) => patch({ plz: e.target.value.slice(0, 5) })} placeholder="80796" inputMode="numeric" maxLength={5} autoComplete="postal-code" />
         </MockField>
         <MockField label="Ort" className="min-w-0">
-          <input
-            className="input"
-            value={state.ort}
-            onChange={(e) => patch({ ort: e.target.value })}
-            placeholder="München"
-            autoComplete="address-level2"
-          />
+          <MockInput value={state.ort} onChange={(e) => patch({ ort: e.target.value })} placeholder="München" autoComplete="address-level2" />
         </MockField>
       </div>
     </>
@@ -137,54 +122,27 @@ function MeldeadresseFields({
     <>
       <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[1fr_7rem]">
         <MockField label="Straße (Objekt / Leistung)" className="min-w-0">
-          <input
-            className="input"
-            value={state.objektStrasse}
-            onChange={(e) =>
+          <MockInput value={state.objektStrasse} onChange={(e) =>
               patch({
                 kundeObjektId: null,
                 objektStrasse: e.target.value,
-              })
-            }
-            placeholder="z.B. Baustellenstraße"
-            autoComplete="address-line1"
-          />
+              })} placeholder="z.B. Baustellenstraße" autoComplete="address-line1" />
         </MockField>
         <MockField label="Nr." className="min-w-0">
-          <input
-            className="input"
-            value={state.objektHausnummer}
-            onChange={(e) =>
+          <MockInput value={state.objektHausnummer} onChange={(e) =>
               patch({
                 kundeObjektId: null,
                 objektHausnummer: e.target.value,
-              })
-            }
-            placeholder="12"
-            autoComplete="address-line2"
-          />
+              })} placeholder="12" autoComplete="address-line2" />
         </MockField>
       </div>
       <div className="full grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <MockField label="PLZ (Objekt)" className="min-w-0">
-          <input
-            className="input"
-            value={state.objektPlz}
-            onChange={(e) =>
-              patch({ kundeObjektId: null, objektPlz: e.target.value.slice(0, 5) })
-            }
-            placeholder="80796"
-            inputMode="numeric"
-            maxLength={5}
-          />
+          <MockInput value={state.objektPlz} onChange={(e) =>
+              patch({ kundeObjektId: null, objektPlz: e.target.value.slice(0, 5) })} placeholder="80796" inputMode="numeric" maxLength={5} />
         </MockField>
         <MockField label="Ort (Objekt)" className="min-w-0">
-          <input
-            className="input"
-            value={state.objektOrt}
-            onChange={(e) => patch({ kundeObjektId: null, objektOrt: e.target.value })}
-            placeholder="München"
-          />
+          <MockInput value={state.objektOrt} onChange={(e) => patch({ kundeObjektId: null, objektOrt: e.target.value })} placeholder="München" />
         </MockField>
       </div>
     </>
@@ -299,13 +257,13 @@ function HvMieterObjektFields({
     .join(' ')
 
   return (
-    <div className="full min-w-0 space-y-3 rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] p-3">
+    <div className="full min-w-0 space-y-3 rounded-card border border-[var(--border)] bg-[var(--bg-soft)] p-3">
       <p className="m-0 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
         Mieter (optional)
       </p>
 
       {mieterPicked ? (
-        <div className="flex min-w-0 items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--green-10)] px-3 py-2.5">
+        <div className="flex min-w-0 items-start gap-2 rounded-card border border-[var(--border)] bg-[var(--green-10)] px-3 py-2.5">
           <div className="min-w-0 flex-1 text-sm">
             <p className="m-0 font-medium text-bw-text">{mieterLabel || 'Mieter'}</p>
             {[state.mieterEmail.trim(), state.mieterTelefon.trim()]
@@ -317,13 +275,9 @@ function HvMieterObjektFields({
               ))}
             <p className="m-0 mt-0.5 text-xs text-bw-text-muted">Im System registriert</p>
           </div>
-          <button
-            type="button"
-            className="btn ghost sm shrink-0"
-            onClick={clearMieterAuswahl}
-          >
+          <MockBtn kind="ghost" sm className="shrink-0" type="button" onClick={clearMieterAuswahl}>
             Ändern
-          </button>
+          </MockBtn>
         </div>
       ) : (
         <MockField
@@ -336,26 +290,15 @@ function HvMieterObjektFields({
               : 'Zuerst Hausverwaltung wählen, dann Mieter suchen.'
           }
         >
-          <input
-            className="input"
-            value={suche}
-            onChange={(e) => setSuche(e.target.value)}
-            placeholder="Name oder E-Mail …"
-            autoComplete="off"
-            disabled={!state.kundeId}
-          />
+          <MockInput value={suche} onChange={(e) => setSuche(e.target.value)} placeholder="Name oder E-Mail …" autoComplete="off" disabled={!state.kundeId} />
           {suchen ? (
             <p className="m-0 mt-1 text-xs text-bw-text-muted">Suche …</p>
           ) : null}
           {treffer.length > 0 ? (
-            <ul className="m-0 mt-1 max-h-48 list-none overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--card)] p-0">
+            <ul className="m-0 mt-1 max-h-48 list-none overflow-y-auto rounded-card border border-[var(--border)] bg-[var(--card)] p-0">
               {treffer.map((t) => (
                 <li key={t.id} className="border-b border-[var(--border)] last:border-0">
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-soft)]"
-                    onClick={() => waehleMieter(t)}
-                  >
+                  <MockBtn fullWidth className="px-3 py-2 text-left text-sm hover:bg-[var(--bg-soft)]" type="button" onClick={() => waehleMieter(t)}>
                     <span className="font-medium">{t.name}</span>
                     {[t.email, t.telefon].filter(Boolean).length ? (
                       <span className="mt-0.5 block text-xs text-bw-text-muted">
@@ -365,7 +308,7 @@ function HvMieterObjektFields({
                     <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
                       {t.quelle === 'kunde' ? 'Kunde' : 'Mieter am Objekt'}
                     </span>
-                  </button>
+                  </MockBtn>
                 </li>
               ))}
             </ul>
@@ -375,62 +318,26 @@ function HvMieterObjektFields({
 
       <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <MockField label="Vorname Mieter" className="min-w-0">
-          <input
-            className="input"
-            value={state.mieterVorname}
-            onChange={(e) =>
-              patch({ mieterVorname: e.target.value, mieterKundeId: null })
-            }
-            placeholder="Max"
-            autoComplete="off"
-          />
+          <MockInput value={state.mieterVorname} onChange={(e) =>
+              patch({ mieterVorname: e.target.value, mieterKundeId: null })} placeholder="Max" autoComplete="off" />
         </MockField>
         <MockField label="Nachname Mieter" className="min-w-0">
-          <input
-            className="input"
-            value={state.mieterNachname}
-            onChange={(e) =>
-              patch({ mieterNachname: e.target.value, mieterKundeId: null })
-            }
-            placeholder="Mustermann"
-            autoComplete="off"
-          />
+          <MockInput value={state.mieterNachname} onChange={(e) =>
+              patch({ mieterNachname: e.target.value, mieterKundeId: null })} placeholder="Mustermann" autoComplete="off" />
         </MockField>
         <MockField label="Telefon Mieter" className="min-w-0">
-          <input
-            className="input"
-            type="tel"
-            value={state.mieterTelefon}
-            onChange={(e) =>
-              patch({ mieterTelefon: e.target.value, mieterKundeId: state.mieterKundeId })
-            }
-            placeholder="+49 …"
-            autoComplete="off"
-          />
+          <MockInput type="tel" value={state.mieterTelefon} onChange={(e) =>
+              patch({ mieterTelefon: e.target.value, mieterKundeId: state.mieterKundeId })} placeholder="+49 …" autoComplete="off" />
         </MockField>
         <MockField label="E-Mail Mieter" className="min-w-0">
-          <input
-            className="input"
-            type="email"
-            value={state.mieterEmail}
-            onChange={(e) =>
-              patch({ mieterEmail: e.target.value, mieterKundeId: state.mieterKundeId })
-            }
-            placeholder="max@example.de"
-            autoComplete="off"
-          />
+          <MockInput type="email" value={state.mieterEmail} onChange={(e) =>
+              patch({ mieterEmail: e.target.value, mieterKundeId: state.mieterKundeId })} placeholder="max@example.de" autoComplete="off" />
         </MockField>
       </div>
 
       {objekte.length > 0 || objekteLaden ? (
         <MockField label="Objekt" full className="min-w-0">
-          <select
-            className="input"
-            value={state.kundeObjektId ?? ''}
-            onChange={(e) => selectObjekt(e.target.value)}
-            aria-label="Objekt wählen"
-            disabled={objekteLaden}
-          >
+          <MockSelect value={state.kundeObjektId ?? ''} onChange={(e) => selectObjekt(e.target.value)} aria-label="Objekt wählen" disabled={objekteLaden}>
             <option value="">
               {objekteLaden ? 'Objekte werden geladen…' : '— Objekt wählen oder Adresse eingeben —'}
             </option>
@@ -439,7 +346,7 @@ function HvMieterObjektFields({
                 {kundenObjektKurzlabel(o)}
               </option>
             ))}
-          </select>
+          </MockSelect>
         </MockField>
       ) : state.kundeId ? (
         <p className="m-0 text-xs text-bw-text-muted">
@@ -483,6 +390,7 @@ export function StaffFunnelWizard({
   const [state, setState] = useState<StaffFunnelState>(() =>
     createInitialStaffFunnelState({ kundeId: defaultKundeId ?? null })
   )
+  const [draftDirty, setDraftDirty] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [bekannterKunde, setBekannterKunde] = useState<Kunde | null>(null)
@@ -507,9 +415,11 @@ export function StaffFunnelWizard({
       .catch(() => setGewerke([]))
   }, [open])
 
+  /* Reset beim Öffnen; Zwischenstand-Prompt überschreibt danach bei Accept. */
   useEffect(() => {
     if (!open) return
     setState(createInitialStaffFunnelState({ kundeId: defaultKundeId ?? null }))
+    setDraftDirty(false)
     setBekannterKunde(null)
     setKundeAdresse(null)
     setError(null)
@@ -532,6 +442,32 @@ export function StaffFunnelWizard({
     // applyKunde bewusst nicht in deps — nur beim Öffnen mit defaultKundeId
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultKundeId])
+
+  /* FORM_ZWISCHENSTAND: staff-funnel */
+  const storageKey = useMemo(
+    () => `bw:staff-funnel-draft:${defaultKundeId?.trim() || 'neu'}`,
+    [defaultKundeId]
+  )
+  const draftData = useMemo<StaffFunnelDraft>(
+    () => ({ state, bestandskunde, meldeAbweichend }),
+    [state, bestandskunde, meldeAbweichend]
+  )
+  const onRestoreDraft = useCallback((data: StaffFunnelDraft) => {
+    setState(data.state)
+    setBestandskunde(data.bestandskunde)
+    setMeldeAbweichend(data.meldeAbweichend)
+    setDraftDirty(true)
+  }, [])
+  const zwischen = useFormZwischenstand<StaffFunnelDraft>({
+    storageKey,
+    enabled: open,
+    data: draftData,
+    onRestore: onRestoreDraft,
+  })
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  useEffect(() => {
+    if (zwischen.savedHint) setLastSavedAt(Date.now())
+  }, [zwischen.savedHint])
 
   const isHv =
     state.kundentyp === 'verwaltung' || istKundeHausverwaltungTyp(bekannterKunde?.typ)
@@ -591,6 +527,7 @@ export function StaffFunnelWizard({
   ])
 
   const patch = useCallback((p: Partial<StaffFunnelState>) => {
+    setDraftDirty(true)
     setState((s) => ({ ...s, ...p }))
   }, [])
 
@@ -678,6 +615,7 @@ export function StaffFunnelWizard({
   }
 
   function setBereich(v: string) {
+    setDraftDirty(true)
     setState((s) => ({
       ...s,
       bereiche: v ? [v] : [],
@@ -717,10 +655,11 @@ export function StaffFunnelWizard({
     setLoading(false)
     if (!r.ok) {
       setError(r.message)
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
-    toast.success('Anfrage angelegt')
+    toast.success(TOAST.anfrage_angelegt)
+    zwischen.clear()
     if (onSuccess) onSuccess(r.id)
     else {
       onClose()
@@ -750,16 +689,37 @@ export function StaffFunnelWizard({
 
   if (!open || !mounted) return null
 
+  const anliegenComplete = isFormular
+    ? Boolean(state.anliegen)
+    : Boolean(state.vorhaben.trim() || state.freitext.trim())
+  const kontaktComplete = bestandskunde
+    ? Boolean(state.kundeId)
+    : needsFirma
+      ? Boolean(state.firmaName.trim())
+      : Boolean(state.vorname.trim() && state.nachname.trim())
+  const canvasSections: DocCanvasSection[] = [
+    { id: 'anliegen', label: 'Anliegen', complete: anliegenComplete },
+    { id: 'kontakt', label: 'Kontakt', complete: kontaktComplete },
+    { id: 'herkunft', label: 'Herkunft', complete: Boolean(state.kanal) },
+  ]
+
   return (
+    <>
     <DocumentCanvas
       open={open}
       title="Anfrage erfassen"
       onClose={onClose}
-      onSave={() => {
-        if (loading) return
-        void submit()
+      draftDirty={draftDirty}
+      lastSavedAt={lastSavedAt}
+      sections={canvasSections}
+      primaryAction={{
+        label: 'Anfrage anlegen',
+        onClick: () => {
+          if (loading) return
+          void submit()
+        },
+        busy: loading,
       }}
-      saveBusy={loading}
       footerCta={
         <StaffPreisIndikation
           min={isFormular ? state.preisMin : null}
@@ -781,50 +741,37 @@ export function StaffFunnelWizard({
 
         <section className="sf-sec">
           <div className="segment-toggle" role="group" aria-label="Erfassungsart">
-            <button
-              type="button"
-              className={cn(
+            <MockBtn className={cn(
                 'segment-toggle-btn',
                 isFormular && 'segment-toggle-btn--active'
-              )}
-              onClick={() => setModus('formular')}
-            >
+              )} type="button" onClick={() => setModus('formular')}>
               Formular
-            </button>
-            <button
-              type="button"
-              className={cn(
+            </MockBtn>
+            <MockBtn className={cn(
                 'segment-toggle-btn',
                 !isFormular && 'segment-toggle-btn--active'
-              )}
-              onClick={() => setModus('frei')}
-            >
+              )} type="button" onClick={() => setModus('frei')}>
               Frei
-            </button>
+            </MockBtn>
           </div>
         </section>
 
         {isFormular ? (
           <>
-            <section className="sf-sec">
+            <section className="sf-sec" data-doc-section="anliegen">
               <h3 className="sf-sec-l">Anliegen</h3>
               <div className="sf-anliegen">
                 {STAFF_ANLIEGEN.map((a) => {
                   const selected = state.anliegen === a.id
                   return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      className={cn('funnel-tile', selected && 'selected')}
-                      onClick={() => selectAnliegen(a.id)}
-                    >
+                    <MockBtn className={cn('funnel-tile', selected && 'selected')} key={a.id} type="button" onClick={() => selectAnliegen(a.id)}>
                       <span className="funnel-tile-icon-wrap" aria-hidden>
                         <FunnelIcon name={a.icon} />
                       </span>
                       <p className="funnel-tile-label">{a.label}</p>
                       <p className="funnel-tile-hint">{a.hint}</p>
                       {a.tag ? <span className="funnel-tile-tag">{a.tag}</span> : null}
-                    </button>
+                    </MockBtn>
                   )
                 })}
               </div>
@@ -833,19 +780,14 @@ export function StaffFunnelWizard({
             {showBereiche ? (
               <section className="sf-sec">
                 <h3 className="sf-sec-l">Bereich</h3>
-                <select
-                  className="input"
-                  value={state.bereiche[0] ?? ''}
-                  onChange={(e) => setBereich(e.target.value)}
-                  aria-label="Bereich"
-                >
+                <MockSelect value={state.bereiche[0] ?? ''} onChange={(e) => setBereich(e.target.value)} aria-label="Bereich">
                   <option value="">Bitte wählen</option>
                   {bereichOptions.map((b) => (
                     <option key={b.value} value={b.value}>
                       {b.label}
                     </option>
                   ))}
-                </select>
+                </MockSelect>
               </section>
             ) : null}
 
@@ -910,12 +852,13 @@ export function StaffFunnelWizard({
                               columns={2}
                               options={config.optionen}
                               value={state.fachdetails[key] ?? ''}
-                              onChange={(v) =>
+                              onChange={(v) => {
+                                setDraftDirty(true)
                                 setState((s) => ({
                                   ...s,
                                   fachdetails: { ...s.fachdetails, [key]: v },
                                 }))
-                              }
+                              }}
                             />
                           </MockField>
                         )
@@ -934,13 +877,9 @@ export function StaffFunnelWizard({
                             hint={g.hinweis}
                           >
                             <div className="sf-groesse-row">
-                              <input
-                                type="number"
-                                min={0}
-                                className="input"
-                                value={state.groessen[bereich] ?? ''}
-                                onChange={(e) => {
+                              <MockInput type="number" min={0} value={state.groessen[bereich] ?? ''} onChange={(e) => {
                                   const raw = e.target.value
+                                  setDraftDirty(true)
                                   setState((s) => {
                                     const next = { ...s.groessen }
                                     if (raw === '') delete next[bereich]
@@ -950,16 +889,10 @@ export function StaffFunnelWizard({
                                     }
                                     return { ...s, groessen: next }
                                   })
-                                }}
-                                placeholder="0"
-                              />
-                              <select
-                                className="input sf-groesse-einheit"
-                                value={
-                                  state.groessenEinheiten[bereich] ??
-                                  defaultGroesseEinheit(bereich)
-                                }
-                                onChange={(e) =>
+                                }} placeholder="0" />
+                              <MockSelect className="sf-groesse-einheit" value={state.groessenEinheiten[bereich] ??
+                                  defaultGroesseEinheit(bereich)} onChange={(e) => {
+                                  setDraftDirty(true)
                                   setState((s) => ({
                                     ...s,
                                     groessenEinheiten: {
@@ -967,15 +900,13 @@ export function StaffFunnelWizard({
                                       [bereich]: e.target.value,
                                     },
                                   }))
-                                }
-                                aria-label={`Einheit ${groessePropLabel(bereich)}`}
-                              >
+                                }} aria-label={`Einheit ${groessePropLabel(bereich)}`}>
                                 {GROESSEN_EINHEITEN.map((u) => (
                                   <option key={u} value={u}>
                                     {groesseEinheitLabel(u)}
                                   </option>
                                 ))}
-                              </select>
+                              </MockSelect>
                             </div>
                           </MockField>
                         )
@@ -984,19 +915,14 @@ export function StaffFunnelWizard({
 
                   {dyn.umsetzungsZeitraum ? (
                     <MockField label="Umsetzung in welchem Zeitraum?" full>
-                      <select
-                        className="input"
-                        value={state.zeitraum}
-                        onChange={(e) => patch({ zeitraum: e.target.value })}
-                        aria-label="Umsetzung in welchem Zeitraum"
-                      >
+                      <MockSelect value={state.zeitraum} onChange={(e) => patch({ zeitraum: e.target.value })} aria-label="Umsetzung in welchem Zeitraum">
                         <option value="">Bitte wählen</option>
                         {ZEITRAUM_ERNEUERN_OPTIONS.map((o) => (
                           <option key={o.value} value={o.value}>
                             {o.label}
                           </option>
                         ))}
-                      </select>
+                      </MockSelect>
                     </MockField>
                   ) : null}
 
@@ -1036,7 +962,7 @@ export function StaffFunnelWizard({
 
           </>
         ) : (
-          <section className="sf-sec">
+          <section className="sf-sec" data-doc-section="anliegen">
             <MockFormSection>
               <SheetEditableField
                 label="Vorhaben"
@@ -1056,7 +982,7 @@ export function StaffFunnelWizard({
           </section>
         )}
 
-        <section className="sf-sec">
+        <section className="sf-sec" data-doc-section="kontakt">
           <Card title="Kunde" collapsible defaultOpen>
             <MockFormSection>
             <div className="full">
@@ -1106,13 +1032,7 @@ export function StaffFunnelWizard({
                 </MockField>
                 {needsFirma ? (
                   <MockField label="Firma" full required>
-                    <input
-                      className="input"
-                      value={state.firmaName}
-                      onChange={(e) => patch({ firmaName: e.target.value })}
-                      placeholder="Muster GmbH"
-                      autoComplete="organization"
-                    />
+                    <MockInput value={state.firmaName} onChange={(e) => patch({ firmaName: e.target.value })} placeholder="Muster GmbH" autoComplete="organization" />
                   </MockField>
                 ) : null}
                 <div className="full grid gap-3 sm:grid-cols-2">
@@ -1120,42 +1040,20 @@ export function StaffFunnelWizard({
                     label={needsFirma ? 'Vorname (Ansprechpartner)' : 'Vorname'}
                     required={!needsFirma}
                   >
-                    <input
-                      className="input"
-                      value={state.vorname}
-                      onChange={(e) => patch({ vorname: e.target.value })}
-                      placeholder="Maria"
-                      autoComplete="given-name"
-                    />
+                    <MockInput value={state.vorname} onChange={(e) => patch({ vorname: e.target.value })} placeholder="Maria" autoComplete="given-name" />
                   </MockField>
                   <MockField
                     label={needsFirma ? 'Nachname (Ansprechpartner)' : 'Nachname'}
                     required={!needsFirma}
                   >
-                    <input
-                      className="input"
-                      value={state.nachname}
-                      onChange={(e) => patch({ nachname: e.target.value })}
-                      placeholder="Koch"
-                      autoComplete="family-name"
-                    />
+                    <MockInput value={state.nachname} onChange={(e) => patch({ nachname: e.target.value })} placeholder="Koch" autoComplete="family-name" />
                   </MockField>
                 </div>
                 <MockField label="Telefon">
-                  <input
-                    className="input"
-                    type="tel"
-                    value={state.telefon}
-                    onChange={(e) => patch({ telefon: e.target.value })}
-                  />
+                  <MockInput type="tel" value={state.telefon} onChange={(e) => patch({ telefon: e.target.value })} />
                 </MockField>
                 <MockField label="E-Mail">
-                  <input
-                    className="input"
-                    type="email"
-                    value={state.email}
-                    onChange={(e) => patch({ email: e.target.value })}
-                  />
+                  <MockInput type="email" value={state.email} onChange={(e) => patch({ email: e.target.value })} />
                 </MockField>
               </>
             )}
@@ -1186,27 +1084,31 @@ export function StaffFunnelWizard({
           </Card>
         </section>
 
-        <section className="sf-sec">
+        <section className="sf-sec" data-doc-section="herkunft">
           <Card title="Herkunft Anfrage" collapsible defaultOpen>
             <MockFormSection>
             <MockField label="Herkunft" full>
-              <select
-                className="input"
-                value={state.kanal}
-                onChange={(e) => patch({ kanal: e.target.value as LeadKanal })}
-                aria-label="Herkunft Anfrage"
-              >
+              <MockSelect value={state.kanal} onChange={(e) => patch({ kanal: e.target.value as LeadKanal })} aria-label="Herkunft Anfrage">
                 {STAFF_KANAL.map((k) => (
                   <option key={k} value={k}>
                     {KANAL_LABELS[k] ?? k}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </MockField>
           </MockFormSection>
           </Card>
         </section>
       </div>
     </DocumentCanvas>
+    <ConfirmPopup
+      open={zwischen.promptOpen}
+      title={zwischen.promptTitle}
+      confirmLabel={CONFIRM.restoreDraft}
+      cancelLabel={CONFIRM.restoreDecline}
+      onConfirm={zwischen.acceptRestore}
+      onClose={zwischen.declineRestore}
+    />
+    </>
   )
 }

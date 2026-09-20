@@ -1,13 +1,16 @@
 'use client'
+import { DateInput } from '@/components/ui/DateInput'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { saveKunde } from '@/app/actions/kunden'
-import { MockBtn, MockChip } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockField } from '@/components/mock-ui/MockForm'
 import { toast } from '@/components/ui/app-toast'
 import {
   istKundeFirmaPflichtTyp,
@@ -19,6 +22,8 @@ import {
   createRechnungHref,
 } from '@/lib/crm/create-entry'
 import { openFabCreate } from '@/components/neu/FabCreateHost'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type Art = '' | 'vorgang' | 'kunde' | 'handwerker'
 type VorgangTyp = '' | 'anfrage' | 'angebot' | 'rechnung'
@@ -80,6 +85,7 @@ export function NeuErstellenClient({
 }: {
   gewerkeOptionen?: GewerkOpt[]
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const router = useRouter()
   const searchParams = useSearchParams()
   const presetParam = searchParams.get('art')
@@ -151,10 +157,10 @@ export function NeuErstellenClient({
         undefined
       )
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Kunde angelegt')
+      toast.success(TOAST.kunde_angelegt)
       router.push(`/kunden/${r.id}`)
     })
   }
@@ -164,7 +170,7 @@ export function NeuErstellenClient({
     const vorname = (f.vorname ?? '').trim()
     const nachname = (f.nachname ?? '').trim()
     if (!firma && !vorname && !nachname) {
-      toast.error('Bitte Firmenname oder Vor-/Nachname angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_firmenname_oder_vor_nachname_angeben })
       return
     }
     const extraGewerk = (f.category ?? '').trim()
@@ -192,10 +198,10 @@ export function NeuErstellenClient({
         notizen: (f.notizen ?? '').trim() || null,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Partner angelegt')
+      toast.success(TOAST.partner_angelegt)
       router.push(`/handwerker/${r.id}`)
     })
   }
@@ -208,9 +214,9 @@ export function NeuErstellenClient({
   return (
     <div className="neu-wiz">
       <div className="neu-wiz-top">
-        <button type="button" className="qa-btn" title="Abbrechen" onClick={() => router.push(backHref)}>
+        <MockBtn className="qa-btn" type="button" title="Abbrechen" onClick={() => router.push(backHref)}>
           <MockIcon ctx="emphasis" n="x" size={18} />
-        </button>
+        </MockBtn>
         <div className="neu-wiz-ttl">{wizTitel}</div>
       </div>
       <div className="neu-wiz-body">
@@ -221,11 +227,7 @@ export function NeuErstellenClient({
             </div>
             <div className="neu-vorgang-grid" style={{ marginBottom: 22 }}>
               {ART_OPTIONS.map((o) => (
-                <button
-                  key={o.v}
-                  type="button"
-                  className={`neu-vorgang-tile${art === o.v ? ' sel' : ''}`}
-                  onClick={() => {
+                <MockBtn className={`neu-vorgang-tile${art === o.v ? ' sel' : ''}`} key={o.v} type="button" onClick={() => {
                     if (o.v === 'kunde') {
                       openFabCreate('kunde')
                       return
@@ -236,13 +238,12 @@ export function NeuErstellenClient({
                     }
                     setArt(o.v)
                     setVorgangTyp('')
-                  }}
-                >
+                  }}>
                   <div className="ico">
                     <MockIcon ctx="emphasis" n={o.ic} size={22} />
                   </div>
                   <div className="t">{o.label}</div>
-                </button>
+                </MockBtn>
               ))}
             </div>
           </>
@@ -274,61 +275,31 @@ export function NeuErstellenClient({
           <div className="neu-fields">
             <div className="form-section-h">Kunden-Daten</div>
             <div className="form-grid">
+        {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+        
               <MockField label="Typ" required>
-                <select
-                  className="sel"
-                  value={f.type ?? 'privat'}
-                  onChange={(e) => set('type', e.target.value)}
-                >
+                <MockSelect className="sel" value={f.type ?? 'privat'} onChange={(e) => set('type', e.target.value)}>
                   <option value="privat">Privat</option>
                   <option value="hausverwaltung">HV</option>
                   <option value="gewerbe">Gewerbe</option>
-                </select>
+                </MockSelect>
               </MockField>
               {firmaPflicht ? (
                 <MockField label="Firma" required full>
-                  <input
-                    className="txt"
-                    value={f.name ?? ''}
-                    onChange={(e) => set('name', e.target.value)}
-                    placeholder="Firmenname"
-                    autoFocus
-                  />
+                  <MockInput className="txt" value={f.name ?? ''} onChange={(e) => set('name', e.target.value)} placeholder="Firmenname" autoFocus />
                 </MockField>
               ) : null}
               <MockField label={firmaPflicht ? 'Vorname (Ansprechpartner)' : 'Vorname'} required>
-                <input
-                  className="txt"
-                  value={f.vorname ?? ''}
-                  onChange={(e) => set('vorname', e.target.value)}
-                  placeholder="Vorname"
-                  autoFocus={!firmaPflicht}
-                />
+                <MockInput className="txt" value={f.vorname ?? ''} onChange={(e) => set('vorname', e.target.value)} placeholder="Vorname" autoFocus={!firmaPflicht} />
               </MockField>
               <MockField label={firmaPflicht ? 'Nachname (Ansprechpartner)' : 'Nachname'} required>
-                <input
-                  className="txt"
-                  value={f.nachname ?? ''}
-                  onChange={(e) => set('nachname', e.target.value)}
-                  placeholder="Nachname"
-                />
+                <MockInput className="txt" value={f.nachname ?? ''} onChange={(e) => set('nachname', e.target.value)} placeholder="Nachname" />
               </MockField>
               <MockField label="Telefon">
-                <input
-                  className="txt"
-                  value={f.tel ?? ''}
-                  onChange={(e) => set('tel', e.target.value)}
-                  placeholder="089 …"
-                />
+                <MockInput className="txt" value={f.tel ?? ''} onChange={(e) => set('tel', e.target.value)} placeholder="089 …" />
               </MockField>
               <MockField label="E-Mail">
-                <input
-                  className="txt"
-                  type="email"
-                  value={f.mail ?? ''}
-                  onChange={(e) => set('mail', e.target.value)}
-                  placeholder="mail@…"
-                />
+                <MockInput className="txt" type="email" value={f.mail ?? ''} onChange={(e) => set('mail', e.target.value)} placeholder="mail@…" />
               </MockField>
             </div>
 
@@ -337,54 +308,24 @@ export function NeuErstellenClient({
             </div>
             <div className="form-grid">
               <MockField label="Straße" required>
-                <input
-                  className="txt"
-                  value={f.strasse ?? ''}
-                  onChange={(e) => set('strasse', e.target.value)}
-                  placeholder="Straße"
-                />
+                <MockInput className="txt" value={f.strasse ?? ''} onChange={(e) => set('strasse', e.target.value)} placeholder="Straße" />
               </MockField>
               <MockField label="Hausnummer" required>
-                <input
-                  className="txt"
-                  value={f.hausnummer ?? ''}
-                  onChange={(e) => set('hausnummer', e.target.value)}
-                  placeholder="Nr."
-                />
+                <MockInput className="txt" value={f.hausnummer ?? ''} onChange={(e) => set('hausnummer', e.target.value)} placeholder="Nr." />
               </MockField>
               <MockField label="PLZ" required>
-                <input
-                  className="txt"
-                  value={f.plz ?? ''}
-                  onChange={(e) => set('plz', e.target.value)}
-                  placeholder="80331"
-                />
+                <MockInput className="txt" value={f.plz ?? ''} onChange={(e) => set('plz', e.target.value)} placeholder="80331" />
               </MockField>
               <MockField label="Ort" required>
-                <input
-                  className="txt"
-                  value={f.ort ?? ''}
-                  onChange={(e) => set('ort', e.target.value)}
-                  placeholder="München"
-                />
+                <MockInput className="txt" value={f.ort ?? ''} onChange={(e) => set('ort', e.target.value)} placeholder="München" />
               </MockField>
               {istGewerbe ? (
                 <>
                   <MockField label="USt-IdNr.">
-                    <input
-                      className="txt"
-                      value={f.ustId ?? ''}
-                      onChange={(e) => set('ustId', e.target.value)}
-                      placeholder="DE…"
-                    />
+                    <MockInput className="txt" value={f.ustId ?? ''} onChange={(e) => set('ustId', e.target.value)} placeholder="DE…" />
                   </MockField>
                   <MockField label="Ansprechpartner">
-                    <input
-                      className="txt"
-                      value={f.ansprechpartner ?? ''}
-                      onChange={(e) => set('ansprechpartner', e.target.value)}
-                      placeholder="Name"
-                    />
+                    <MockInput className="txt" value={f.ansprechpartner ?? ''} onChange={(e) => set('ansprechpartner', e.target.value)} placeholder="Name" />
                   </MockField>
                 </>
               ) : null}
@@ -395,46 +336,26 @@ export function NeuErstellenClient({
             </div>
             <div className="form-grid">
               <MockField label="Webseite">
-                <input
-                  className="txt"
-                  value={f.webseite ?? ''}
-                  onChange={(e) => set('webseite', e.target.value)}
-                  placeholder="https://…"
-                />
+                <MockInput className="txt" value={f.webseite ?? ''} onChange={(e) => set('webseite', e.target.value)} placeholder="https://…" />
               </MockField>
               {!firmaPflicht ? (
                 <MockField label="Geburtstag">
-                  <input
-                    className="txt"
-                    type="date"
-                    value={f.geburtstag ?? ''}
-                    onChange={(e) => set('geburtstag', e.target.value)}
-                  />
+                  <DateInput className="txt" value={f.geburtstag ?? ''} onChange={(e) => set('geburtstag', e.target.value)} />
                 </MockField>
               ) : (
                 <div />
               )}
               <MockField label="Quelle">
-                <select
-                  className="sel"
-                  value={f.quelle ?? ''}
-                  onChange={(e) => set('quelle', e.target.value)}
-                >
+                <MockSelect className="sel" value={f.quelle ?? ''} onChange={(e) => set('quelle', e.target.value)}>
                   {KUNDE_QUELLE_OPTS.map((o) => (
                     <option key={o.value || 'empty'} value={o.value}>
                       {o.label}
                     </option>
                   ))}
-                </select>
+                </MockSelect>
               </MockField>
               <MockField label="Notizen" full>
-                <textarea
-                  className="ta"
-                  value={f.notizen ?? ''}
-                  onChange={(e) => set('notizen', e.target.value)}
-                  rows={3}
-                  placeholder="Interne Notizen…"
-                />
+                <MockTextarea className="ta" value={f.notizen ?? ''} onChange={(e) => set('notizen', e.target.value)} rows={3} placeholder="Interne Notizen…" />
               </MockField>
             </div>
 
@@ -454,62 +375,25 @@ export function NeuErstellenClient({
             <div className="form-section-h">Partner-Daten</div>
             <div className="form-grid">
               <MockField label="Firmenname" required full>
-                <input
-                  className="txt"
-                  value={f.name ?? ''}
-                  onChange={(e) => set('name', e.target.value)}
-                  placeholder="Betrieb / Firma"
-                  autoFocus
-                />
+                <MockInput className="txt" value={f.name ?? ''} onChange={(e) => set('name', e.target.value)} placeholder="Betrieb / Firma" autoFocus />
               </MockField>
               <MockField label="Vorname (Geschäftsführer)">
-                <input
-                  className="txt"
-                  value={f.vorname ?? ''}
-                  onChange={(e) => set('vorname', e.target.value)}
-                  placeholder="Vorname"
-                />
+                <MockInput className="txt" value={f.vorname ?? ''} onChange={(e) => set('vorname', e.target.value)} placeholder="Vorname" />
               </MockField>
               <MockField label="Nachname (Geschäftsführer)">
-                <input
-                  className="txt"
-                  value={f.nachname ?? ''}
-                  onChange={(e) => set('nachname', e.target.value)}
-                  placeholder="Nachname"
-                />
+                <MockInput className="txt" value={f.nachname ?? ''} onChange={(e) => set('nachname', e.target.value)} placeholder="Nachname" />
               </MockField>
               <MockField label="Telefon">
-                <input
-                  className="txt"
-                  value={f.tel ?? ''}
-                  onChange={(e) => set('tel', e.target.value)}
-                  placeholder="0170 …"
-                />
+                <MockInput className="txt" value={f.tel ?? ''} onChange={(e) => set('tel', e.target.value)} placeholder="0170 …" />
               </MockField>
               <MockField label="E-Mail">
-                <input
-                  className="txt"
-                  type="email"
-                  value={f.mail ?? ''}
-                  onChange={(e) => set('mail', e.target.value)}
-                  placeholder="mail@…"
-                />
+                <MockInput className="txt" type="email" value={f.mail ?? ''} onChange={(e) => set('mail', e.target.value)} placeholder="mail@…" />
               </MockField>
               <MockField label="Gewerk (Freitext)">
-                <input
-                  className="txt"
-                  value={f.category ?? ''}
-                  onChange={(e) => set('category', e.target.value)}
-                  placeholder="z.B. Sanitär"
-                />
+                <MockInput className="txt" value={f.category ?? ''} onChange={(e) => set('category', e.target.value)} placeholder="z.B. Sanitär" />
               </MockField>
               <MockField label="WhatsApp">
-                <input
-                  className="txt"
-                  value={f.whatsapp ?? ''}
-                  onChange={(e) => set('whatsapp', e.target.value)}
-                  placeholder="0170 …"
-                />
+                <MockInput className="txt" value={f.whatsapp ?? ''} onChange={(e) => set('whatsapp', e.target.value)} placeholder="0170 …" />
               </MockField>
             </div>
 
@@ -528,8 +412,7 @@ export function NeuErstellenClient({
                       className="field"
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
                     >
-                      <input
-                        type="checkbox"
+                      <MockCheckbox
                         checked={gewerkSlugs.has(g.slug)}
                         onChange={() => toggleGewerk(g.slug)}
                       />
@@ -545,20 +428,10 @@ export function NeuErstellenClient({
             </div>
             <div className="form-grid">
               <MockField label="Adresse" full>
-                <input
-                  className="txt"
-                  value={f.adresse ?? ''}
-                  onChange={(e) => set('adresse', e.target.value)}
-                  placeholder="Straße Nr., PLZ Ort"
-                />
+                <MockInput className="txt" value={f.adresse ?? ''} onChange={(e) => set('adresse', e.target.value)} placeholder="Straße Nr., PLZ Ort" />
               </MockField>
               <MockField label="Webseite" full>
-                <input
-                  className="txt"
-                  value={f.webseite ?? ''}
-                  onChange={(e) => set('webseite', e.target.value)}
-                  placeholder="https://…"
-                />
+                <MockInput className="txt" value={f.webseite ?? ''} onChange={(e) => set('webseite', e.target.value)} placeholder="https://…" />
               </MockField>
             </div>
 
@@ -567,36 +440,16 @@ export function NeuErstellenClient({
             </div>
             <div className="form-grid">
               <MockField label="Steuernummer">
-                <input
-                  className="txt"
-                  value={f.steuernummer ?? ''}
-                  onChange={(e) => set('steuernummer', e.target.value)}
-                />
+                <MockInput className="txt" value={f.steuernummer ?? ''} onChange={(e) => set('steuernummer', e.target.value)} />
               </MockField>
               <MockField label="USt-IdNr.">
-                <input
-                  className="txt"
-                  value={f.ustId ?? ''}
-                  onChange={(e) => set('ustId', e.target.value)}
-                  placeholder="DE…"
-                />
+                <MockInput className="txt" value={f.ustId ?? ''} onChange={(e) => set('ustId', e.target.value)} placeholder="DE…" />
               </MockField>
               <MockField label="IBAN" full>
-                <input
-                  className="txt"
-                  value={f.iban ?? ''}
-                  onChange={(e) => set('iban', e.target.value)}
-                  placeholder="DE…"
-                />
+                <MockInput className="txt" value={f.iban ?? ''} onChange={(e) => set('iban', e.target.value)} placeholder="DE…" />
               </MockField>
               <MockField label="Notizen" full>
-                <textarea
-                  className="ta"
-                  value={f.notizen ?? ''}
-                  onChange={(e) => set('notizen', e.target.value)}
-                  rows={3}
-                  placeholder="Interne Notizen…"
-                />
+                <MockTextarea className="ta" value={f.notizen ?? ''} onChange={(e) => set('notizen', e.target.value)} rows={3} placeholder="Interne Notizen…" />
               </MockField>
             </div>
 

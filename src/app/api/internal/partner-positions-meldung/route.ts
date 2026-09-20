@@ -1,9 +1,11 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 
 import type { CrmNotificationTyp } from '@/app/(dashboard)/notifications/actions'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { sendCrmPushToStaff } from '@/lib/push/send'
+import { safeVoidNotify } from '@/lib/errors/safe-void-notify'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 function authorize(req: Request): boolean {
@@ -90,22 +92,24 @@ export async function POST(req: Request) {
     })
   }
 
-  const { data: auf } = await supabaseAdmin
+  const {data: auf, error} = await supabaseAdmin
     .from('auftraege')
     .select('id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/api/internal/partner-positions-meldung/route:auftraege', error)
   if (!auf) {
     return NextResponse.json({ ok: false, error: 'Auftrag unbekannt' }, { status: 404 })
   }
 
-  let hwName = 'Handwerker'
+  let hwName = 'Partner'
   if (handwerkerId) {
-    const { data: hw } = await supabaseAdmin
+    const {data: hw, error} = await supabaseAdmin
       .from('handwerker')
       .select('name')
       .eq('id', handwerkerId)
       .maybeSingle()
+    if (error) logDbError('app/api/internal/partner-positions-meldung/route:handwerker', error)
     hwName = String(hw?.name ?? '').trim() || hwName
   }
 
@@ -121,13 +125,16 @@ export async function POST(req: Request) {
     const href = `/auftraege/${auftragId}?tab=leistungen${
       positionId ? `&position=${encodeURIComponent(positionId)}` : ''
     }`
-    void sendCrmPushToStaff({
-      typ: pushTyp,
-      title: pushTitle,
-      body: pushBody.slice(0, 180),
-      url: href,
-      tag: `leistung-update-${auftragId}-${positionId || 'all'}-${Date.now()}`,
-    }).catch((e) => console.warn('[partner-positions-meldung] push', e))
+    safeVoidNotify(
+      'partner-positions-meldung:push',
+      sendCrmPushToStaff({
+        typ: pushTyp,
+        title: pushTitle,
+        body: pushBody.slice(0, 180),
+        url: href,
+        tag: `leistung-update-${auftragId}-${positionId || 'all'}-${Date.now()}`,
+      })
+    )
   }
 
   return NextResponse.json({ ok: true })

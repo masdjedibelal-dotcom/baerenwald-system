@@ -1,14 +1,16 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState } from 'react'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getPartnerPortalLoginHint } from '@/app/(dashboard)/handwerker/actions'
 import { KundenportalLinkVersendenModal } from '@/components/crm/KundenportalLinkVersendenModal'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
 import { openPortalAsKunde, openPortalAsHandwerker } from '@/app/(dashboard)/impersonation/actions'
 import { useIsCrmAdmin } from '@/hooks/useIsCrmAdmin'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 /**
  * Einheitliche Portal-Zeile in Stammdaten (Kunde · Handwerker · Vorgang):
@@ -73,7 +75,7 @@ export function StammdatenPortalZeile({
       return
     }
     if (!fallbackEmail?.trim()) {
-      toast.error('Keine E-Mail — Portal-Einladung nicht möglich.')
+      toast.error(TOAST.keine_e_mail_portal_einladung_nicht_moeglich)
       return
     }
     setModalOpen(true)
@@ -87,14 +89,14 @@ export function StammdatenPortalZeile({
       const r = hid ? await openPortalAsHandwerker(hid) : await openPortalAsKunde(kid!)
       if (!r.ok) {
         popup?.close()
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       if (popup) popup.location.href = r.url
       else window.location.assign(r.url)
     } catch {
       popup?.close()
-      toast.error('Portal konnte nicht geöffnet werden.')
+      toast.error(TOAST.portal_konnte_nicht_geoeffnet_werden)
     } finally {
       setLoginBusy(false)
     }
@@ -126,31 +128,18 @@ export function StammdatenPortalZeile({
         <span className="t">{statusLabel}</span>
         {showInvite ? (
           <span className="a">
-            <button
-              type="button"
-              className="vgid-portal__invite"
-              onClick={openInvite}
-              aria-label="Portal-Einladung senden"
-              title="Portal-Einladung erneut senden"
-            >
+            <MockBtn className="vgid-portal__invite" type="button" onClick={openInvite} aria-label="Portal-Einladung senden" title="Portal-Einladung erneut senden">
               <MockIcon ctx="default" n="send" size={15} />
               <span>Einladen</span>
-            </button>
+            </MockBtn>
           </span>
         ) : null}
         {showLogin ? (
           <span className="a">
-            <button
-              type="button"
-              className="vgid-portal__login"
-              onClick={() => void openLogin()}
-              disabled={loginBusy}
-              aria-label={hid ? 'Partner-Portal Login' : 'Kundenportal Login'}
-              title={hid ? 'Als Partner im Portal anmelden' : 'Als Kunde im Portal anmelden'}
-            >
+            <MockBtn className="vgid-portal__login" type="button" onClick={() => void openLogin()} disabled={loginBusy} aria-label={hid ? 'Partner-Portal Login' : 'Kundenportal Login'} title={hid ? 'Als Partner im Portal anmelden' : 'Als Kunde im Portal anmelden'}>
               <MockIcon ctx="btn" n="log-in" size={15} />
               <span>Login</span>
-            </button>
+            </MockBtn>
           </span>
         ) : null}
       </div>

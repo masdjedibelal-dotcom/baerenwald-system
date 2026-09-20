@@ -1,5 +1,9 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   DndContext,
@@ -18,9 +22,6 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { PosAddRow, type PosAddKind } from '@/components/posboard/PosAddRow'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { SwipeRow } from '@/components/ui/SwipeRow'
@@ -28,6 +29,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
+import { C } from '@/lib/tokens/colors'
 
 export type PosTableBadge = {
   kind?: string
@@ -56,10 +58,6 @@ export type PosTableGroup = {
   items: PosTableItem[]
 }
 
-function PosTableMenu({ items }: { items: EntityMenuItem[] }) {
-  return <MockEntityRowMenu items={items} title="Position" />
-}
-
 function SelectBox({ on }: { on: boolean }) {
   return (
     <span
@@ -68,9 +66,9 @@ function SelectBox({ on }: { on: boolean }) {
         height: 17,
         flexShrink: 0,
         borderRadius: 4,
-        border: `1.5px solid ${on ? 'var(--green)' : 'var(--border-strong)'}`,
+        border: `1.0.3125remrem solid ${on ? 'var(--green)' : 'var(--border-strong)'}`,
         background: on ? 'var(--green)' : 'transparent',
-        color: '#fff',
+        color: C.white,
         display: 'grid',
         placeItems: 'center',
         cursor: 'pointer',
@@ -177,18 +175,11 @@ function SortableGroupHeader({
         {g.titel ? <span className="gt">· {g.titel}</span> : null}
         <div style={{ flex: 1 }} />
         {onAddKind && !unifiedAdd ? (
-          <button
-            type="button"
-            className={cn('pt2-gewerk-add', addOpen && 'is-open')}
-            title="Position hinzufügen"
-            aria-label="Position hinzufügen"
-            aria-expanded={addOpen}
-            onClick={() => setAddOpenFor(addOpen ? null : g.id)}
-          >
+          <MockBtn className={cn('pt2-gewerk-add', addOpen && 'is-open')} type="button" title="Position hinzufügen" aria-label="Position hinzufügen" aria-expanded={addOpen} onClick={() => setAddOpenFor(addOpen ? null : g.id)}>
             <MockIcon ctx="default" n="plus" size={14} />
-          </button>
+          </MockBtn>
         ) : null}
-        {groupActions ? <PosTableMenu items={groupActions(g)} /> : null}
+        {groupActions ? <MockEntityRowMenu items={groupActions(g)} title="Position" /> : null}
       </div>
       {children}
     </div>
@@ -322,7 +313,7 @@ function PosRowContent({
       </div>
       <div className="pt2-preis pt2-preis--desk">{it.preisLabel ?? ''}</div>
       <div className="pt2-act">
-        {itemActions ? <PosTableMenu items={itemActions(g, it)} /> : null}
+        {itemActions ? <MockEntityRowMenu items={itemActions(g, it)} title="Position" /> : null}
       </div>
     </div>
   )
@@ -587,10 +578,10 @@ export function PosTable({
               <div
                 className="pt2-empty"
                 style={{
-                  padding: '12px 14px',
+                  padding: '0.75rem 0.8750remrem',
                   fontSize: 'var(--fs-meta)',
                   color: 'var(--text-4)',
-                  borderBottom: '0.5px solid var(--border)',
+                  borderBottom: '0.0.3125remrem solid var(--border)',
                 }}
               >
                 Keine Positionen
@@ -643,14 +634,9 @@ export function PosTable({
               </div>
             ) : null}
             {!onAddKind && onAddItem && !unifiedAdd ? (
-              <button
-                type="button"
-                className="pt-add"
-                onClick={() => onAddItem(g)}
-                style={{ borderBottom: '0.5px solid var(--border)' }}
-              >
+              <MockBtn className="pt-add" type="button" onClick={() => onAddItem(g)} style={{ borderBottom: '0.0.3125remrem solid var(--border)' }}>
                 <MockIcon ctx="default" n="plus" size={13} /> Position hinzufügen
-              </button>
+              </MockBtn>
             ) : null}
           </>
         )
@@ -695,30 +681,23 @@ export function PosTable({
               {g.titel ? <span className="gt">· {g.titel}</span> : null}
               <div style={{ flex: 1 }} />
               {onAddKind && !unifiedAdd ? (
-                <button
-                  type="button"
-                  className={cn('pt2-gewerk-add', addOpen && 'is-open')}
-                  title="Position hinzufügen"
-                  aria-label="Position hinzufügen"
-                  aria-expanded={addOpen}
-                  onClick={() => setAddOpenFor(addOpen ? null : g.id)}
-                >
+                <MockBtn className={cn('pt2-gewerk-add', addOpen && 'is-open')} type="button" title="Position hinzufügen" aria-label="Position hinzufügen" aria-expanded={addOpen} onClick={() => setAddOpenFor(addOpen ? null : g.id)}>
                   <MockIcon ctx="default" n="plus" size={14} />
-                </button>
+                </MockBtn>
               ) : null}
-              {groupActions ? <PosTableMenu items={groupActions(g)} /> : null}
+              {groupActions ? <MockEntityRowMenu items={groupActions(g)} title="Position" /> : null}
             </div>
             {itemList}
           </div>
         )
       })}
       {onAddKind && !hasGroups && !unifiedAdd && !documentAddKinds ? (
-        <div style={{ padding: '12px 0 4px' }}>
+        <div style={{ padding: 'var(--sp-row) 0 0.25rem' }}>
           <PosAddRow onAdd={(kind) => onAddKind(kind)} disabledKinds={disabledAddKinds} />
         </div>
       ) : null}
       {onAddKind && documentAddKinds && !unifiedAdd ? (
-        <div style={{ padding: '12px 0 4px' }}>
+        <div style={{ padding: 'var(--sp-row) 0 0.25rem' }}>
           <PosAddRow
             kinds={documentAddKinds}
             onAdd={(kind) => onAddKind(kind)}
@@ -727,18 +706,13 @@ export function PosTable({
         </div>
       ) : null}
       {onAddGroup && !unifiedAdd ? (
-        <button
-          type="button"
-          className="pt-add"
-          onClick={onAddGroup}
-          style={{
+        <MockBtn className="pt-add" type="button" onClick={onAddGroup} style={{
             color: 'var(--green)',
             fontWeight: 600,
-            borderBottom: showTotals ? '0.5px solid var(--border)' : 'none',
-          }}
-        >
+            borderBottom: showTotals ? '0.0.3125remrem solid var(--border)' : 'none',
+          }}>
           <MockIcon ctx="default" n="plus" size={14} /> Gewerk hinzufügen
-        </button>
+        </MockBtn>
       ) : null}
       {showTotals ? (
         <div className="pt2-foot">

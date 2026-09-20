@@ -1,6 +1,7 @@
+import { createClient } from '@/lib/supabase-server'
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import type { AngebotDetail } from '@/lib/types'
 
 const ANGEBOT_DETAIL_SELECT = `
@@ -25,9 +26,7 @@ export async function loadAngebotDetail(
   supabase: SupabaseClient,
   id: string
 ): Promise<AngebotDetail | null> {
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db.from('angebote').select(ANGEBOT_DETAIL_SELECT).eq('id', id).maybeSingle()
-  )
+  const { data, error } = await (() => { const db = createClient(); return db.from('angebote').select(ANGEBOT_DETAIL_SELECT).eq('id', id).maybeSingle() })()
   if (error || !data) return null
   const row = data as AngebotDetail
   return {

@@ -1,10 +1,10 @@
 'use client'
 
+import { MockBtn, MockTabs } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import {
   ctaLabel,
   getCrmNotificationUnreadCount,
@@ -13,7 +13,7 @@ import {
   markCrmNotificationRead,
   typHint,
   typLabel,
-  type CrmNotificationFilter,
+  type NotificationReadFilter,
   type CrmNotificationItem,
 } from '@/app/(dashboard)/notifications/actions'
 import { cn } from '@/lib/utils'
@@ -26,14 +26,14 @@ export function CrmNotificationsBell() {
   const router = useRouter()
   const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
-  const [filter, setFilter] = useState<CrmNotificationFilter>('ungelesen')
+  const [filter, setFilter] = useState<NotificationReadFilter>('ungelesen')
   const [items, setItems] = useState<CrmNotificationItem[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [detail, setDetail] = useState<CrmNotificationItem | null>(null)
   const [pending, startTransition] = useTransition()
 
   const reload = useCallback(
-    (f: CrmNotificationFilter = filter) => {
+    (f: NotificationReadFilter = filter) => {
       startTransition(async () => {
         const res = await listCrmNotifications(f)
         if (!res.ok) {
@@ -141,21 +141,12 @@ export function CrmNotificationsBell() {
 
   return (
     <>
-      <button
-        type="button"
-        className={cn('topbar-icon-btn topbar-notif-btn', open && 'is-open')}
-        aria-label={
-          unreadCount > 0
+      <MockBtn className={cn('topbar-icon-btn topbar-notif-btn', open && 'is-open')} type="button" aria-label={unreadCount > 0
             ? `Benachrichtigungen, ${unreadCount} ungelesen`
-            : 'Benachrichtigungen'
-        }
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={onOpen}
-      >
+            : 'Benachrichtigungen'} aria-haspopup="dialog" aria-expanded={open} onClick={onOpen}>
         <MockIcon ctx="btn" n="bell" size={18} />
         {badge ? <span className="topbar-notif-badge">{badge}</span> : null}
-      </button>
+      </MockBtn>
 
       <EditorSheet
         open={open}
@@ -185,25 +176,19 @@ export function CrmNotificationsBell() {
           ) : null
         }
       >
-        <div className="crm-notif-filters" role="tablist" aria-label="Filter">
-          {(
-            [
-              ['ungelesen', 'Ungelesen'],
-              ['gelesen', 'Gelesen'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={filter === id}
-              className={cn('crm-notif-filter', filter === id && 'is-active')}
-              onClick={() => setFilter(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <MockTabs
+          items={[
+            { id: 'ungelesen', label: 'Ungelesen' },
+            { id: 'gelesen', label: 'Gelesen' },
+          ]}
+          value={filter}
+          onChange={(id) => setFilter(id as NotificationReadFilter)}
+          aria-label="Filter"
+          className="crm-notif-filters"
+          tabClassName="crm-notif-filter"
+          activeClassName="is-active"
+          showIcons={false}
+        />
 
         {pending && !items.length ? (
           <p className="crm-notif-empty">Lädt…</p>
@@ -217,15 +202,10 @@ export function CrmNotificationsBell() {
           <ul className="crm-notif-list">
             {items.map((item) => (
               <li key={item.sourceKey} className="crm-notif-list__item">
-                <button
-                  type="button"
-                  className={cn('crm-notif-row', !item.gelesen && 'is-unread')}
-                  onClick={() => goToVorgang(item)}
-                  onContextMenu={(e) => {
+                <MockBtn className={cn('crm-notif-row', !item.gelesen && 'is-unread')} type="button" onClick={() => goToVorgang(item)} onContextMenu={(e) => {
                     e.preventDefault()
                     openDetail(item)
-                  }}
-                >
+                  }}>
                   <span className="crm-notif-row__body">
                     <span className="crm-notif-row__title">{item.title}</span>
                     {item.subtitle ? (
@@ -233,7 +213,7 @@ export function CrmNotificationsBell() {
                     ) : null}
                   </span>
                   {!item.gelesen ? <span className="crm-notif-row__dot" aria-hidden /> : null}
-                </button>
+                </MockBtn>
               </li>
             ))}
           </ul>

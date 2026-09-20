@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type UnifiedTeamLinkResult = {
@@ -30,10 +31,11 @@ export async function ensureUnifiedTeamAccount(
     phone: telefon,
   })
 
-  const { data: hwRows } = await admin
+  const { data: hwRows, error } = await admin
     .from('handwerker')
     .select('id, name, email, auth_user_id')
     .ilike('email', email)
+  if (error) logDbError('lib/auth/unified-team-account:handwerker', error)
 
   const hw = (hwRows ?? []).find((r) => (r.email as string)?.trim().toLowerCase() === email)
   if (!hw) {
@@ -51,7 +53,7 @@ export async function ensureUnifiedTeamAccount(
       userProfileOk: true,
       handwerkerLinked: false,
       handwerkerName: hw.name as string,
-      handwerkerConflict: `Handwerker „${hw.name}“ ist bereits einem anderen Login zugeordnet.`,
+      handwerkerConflict: `Partner „${hw.name}“ ist bereits einem anderen Login zugeordnet.`,
     }
   }
 
@@ -60,6 +62,7 @@ export async function ensureUnifiedTeamAccount(
       .from('handwerker')
       .update({ auth_user_id: input.authUserId })
       .eq('id', hw.id as string)
+    if (error) logDbError('lib/auth/unified-team-account:handwerker', error)
     if (error) {
       return {
         userProfileOk: true,
@@ -82,10 +85,11 @@ export async function teamAccountHasPartnerPortal(
   admin: SupabaseClient,
   authUserId: string
 ): Promise<boolean> {
-  const { data } = await admin
+  const { data, error } = await admin
     .from('handwerker')
     .select('id')
     .eq('auth_user_id', authUserId)
     .maybeSingle()
+  if (error) logDbError('lib/auth/unified-team-account:handwerker', error)
   return Boolean(data?.id)
 }

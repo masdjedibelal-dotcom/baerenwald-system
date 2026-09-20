@@ -1,13 +1,15 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockProp } from '@/components/mock-ui/MockProp'
-import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 const ROLLEN: { rolle: string; beschreibung: string; aktiv: boolean }[] = [
   { rolle: 'Administrator', beschreibung: 'Voller Zugriff inkl. Finanzen & Einstellungen', aktiv: true },
-  { rolle: 'Mitarbeiter', beschreibung: 'Aufträge, Handwerker, Termine', aktiv: true },
+  { rolle: 'Mitarbeiter', beschreibung: 'Aufträge, Partner, Termine', aktiv: true },
 ]
 
 export function EinstellungenSicherheitClient() {
@@ -26,10 +28,10 @@ export function EinstellungenSicherheitClient() {
           <MockProp label="Daten-Export">jederzeit (CSV / DATEV)</MockProp>
         </div>
         <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-          <MockBtn sm icon="download" onClick={() => toast.success('Datenexport gestartet (Demo)')}>
+          <MockBtn sm icon="download" onClick={() => toast.success(TOAST.datenexport_gestartet_demo)}>
             Datenexport
           </MockBtn>
-          <MockBtn sm icon="file-text" onClick={() => toast.success('AV-Vertrag geöffnet (Demo)')}>
+          <MockBtn sm icon="file-text" onClick={() => toast.success(TOAST.av_vertrag_geoeffnet_demo)}>
             AV-Vertrag
           </MockBtn>
         </div>
@@ -53,7 +55,7 @@ export function EinstellungenSicherheitClient() {
           GoBD-konforme Aufbewahrung, unveränderbare Rechnungs-PDFs.
         </div>
         <div style={{ marginTop: 10 }}>
-          <MockBtn sm icon="list" onClick={() => toast.success('Änderungsprotokoll geöffnet (Demo)')}>
+          <MockBtn sm icon="list" onClick={() => toast.success(TOAST.aenderungsprotokoll_geoeffnet_demo)}>
             Änderungsprotokoll
           </MockBtn>
         </div>

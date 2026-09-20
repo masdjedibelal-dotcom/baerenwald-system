@@ -2,6 +2,7 @@
  * Lädt die gemeinsame Bericht-Datenquelle (Phase 12 / Spec §16).
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import {
   listAuftragPositionEintraege,
   listAuftragTagesspannen,
@@ -38,6 +39,7 @@ export async function loadBerichtDatenquelle(
     .select('id, titel, kunden(*)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (aufErr) logDbError('lib/auftraege/load-bericht-datenquelle:auftraege', aufErr)
 
   if (aufErr || !auf) {
     return { ok: false, message: aufErr?.message || 'Auftrag nicht gefunden.' }
@@ -46,13 +48,14 @@ export async function loadBerichtDatenquelle(
   const kundeRaw = auf.kunden
   const kunde = (Array.isArray(kundeRaw) ? kundeRaw[0] : kundeRaw) as Kunde | null
 
-  const { data: posRows } = await supabaseAdmin
+  const { data: posRows, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
       'id, leistung_name, beschreibung, typ, verguetung, gewerk_name, stundensatz, preis_partner, geschaetzt_std, handwerker(name, firma)'
     )
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: true })
+  if (error2) logDbError('lib/auftraege/load-bericht-datenquelle:auftrag_positionen', error2)
 
   const positionen: BerichtPositionMeta[] = (posRows ?? []).map((p) => {
     const hwRaw = p.handwerker
@@ -74,10 +77,11 @@ export async function loadBerichtDatenquelle(
   const posIds = positionen.map((p) => p.id)
   const material: BerichtMaterialZeile[] = []
   if (posIds.length) {
-    const { data: mats } = await supabaseAdmin
+    const { data: mats, error } = await supabaseAdmin
       .from('position_material')
       .select('position_id, bezeichnung, menge, einzelpreis')
       .in('position_id', posIds)
+    if (error) logDbError('lib/auftraege/load-bericht-datenquelle:position_material', error)
     for (const m of mats ?? []) {
       const menge = Number(m.menge) || 0
       const einzelpreis = Number(m.einzelpreis) || 0

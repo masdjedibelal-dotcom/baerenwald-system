@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { acceptRahmenvertragFromPortal } from '@/lib/vertraege/provision-rahmenvertrag-portal'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -25,11 +26,12 @@ export async function POST(req: Request) {
   let handwerkerId = body.handwerker_id?.trim() ?? ''
   if (!handwerkerId && body.email?.trim()) {
     const email = body.email.trim().toLowerCase()
-    const { data } = await supabaseAdmin
+    const {data, error} = await supabaseAdmin
       .from('handwerker')
       .select('id')
       .ilike('email', email)
       .maybeSingle()
+    if (error) logDbError('app/api/internal/partner-rahmenvertrag-accept/route:handwerker', error)
     handwerkerId = (data?.id as string | undefined) ?? ''
   }
 

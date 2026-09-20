@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
@@ -42,33 +48,36 @@ async function resolveGewerkId(
 ): Promise<string | null> {
   if (preferred?.trim()) return preferred.trim()
 
-  const { data: hw } = await supabaseAdmin
+  const { data: hw, error } = await supabaseAdmin
     .from('handwerker')
     .select('gewerke')
     .eq('id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:handwerker', error)
   const slugs = Array.isArray(hw?.gewerke)
     ? (hw!.gewerke as string[]).map((s) => String(s).trim()).filter(Boolean)
     : []
 
   if (slugs.length) {
-    const { data: bySlug } = await supabaseAdmin
+    const { data: bySlug, error } = await supabaseAdmin
       .from('gewerke')
       .select('id')
       .in('slug', slugs)
       .eq('aktiv', true)
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:gewerke', error)
     if (bySlug?.id) return String(bySlug.id)
   }
 
-  const { data: fallback } = await supabaseAdmin
+  const { data: fallback, error: error2 } = await supabaseAdmin
     .from('gewerke')
     .select('id')
     .eq('aktiv', true)
     .order('name')
     .limit(1)
     .maybeSingle()
+  if (error2) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:gewerke', error2)
   return fallback?.id ? String(fallback.id) : null
 }
 
@@ -79,7 +88,7 @@ async function ensureInternAngebot(opts: {
   beschreibung: string
   positionen: Record<string, unknown>[]
 }): Promise<{ ok: true; angebotId: string } | { ok: false; message: string }> {
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error } = await supabaseAdmin
     .from('angebote')
     .select('id')
     .eq('lead_id', opts.leadId)
@@ -87,9 +96,10 @@ async function ensureInternAngebot(opts: {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:angebote', error)
 
   if (existing?.id) {
-    await supabaseAdmin
+    const { error: __dbErr1 } = await supabaseAdmin
       .from('angebote')
       .update({
         leistungsumfang: opts.titel,
@@ -98,10 +108,11 @@ async function ensureInternAngebot(opts: {
         updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
+    if (__dbErr1) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:angebote', __dbErr1)
     return { ok: true, angebotId: String(existing.id) }
   }
 
-  const { data: row, error } = await supabaseAdmin
+  const { data: row, error: error2 } = await supabaseAdmin
     .from('angebote')
     .insert({
       lead_id: opts.leadId,
@@ -117,9 +128,10 @@ async function ensureInternAngebot(opts: {
     })
     .select('id')
     .single()
+  if (error2) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:angebote', error2)
 
-  if (error || !row?.id) {
-    return { ok: false, message: error?.message ?? 'Internes Angebot konnte nicht angelegt werden.' }
+  if (error2 || !row?.id) {
+    return { ok: false, message: error2?.message ?? 'Internes Angebot konnte nicht angelegt werden.' }
   }
   return { ok: true, angebotId: String(row.id) }
 }
@@ -143,20 +155,22 @@ export async function anfrageHandwerkerAnfragen(input: {
 
   if (!leadId) return { ok: false, message: 'Anfrage fehlt.' }
   if (!titel) return { ok: false, message: 'Titel fehlt.' }
-  if (!hwIds.length) return { ok: false, message: 'Bitte mindestens einen Handwerker auswählen.' }
+  if (!hwIds.length) return { ok: false, message: 'Bitte mindestens einen Partner auswählen.' }
 
   const { data: lead, error: leadErr } = await supabaseAdmin
     .from('leads')
     .select('id, kunde_id, auftraggeber_kunde_id, org_freigabe_status, hv_meldung_status')
     .eq('id', leadId)
     .maybeSingle()
+  if (leadErr) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:leads', leadErr)
 
   if (leadErr || !lead) return { ok: false, message: 'Anfrage nicht gefunden.' }
 
-  const { data: gewerkRows } = await supabaseAdmin
+  const { data: gewerkRows, error: error2 } = await supabaseAdmin
     .from('gewerke')
     .select('id, name, slug')
     .eq('aktiv', true)
+  if (error2) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:gewerke', error2)
   const internPositionen = partnerLvVorgabeToAngebotPositionen(
     input.positionen ?? [],
     (gewerkRows ?? []) as Array<{ id: string; name: string; slug?: string }>
@@ -182,12 +196,13 @@ export async function anfrageHandwerkerAnfragen(input: {
       return { ok: false, message: 'Kein Gewerk gefunden — bitte unter Einstellungen anlegen.' }
     }
 
-    const { data: existingRows } = await supabaseAdmin
+    const { data: existingRows, error } = await supabaseAdmin
       .from('angebot_handwerker')
       .select('id, status, angebot_id, angebote!inner(lead_id)')
       .eq('handwerker_id', hwId)
       .eq('ohne_lv', true)
       .eq('angebote.lead_id', leadId)
+    if (error) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:angebot_handwerker', error)
 
     const existing = (existingRows ?? []).find((r) => {
       const st = String(r.status ?? '').toLowerCase()
@@ -195,7 +210,7 @@ export async function anfrageHandwerkerAnfragen(input: {
     })
 
     if (existing?.id) {
-      await supabaseAdmin
+      const { error: __dbErr2 } = await supabaseAdmin
         .from('angebot_handwerker')
         .update({
           aufgabe_notiz: notiz || null,
@@ -204,6 +219,7 @@ export async function anfrageHandwerkerAnfragen(input: {
           angebot_id: attachAngebotId,
         })
         .eq('id', existing.id)
+      if (__dbErr2) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:angebot_handwerker', __dbErr2)
       zuweisungIds.push(String(existing.id))
       continue
     }
@@ -220,6 +236,7 @@ export async function anfrageHandwerkerAnfragen(input: {
       })
       .select('id')
       .single()
+    if (insErr) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:angebot_handwerker', insErr)
 
     if (insErr || !inserted?.id) {
       return { ok: false, message: insErr?.message ?? 'Zuweisung konnte nicht angelegt werden.' }
@@ -245,9 +262,9 @@ export async function anfrageHandwerkerAnfragen(input: {
     gesendet++
   }
 
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
   if (attachAngebotId !== intern.angebotId) {
-    revalidatePath(`/angebote/${attachAngebotId}`)
+    revalidateAngebotDetail(attachAngebotId)
   }
   return { ok: true, gesendet }
 }
@@ -261,7 +278,7 @@ export type AnfragePartnerEinholungRow = AngebotHandwerkerRow & {
   ist_intern_gehaeuse?: boolean
 }
 
-export async function listAnfragePartnerEinholungen(
+export async function listAnfrageHandwerkerEinholungen(
   leadId: string
 ): Promise<{ ok: true; rows: AnfragePartnerEinholungRow[] } | { ok: false; message: string }> {
   const auth = await requireUser()
@@ -275,6 +292,7 @@ export async function listAnfragePartnerEinholungen(
     .eq('ohne_lv', true)
     .eq('angebote.lead_id', id)
     .order('gesendet_at', { ascending: false })
+  if (error) logDbError('app/anfragen/anfrage-handwerker-anfragen-actions:angebot_handwerker', error)
 
   if (error) {
     if (/ohne_lv|ist_partner_einholung|column/i.test(error.message)) {

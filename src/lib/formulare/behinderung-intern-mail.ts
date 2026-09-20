@@ -13,7 +13,7 @@ export function buildBehinderungInternHtml(input: {
   return `
   <p><strong>Behinderungsanzeige eingegangen</strong></p>
   <p>Auftrag: <strong>${input.auftragIdShort}</strong> · Kundin: <strong>${input.kundeName}</strong></p>
-  <p>Handwerker: <strong>${input.handwerkerName}</strong></p>
+  <p>Partner: <strong>${input.handwerkerName}</strong></p>
   <p>Grund: <strong>${input.grund}</strong></p>
   <p>Geschätzter Verzug: <strong>${input.verzugTage}</strong> Arbeitstage</p>
   <p>Beschreibung:<br/>${input.beschreibung.replace(/\n/g, '<br/>')}</p>

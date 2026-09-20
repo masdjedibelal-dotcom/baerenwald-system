@@ -1,5 +1,10 @@
 'use client'
+import { DateInput } from '@/components/ui/DateInput'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useTransition } from '@/components/ui/action-busy'
+import { C } from '@/lib/tokens/colors'
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -9,6 +14,7 @@ import {
   sendAuftragLeistungenAnHandwerkerV3,
   zuweiseHandwerkerAnPositionenV3,
 } from '@/app/(dashboard)/auftraege/leistungen-steuerung-v3-actions'
+import { formatEuro } from '@/lib/format/geld-datum'
 import {
   sendAngebotLeistungenAnHandwerkerV3,
   zuweiseHandwerkerAnAngebotPositionen,
@@ -19,9 +25,10 @@ import { richTextToPlain } from '@/lib/rich-text'
 import { BEREICH_LABELS, cn } from '@/lib/utils'
 import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
 import { HandwerkerSuchenSheet } from '@/components/auftraege/leistungen-v3/HandwerkerSuchenSheet'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function ymdToDisplay(ymd: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim())
@@ -68,7 +75,7 @@ export function AuftragLeistungZuweisungModal({
   open: boolean
   onClose: () => void
   /** Auftrag-Modus; ohne → Angebot-Zuweisung über angebotId */
-  auftragId?: string | null
+auftragId?: string | null
   angebotId?: string | null
   projektName?: string
   positionIds: string[]
@@ -77,6 +84,7 @@ export function AuftragLeistungZuweisungModal({
   onDone: () => void
 }) {
   const isAngebotOnly = !auftragId?.trim() && Boolean(angebotId?.trim())
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useTransition()
   const [dirty, setDirty] = useState(false)
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())
@@ -181,7 +189,7 @@ export function AuftragLeistungZuweisungModal({
   function confirm() {
     const ids = Array.from(selectedHwIds)
     if (!ids.length) {
-      toast.error('Bitte mindestens einen Handwerker auswählen.')
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_einen_partner_auswaehlen })
       return
     }
     const primaryHw = ids[0]
@@ -192,7 +200,7 @@ export function AuftragLeistungZuweisungModal({
     if (isSingle) {
       ekNum = parseNum(partnerNetto)
       if (ekNum == null || ekNum < 0) {
-        toast.error('Partner-EK (netto) angeben (0 € oder mehr).')
+        toast.error(TOAST.partner_ek_netto_angeben_0_oder_mehr)
         return
       }
     } else {
@@ -227,11 +235,11 @@ export function AuftragLeistungZuweisungModal({
         return
       }
       if (zeitModus === 'zeitraum' && !bisYmd) {
-        toast.error('Bitte den Leistungszeitraum (bis) angeben.')
+        applyFieldErrors({ _form: TOAST.bitte_den_leistungszeitraum_bis_angeben })
         return
       }
       if (vonYmd && bisYmd && bisYmd < vonYmd) {
-        toast.error('„Bis“ darf nicht vor „Von“ liegen.')
+        toast.error(TOAST.bis_darf_nicht_vor_von_liegen)
         return
       }
     }
@@ -256,7 +264,7 @@ export function AuftragLeistungZuweisungModal({
                 .join(', '),
         })
         if (!assign.ok) {
-          toast.error(assign.message)
+          toast.systemError(assign)
           return
         }
 
@@ -265,14 +273,14 @@ export function AuftragLeistungZuweisungModal({
           zuweisungIds: assign.zuweisungIds,
         })
         if (!sent.ok) {
-          toast.error(sent.message)
+          toast.systemError(sent)
           return
         }
 
         toast.success(
           sent.gesendet === 1
-            ? 'Anfrage an Handwerker gesendet'
-            : `${sent.gesendet} Anfragen an Handwerker gesendet`
+            ? 'Anfrage an Partner gesendet'
+            : `${sent.gesendet} Anfragen an Partner gesendet`
         )
         onDone()
         onClose()
@@ -280,7 +288,7 @@ export function AuftragLeistungZuweisungModal({
       }
 
       if (!auftragId) {
-        toast.error('Auftrag fehlt.')
+        toast.error(TOAST.auftrag_fehlt)
         return
       }
 
@@ -293,7 +301,7 @@ export function AuftragLeistungZuweisungModal({
           end_datum: bisYmd,
         })
         if (!patch.ok) {
-          toast.error(patch.message)
+          toast.systemError(patch)
           return
         }
       }
@@ -308,7 +316,7 @@ export function AuftragLeistungZuweisungModal({
         endDatum: bisYmd,
       })
       if (!assign.ok) {
-        toast.error(assign.message)
+        toast.systemError(assign)
         return
       }
 
@@ -320,14 +328,14 @@ export function AuftragLeistungZuweisungModal({
         positionIds,
       })
       if (!sent.ok) {
-        toast.error(sent.message)
+        toast.systemError(sent)
         return
       }
 
       toast.success(
         sent.gesendet === 1
-          ? 'Anfrage an Handwerker gesendet'
-          : `${sent.gesendet} Anfragen an Handwerker gesendet`
+          ? 'Anfrage an Partner gesendet'
+          : `${sent.gesendet} Anfragen an Partner gesendet`
       )
       onDone()
       onClose()
@@ -344,7 +352,6 @@ export function AuftragLeistungZuweisungModal({
       return n != null && n >= 0
     })
   })()
-  const canSend = !pending && selectedHwIds.size > 0 && ekOk
 
   const selectedDisplay = useMemo(() => {
     return selectedHwRows.filter((h) => selectedHwIds.has(h.id))
@@ -353,7 +360,7 @@ export function AuftragLeistungZuweisungModal({
   function formatVk(pos: AuftragPosition): string {
     const vk = pos.preis_fix
     if (vk == null || !Number.isFinite(vk)) return '—'
-    return `${vk.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`
+    return formatEuro(vk, { decimals: 2 })
   }
 
   return (
@@ -368,14 +375,15 @@ export function AuftragLeistungZuweisungModal({
         compose
         composeLabel={pending ? 'Senden…' : 'Senden'}
         confirmBusy={pending}
-        confirmDisabled={!canSend}
+        confirmDisabled={pending}
         onConfirm={confirm}
         className="hw-anfrage-modal"
         bodyClassName="hw-anfrage-body"
-        /* Handwerker-Suche darüber → Parent zurücktreten, sonst peekt/verdeckt Zuweisung */
+        /* Partner-Suche darüber → Parent zurücktreten, sonst peekt/verdeckt Zuweisung */
         overlayClassName={pickerOpen ? 'editor-sheet-overlay--recessed' : undefined}
       >
-        <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p>
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p>
 
         <div className="hw-anfrage-section">
           <div className="hw-anfrage-section-head">
@@ -383,24 +391,16 @@ export function AuftragLeistungZuweisungModal({
             {selectedHwIds.size > 0 ? <span>{selectedHwIds.size} ausgewählt</span> : null}
           </div>
 
-          <input
-            className="sel w-full"
-            readOnly
-            placeholder="Partner suchen…"
-            disabled={pending}
-            aria-label="Partner suchen"
-            onFocus={(e) => {
+          <MockInput className="sel w-full" readOnly placeholder="Partner suchen…" disabled={pending} aria-label="Partner suchen" onFocus={(e) => {
               e.currentTarget.blur()
               if (pending) return
               dismissKiOverSheet()
               setPickerOpen(true)
-            }}
-            onClick={() => {
+            }} onClick={() => {
               if (pending) return
               dismissKiOverSheet()
               setPickerOpen(true)
-            }}
-          />
+            }} />
 
           {selectedDisplay.length > 0 ? (
             <ul className="hw-anfrage-list mt-3">
@@ -426,15 +426,9 @@ export function AuftragLeistungZuweisungModal({
                           ) : null}
                         </span>
                       </span>
-                      <button
-                        type="button"
-                        className="hw-anfrage-remove"
-                        aria-label={`${displayName} entfernen`}
-                        disabled={pending}
-                        onClick={() => removeHw(h.id)}
-                      >
+                      <MockBtn className="hw-anfrage-remove" type="button" aria-label={`${displayName} löschen`} disabled={pending} onClick={() => removeHw(h.id)}>
                         <MockIcon ctx="btn" n="x" size={14} />
-                      </button>
+                      </MockBtn>
                     </div>
                   </li>
                 )
@@ -449,15 +443,10 @@ export function AuftragLeistungZuweisungModal({
           <>
             <label className="hw-anfrage-field">
               <span className="hw-anfrage-label">Titel</span>
-              <input
-                className="input"
-                value={titel}
-                onChange={(e) => {
+              <MockInput value={titel} onChange={(e) => {
                   setDirty(true)
                   setTitel(e.target.value)
-                }}
-                disabled={pending}
-              />
+                }} disabled={pending} />
             </label>
 
             <div className="hw-anfrage-field">
@@ -468,19 +457,13 @@ export function AuftragLeistungZuweisungModal({
                   setDirty(true)
                   setBeschreibung(text)
                 }}
-                extraHint="Leistungsbeschreibung für die Handwerker-Anfrage (Partner-Portal / Mail)."
+                extraHint="Leistungsbeschreibung für die Partner-Anfrage (Partner-Portal / Mail)."
                 disabled={pending || pickerOpen}
               >
-                <textarea
-                  className="input ta ta--long"
-                  rows={14}
-                  value={beschreibung}
-                  onChange={(e) => {
+                <MockTextarea className="ta ta--long" rows={14} value={beschreibung} onChange={(e) => {
                     setDirty(true)
                     setBeschreibung(e.target.value)
-                  }}
-                  disabled={pending}
-                />
+                  }} disabled={pending} />
               </KiAssistFieldLabel>
             </div>
 
@@ -490,23 +473,13 @@ export function AuftragLeistungZuweisungModal({
                 <span className="prefix" aria-hidden>
                   €
                 </span>
-                <input
-                  type="number"
-                  className="input"
-                  step="0.01"
-                  min="0"
-                  required
-                  value={partnerNetto}
-                  onChange={(e) => {
+                <MockInput type="number" step="0.01" min="0" required value={partnerNetto} onChange={(e) => {
                     setDirty(true)
                     setPartnerNetto(e.target.value)
-                  }}
-                  disabled={pending}
-                  aria-invalid={!ekOk && partnerNetto.trim() !== ''}
-                />
+                  }} disabled={pending} aria-invalid={!ekOk && partnerNetto.trim() !== ''} />
               </div>
               {!ekOk ? (
-                <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
+                <span className="hw-anfrage-hint" style={{ color: `var(--red, ${C.redTx2})`, fontSize: 'var(--fs-meta)' }}>
                   Pflicht — 0 € oder mehr
                 </span>
               ) : null}
@@ -541,18 +514,7 @@ export function AuftragLeistungZuweisungModal({
                         <span className="prefix" aria-hidden>
                           €
                         </span>
-                        <input
-                          type="number"
-                          className="input"
-                          step="0.01"
-                          min="0"
-                          required
-                          value={raw}
-                          onChange={(e) => setEkForPos(p.id, e.target.value)}
-                          disabled={pending}
-                          aria-label={`Partner-EK für ${p.leistung_name?.trim() || 'Leistung'}`}
-                          aria-invalid={!rowOk && raw.trim() !== ''}
-                        />
+                        <MockInput type="number" step="0.01" min="0" required value={raw} onChange={(e) => setEkForPos(p.id, e.target.value)} disabled={pending} aria-label={`Partner-EK für ${p.leistung_name?.trim() || 'Leistung'}`} aria-invalid={!rowOk && raw.trim() !== ''} />
                       </span>
                     </label>
                   </div>
@@ -560,7 +522,7 @@ export function AuftragLeistungZuweisungModal({
               })}
             </div>
             {!ekOk ? (
-              <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
+              <span className="hw-anfrage-hint" style={{ color: `var(--red, ${C.redTx2})`, fontSize: 'var(--fs-meta)' }}>
                 Für jede Leistung Partner-EK eintragen (0 € oder mehr)
               </span>
             ) : null}
@@ -573,26 +535,16 @@ export function AuftragLeistungZuweisungModal({
                 <span>Leistungszeitraum *</span>
               </div>
               <div className="hw-anfrage-seg" role="group" aria-label="Zeitraum-Modus">
-                <button
-                  type="button"
-                  className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
+                <MockBtn className={cn('hw-anfrage-seg-btn', zeitModus === 'zeitraum' && 'is-active')} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
                     setDirty(true)
                     setZeitModus('zeitraum')
                     if (document.activeElement instanceof HTMLElement) {
                       document.activeElement.blur()
                     }
-                  }}
-                  disabled={pending}
-                >
+                  }} disabled={pending}>
                   Zeitraum
-                </button>
-                <button
-                  type="button"
-                  className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
+                </MockBtn>
+                <MockBtn className={cn('hw-anfrage-seg-btn', zeitModus === 'tag' && 'is-active')} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => {
                     setDirty(true)
                     setZeitModus('tag')
                     if (von) setBis(von)
@@ -600,52 +552,35 @@ export function AuftragLeistungZuweisungModal({
                     if (document.activeElement instanceof HTMLElement) {
                       document.activeElement.blur()
                     }
-                  }}
-                  disabled={pending}
-                >
+                  }} disabled={pending}>
                   Einzelner Tag
-                </button>
+                </MockBtn>
               </div>
               {/* Beide Felder gemountet — Unmount von „Bis“ öffnet sonst iOS-Datepicker neu */}
               <div className={cn('hw-anfrage-date-row', zeitModus === 'tag' && 'hw-anfrage-date-row--single')}>
                 <label className="hw-anfrage-field">
                   <span className="hw-anfrage-label">{zeitModus === 'tag' ? 'Datum *' : 'Von *'}</span>
                   <div className="hw-anfrage-date-field">
-                    <input
-                      type="date"
-                      className="input"
-                      required
-                      value={von.trim() ? displayToYmd(von) : ''}
-                      onChange={(e) => {
+                    <DateInput required value={von.trim() ? displayToYmd(von) : ''} onChange={(e) => {
                         setDirty(true)
                         const v = e.target.value
                         setVon(v ? ymdToDisplay(v) : '')
                         if (zeitModus === 'tag') setBis(v ? ymdToDisplay(v) : '')
-                      }}
-                      disabled={pending}
-                    />
-                    <button
-                      type="button"
-                      className="hw-anfrage-date-icon"
-                      tabIndex={-1}
-                      disabled={pending}
-                      aria-label="Kalender öffnen"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => {
+                      }} disabled={pending} />
+                    <MockBtn className="hw-anfrage-date-icon" type="button" tabIndex={-1} disabled={pending} aria-label="Kalender öffnen" onMouseDown={(e) => e.preventDefault()} onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
                         const input = (e.currentTarget.parentElement?.querySelector(
-                          'input[type="date"]'
+                          '.date-field__input'
                         ) ?? null) as HTMLInputElement | null
                         try {
                           input?.showPicker?.()
                         } catch {
                           input?.focus()
                         }
-                      }}
-                    >
+                      }}>
                       <MockIcon ctx="btn" n="calendar" size={15} />
-                    </button>
+                    </MockBtn>
                   </div>
                 </label>
                 <label
@@ -656,46 +591,30 @@ export function AuftragLeistungZuweisungModal({
                 >
                   <span className="hw-anfrage-label">Bis *</span>
                   <div className="hw-anfrage-date-field">
-                    <input
-                      type="date"
-                      className="input"
-                      required={zeitModus === 'zeitraum'}
-                      value={bis.trim() ? displayToYmd(bis) : ''}
-                      onChange={(e) => {
+                    <DateInput required={zeitModus === 'zeitraum'} value={bis.trim() ? displayToYmd(bis) : ''} onChange={(e) => {
                         setDirty(true)
                         const v = e.target.value
                         setBis(v ? ymdToDisplay(v) : '')
-                      }}
-                      disabled={pending || zeitModus === 'tag'}
-                      tabIndex={zeitModus === 'tag' ? -1 : undefined}
-                    />
-                    <button
-                      type="button"
-                      className="hw-anfrage-date-icon"
-                      tabIndex={-1}
-                      disabled={pending || zeitModus === 'tag'}
-                      aria-label="Kalender öffnen"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => {
+                      }} disabled={pending || zeitModus === 'tag'} tabIndex={zeitModus === 'tag' ? -1 : undefined} />
+                    <MockBtn className="hw-anfrage-date-icon" type="button" tabIndex={-1} disabled={pending || zeitModus === 'tag'} aria-label="Kalender öffnen" onMouseDown={(e) => e.preventDefault()} onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
                         const input = (e.currentTarget.parentElement?.querySelector(
-                          'input[type="date"]'
+                          '.date-field__input'
                         ) ?? null) as HTMLInputElement | null
                         try {
                           input?.showPicker?.()
                         } catch {
                           input?.focus()
                         }
-                      }}
-                    >
+                      }}>
                       <MockIcon ctx="btn" n="calendar" size={15} />
-                    </button>
+                    </MockBtn>
                   </div>
                 </label>
               </div>
               {!von.trim() || (zeitModus === 'zeitraum' && !bis.trim()) ? (
-                <span className="hw-anfrage-hint" style={{ color: 'var(--red, #b91c1c)', fontSize: 'var(--fs-meta)' }}>
+                <span className="hw-anfrage-hint" style={{ color: `var(--red, ${C.redTx2})`, fontSize: 'var(--fs-meta)' }}>
                   Pflicht — für Partner-Leistungen und spätere Belege
                 </span>
               ) : null}

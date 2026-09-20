@@ -17,6 +17,7 @@ import { neuePositionsId } from '@/lib/angebot-positionen'
 import {
   bereicheFuerAnzeige,
 } from '@/lib/lead-gewerbe-storage'
+import { formatNumber, formatEuroSpanne } from '@/lib/format/geld-datum'
 
 export type AngebotDokumentTyp = 'einfach' | 'projekt'
 
@@ -222,10 +223,7 @@ export function plusDaysYmd(days: number): string {
 
 /** Anzeige eines Betrags (Gesamt/Position) — kein Von-bis. */
 export function formatEurRange(min: number, max: number): string {
-  const f = (n: number) =>
-    n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-  const total = max > 0 ? max : min > 0 ? min : 0
-  return f(total)
+  return formatEuroSpanne(min, max, { decimals: 0 })
 }
 
 export function summeWizardPositionen(positions: WizardPosition[]) {

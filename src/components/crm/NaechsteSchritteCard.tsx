@@ -1,7 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import Link from 'next/link'
-import { Check, ListChecks } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 
 export type NaechsterSchritt = {
@@ -28,7 +29,7 @@ export function NaechsteSchritteCard({
     <Card
       title={
         <>
-          <ListChecks className="h-4 w-4 text-bw-primary" aria-hidden />
+          <MockIcon n="checklist" ctx="default" className="h-4 w-4 text-bw-primary" aria-hidden />
           {title}
         </>
       }
@@ -38,10 +39,10 @@ export function NaechsteSchritteCard({
           const inner = (
             <>
               <span className={`detail-step-check ${step.done ? 'done' : ''}`} aria-hidden>
-                {step.done ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
+                {step.done ? <MockIcon n="check" ctx="default" className="h-2.5 w-2.5" /> : null}
               </span>
               <span
-                className={`flex-1 text-[13px] ${step.done ? 'text-bw-text-muted line-through' : 'text-bw-text'}`}
+                className={`flex-1 text-fs-text ${step.done ? 'text-bw-text-muted line-through' : 'text-bw-text'}`}
               >
                 {step.label}
               </span>
@@ -64,17 +65,12 @@ export function NaechsteSchritteCard({
 
           if (step.onClick && !step.done) {
             return (
-              <button
-                key={step.id}
-                type="button"
-                className="detail-step detail-step-btn w-full text-left"
-                onClick={() => {
+              <MockBtn fullWidth className="detail-step detail-step-btn text-left" key={step.id} type="button" onClick={() => {
                   onStepClick?.(step)
                   step.onClick?.()
-                }}
-              >
+                }}>
                 {inner}
-              </button>
+              </MockBtn>
             )
           }
 

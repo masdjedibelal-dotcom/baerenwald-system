@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { useMemo, useState } from 'react'
 import { ZeitraumIconPopover } from '@/components/ui/ZeitraumIconPopover'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
 import {
@@ -10,10 +11,7 @@ import {
   type PartnerWirtschaftZeitraum,
 } from '@/lib/handwerker/partner-wirtschaft'
 import { cn } from '@/lib/utils'
-
-function formatEurGanz(n: number): string {
-  return `${Math.round(n).toLocaleString('de-DE')} €`
-}
+import { formatEuro } from '@/lib/format/geld-datum'
 
 function UmsatzverlaufBars({
   monate,
@@ -45,13 +43,13 @@ function UmsatzverlaufBars({
             onBlur={() => setHoverKey(null)}
             tabIndex={0}
             role="img"
-            aria-label={`${m.label}: ${formatEurGanz(m.betrag)}`}
+            aria-label={`${m.label}: ${formatEuro(m.betrag, { rounded: true, decimals: 0 })}`}
           >
             <div className="kw-chart-hit">
               {isHover ? (
                 <div className="kw-chart-tip" role="tooltip">
                   <span className="kw-chart-tip-month">{m.label}</span>
-                  <span className="kw-chart-tip-val">{formatEurGanz(m.betrag)}</span>
+                  <span className="kw-chart-tip-val">{formatEuro(m.betrag, { rounded: true, decimals: 0 })}</span>
                 </div>
               ) : null}
               <div
@@ -103,11 +101,11 @@ export function HandwerkerWirtschaftlicheUebersicht({
       </div>
 
       <div className="kw-kpi-row">
-        <div className="card kw-kpi is-accent dshell-framed">
+        <MockCard className="kw-kpi is-accent dshell-framed" flush>
           <div className="kw-kpi-label">
             Umsatz{zeitraum !== 'all' ? ` · ${snap.zeitraumLabelKurz}` : ''}
           </div>
-          <div className="kw-kpi-val">{formatEurGanz(snap.umsatz)}</div>
+          <div className="kw-kpi-val">{formatEuro(snap.umsatz, { rounded: true, decimals: 0 })}</div>
           {delta ? (
             <div
               className={cn(
@@ -129,60 +127,45 @@ export function HandwerkerWirtschaftlicheUebersicht({
           ) : (
             <div className="kw-kpi-meta">Gesamtumsatz</div>
           )}
-        </div>
+        </MockCard>
 
-        <div className="card kw-kpi dshell-framed">
+        <MockCard className="kw-kpi dshell-framed" flush>
           <div className="kw-kpi-label">Offenes Volumen</div>
-          <div className="kw-kpi-val">{formatEurGanz(snap.offenesVolumen)}</div>
+          <div className="kw-kpi-val">{formatEuro(snap.offenesVolumen, { rounded: true, decimals: 0 })}</div>
           <div className="kw-kpi-meta">aus laufenden Einsätzen</div>
-        </div>
+        </MockCard>
 
-        <div className="card kw-kpi dshell-framed">
+        <MockCard className="kw-kpi dshell-framed" flush>
           <div className="kw-kpi-label">Aktive Einsätze</div>
           <div className="kw-kpi-val">{snap.aktiveEinsaetze}</div>
           <div className="kw-kpi-meta">
             {snap.anfragenGesamt} Anfrage{snap.anfragenGesamt === 1 ? '' : 'n'} gesamt
           </div>
-        </div>
+        </MockCard>
       </div>
 
-      <div className="card kw-chart dshell-framed">
-        <div className="card-h">
-          <div className="card-title title">
-            <MockIcon ctx="emphasis" n="activity" size={16} />
-            Umsatzverlauf
-          </div>
-        </div>
-        <div className="card-b">
-          {snap.monate.every((m) => m.betrag <= 0) ? (
-            <p className="kw-chart-empty">Noch kein Umsatz in diesem Zeitraum.</p>
-          ) : (
-            <UmsatzverlaufBars monate={snap.monate} />
-          )}
-        </div>
-      </div>
+      <MockCard className="kw-chart dshell-framed" title="Umsatzverlauf" icon="activity">
+        {snap.monate.every((m) => m.betrag <= 0) ? (
+          <p className="kw-chart-empty">Noch kein Umsatz in diesem Zeitraum.</p>
+        ) : (
+          <UmsatzverlaufBars monate={snap.monate} />
+        )}
+      </MockCard>
 
-      <div className="card pw-gewerk dshell-framed">
-        <div className="card-h">
-          <div className="card-title title">
-            <MockIcon ctx="emphasis" n="activity" size={16} />
-            Volumen nach Gewerk
-          </div>
-        </div>
-        <div className="card-b">
-          {snap.gewerke.length === 0 ? (
-            <p className="kw-chart-empty" style={{ padding: '12px 0' }}>
-              Noch kein Volumen nach Gewerk.
-            </p>
-          ) : (
-            <ul className="pw-gewerk-list">
-              {snap.gewerke.map((g) => (
-                <li key={g.name} className="pw-gewerk-row">
-                  <div className="pw-gewerk-top">
-                    <span className="pw-gewerk-name" title={g.name}>
-                      {g.name}
-                    </span>
-                    <span className="pw-gewerk-val">{formatEurGanz(g.betrag)}</span>
+      <MockCard className="pw-gewerk dshell-framed" title="Volumen nach Gewerk" icon="activity">
+        {snap.gewerke.length === 0 ? (
+          <p className="kw-chart-empty" style={{ padding: 'var(--sp-row) 0' }}>
+            Noch kein Volumen nach Gewerk.
+          </p>
+        ) : (
+          <ul className="pw-gewerk-list">
+            {snap.gewerke.map((g) => (
+              <li key={g.name} className="pw-gewerk-row">
+                <div className="pw-gewerk-top">
+                  <span className="pw-gewerk-name" title={g.name}>
+                    {g.name}
+                  </span>
+                    <span className="pw-gewerk-val">{formatEuro(g.betrag, { rounded: true, decimals: 0 })}</span>
                   </div>
                   <div className="pw-gewerk-track">
                     <div
@@ -196,8 +179,7 @@ export function HandwerkerWirtschaftlicheUebersicht({
               ))}
             </ul>
           )}
-        </div>
-      </div>
+      </MockCard>
     </div>
   )
 }

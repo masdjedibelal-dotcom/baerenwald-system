@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import {
   useEffect,
   useMemo,
@@ -172,19 +173,12 @@ export function SwipeRow({
           aria-hidden={!revealing || dx <= 0}
         >
           {left.map((a) => (
-            <button
-              key={a.label}
-              type="button"
-              className={cn('swiperow-act-btn', `tone-${a.tone ?? 'neutral'}`)}
-              aria-label={a.label}
-              tabIndex={dx > 0 ? 0 : -1}
-              onClick={(e) => {
+            <MockBtn className={cn('swiperow-act-btn', `tone-${a.tone ?? 'neutral'}`)} key={a.label} type="button" aria-label={a.label} tabIndex={dx > 0 ? 0 : -1} onClick={(e) => {
                 e.stopPropagation()
                 runAction(a)
-              }}
-            >
+              }}>
               <ActionIcon n={a.icon} size={16} />
-            </button>
+            </MockBtn>
           ))}
         </div>
       ) : null}
@@ -194,19 +188,12 @@ export function SwipeRow({
           aria-hidden={!revealing || dx >= 0}
         >
           {right.map((a) => (
-            <button
-              key={a.label}
-              type="button"
-              className={cn('swiperow-act-btn', `tone-${a.tone ?? 'neutral'}`)}
-              aria-label={a.label}
-              tabIndex={dx < 0 ? 0 : -1}
-              onClick={(e) => {
+            <MockBtn className={cn('swiperow-act-btn', `tone-${a.tone ?? 'neutral'}`)} key={a.label} type="button" aria-label={a.label} tabIndex={dx < 0 ? 0 : -1} onClick={(e) => {
                 e.stopPropagation()
                 runAction(a)
-              }}
-            >
+              }}>
               <ActionIcon n={a.icon} size={16} />
-            </button>
+            </MockBtn>
           ))}
         </div>
       ) : null}

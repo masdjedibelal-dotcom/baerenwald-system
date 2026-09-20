@@ -1,14 +1,23 @@
 'use client'
-
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { DateInput } from '@/components/ui/DateInput'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
+<<<<<<< Updated upstream
+=======
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import type { ExportField } from '@/hooks/useExport'
 import { getZeitraumRange, type ZeitraumPreset } from '@/lib/listZeitraum'
 import { RECHNUNGEN_PDF_ZIP_MAX } from '@/lib/rechnungen/export-constants'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type ExportMode = 'csv' | 'pdf_zip'
 
@@ -53,6 +62,7 @@ export function RechnungenExportModal({
   const [mode, setMode] = useState<ExportMode>('csv')
   const [scope, setScope] = useState<'view' | 'all'>('view')
   const [selected, setSelected] = useState<Record<string, boolean>>({})
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pdfVon, setPdfVon] = useState('')
   const [pdfBis, setPdfBis] = useState('')
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -87,7 +97,7 @@ export function RechnungenExportModal({
 
   async function handlePdfZipDownload() {
     if (!pdfVon.trim() || !pdfBis.trim()) {
-      toast.error('Bitte Von- und Bis-Datum angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_von_und_bis_datum_angeben })
       return
     }
     setPdfLoading(true)
@@ -113,38 +123,31 @@ export function RechnungenExportModal({
       )
       onClose()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Export fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Export fehlgeschlagen')
     } finally {
       setPdfLoading(false)
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Rechnungen exportieren" size="md">
-      <div className="space-y-4">
+    <EditorSheet open={open} onClose={onClose} title="Rechnungen exportieren" size="md">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={`rounded-full px-3 py-1 text-[length:var(--fs-text)] font-medium ${
+          <MockBtn className={`rounded-pill px-3 py-1 text-[length:var(--fs-text)] font-medium ${
               mode === 'csv'
                 ? 'bg-bw-primary text-white'
                 : 'bg-bw-bg text-bw-text-muted hover:bg-bw-hover'
-            }`}
-            onClick={() => setMode('csv')}
-          >
+            }`} type="button" onClick={() => setMode('csv')}>
             CSV
-          </button>
-          <button
-            type="button"
-            className={`rounded-full px-3 py-1 text-[length:var(--fs-text)] font-medium ${
+          </MockBtn>
+          <MockBtn className={`rounded-pill px-3 py-1 text-[length:var(--fs-text)] font-medium ${
               mode === 'pdf_zip'
                 ? 'bg-bw-primary text-white'
                 : 'bg-bw-bg text-bw-text-muted hover:bg-bw-hover'
-            }`}
-            onClick={() => setMode('pdf_zip')}
-          >
+            }`} type="button" onClick={() => setMode('pdf_zip')}>
             PDF-ZIP
-          </button>
+          </MockBtn>
         </div>
 
         {mode === 'csv' ? (
@@ -178,11 +181,10 @@ export function RechnungenExportModal({
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {fields.map((f) => (
                   <label key={f.key} className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
-                    <input
-                      type="checkbox"
+                    <MockCheckbox
                       checked={selected[f.key] ?? true}
                       onChange={() => toggle(f.key)}
-                      className="rounded border-bw-border text-bw-primary"
+                      className="rounded-card border-bw-border text-bw-primary"
                     />
                     {f.label}
                   </label>
@@ -191,17 +193,17 @@ export function RechnungenExportModal({
             </div>
 
             <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
-              <Button type="button" variant="secondary" onClick={onClose}>
+              <MockBtn type="button" kind="secondary" onClick={onClose}>
                 Abbrechen
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="primary"
+                kind="primary"
                 onClick={handleCsvDownload}
                 disabled={!fields.some((f) => selected[f.key])}
               >
                 CSV herunterladen
-              </Button>
+              </MockBtn>
             </div>
           </>
         ) : (
@@ -211,40 +213,28 @@ export function RechnungenExportModal({
               einer ZIP-Datei. Es wird das Rechnungsdatum verwendet.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                label="Von"
-                type="date"
-                required
-                value={pdfVon}
-                onChange={(e) => setPdfVon(e.target.value)}
-              />
-              <Input
-                label="Bis"
-                type="date"
-                required
-                value={pdfBis}
-                onChange={(e) => setPdfBis(e.target.value)}
-              />
+              <MockField label="Von" required><DateInput required value={pdfVon} onChange={(e) => setPdfVon(e.target.value)} /></MockField>
+              <MockField label="Bis" required><DateInput required value={pdfBis} onChange={(e) => setPdfBis(e.target.value)} /></MockField>
             </div>
             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
               Maximal {RECHNUNGEN_PDF_ZIP_MAX} Rechnungen pro Export.
             </p>
             <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
-              <Button type="button" variant="secondary" onClick={onClose} disabled={pdfLoading}>
+              <MockBtn type="button" kind="secondary" onClick={onClose} disabled={pdfLoading}>
                 Abbrechen
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="primary"
+                kind="primary"
                 onClick={() => void handlePdfZipDownload()}
                 disabled={pdfLoading}
               >
                 {pdfLoading ? 'ZIP wird erstellt …' : 'PDF-ZIP herunterladen'}
-              </Button>
+              </MockBtn>
             </div>
           </>
         )}
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

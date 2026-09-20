@@ -1,11 +1,16 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState } from 'react'
 import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { DateInput } from '@/components/ui/DateInput'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
+
+export type SheetEditableFieldKind = 'text' | 'tel' | 'email' | 'date' | 'long'
 
 type Props = {
   label: string
@@ -29,15 +34,27 @@ type Props = {
    */
   sheetContext?: EditorSheetContext
   /**
-   * `auto` (default): detail → inline; canvas → Desktop inline / Mobil Sheet.
+   * `auto` (default): kurze Felder (text/tel/email/date) immer inline;
+   * long/multiline → detail inline, canvas Desktop inline / Mobil Sheet.
    * `inline` / `sheet`: erzwingen.
    */
   editMode?: 'auto' | 'inline' | 'sheet'
+  /**
+   * Kurze Feldarten — immer inline (kein Sheet pro Feld).
+   * `long` = lange Texte (Beschreibung etc.).
+   */
+  kind?: SheetEditableFieldKind
+}
+
+function isShortKind(kind: SheetEditableFieldKind | undefined, multiline: boolean): boolean {
+  if (multiline) return false
+  if (kind === 'long') return false
+  return true
 }
 
 /**
- * Textfeld: Desktop (und in Detail-Sheets) direkt tippen;
- * Mobil auf der Canvas-Seite optional Sheet mit Stift.
+ * Textfeld: kurze Felder (Text, Tel, E-Mail, Datum) immer inline;
+ * lange Texte mobil optional Sheet mit Stift.
  */
 export function SheetEditableField({
   label,
@@ -53,11 +70,19 @@ export function SheetEditableField({
   hint,
   sheetContext = 'canvas',
   editMode = 'auto',
+  kind,
 }: Props) {
   const isMobile = useIsMobile()
+  const short = isShortKind(kind, multiline) || (!multiline && kind !== 'long')
+  const resolvedKind: SheetEditableFieldKind =
+    kind ?? (multiline ? 'long' : 'text')
+
   const useSheet =
     editMode === 'sheet' ||
-    (editMode === 'auto' && sheetContext !== 'detail' && isMobile)
+    (editMode === 'auto' &&
+      !short &&
+      sheetContext !== 'detail' &&
+      isMobile)
 
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -80,30 +105,65 @@ export function SheetEditableField({
   }
 
   const display = value.trim()
-  const showKi = Boolean(kiExtraHint != null || multiline)
+  const showKi =
+    Boolean(kiExtraHint != null || multiline || resolvedKind === 'long') &&
+    resolvedKind !== 'date' &&
+    resolvedKind !== 'tel' &&
+    resolvedKind !== 'email'
 
-  if (!useSheet) {
-    const control = multiline ? (
-      <textarea
-        className="input ta ta--long wizard-dok-beschreibung"
-        rows={rows}
-        value={value}
+  function renderControl(
+    current: string,
+    onChange: (v: string) => void,
+    opts?: { autoFocus?: boolean }
+  ) {
+    if (resolvedKind === 'date') {
+      return (
+        <DateInput
+          value={current}
+          disabled={disabled}
+          autoFocus={opts?.autoFocus}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )
+    }
+    if (multiline || resolvedKind === 'long') {
+      return (
+        <MockTextarea
+          className="ta ta--long wizard-dok-beschreibung"
+          rows={rows}
+          value={current}
+          disabled={disabled}
+          placeholder={placeholder}
+          autoFocus={opts?.autoFocus}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )
+    }
+    const inputType =
+      resolvedKind === 'email' ? 'email' : resolvedKind === 'tel' ? 'tel' : 'text'
+    return (
+      <MockInput
+        type={inputType}
+        value={current}
         disabled={disabled}
         placeholder={placeholder}
-        onChange={(e) => onSave(e.target.value)}
-      />
-    ) : (
-      <input
-        className="input"
-        value={value}
-        disabled={disabled}
-        placeholder={placeholder}
-        onChange={(e) => onSave(e.target.value)}
+        autoFocus={opts?.autoFocus}
+        onChange={(e) => onChange(e.target.value)}
       />
     )
+  }
+
+  if (!useSheet) {
+    const control = renderControl(value, onSave)
 
     return (
-      <div className={cn('sheet-editable-field sheet-editable-field--inline full', multiline && 'sheet-editable-field--dok-beschreibung', className)}>
+      <div
+        className={cn(
+          'sheet-editable-field sheet-editable-field--inline full',
+          (multiline || resolvedKind === 'long') && 'sheet-editable-field--dok-beschreibung',
+          className
+        )}
+      >
         {hint ? <p className="sheet-editable-field__hint">{hint}</p> : null}
         {showKi ? (
           <KiAssistFieldLabel
@@ -111,7 +171,7 @@ export function SheetEditableField({
             value={value}
             onApply={onSave}
             extraHint={kiExtraHint}
-            multiline={multiline}
+            multiline={multiline || resolvedKind === 'long'}
             disabled={disabled}
             className="full"
           >
@@ -129,32 +189,38 @@ export function SheetEditableField({
 
   return (
     <>
-      <div className={cn('sheet-editable-field full', multiline && 'sheet-editable-field--dok-beschreibung', className)}>
+      <div
+        className={cn(
+          'sheet-editable-field full',
+          (multiline || resolvedKind === 'long') && 'sheet-editable-field--dok-beschreibung',
+          className
+        )}
+      >
         <div className="lt-field-lbl">{label}</div>
         {hint ? <p className="sheet-editable-field__hint">{hint}</p> : null}
         <div className="sheet-editable-field__row">
-          <button
-            type="button"
+          <MockBtn
             className={cn(
               'sheet-editable-field__value',
-              multiline && 'sheet-editable-field__value--multi',
+              (multiline || resolvedKind === 'long') && 'sheet-editable-field__value--multi',
               !display && 'is-empty'
             )}
+            type="button"
             disabled={disabled}
             onClick={() => !disabled && setOpen(true)}
           >
             {display || placeholder}
-          </button>
-          <button
-            type="button"
+          </MockBtn>
+          <MockBtn
             className="ki-assist-icon-btn sheet-editable-field__edit"
+            type="button"
             title={`${label} bearbeiten`}
             aria-label={`${label} bearbeiten`}
             disabled={disabled}
             onClick={() => setOpen(true)}
           >
             <MockIcon ctx="btn" n="pencil" size={16} />
-          </button>
+          </MockBtn>
         </div>
       </div>
 
@@ -177,59 +243,27 @@ export function SheetEditableField({
                 setDirty(true)
               }}
               extraHint={kiExtraHint}
-              multiline={multiline}
+              multiline={multiline || resolvedKind === 'long'}
               className="full"
             >
-              {multiline ? (
-                <textarea
-                  className="input ta ta--long wizard-dok-beschreibung"
-                  rows={rows}
-                  value={draft}
-                  autoFocus
-                  placeholder={placeholder}
-                  onChange={(e) => {
-                    setDraft(e.target.value)
-                    setDirty(true)
-                  }}
-                />
-              ) : (
-                <input
-                  className="input"
-                  value={draft}
-                  autoFocus
-                  placeholder={placeholder}
-                  onChange={(e) => {
-                    setDraft(e.target.value)
-                    setDirty(true)
-                  }}
-                />
+              {renderControl(
+                draft,
+                (v) => {
+                  setDraft(v)
+                  setDirty(true)
+                },
+                { autoFocus: true }
               )}
             </KiAssistFieldLabel>
           ) : (
             <div className="full">
-              {multiline ? (
-                <textarea
-                  className="input ta ta--long wizard-dok-beschreibung"
-                  rows={rows}
-                  value={draft}
-                  autoFocus
-                  placeholder={placeholder}
-                  onChange={(e) => {
-                    setDraft(e.target.value)
-                    setDirty(true)
-                  }}
-                />
-              ) : (
-                <input
-                  className="input"
-                  value={draft}
-                  autoFocus
-                  placeholder={placeholder}
-                  onChange={(e) => {
-                    setDraft(e.target.value)
-                    setDirty(true)
-                  }}
-                />
+              {renderControl(
+                draft,
+                (v) => {
+                  setDraft(v)
+                  setDirty(true)
+                },
+                { autoFocus: true }
               )}
             </div>
           )}

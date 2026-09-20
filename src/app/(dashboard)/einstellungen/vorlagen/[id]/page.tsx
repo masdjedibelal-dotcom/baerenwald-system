@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { AngebotNeuForm } from '@/components/angebote/AngebotNeuForm'
@@ -24,7 +25,6 @@ export default async function VorlageBearbeitenPage({ params }: { params: { id: 
       .eq('aktiv', true),
     supabase.from('angebot_vorlagen').select('*').eq('id', params.id).maybeSingle(),
   ])
-
   if (!vRow) notFound()
 
   const v = {

@@ -1,4 +1,6 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export function generateAngebotsnr(year: number, sequence: number): string {
   const y = year.toString().slice(-2)
@@ -21,6 +23,7 @@ export async function nextAngebotsnummerJahr(year = new Date().getFullYear()): P
     .not('angebotsnr', 'is', null)
     .like('angebotsnr', `${prefix}%`)
     .neq('status_einfach', 'entwurf')
+  if (error) logDbError('lib/angebot-utils:angebote', error)
 
   if (error) {
     console.warn('[angebot-utils] angebotsnr query:', error.message)
@@ -51,14 +54,12 @@ export async function ensureAngebotsnummerFuerVersand(
     .from('angebote')
     .update({ angebotsnr: nummer, updated_at: new Date().toISOString() })
     .eq('id', angebotId)
+  if (error) logDbError('lib/angebot-utils:angebote', error)
 
   if (error) return { ok: false, message: error.message }
   return { ok: true, nummer }
 }
 
 export function formatEurBetrag(n: number): string {
-  return `${n.toLocaleString('de-DE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} €`
+  return formatEuro(n)
 }

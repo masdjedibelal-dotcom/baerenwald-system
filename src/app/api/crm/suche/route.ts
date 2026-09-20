@@ -1,5 +1,7 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
+import type { AppSearchHit, SearchGroupId } from '@/lib/search/app-search-types'
 
 export async function GET(req: Request) {
   const q = new URL(req.url).searchParams.get('q')?.trim().toLowerCase() ?? ''
@@ -10,7 +12,18 @@ export async function GET(req: Request) {
   const supabase = createClient()
   const pattern = `%${q}%`
 
-  const [leads, kunden, auftraege, angebote, rechnungen, handwerker, partner] = await Promise.all([
+  const [
+    leads,
+    kunden,
+    auftraege,
+    angebote,
+    rechnungen,
+    handwerker,
+    partner,
+    objekte,
+    abnahmen,
+    kundenDok,
+  ] = await Promise.all([
     supabase
       .from('leads')
       .select('id, kontakt_name, situation, plz')
@@ -50,20 +63,60 @@ export async function GET(req: Request) {
       .ilike('name', pattern)
       .eq('aktiv', true)
       .limit(5),
+    supabase
+      .from('kunden_objekte')
+      .select('id, titel, kostenstelle_nr, kunde_id')
+      .or(`titel.ilike.${pattern},kostenstelle_nr.ilike.${pattern}`)
+      .limit(5),
+    supabase
+      .from('auftrag_abnahmeprotokolle')
+      .select('id, auftrag_id, pdf_url, abnahme_datum, notizen')
+      .not('pdf_url', 'is', null)
+      .limit(4),
+    supabase
+      .from('kunden_dokumente')
+      .select('id, titel, dateiname, kunde_id')
+      .or(`titel.ilike.${pattern},dateiname.ilike.${pattern}`)
+      .limit(4),
   ])
 
-  type Hit = { id: string; icon: string; label: string; sub?: string; href: string }
-  const hits: Hit[] = []
+  for (const [label, res] of [
+    ['leads', leads],
+    ['kunden', kunden],
+    ['auftraege', auftraege],
+    ['angebote', angebote],
+    ['rechnungen', rechnungen],
+    ['handwerker', handwerker],
+    ['partner', partner],
+    ['objekte', objekte],
+    ['abnahmen', abnahmen],
+    ['kundenDok', kundenDok],
+  ] as const) {
+    if (res.error) logDbError(`api/crm/suche:${label}`, res.error)
+  }
+
+  const hits: AppSearchHit[] = []
+  const push = (
+    group: SearchGroupId,
+    id: string,
+    icon: string,
+    label: string,
+    sub: string | undefined,
+    href: string
+  ) => {
+    hits.push({ id, group, icon, label, sub, href })
+  }
 
   for (const l of leads.data ?? []) {
     const label = (l.kontakt_name as string) || 'Anfrage'
-    hits.push({
-      id: `l-${l.id}`,
-      icon: 'inbox',
+    push(
+      'vorgaenge',
+      `l-${l.id}`,
+      'inbox',
       label,
-      sub: 'Anfrage',
-      href: `/anfragen/${l.id}`,
-    })
+      'Anfrage',
+      `/anfragen/${l.id}`
+    )
   }
 
   for (const k of kunden.data ?? []) {
@@ -73,24 +126,26 @@ export async function GET(req: Request) {
       (k.name as string) ||
       [(k.vorname as string), (k.nachname as string)].filter(Boolean).join(' ') ||
       'Kunde'
-    hits.push({
-      id: `k-${k.id}`,
-      icon: 'users',
-      label: name,
-      sub: `Kunde${k.ort ? ` · ${k.ort}` : ''}`,
-      href: `/kunden/${k.id}`,
-    })
+    push(
+      'kunden',
+      `k-${k.id}`,
+      'users',
+      name,
+      k.ort ? `Kunde · ${k.ort}` : 'Kunde',
+      `/kunden/${k.id}`
+    )
   }
 
   for (const a of auftraege.data ?? []) {
     const kunde = a.kunden as { name?: string } | null
-    hits.push({
-      id: `a-${a.id}`,
-      icon: 'briefcase',
-      label: (a.titel as string) || 'Auftrag',
-      sub: `Auftrag · ${kunde?.name ?? ''}`,
-      href: `/auftraege/${a.id}`,
-    })
+    push(
+      'vorgaenge',
+      `a-${a.id}`,
+      'briefcase',
+      (a.titel as string) || 'Auftrag',
+      ['Auftrag', kunde?.name].filter(Boolean).join(' · '),
+      `/auftraege/${a.id}`
+    )
   }
 
   for (const ag of angebote.data ?? []) {
@@ -101,13 +156,24 @@ export async function GET(req: Request) {
       ''
     const nr = (ag.angebotsnr as string | null)?.trim()
     const lu = (ag.leistungsumfang as string | null)?.trim()
-    hits.push({
-      id: `ag-${ag.id}`,
-      icon: 'file-invoice',
-      label: nr || lu || 'Angebot',
-      sub: `Angebot${kundeName ? ` · ${kundeName}` : ''}`,
-      href: `/angebote/${ag.id}`,
-    })
+    push(
+      'vorgaenge',
+      `ag-${ag.id}`,
+      'file-invoice',
+      nr || lu || 'Angebot',
+      [nr, 'Angebot', kundeName].filter(Boolean).join(' · '),
+      `/angebote/${ag.id}`
+    )
+    if (nr) {
+      push(
+        'dokumente',
+        `ag-pdf-${ag.id}`,
+        'file',
+        `Angebot ${nr}`,
+        'PDF · Angebot',
+        `/angebote/${ag.id}`
+      )
+    }
   }
 
   for (const r of rechnungen.data ?? []) {
@@ -116,34 +182,86 @@ export async function GET(req: Request) {
       k?.name?.trim() ||
       [k?.vorname, k?.nachname].filter(Boolean).join(' ').trim() ||
       ''
-    hits.push({
-      id: `r-${r.id}`,
-      icon: 'receipt',
-      label: (r.rechnungsnummer as string)?.trim() || 'Rechnung',
-      sub: `Rechnung${kundeName ? ` · ${kundeName}` : (r.status as string) ? ` · ${r.status}` : ''}`,
-      href: `/rechnungen/${r.id}`,
-    })
+    const nr = (r.rechnungsnummer as string)?.trim()
+    push(
+      'vorgaenge',
+      `r-${r.id}`,
+      'receipt',
+      nr || 'Rechnung',
+      [nr, 'Rechnung', kundeName].filter(Boolean).join(' · '),
+      `/rechnungen/${r.id}`
+    )
+    if (nr) {
+      push(
+        'dokumente',
+        `r-pdf-${r.id}`,
+        'file',
+        `Rechnung ${nr}`,
+        'PDF · Rechnung',
+        `/rechnungen/${r.id}`
+      )
+    }
   }
 
   for (const h of handwerker.data ?? []) {
-    hits.push({
-      id: `h-${h.id}`,
-      icon: 'tool',
-      label: (h.firma as string) || (h.name as string) || 'Partner',
-      sub: 'Partner',
-      href: `/handwerker/${h.id}`,
-    })
+    push(
+      'partner',
+      `h-${h.id}`,
+      'tool',
+      (h.firma as string) || (h.name as string) || 'Partner',
+      'Partner',
+      `/handwerker/${h.id}`
+    )
   }
 
   for (const p of partner.data ?? []) {
-    hits.push({
-      id: `p-${p.id}`,
-      icon: 'building',
-      label: p.name as string,
-      sub: 'Netzwerk',
-      href: `/partner/${p.id}`,
-    })
+    push('partner', `p-${p.id}`, 'building', p.name as string, 'Netzwerk', `/partner/${p.id}`)
   }
 
-  return NextResponse.json({ hits: hits.slice(0, 14) })
+  for (const o of objekte.data ?? []) {
+    const titel = (o.titel as string) || 'Objekt'
+    const ks = (o.kostenstelle_nr as string | null)?.trim()
+    push(
+      'objekte',
+      `o-${o.id}`,
+      'building-2',
+      titel,
+      ks ? `Objekt · ${ks}` : 'Objekt',
+      `/kunden/${o.kunde_id}?objekt=${o.id}`
+    )
+  }
+
+  for (const a of abnahmen.data ?? []) {
+    if (!a.pdf_url) continue
+    push(
+      'dokumente',
+      `abn-${a.id}`,
+      'file-check',
+      'Abnahmeprotokoll',
+      a.abnahme_datum ? `Abnahme · ${a.abnahme_datum}` : 'Abnahme',
+      `/auftraege/${a.auftrag_id}`
+    )
+  }
+
+  for (const d of kundenDok.data ?? []) {
+    const titel = (d.titel as string) || (d.dateiname as string) || 'Dokument'
+    push(
+      'dokumente',
+      `kd-${d.id}`,
+      'file',
+      titel,
+      'Akte',
+      d.kunde_id ? `/kunden/${d.kunde_id}` : '/kunden'
+    )
+  }
+
+  // Dedup by id
+  const seen = new Set<string>()
+  const unique = hits.filter((h) => {
+    if (seen.has(h.id)) return false
+    seen.add(h.id)
+    return true
+  })
+
+  return NextResponse.json({ hits: unique.slice(0, 20) })
 }

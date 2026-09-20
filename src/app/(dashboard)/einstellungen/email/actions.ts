@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateEinstellungenPath } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 
 export type EmailTemplateRow = {
@@ -16,6 +22,7 @@ export type EmailTemplateRow = {
 export async function loadEmailTemplates(): Promise<EmailTemplateRow[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from('email_templates').select('*').order('name')
+  if (error) logDbError('app/einstellungen/email/actions:email_templates', error)
   if (error) {
     console.warn('loadEmailTemplates', error.message)
     return []
@@ -36,7 +43,8 @@ export async function saveEmailTemplate(
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
+  if (error) logDbError('app/einstellungen/email/actions:email_templates', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/email')
+  revalidateEinstellungenPath('/einstellungen/email')
   return { ok: true }
 }

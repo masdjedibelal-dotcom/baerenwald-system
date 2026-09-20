@@ -1,5 +1,5 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { notFound, redirect } from 'next/navigation'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { AngebotDetailPageClient } from '@/components/angebote/AngebotDetailPageClient'
 import { loadWizardContext } from '@/lib/wizard-context'
@@ -11,8 +11,7 @@ import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
 
 export default async function AngebotDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db
+  const { data, error: error1 } = await (() => { const db = createClient(); return db
       .from('angebote')
       .select(
         `
@@ -33,10 +32,9 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
     `
       )
       .eq('id', params.id)
-      .maybeSingle()
-  )
+      .maybeSingle() })()
 
-  if (error || !data) notFound()
+  if (error1 || !data) notFound()
 
   const internEinholung = (data as { ist_partner_einholung?: boolean | null; lead_id?: string | null })
     .ist_partner_einholung === true
@@ -50,14 +48,14 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
     positionen: normalizeAngebotPositionen((data as { positionen: unknown }).positionen),
   }
 
-  const { data: auftrag } = await supabase
+  const {data: auftrag, error: error2} = await supabase
     .from('auftraege')
     .select('id')
     .eq('angebot_id', params.id)
     .maybeSingle()
+  if (error2) logDbError('app/angebote/[id]/page:auftraege', error2)
 
-  const [{ gewerke, preislisten: wizardPreislisten, firm }, leadDetail, kiVisualisierungen, projektKontext, { data: hwRows }] =
-    await Promise.all([
+  const [{ gewerke, preislisten: wizardPreislisten, firm }, leadDetail, kiVisualisierungen, projektKontext, { data: hwRows }] = await Promise.all([
       loadWizardContext(supabase),
       detail.lead_id ? loadAnfrageDetail(supabase, detail.lead_id) : Promise.resolve(null),
       loadKiVisualisierungenForAngebot(params.id),
@@ -71,7 +69,6 @@ export default async function AngebotDetailPage({ params }: { params: { id: stri
       }),
       supabase.from('handwerker').select('*').eq('aktiv', true).order('name'),
     ])
-
   return (
     <AngebotDetailPageClient
       detail={detail}

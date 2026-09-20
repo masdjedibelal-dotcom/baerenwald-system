@@ -1,7 +1,11 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomBytes } from 'crypto'
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
@@ -40,18 +44,20 @@ export async function createDirektauftragMitLeistungen(input: {
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (leadErr) logDbError('app/auftraege/direktauftrag-leistungen-actions:leads', leadErr)
   if (leadErr || !lead) return { ok: false, message: leadErr?.message ?? 'Anfrage nicht gefunden.' }
 
   const kundeId = leadVertragsKundeId(lead)
   if (!kundeId) return { ok: false, message: 'Kein Kunde an der Anfrage.' }
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error: error2 } = await supabaseAdmin
     .from('auftraege')
     .select('id')
     .eq('lead_id', leadId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/direktauftrag-leistungen-actions:auftraege', error2)
   if (existing?.id) {
     return {
       ok: false,
@@ -96,6 +102,7 @@ export async function createDirektauftragMitLeistungen(input: {
     .insert(insertRow)
     .select('id')
     .single()
+  if (aErr) logDbError('app/auftraege/direktauftrag-leistungen-actions:auftraege', aErr)
 
   if (aErr && /ist_notfall|notfall_verguetung/i.test(aErr.message)) {
     delete insertRow.ist_notfall
@@ -112,7 +119,8 @@ export async function createDirektauftragMitLeistungen(input: {
   const auftragId = String(auftrag.id)
   const posRes = await replaceAuftragPositionenFromPosBoard(auftragId, lines)
   if (!posRes.ok) {
-    await supabaseAdmin.from('auftraege').delete().eq('id', auftragId)
+    const { error: __dbErr1 } = await supabaseAdmin.from('auftraege').delete().eq('id', auftragId)
+    if (__dbErr1) logDbError('app/auftraege/direktauftrag-leistungen-actions:auftraege', __dbErr1)
     return posRes
   }
 
@@ -125,7 +133,8 @@ export async function createDirektauftragMitLeistungen(input: {
     leadUpdate.org_freigabe_status = 'nicht_noetig'
     leadUpdate.freigabe_bypass_grund = 'akut'
   }
-  await supabaseAdmin.from('leads').update(leadUpdate).eq('id', leadId)
+  const { error: __dbErr2 } = await supabaseAdmin.from('leads').update(leadUpdate).eq('id', leadId)
+  if (__dbErr2) logDbError('app/auftraege/direktauftrag-leistungen-actions:leads', __dbErr2)
 
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
@@ -156,11 +165,12 @@ export async function createDirektauftragMitLeistungen(input: {
       const { getMailBranding } = await import('@/lib/get-mail-branding')
       const { buildPortalLoginLink } = await import('@/lib/portal-utils')
       const branding = await getMailBranding(supabaseAdmin)
-      const { data: hv } = await supabaseAdmin
+      const { data: hv, error } = await supabaseAdmin
         .from('kunden')
         .select('id, name, email, org_anzeigename, portal_modus')
         .eq('id', kundeId)
         .maybeSingle()
+      if (error) logDbError('app/auftraege/direktauftrag-leistungen-actions:kunden', error)
       const email = hv?.email?.trim()
       if (email && hv?.portal_modus === 'organisation') {
         const orgName =
@@ -202,9 +212,7 @@ export async function createDirektauftragMitLeistungen(input: {
     console.warn('[createDirektauftragMitLeistungen] Portal-Notify:', e)
   }
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/auftraege')
-  revalidatePath('/vorgaenge')
+  revalidateAuftragDetail(auftragId)
+  revalidateLeadDetail(leadId)
   return { ok: true, auftragId }
 }

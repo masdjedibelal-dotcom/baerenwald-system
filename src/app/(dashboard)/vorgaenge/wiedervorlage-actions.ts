@@ -1,5 +1,10 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateVorgaengeListe } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 
@@ -45,10 +50,11 @@ export async function setWiedervorlage(input: {
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
+  if (error) logDbError('app/vorgaenge/wiedervorlage-actions:query', error)
 
   if (error) return { ok: false, message: error.message }
 
   revalidatePath(DETAIL_PATH[input.entity](id))
-  revalidatePath('/vorgaenge')
+  revalidateVorgaengeListe()
   return { ok: true }
 }

@@ -1,13 +1,19 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { RichTextContent } from '@/components/ui/RichTextContent'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { bulkDeleteAngebotPositionen } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { summenAusPositionen, positionNettoZeile } from '@/lib/angebot-positionen'
@@ -33,6 +39,7 @@ import {
   type AngebotGewerkBlock,
   type AngebotGewerkOpt,
 } from '@/components/angebote/positionen-v3/utils'
+import { TOAST } from '@/lib/copy'
 
 function FreitextRow({ entry }: { entry: Extract<AngebotBlockPdfEntry, { kind: 'freitext' }> }) {
   return (
@@ -163,12 +170,12 @@ export function AngebotPositionenV3Tab({
   function bulkDelete() {
     const ids = Array.from(selectedIds)
     if (!ids.length) return
-    confirmDelete(
-      ids.length === 1 ? 'Position entfernen?' : `${ids.length} Positionen entfernen?`,
+    openDeleteConfirm(
+      ids.length === 1 ? 'Position löschen?' : `${ids.length} Positionen löschen?`,
       async () => {
         const r = await bulkDeleteAngebotPositionen(angebotId, ids)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
         toast.success(r.deleted === 1 ? 'Position entfernt.' : `${r.deleted} Positionen entfernt.`)
@@ -181,15 +188,15 @@ export function AngebotPositionenV3Tab({
 
   function deleteOne(pos: AngebotPosition) {
     const titel = angebotPositionAnzeigeTitel(pos)
-    confirmDelete(
-      `„${titel}“ entfernen?`,
+    openDeleteConfirm(
+      `„“ löschen?`,
       async () => {
         const r = await bulkDeleteAngebotPositionen(angebotId, [pos.id])
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Position entfernt.')
+        toast.success(TOAST.position_entfernt)
         setDetailPos(null)
         setSelectedIds((prev) => {
           const next = new Set(prev)
@@ -303,10 +310,18 @@ export function AngebotPositionenV3Tab({
       {editable && selectedCount > 0 ? (
         <div className="pos-v3-bulk-bar">
           <span className="text-[length:var(--fs-text)] font-medium text-bw-text">{selectedCount} ausgewählt</span>
-          <Button type="button" variant="danger" size="sm" disabled={disabled} onClick={bulkDelete}>
+          <MockBtn type="button" kind="danger" sm disabled={disabled} onClick={bulkDelete}>
+<<<<<<< Updated upstream
+            <MockIcon n="trash" ctx="default" className="h-4 w-4" />
+            Löschen
+          </MockBtn>
+          <MockBtn className="pos-v3-bulk-close" type="button" aria-label="Auswahl aufheben" onClick={clearSelection}>
+            <MockIcon n="x" ctx="default" className="h-4 w-4" />
+          </MockBtn>
+=======
             <Trash2 className="h-4 w-4" />
             Entfernen
-          </Button>
+          </MockBtn>
           <button
             type="button"
             className="pos-v3-bulk-close"
@@ -315,6 +330,7 @@ export function AngebotPositionenV3Tab({
           >
             <X className="h-4 w-4" />
           </button>
+>>>>>>> Stashed changes
         </div>
       ) : null}
 
@@ -478,8 +494,7 @@ function EditableGewerkBlock({
       <header className="pos-v3-gewerk-head">
         {blockIds.length > 0 ? (
           <label className="pos-v3-check">
-            <input
-              type="checkbox"
+            <MockCheckbox
               checked={blockAllSelected}
               ref={(el) => {
                 if (el) el.indeterminate = blockSomeSelected && !blockAllSelected
@@ -496,15 +511,9 @@ function EditableGewerkBlock({
           {isEmpty ? 'Noch keine Leistungen' : `VK gesamt: ${formatEurBetrag(vkSumme)}`}
         </span>
         {isEmpty ? (
-          <button
-            type="button"
-            className="pos-v3-row-delete"
-            disabled={disabled}
-            aria-label="Leeren Gewerk-Abschnitt entfernen"
-            onClick={onRemoveEmpty}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <MockBtn className="pos-v3-row-delete" type="button" disabled={disabled} aria-label="Leeren Gewerk-Abschnitt löschen" onClick={onRemoveEmpty}>
+            <MockIcon n="x" ctx="default" className="h-4 w-4" />
+          </MockBtn>
         ) : null}
       </header>
 
@@ -535,8 +544,7 @@ function EditableGewerkBlock({
                 }}
               >
                 <label className="pos-v3-check" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
+                  <MockCheckbox
                     checked={selectedIds.has(pos.id)}
                     disabled={disabled}
                     onChange={() => onToggleOne(pos.id)}
@@ -557,28 +565,22 @@ function EditableGewerkBlock({
                   </span>
                 </div>
 
-                <button
-                  type="button"
-                  className="pos-v3-row-delete"
-                  disabled={disabled}
-                  aria-label="Position entfernen"
-                  onClick={(e) => {
+                <MockBtn className="pos-v3-row-delete" type="button" disabled={disabled} aria-label="Position löschen" onClick={(e) => {
                     e.stopPropagation()
                     onDeleteOne(pos)
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                  }}>
+                  <MockIcon n="trash" ctx="default" className="h-4 w-4" />
+                </MockBtn>
               </div>
             </li>
           )
         })}
       </ul>
 
-      <button type="button" className="pos-v3-add-btn" disabled={disabled} onClick={onAdd}>
-        <Plus className="h-4 w-4" />
+      <MockBtn className="pos-v3-add-btn" type="button" disabled={disabled} onClick={onAdd}>
+        <MockIcon n="plus" ctx="default" className="h-4 w-4" />
         Position hinzufügen
-      </button>
+      </MockBtn>
     </section>
   )
 }

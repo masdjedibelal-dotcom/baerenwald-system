@@ -1,7 +1,8 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { useState, type ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { PartnerEditSheet } from '@/components/handwerker/PartnerEditSheet'
 import type { Handwerker } from '@/lib/types'
 
@@ -40,10 +41,10 @@ export function EntityHandwerkerBankCard({
 
   return (
     <>
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">Bank & Steuer</div>
-          {!disabled ? (
+      <MockCard
+        title="Bank & Steuer"
+        actions={
+          !disabled ? (
             <MockBtn
               sm
               kind="ghost"
@@ -51,16 +52,15 @@ export function EntityHandwerkerBankCard({
               title="Bearbeiten"
               onClick={() => setSheetOpen(true)}
             />
-          ) : null}
+          ) : null
+        }
+      >
+        <div className="props">
+          <PropRow label="IBAN" value={handwerker.iban?.trim() || '—'} />
+          <PropRow label="USt-ID" value={handwerker.ustid?.trim() || '—'} />
+          <PropRow label="Steuernummer" value={handwerker.steuernummer?.trim() || '—'} />
         </div>
-        <div className="card-b">
-          <div className="props">
-            <PropRow label="IBAN" value={handwerker.iban?.trim() || '—'} />
-            <PropRow label="USt-ID" value={handwerker.ustid?.trim() || '—'} />
-            <PropRow label="Steuernummer" value={handwerker.steuernummer?.trim() || '—'} />
-          </div>
-        </div>
-      </div>
+      </MockCard>
 
       <PartnerEditSheet
         open={sheetOpen}

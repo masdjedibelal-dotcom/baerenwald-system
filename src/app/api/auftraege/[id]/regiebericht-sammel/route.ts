@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -15,7 +16,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
     return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
   }
 
-  const { data: auf } = await supabase.from('auftraege').select('id').eq('id', params.id).maybeSingle()
+  const {data: auf, error} = await supabase.from('auftraege').select('id').eq('id', params.id).maybeSingle()
+  if (error) logDbError('app/api/auftraege/[id]/regiebericht-sammel/route:auftraege', error)
   if (!auf) {
     return NextResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 })
   }

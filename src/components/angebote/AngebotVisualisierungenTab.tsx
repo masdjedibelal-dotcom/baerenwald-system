@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Sparkles } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Card } from '@/components/ui/Card'
 import type { KiVisualisierung } from '@/lib/visualize/types'
 import { formatDatumZeit } from '@/lib/utils'
@@ -21,10 +21,10 @@ export function AngebotVisualisierungenTab({
           KI-Visualisierungen für dieses Angebot — Vorher/Nachher für Kunden-PDF und Mail.
         </p>
         <Link href={`/angebote/${angebotId}/visualisierung`}>
-          <Button type="button" variant="primary" className="bg-[#1A3D2B]">
+          <MockBtn type="button" kind="primary" className="bg-[#1A3D2B]">
             <Sparkles className="mr-1.5 h-4 w-4" aria-hidden />
             Neue Visualisierung
-          </Button>
+          </MockBtn>
         </Link>
       </div>
 

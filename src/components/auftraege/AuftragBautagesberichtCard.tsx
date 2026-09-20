@@ -1,18 +1,24 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { useLocalTransition } from '@/components/ui/action-busy'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useEffect, useMemo, useRef, useState } from 'react'
+<<<<<<< Updated upstream
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+=======
 import { ChevronDown, Download, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
 import { TimeInput } from '@/components/ui/TimeInput'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   createAuftragBautagesbericht,
   deleteAuftragBautagesbericht,
@@ -28,6 +34,8 @@ import {
 import type { AuftragHandwerkerRow } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function fotosAnzeige(b: AuftragBautagesbericht): BautagesberichtFoto[] {
   return b.foto_display_urls?.length ? b.foto_display_urls : b.fotos
@@ -71,36 +79,43 @@ function StringListEditor({
       <div className="space-y-2">
         {items.map((item, i) => (
           <div key={i} className="flex gap-2">
-            <Input
-              value={item}
-              onChange={(e) => {
+            <MockInput value={item} onChange={(e) => {
                 const next = [...items]
                 next[i] = e.target.value
                 onChange(next)
+<<<<<<< Updated upstream
+              }} placeholder={placeholder} />
+            <MockBtn
+              type="button"
+              kind="ghost" sm
+              aria-label="Zeile löschen"
+              onClick={() => onChange(items.filter((_, j) => j !== i))}
+            >
+              <MockIcon n="x" ctx="default" className="h-4 w-4" />
+=======
               }}
               placeholder={placeholder}
             />
-            <Button
+            <MockBtn
               type="button"
-              variant="ghost"
-              size="sm"
+              kind="ghost" sm
               aria-label="Zeile entfernen"
               onClick={() => onChange(items.filter((_, j) => j !== i))}
             >
               <X className="h-4 w-4" />
-            </Button>
+>>>>>>> Stashed changes
+            </MockBtn>
           </div>
         ))}
-        <Button
+        <MockBtn
           type="button"
-          variant="ghost"
-          size="sm"
+          kind="ghost" sm
           className="gap-1"
           onClick={() => onChange([...items, ''])}
         >
-          <Plus className="h-3.5 w-3.5" />
+          <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" />
           Zeile hinzufügen
-        </Button>
+        </MockBtn>
       </div>
     </div>
   )
@@ -121,6 +136,7 @@ export function AuftragBautagesberichtCard({
   handwerker?: AuftragHandwerkerRow[]
   onChanged: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const [rows, setRows] = useState(initial)
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set())
@@ -187,7 +203,7 @@ export function AuftragBautagesberichtCard({
         })
         const json = (await res.json()) as { url?: string; message?: string }
         if (!res.ok || !json.url) {
-          toast.error(json.message ?? 'Upload fehlgeschlagen')
+          toast.systemError(json, 'ui', 'Upload fehlgeschlagen')
           continue
         }
         added.push({ url: json.url, caption: '' })
@@ -225,21 +241,21 @@ export function AuftragBautagesberichtCard({
     startTransition(async () => {
       const payload = payloadFromForm()
       if (!payload.leistungen.length) {
-        toast.error('Bitte mindestens eine ausgeführte Leistung eintragen.')
+        applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_ausgefuehrte_leistung_eint })
         return
       }
       if (editId) {
         const r = await updateAuftragBautagesbericht(editId, payload)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           return
         }
-        toast.success('Bautagesbericht gespeichert')
+        toast.success(TOAST.bautagesbericht_gespeichert)
         closeForm()
       } else {
         const r = await createAuftragBautagesbericht({ auftrag_id: auftragId, ...payload })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           return
         }
         toast.success(`Bautagesbericht Tag ${String(naechsterTag).padStart(2, '0')} angelegt`)
@@ -252,13 +268,13 @@ export function AuftragBautagesberichtCard({
   }
 
   function removeBericht(id: string) {
-    confirmDelete('Bautagesbericht löschen?', async () => {
+    openDeleteConfirm('Bautagesbericht löschen?', async () => {
       const r = await deleteAuftragBautagesbericht(id)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         throw new Error(r.message)
       }
-      toast.success('Gelöscht')
+      toast.success(TOAST.geloescht)
       setRows((prev) => prev.filter((b) => b.id !== id))
       onChanged()
     })
@@ -280,23 +296,16 @@ export function AuftragBautagesberichtCard({
             const open = openIds.has(b.id)
             const tag = String(b.tag_nummer).padStart(2, '0')
             return (
-              <li key={b.id} className="rounded-lg border border-bw-border bg-bw-surface">
+              <li key={b.id} className="rounded-card border border-bw-border bg-bw-surface">
                 <div className="flex items-center gap-2 px-3 py-2.5">
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                    onClick={() =>
+                  <MockBtn className="flex min-w-0 flex-1 items-center gap-2 text-left" type="button" onClick={() =>
                       setOpenIds((prev) => {
                         const next = new Set(prev)
                         if (next.has(b.id)) next.delete(b.id)
                         else next.add(b.id)
                         return next
-                      })
-                    }
-                  >
-                    <ChevronDown
-                      className={cn('h-4 w-4 shrink-0 transition', open && 'rotate-180')}
-                    />
+                      })}>
+                    <MockIcon n="chevron-down" ctx="default" className={cn('h-4 w-4 shrink-0 transition', open && 'rotate-180')} />
                     <span className="font-medium text-bw-text">
                       Tag {tag} · {formatDatum(b.datum)}
                     </span>
@@ -305,28 +314,35 @@ export function AuftragBautagesberichtCard({
                         {b.personal_namen.length} MA
                       </span>
                     ) : null}
-                  </button>
+                  </MockBtn>
                   <a
                     href={`/api/auftraege/${auftragId}/bautagesbericht/${b.id}`}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[length:var(--fs-meta)] font-medium text-bw-primary hover:bg-bw-primary/10"
+                    className="inline-flex items-center gap-1 rounded-field px-2 py-1 text-[length:var(--fs-meta)] font-medium text-bw-primary hover:bg-bw-primary/10"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    <Download className="h-3.5 w-3.5" />
+                    <MockIcon n="download" ctx="default" className="h-3.5 w-3.5" />
                     PDF
                   </a>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => startEdit(b)}>
+                  <MockBtn type="button" kind="ghost" sm onClick={() => startEdit(b)}>
+<<<<<<< Updated upstream
+                    <MockIcon n="pencil" ctx="default" className="h-3.5 w-3.5" />
+=======
                     <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
+>>>>>>> Stashed changes
+                  </MockBtn>
+                  <MockBtn
                     type="button"
-                    variant="ghost"
-                    size="sm"
+                    kind="ghost" sm
                     onClick={() => removeBericht(b.id)}
                     disabled={pending}
                   >
+<<<<<<< Updated upstream
+                    <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5 text-status-cancel-text" />
+=======
                     <Trash2 className="h-3.5 w-3.5 text-status-cancel-text" />
-                  </Button>
+>>>>>>> Stashed changes
+                  </MockBtn>
                 </div>
                 {open ? (
                   <div className="border-t border-bw-border px-3 py-3 text-[length:var(--fs-text)] text-bw-text-muted space-y-2">
@@ -346,7 +362,7 @@ export function AuftragBautagesberichtCard({
                             <img
                               src={f.url}
                               alt={f.caption ?? `Foto ${i + 1}`}
-                              className="h-16 w-24 rounded object-cover"
+                              className="h-16 w-24 rounded-card object-cover"
                             />
                           </a>
                         ))}
@@ -360,19 +376,18 @@ export function AuftragBautagesberichtCard({
         </ul>
       )}
 
-      <Button
+      <MockBtn
         type="button"
-        variant="secondary"
-        size="sm"
+        kind="secondary" sm
         className="gap-1"
         onClick={() => {
           resetNeu()
           setAddOpen(true)
         }}
       >
-        <Plus className="h-4 w-4" />
+        <MockIcon n="plus" ctx="default" className="h-4 w-4" />
         Bautagesbericht Tag {String(naechsterTag).padStart(2, '0')}
-      </Button>
+      </MockBtn>
 
       <EditorSheet
         open={formOpen}
@@ -382,9 +397,11 @@ export function AuftragBautagesberichtCard({
         context="detail"
         dirty
         size="lg"
-        footer={<BautagesberichtFormFooter pending={pending} onSave={save} />}
+        secondary={{ label: 'Abbrechen', disabled: pending }}
+        primary={{ label: 'Speichern', busy: pending, onClick: save }}
       >
-        <div className="space-y-4">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="form-field">
               <label className="form-field-label">Datum</label>
@@ -396,11 +413,7 @@ export function AuftragBautagesberichtCard({
             </div>
             <div className="form-field">
               <label className="form-field-label">Wetter</label>
-              <Input
-                value={form.wetter}
-                onChange={(e) => setForm((f) => ({ ...f, wetter: e.target.value }))}
-                placeholder="z. B. Sonnig, trocken"
-              />
+              <MockInput value={form.wetter} onChange={(e) => setForm((f) => ({ ...f, wetter: e.target.value }))} placeholder="z. B. Sonnig, trocken" />
             </div>
             <div className="form-field sm:col-span-2">
               <FilterRangeRow
@@ -424,17 +437,11 @@ export function AuftragBautagesberichtCard({
             </div>
             <div className="form-field">
               <label className="form-field-label">Auftraggeber</label>
-              <Input
-                value={form.auftraggeber_name}
-                onChange={(e) => setForm((f) => ({ ...f, auftraggeber_name: e.target.value }))}
-              />
+              <MockInput value={form.auftraggeber_name} onChange={(e) => setForm((f) => ({ ...f, auftraggeber_name: e.target.value }))} />
             </div>
             <div className="form-field">
               <label className="form-field-label">Nachunternehmer (Firma)</label>
-              <Input
-                value={form.nachunternehmer_firma}
-                onChange={(e) => setForm((f) => ({ ...f, nachunternehmer_firma: e.target.value }))}
-              />
+              <MockInput value={form.nachunternehmer_firma} onChange={(e) => setForm((f) => ({ ...f, nachunternehmer_firma: e.target.value }))} />
             </div>
           </div>
           <StringListEditor
@@ -450,11 +457,7 @@ export function AuftragBautagesberichtCard({
               onApply={(text) => setForm((f) => ({ ...f, behinderungen: text }))}
               extraHint="Bautagesbericht — Behinderungen (PDF)."
             >
-              <Textarea
-                rows={3}
-                value={form.behinderungen}
-                onChange={(e) => setForm((f) => ({ ...f, behinderungen: e.target.value }))}
-              />
+              <RichTextEditor value={typeof (form.behinderungen) === 'string' ? (form.behinderungen) : ''} onChange={(__v) => setForm((f) => ({ ...f, behinderungen: __v }))} minHeight={120} />
             </KiAssistFieldLabel>
           </div>
           <div className="form-field">
@@ -464,11 +467,7 @@ export function AuftragBautagesberichtCard({
               onApply={(text) => setForm((f) => ({ ...f, qualitaetssicherung: text }))}
               extraHint="Bautagesbericht — Qualitätssicherung (PDF)."
             >
-              <Textarea
-                rows={3}
-                value={form.qualitaetssicherung}
-                onChange={(e) => setForm((f) => ({ ...f, qualitaetssicherung: e.target.value }))}
-              />
+              <RichTextEditor value={typeof (form.qualitaetssicherung) === 'string' ? (form.qualitaetssicherung) : ''} onChange={(__v) => setForm((f) => ({ ...f, qualitaetssicherung: __v }))} minHeight={120} />
             </KiAssistFieldLabel>
           </div>
           <StringListEditor
@@ -483,11 +482,7 @@ export function AuftragBautagesberichtCard({
               onApply={(text) => setForm((f) => ({ ...f, zusammenfassung: text }))}
               extraHint="Bautagesbericht — Zusammenfassung (PDF)."
             >
-              <Textarea
-                rows={3}
-                value={form.zusammenfassung}
-                onChange={(e) => setForm((f) => ({ ...f, zusammenfassung: e.target.value }))}
-              />
+              <RichTextEditor value={typeof (form.zusammenfassung) === 'string' ? (form.zusammenfassung) : ''} onChange={(__v) => setForm((f) => ({ ...f, zusammenfassung: __v }))} minHeight={120} />
             </KiAssistFieldLabel>
           </div>
           <StringListEditor
@@ -504,20 +499,20 @@ export function AuftragBautagesberichtCard({
               {form.fotos.map((f, i) => (
                 <div key={i} className="w-36 space-y-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt="" className="h-20 w-full rounded object-cover" />
-                  <Input
-                    value={f.caption ?? ''}
-                    placeholder="Bildbeschriftung"
-                    onChange={(e) => {
+                  <img src={f.url} alt="" className="h-20 w-full rounded-card object-cover" />
+                  <MockInput value={f.caption ?? ''} placeholder="Bildbeschriftung" onChange={(e) => {
                       const fotos = [...form.fotos]
                       fotos[i] = { ...fotos[i], caption: e.target.value }
                       setForm((prev) => ({ ...prev, fotos }))
+<<<<<<< Updated upstream
+                    }} />
+=======
                     }}
                   />
-                  <Button
+>>>>>>> Stashed changes
+                  <MockBtn
                     type="button"
-                    variant="ghost"
-                    size="sm"
+                    kind="ghost" sm
                     onClick={() =>
                       setForm((prev) => ({
                         ...prev,
@@ -525,22 +520,25 @@ export function AuftragBautagesberichtCard({
                       }))
                     }
                   >
+<<<<<<< Updated upstream
+                    Löschen
+=======
                     Entfernen
-                  </Button>
+>>>>>>> Stashed changes
+                  </MockBtn>
                 </div>
               ))}
             </div>
-            <Button
+            <MockBtn
               type="button"
-              variant="secondary"
-              size="sm"
+              kind="secondary" sm
               className="mt-2 gap-1"
               disabled={uploading || form.fotos.length >= BAUTAGESBERICHT_MAX_FOTOS}
               onClick={() => fileRef.current?.click()}
             >
-              <Upload className="h-3.5 w-3.5" />
+              <MockIcon n="upload" ctx="default" className="h-3.5 w-3.5" />
               Fotos hochladen
-            </Button>
+            </MockBtn>
             <input
               ref={fileRef}
               type="file"
@@ -558,6 +556,8 @@ export function AuftragBautagesberichtCard({
     </div>
   )
 }
+<<<<<<< Updated upstream
+=======
 
 function BautagesberichtFormFooter({
   pending,
@@ -569,12 +569,13 @@ function BautagesberichtFormFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="sheet-footer-actions ldr-cta">
-      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
+      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()} disabled={pending}>
         Abbrechen
-      </Button>
-      <Button type="button" variant="primary" loading={pending} onClick={onSave}>
+      </MockBtn>
+      <MockBtn type="button" kind="primary" loading={pending} onClick={onSave}>
         Speichern
-      </Button>
+      </MockBtn>
     </div>
   )
 }
+>>>>>>> Stashed changes

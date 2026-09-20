@@ -1,7 +1,8 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { revalidateKundeDetail } from '@/lib/crm-revalidate'
+import { createClient } from '@/lib/supabase-server'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import { normalizeOrgHttpUrl } from '@/lib/org/melde-legal-urls'
 import { isValidMeldeSlug, normalizeOrgSlug } from '@/lib/org/slug'
@@ -35,9 +36,7 @@ export async function checkOrgKennungUnique(
     return { ok: false, message: 'Org-Kennung: 2–48 Zeichen, nur Kleinbuchstaben, Zahlen und Bindestriche.' }
   }
 
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('id').ilike('org_kennung', slug).limit(1)
-  )
+  const { data, error } = await (() => { const db = createClient(); return db.from('kunden').select('id').ilike('org_kennung', slug).limit(1) })()
   if (error) return { ok: false, message: error.message }
 
   const hit = (data ?? [])[0] as { id: string } | undefined
@@ -54,9 +53,7 @@ export async function saveKundeOrganisation(
   const id = kundeId?.trim()
   if (!id) return { ok: false, message: 'Kunde fehlt.' }
 
-  const { data: kundeRow, error: kundeErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('typ').eq('id', id).maybeSingle()
-  )
+  const { data: kundeRow, error: kundeErr } = await (() => { const db = createClient(); return db.from('kunden').select('typ').eq('id', id).maybeSingle() })()
   if (kundeErr) return { ok: false, message: kundeErr.message }
   const typ = (kundeRow as { typ?: string } | null)?.typ
   const istHausverwaltung = istKundeHausverwaltungTyp(typ)
@@ -123,7 +120,7 @@ export async function saveKundeOrganisation(
   if (impressumUrl !== undefined) payload.impressum_url = impressumUrl
   if (datenschutzUrl !== undefined) payload.datenschutz_url = datenschutzUrl
 
-  const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
+  const { error } = await (() => { const db = createClient(); return db.from('kunden').update(payload).eq('id', id) })()
   if (error) {
     // Migration ggf. noch nicht angewendet — ohne neues Flag erneut speichern
     const msg = error.message ?? ''
@@ -133,17 +130,14 @@ export async function saveKundeOrganisation(
     ) {
       const { kleinreparaturen_ohne_angebot: _drop, ...ohneFlag } = payload
       void _drop
-      const retry = await withCrmReadFallback(async (db) =>
-        db.from('kunden').update(ohneFlag).eq('id', id)
-      )
+      const retry = await (() => { const db = createClient(); return db.from('kunden').update(ohneFlag).eq('id', id) })()
       if (retry.error) return { ok: false, message: retry.error.message }
     } else {
       return { ok: false, message: error.message }
     }
   }
 
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${id}`)
+  revalidateKundeDetail(id)
   return { ok: true }
 }
 
@@ -161,9 +155,7 @@ export async function saveKundeMeldeLegalUrls(
   const id = kundeId?.trim()
   if (!id) return { ok: false, message: 'Kunde fehlt.' }
 
-  const { data: kundeRow, error: kundeErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('typ').eq('id', id).maybeSingle()
-  )
+  const { data: kundeRow, error: kundeErr } = await (() => { const db = createClient(); return db.from('kunden').select('typ').eq('id', id).maybeSingle() })()
   if (kundeErr) return { ok: false, message: kundeErr.message }
   if (!istKundeHausverwaltungTyp((kundeRow as { typ?: string } | null)?.typ)) {
     return { ok: false, message: 'Legal-Links nur für Hausverwaltung.' }
@@ -181,19 +173,16 @@ export async function saveKundeMeldeLegalUrls(
     return { ok: false, message: 'Datenschutz-URL ungültig (z. B. www.firma.de/datenschutz).' }
   }
 
-  const { error } = await withCrmReadFallback(async (db) =>
-    db
+  const { error } = await (() => { const db = createClient(); return db
       .from('kunden')
       .update({
         impressum_url: impressumUrl,
         datenschutz_url: datenschutzUrl,
       })
-      .eq('id', id)
-  )
+      .eq('id', id) })()
   if (error) return { ok: false, message: error.message }
 
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${id}`)
+  revalidateKundeDetail(id)
   return { ok: true, impressum_url: impressumUrl, datenschutz_url: datenschutzUrl }
 }
 
@@ -211,9 +200,7 @@ export async function saveKundeFreigabeRegeln(
   const id = kundeId?.trim()
   if (!id) return { ok: false, message: 'Kunde fehlt.' }
 
-  const { data: kundeRow, error: kundeErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('typ, freigabe_modus').eq('id', id).maybeSingle()
-  )
+  const { data: kundeRow, error: kundeErr } = await (() => { const db = createClient(); return db.from('kunden').select('typ, freigabe_modus').eq('id', id).maybeSingle() })()
   if (kundeErr) return { ok: false, message: kundeErr.message }
   const row = kundeRow as { typ?: string; freigabe_modus?: FreigabeModus | null } | null
   if (!istKundeHausverwaltungTyp(row?.typ)) {
@@ -241,7 +228,7 @@ export async function saveKundeFreigabeRegeln(
     payload.akut_fall_ids = normalizeAkutFallIds(input.akut_fall_ids)
   }
 
-  const { error } = await withCrmReadFallback(async (db) => db.from('kunden').update(payload).eq('id', id))
+  const { error } = await (() => { const db = createClient(); return db.from('kunden').update(payload).eq('id', id) })()
   if (error) {
     const msg = error.message ?? ''
     // akut_fall_ids nie still droppen — sonst Toast „ok“, Liste nach Reload leer
@@ -259,25 +246,20 @@ export async function saveKundeFreigabeRegeln(
       nextPayload = withoutHm
     }
     if (nextPayload !== payload) {
-      const retry = await withCrmReadFallback(async (db) =>
-        db.from('kunden').update(nextPayload).eq('id', id)
-      )
+      const retry = await (() => { const db = createClient(); return db.from('kunden').update(nextPayload).eq('id', id) })()
       if (retry.error) return { ok: false, message: retry.error.message }
     } else {
       return { ok: false, message: error.message }
     }
   }
 
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${id}`)
+  revalidateKundeDetail(id)
   return { ok: true }
 }
 
 /** Prüft ob Org-Kennung gesetzt ist (Pflicht vor erstem Objekt im Auftraggeber-Modus). */
 export async function kundeHatOrgKennung(kundeId: string): Promise<boolean> {
-  const { data } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('portal_modus, org_kennung').eq('id', kundeId).maybeSingle()
-  )
+  const { data } = await (() => { const db = createClient(); return db.from('kunden').select('portal_modus, org_kennung').eq('id', kundeId).maybeSingle() })()
   const row = data as { portal_modus?: string; org_kennung?: string | null } | null
   if (!row || row.portal_modus !== 'organisation') return true
   return Boolean(row.org_kennung?.trim())

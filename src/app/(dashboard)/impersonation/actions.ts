@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { requireCrmAdmin } from '@/lib/auth/crm-access-server'
 import {
   createPortalImpersonationUrl,
@@ -17,6 +18,7 @@ async function resolveKundeTarget(kundeId: string): Promise<
     .select('id, email, name, portal_modus, auth_user_id, ist_spam')
     .eq('id', kundeId)
     .maybeSingle()
+  if (error) logDbError('app/impersonation/actions:kunden', error)
   if (error || !data) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden.' }
   if ((data as { ist_spam?: boolean | null }).ist_spam) {
     return { ok: false, message: 'Kunde ist als Spam markiert — Portal-Zugang gesperrt.' }
@@ -37,19 +39,21 @@ async function resolveKundeTarget(kundeId: string): Promise<
         message: 'Kein Portal-Konto verknüpft — zuerst Einladung / Account anlegen.',
       }
     }
-    const { data: hw } = await supabaseAdmin
+    const { data: hw, error } = await supabaseAdmin
       .from('handwerker')
       .select('auth_user_id')
       .ilike('email', email)
       .not('auth_user_id', 'is', null)
       .limit(1)
       .maybeSingle()
-    const { data: profile } = await supabaseAdmin
+    if (error) logDbError('app/impersonation/actions:handwerker', error)
+    const { data: profile, error: error2 } = await supabaseAdmin
       .from('user_profiles')
       .select('id')
       .ilike('email', email)
       .limit(1)
       .maybeSingle()
+    if (error2) logDbError('app/impersonation/actions:user_profiles', error2)
     if (!hw?.auth_user_id && !profile?.id) {
       return {
         ok: false,
@@ -80,12 +84,17 @@ async function resolveHandwerkerTarget(handwerkerId: string): Promise<
     .select('id, email, name, firma, auth_user_id, ist_portal_gesperrt')
     .eq('id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('app/impersonation/actions:handwerker', error)
+<<<<<<< Updated upstream
+  if (error || !data) return { ok: false, message: error?.message ?? 'Partner nicht gefunden.' }
+=======
   if (error || !data) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden.' }
+>>>>>>> Stashed changes
   if ((data as { ist_portal_gesperrt?: boolean | null }).ist_portal_gesperrt) {
     return { ok: false, message: 'Partner ist vom Portal ausgeschlossen — Zugang gesperrt.' }
   }
   const email = (data.email as string | null)?.trim()
-  if (!email) return { ok: false, message: 'Handwerker hat keine E-Mail.' }
+  if (!email) return { ok: false, message: 'Partner hat keine E-Mail.' }
   if (!(data.auth_user_id as string | null)?.trim()) {
     return {
       ok: false,
@@ -114,6 +123,7 @@ export async function openMieterStatusPreview(leadId: string): Promise<
     .select('id, melde_tracking_token, einladung_token, kontakt_email')
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/impersonation/actions:leads', error)
   if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden.' }
 
   const token =

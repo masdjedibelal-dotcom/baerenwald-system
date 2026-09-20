@@ -68,18 +68,18 @@ Wenn ein Input fokussiert wird, schiebt die native Tastatur hoch. **✓ darf nic
 | Trigger | Verhalten |
 |---------|-----------|
 | Feld geändert (`dirty`) + **X** / Swipe-dismiss / Backdrop | **Nicht** sofort schließen |
-| Stattdessen | Confirmation-**ActionSheet**: „Änderungen verwerfen?“ → **Verwerfen** (destruktiv/rot) · **Weiter bearbeiten** |
+| Stattdessen | **ConfirmPopup** (E1): „Änderungen verwerfen?“ → **Verwerfen** (destruktiv/rot) · **Weiter bearbeiten** |
 | Nicht dirty | Sofort schließen |
 | Nach erfolgreichem ✓ Speichern | Schließen ohne Confirm |
 
-Confirm ist **ActionSheet** (kurz), kein zweites EditorSheet / kein Modal-in-Modal. Stack bleibt: Base → EditorSheet → (optional) ActionSheet-Confirm = erlaubt als System-Confirm, nicht als Edit-Layer.
+Confirm ist **ConfirmPopup** (E1), kein ActionSheet, kein zweites EditorSheet / kein Modal-in-Modal. Stack bleibt: Base → EditorSheet → (optional) ConfirmPopup = erlaubt als System-Confirm, nicht als Edit-Layer.
 
 #### S9 · Canvas-Exit
 
 | Aktion | Verhalten |
 |--------|-----------|
 | Canvas **X** | **Auto-Entwurf speichern**, schließen — **kein** Dirty-Confirm |
-| DocBar **Verwerfen** | Einzige destruktive Exit → ActionSheet-Confirm |
+| DocBar **Verwerfen** | Einzige destruktive Exit → ConfirmPopup (E1) |
 | Canvas ✓ | Explizit Speichern (Entwurf) |
 
 #### S10 · Back-Handling
@@ -205,7 +205,7 @@ Stammdaten auf Detail · kurze Entity-Karten.
 
 ### Nicht EditorSheet
 
-Confirm Löschen · PDF-Preview · Filter-Sheet · FAB „Neu …“-Menü.
+ConfirmPopup (Löschen / Dirty, E1) · PDF-Preview · Filter-Sheet · FAB „Neu …“-Menü.
 
 ---
 
@@ -216,7 +216,7 @@ EditorSheet({ context: 'detail' | 'canvas', dirty?, onDismissAttempt })
   mobile  → Bottom Sheet (flex + visualViewport; Header sticky ✓)
   detail  → Slide-over
   canvas  → Center Modal
-  dirty + X/Swipe → ActionSheet „Änderungen verwerfen?“
+  dirty + X/Swipe → ConfirmPopup „Änderungen verwerfen?“ (E1)
 ```
 
 | Phase | Was |

@@ -1,9 +1,10 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { useMemo, useState, useTransition } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { DateInput } from '@/components/ui/DateInput'
 import { toast } from '@/components/ui/app-toast'
 
@@ -72,7 +73,10 @@ export function VersammlungsberichtDialog({
           `/api/objekte/${encodeURIComponent(objektId)}/versammlungsbericht?${params}`
         )
         if (!res.ok) {
-          const j = (await res.json().catch(() => null)) as { error?: string } | null
+          const j = (await res.json().catch((err) => {
+            console.error('[VersammlungsberichtDialog] res.json', err)
+            return null
+          })) as { error?: string } | null
           toast.error(j?.error || 'PDF konnte nicht erstellt werden.')
           return
         }
@@ -82,7 +86,7 @@ export function VersammlungsberichtDialog({
         setTimeout(() => URL.revokeObjectURL(url), 60_000)
         onClose()
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Export fehlgeschlagen.')
+        toast.systemError(e, 'ui', 'Export fehlgeschlagen.')
       }
     })
   }
@@ -93,21 +97,13 @@ export function VersammlungsberichtDialog({
       onClose={onClose}
       title="Versammlungsbericht"
       context="canvas"
-      footer={
-        <div className="flex justify-end gap-2">
-          <MockBtn kind="ghost" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn
-            kind="primary"
-            icon="file-text"
-            onClick={exportPdf}
-            disabled={pending || !von.trim() || !bis.trim()}
-          >
-            {pending ? 'Wird erstellt …' : 'PDF erstellen'}
-          </MockBtn>
-        </div>
-      }
+      secondary={{ label: 'Abbrechen', disabled: pending }}
+      primary={{
+        label: 'PDF erstellen',
+        onClick: exportPdf,
+        disabled: pending || !von.trim() || !bis.trim(),
+        busy: pending,
+      }}
     >
       <MockFormSection title="Zeitraum">
         <div className="flex flex-wrap gap-2 mb-3">
@@ -153,14 +149,13 @@ export function VersammlungsberichtDialog({
       </MockFormSection>
       <MockFormSection title="Inhalt">
         <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
+          <MockCheckbox
             checked={einzelpreise}
             onChange={(e) => setEinzelpreise(e.target.checked)}
           />
           <span>Einzelpreise in der Maßnahmenliste anzeigen</span>
         </label>
-        <p style={{ margin: '8px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+        <p style={{ margin: '0.5rem 0 0', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
           Der Bericht wird immer erzeugt — auch ohne Vorgänge oder Anlagen im Zeitraum.
         </p>
       </MockFormSection>

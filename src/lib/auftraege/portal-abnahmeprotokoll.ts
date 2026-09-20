@@ -2,6 +2,7 @@
  * Portal → CRM: Teilabnahme nach Kunden-Signatur.
  * Kein Auto-Mail / kein an_kunde_gesendet_at — Status zur_freigabe für CRM.
  */
+import { logDbError } from '@/lib/errors/log-db-error'
 import {
   getAbnahmeprotokollMailDefaults,
   loadAbnahmeprotokollSummary,
@@ -31,20 +32,22 @@ async function assertPartnerOwnsAuftrag(
   auftragId: string,
   handwerkerId: string
 ): Promise<boolean> {
-  const { data: hw } = await supabaseAdmin
+  const { data: hw, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('auftrag_id')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .limit(1)
+  if (error) logDbError('lib/auftraege/portal-abnahmeprotokoll:auftrag_handwerker', error)
   if (hw?.length) return true
 
-  const { data: pos } = await supabaseAdmin
+  const { data: pos, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select('id')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .limit(1)
+  if (error2) logDbError('lib/auftraege/portal-abnahmeprotokoll:auftrag_positionen', error2)
   return Boolean(pos?.length)
 }
 
@@ -58,15 +61,16 @@ async function loadHwProtokollId(
   auftragId: string,
   handwerkerId: string
 ): Promise<string | null> {
-  const { data: link } = await supabaseAdmin
+  const { data: link, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('abnahme_protokoll_id')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('lib/auftraege/portal-abnahmeprotokoll:auftrag_handwerker', error)
   if (link?.abnahme_protokoll_id) return String(link.abnahme_protokoll_id)
 
-  const { data: row } = await supabaseAdmin
+  const { data: row, error: error2 } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
     .select('id')
     .eq('auftrag_id', auftragId)
@@ -75,6 +79,7 @@ async function loadHwProtokollId(
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error2) logDbError('lib/auftraege/portal-abnahmeprotokoll:auftrag_abnahmeprotokolle', error2)
   return (row?.id as string | null) ?? null
 }
 
@@ -216,11 +221,12 @@ export async function createPortalAbnahmeNachSignatur(
     })
     .eq('id', protokollId)
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('titel')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('lib/auftraege/portal-abnahmeprotokoll:auftraege', error)
   const projektName = String(auf?.titel ?? '').trim() || 'Auftrag'
 
   await notifyPartnerUnified({
@@ -275,13 +281,14 @@ export async function bestaetigePortalAbnahme(
     .from('auftrag_abnahmeprotokolle')
     .update({ meta, updated_at: now })
     .eq('id', summary.id)
+  if (error) logDbError('lib/auftraege/portal-abnahmeprotokoll:auftrag_abnahmeprotokolle', error)
   if (error) return { ok: false, message: error.message }
 
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
     typ: 'notiz',
     titel: 'Partner hat Abnahmeprotokoll bestätigt',
-    beschreibung: 'Handwerker hat das Abnahmeprotokoll im Portal bestätigt (ohne Versand).',
+    beschreibung: 'Partner hat das Abnahmeprotokoll im Portal bestätigt (ohne Versand).',
     erstellt_von: null,
     sichtbar_fuer_kunde: false,
   })

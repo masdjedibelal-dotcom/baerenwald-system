@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -43,6 +44,7 @@ export async function nextRechnungsnummerAusDb(
     .from('rechnungen')
     .select('rechnungsnummer')
     .like('rechnungsnummer', `${prefix}%`)
+  if (error) logDbError('lib/rechnungen/next-rechnungsnummer:rechnungen', error)
 
   if (error) {
     console.warn('[nextRechnungsnummerAusDb]', error.message)
@@ -73,6 +75,7 @@ export async function allocateRechnungsnummer(
   const { data: rpcRaw, error: rpcErr } = await supabase.rpc('generate_beleg_nummer', {
     p_typ: typ,
   })
+  if (rpcErr) logDbError('lib/rechnungen/next-rechnungsnummer:query', rpcErr)
 
   if (!rpcErr && rpcRaw) {
     const fromRpc = String(rpcRaw).trim()
@@ -115,21 +118,23 @@ export async function releaseRechnungsnummerWennEntwurf(
 ): Promise<void> {
   const id = rechnungId.trim()
   if (!id) return
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('rechnungen')
     .select('status, rechnungsnummer')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/rechnungen/next-rechnungsnummer:rechnungen', error)
   if (!data) return
   if (String(data.status ?? '').trim().toLowerCase() !== 'entwurf') return
   if (!String(data.rechnungsnummer ?? '').trim()) return
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('rechnungen')
     .update({ rechnungsnummer: null, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('status', 'entwurf')
-  if (error) {
-    console.warn('[releaseRechnungsnummerWennEntwurf]', id, error.message)
+  if (error2) logDbError('lib/rechnungen/next-rechnungsnummer:rechnungen', error2)
+  if (error2) {
+    console.warn('[releaseRechnungsnummerWennEntwurf]', id, error2.message)
   }
 }
 
@@ -167,6 +172,7 @@ export async function ensureRechnungsnummerFuerVersand(
       .from('rechnungen')
       .update({ rechnungsnummer: nummer, updated_at: new Date().toISOString() })
       .eq('id', rechnungId)
+    if (error) logDbError('lib/rechnungen/next-rechnungsnummer:rechnungen', error)
 
     if (!error) return { ok: true, nummer }
 

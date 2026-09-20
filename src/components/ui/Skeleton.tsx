@@ -2,7 +2,7 @@
 
 export function SkeletonCard() {
   return (
-    <div className="skeleton-card">
+    <div className="skeleton-block">
       <div className="skeleton-title" />
       <div className="skeleton-text" />
       <div className="skeleton-text w-3/4" />
@@ -17,7 +17,7 @@ export function SkeletonRow() {
         <div className="skeleton h-4 w-1/3" />
         <div className="skeleton h-3 w-1/2" />
       </div>
-      <div className="skeleton h-6 w-16 rounded-full" />
+      <div className="skeleton h-6 w-16 rounded-pill" />
     </div>
   )
 }

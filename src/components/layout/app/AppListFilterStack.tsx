@@ -1,8 +1,8 @@
 'use client'
 
+import { MockSelect } from '@/components/mock-ui/MockForm'
 import type { ReactNode } from 'react'
 import { ExportCsvButton } from '@/components/ui/ExportCsvButton'
-import { AppFilterPill, AppFilterRail } from '@/components/layout/app/AppFilterRail'
 import {
   LIST_FILTER_ICON_BTN_CLASS,
   LIST_FILTER_PILL_SELECT_CLASS,
@@ -15,7 +15,7 @@ import { ZEITRAUM_OPTIONS } from '@/lib/listZeitraum'
 type SelectOption = { value: string; label: string }
 
 /**
- * Mobil: Sortierung, Zeitraum und weitere Filter als Pills (gleiche Höhe/Typo wie Desktop).
+ * Mobil: Sortierung, Zeitraum und weitere Filter als Chiprow (gleiche Höhe/Typo wie Desktop).
  */
 export function AppListFilterRail({
   sort,
@@ -38,10 +38,15 @@ export function AppListFilterRail({
   className?: string
 }) {
   return (
-    <AppFilterRail className={cn('shrink-0', className)}>
-      {sort ? <AppFilterPill>{sort}</AppFilterPill> : null}
-      <AppFilterPill active={zeitraumValue !== 'alle'}>
-        <select
+    <div
+      className={cn(
+        'chiprow flex shrink-0 gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        className
+      )}
+    >
+      {sort ? <div className="shrink-0">{sort}</div> : null}
+      <div className={cn('shrink-0', zeitraumValue !== 'alle' && 'filter-select-active')}>
+        <MockSelect
           aria-label="Zeitraum"
           value={zeitraumValue}
           onChange={(e) => onZeitraumChange(e.target.value as ZeitraumPreset)}
@@ -52,11 +57,11 @@ export function AppListFilterRail({
               {o.label}
             </option>
           ))}
-        </select>
-      </AppFilterPill>
+        </MockSelect>
+      </div>
       {secondaryFilter ? (
-        <AppFilterPill active={Boolean(secondaryFilter.value)}>
-          <select
+        <div className={cn('shrink-0', Boolean(secondaryFilter.value) && 'filter-select-active')}>
+          <MockSelect
             aria-label={secondaryFilter.label}
             value={secondaryFilter.value}
             onChange={(e) => secondaryFilter.onChange(e.target.value)}
@@ -67,19 +72,19 @@ export function AppListFilterRail({
                 {o.label}
               </option>
             ))}
-          </select>
-        </AppFilterPill>
+          </MockSelect>
+        </div>
       ) : null}
       {onExportClick ? (
-        <AppFilterPill>
+        <div className="shrink-0">
           <ExportCsvButton
             variant="ghost"
             onClick={onExportClick}
             iconOnly
             className={LIST_FILTER_ICON_BTN_CLASS}
           />
-        </AppFilterPill>
+        </div>
       ) : null}
-    </AppFilterRail>
+    </div>
   )
 }

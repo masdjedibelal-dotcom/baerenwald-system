@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Check } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
@@ -459,16 +461,9 @@ export function PositionAddSheet({
               }}
             />
           ) : null}
-          <button
-            type="button"
-            className="editor-sheet__confirm"
-            disabled={headerConfirmDisabled}
-            onClick={onConfirm}
-            aria-label="Speichern"
-            title="Speichern"
-          >
-            <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-          </button>
+          <MockBtn className="editor-sheet__confirm" type="button" disabled={headerConfirmDisabled} onClick={onConfirm} aria-label="Speichern" title="Speichern">
+            <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
+          </MockBtn>
         </div>
       }
     >
@@ -476,14 +471,9 @@ export function PositionAddSheet({
         {chips
           .filter((c) => c.show !== false)
           .map((c) => (
-            <button
-              key={c.mode}
-              type="button"
-              className={cn('picker-sheet__chip', mode === c.mode && 'is-active')}
-              onClick={() => setMode(c.mode)}
-            >
+            <MockBtn className={cn('picker-sheet__chip', mode === c.mode && 'is-active')} key={c.mode} type="button" onClick={() => setMode(c.mode)}>
               {c.label}
-            </button>
+            </MockBtn>
           ))}
       </div>
 
@@ -498,28 +488,23 @@ export function PositionAddSheet({
           {katalogGewerke.length > 0 ? (
             <div className="field">
               <div className="field-label">Gewerk</div>
-              <select
-                className="sel"
-                value={gewerkFilter ?? ''}
-                onChange={(e) => setGewerkFilter(e.target.value || null)}
-                aria-label="Gewerk"
-              >
+              <MockSelect className="sel" value={gewerkFilter ?? ''} onChange={(e) => setGewerkFilter(e.target.value || null)} aria-label="Gewerk">
                 <option value="">Alle Gewerke</option>
                 {katalogGewerke.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </div>
           ) : null}
 
           {katalogLoading && !rows.length ? (
             <p className="picker-sheet__empty">Lädt…</p>
           ) : !katalogLoading && !filtered.length ? (
-            <p className="picker-sheet__empty">Keine Treffer.</p>
+            <MockEmpty title="Keine Treffer." />
           ) : (
-            <div className="max-h-[280px] overflow-y-auto rounded-md border border-bw-border">
+            <div className="max-h-[280px] overflow-y-auto rounded-field border border-bw-border">
               {grouped.map(([gewerkName, items]) => (
                 <div key={gewerkName}>
                   <div className="sticky top-0 bg-bw-surface-2 px-3 py-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
@@ -531,35 +516,27 @@ export function PositionAddSheet({
                       const selectedHere = picked?.position.id === p.id
                       return (
                         <li key={p.id} className="border-t border-bw-border/60">
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-bw-surface-2"
-                            onClick={() => tryPickPosition(p)}
-                          >
+                          <MockBtn fullWidth className="flex items-center gap-2 px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-bw-surface-2" type="button" onClick={() => tryPickPosition(p)}>
                             <span className="min-w-0 flex-1 font-medium">{p.titel}</span>
                             <MockBadge kind="fertig">{p.kategorie}</MockBadge>
                             <span className="shrink-0 text-[length:var(--fs-meta)] text-bw-text-muted">
                               {p.varianten.length} Var.
                             </span>
-                          </button>
+                          </MockBtn>
                           {(expanded || (selectedHere && p.varianten.length > 1)) && (
                             <ul className="bg-bw-surface-2/50 px-3 pb-2">
                               {p.varianten.map((v) => (
                                 <li key={v.id}>
-                                  <button
-                                    type="button"
-                                    className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[length:var(--fs-text)] ${
+                                  <MockBtn className={`flex w-full items-center justify-between gap-2 rounded-button px-2 py-1.5 text-[length:var(--fs-text)] ${
                                       picked?.variante.id === v.id
-                                        ? 'bg-emerald-50 text-emerald-950'
+                                        ? 'bg-status-order-bg text-status-order-text'
                                         : 'hover:bg-white'
-                                    }`}
-                                    onClick={() => selectVariante(p, v)}
-                                  >
+                                    }`} type="button" onClick={() => selectVariante(p, v)}>
                                     <span>{katalogVarianteLabel(v)}</span>
                                     <span className="tabular-nums text-bw-text-muted">
                                       {katalogPreisLabel(v)} / {v.einheit}
                                     </span>
-                                  </button>
+                                  </MockBtn>
                                 </li>
                               ))}
                             </ul>
@@ -574,8 +551,8 @@ export function PositionAddSheet({
           )}
 
           {picked ? (
-            <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
-              <p className="text-[length:var(--fs-text)] font-medium text-emerald-950">
+            <div className="space-y-2 rounded-field border border-status-order-bg bg-status-order-bg/40 p-3">
+              <p className="text-[length:var(--fs-text)] font-medium text-status-order-text">
                 {picked.position.titel}
                 {picked.variante.variante?.trim()
                   ? ` · ${picked.variante.variante}`
@@ -584,12 +561,7 @@ export function PositionAddSheet({
               </p>
               <label className="block text-[length:var(--fs-text)] text-bw-text-muted">
                 Menge
-                <input
-                  className="sel mt-0.5 w-full"
-                  value={menge}
-                  onChange={(e) => setMenge(e.target.value)}
-                  inputMode="decimal"
-                />
+                <MockInput className="sel mt-0.5 w-full" value={menge} onChange={(e) => setMenge(e.target.value)} inputMode="decimal" />
               </label>
               <SheetEditableField
                 label="Beschreibung"
@@ -609,29 +581,20 @@ export function PositionAddSheet({
         <div className="form-grid">
           <div className="field">
             <div className="field-label">Gewerk</div>
-            <select
-              className="sel"
-              value={frei.gewerk}
-              onChange={(e) => setFrei((f) => ({ ...f, gewerk: e.target.value }))}
-            >
+            <MockSelect className="sel" value={frei.gewerk} onChange={(e) => setFrei((f) => ({ ...f, gewerk: e.target.value }))}>
               {gewerkOptions.map((g) => (
                 <option key={g || '__ohne__'} value={g}>
                   {g || 'Ohne Gewerk'}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </div>
           <div />
           <div className="field" style={{ gridColumn: '1 / -1' }}>
             <div className="field-label">
               Bezeichnung<span className="req">*</span>
             </div>
-            <input
-              className="txt"
-              value={frei.name}
-              onChange={(e) => setFrei((f) => ({ ...f, name: e.target.value }))}
-              placeholder="z.B. Wandfliesen verlegen"
-            />
+            <MockInput className="txt" value={frei.name} onChange={(e) => setFrei((f) => ({ ...f, name: e.target.value }))} placeholder="z.B. Wandfliesen verlegen" />
           </div>
           <SheetEditableField
             label="Beschreibung"
@@ -664,19 +627,13 @@ export function PositionAddSheet({
                 onValueChange={(menge) => setFrei((f) => ({ ...f, menge }))}
                 style={{ flex: 1 }}
               />
-              <select
-                className="sel"
-                value={frei.einheit}
-                onChange={(e) => setFrei((f) => ({ ...f, einheit: e.target.value }))}
-                style={{ width: 100 }}
-                disabled={Boolean(frei.regie)}
-              >
+              <MockSelect className="sel" value={frei.einheit} onChange={(e) => setFrei((f) => ({ ...f, einheit: e.target.value }))} style={{ width: 100 }} disabled={Boolean(frei.regie)}>
                 {POSITION_MENGE_EINHEITEN.map((u) => (
                   <option key={u} value={u}>
                     {u}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </div>
           </div>
           <div className="field pos-add-preis-ust">
@@ -697,16 +654,11 @@ export function PositionAddSheet({
                 />
               </div>
               {showUst ? (
-                <select
-                  className="sel pos-add-preis-ust__ust"
-                  value={String(frei.ust)}
-                  onChange={(e) => setFrei((f) => ({ ...f, ust: Number(e.target.value) }))}
-                  aria-label="USt."
-                >
+                <MockSelect className="sel pos-add-preis-ust__ust" value={String(frei.ust)} onChange={(e) => setFrei((f) => ({ ...f, ust: Number(e.target.value) }))} aria-label="USt.">
                   <option value="19">19%</option>
                   <option value="7">7%</option>
                   <option value="0">0%</option>
-                </select>
+                </MockSelect>
               ) : null}
             </div>
           </div>
@@ -723,27 +675,18 @@ export function PositionAddSheet({
         <div className="form-grid">
           <div className="field">
             <div className="field-label">Gewerk</div>
-            <select
-              className="sel"
-              value={freitext.gewerk}
-              onChange={(e) => setFreitext((f) => ({ ...f, gewerk: e.target.value }))}
-            >
+            <MockSelect className="sel" value={freitext.gewerk} onChange={(e) => setFreitext((f) => ({ ...f, gewerk: e.target.value }))}>
               {gewerkOptions.map((g) => (
                 <option key={g} value={g}>
                   {g}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </div>
           <div />
           <div className="field" style={{ gridColumn: '1 / -1' }}>
             <div className="field-label">Überschrift</div>
-            <input
-              className="txt"
-              value={freitext.name}
-              onChange={(e) => setFreitext((f) => ({ ...f, name: e.target.value }))}
-              placeholder="z. B. Wichtiger Hinweis"
-            />
+            <MockInput className="txt" value={freitext.name} onChange={(e) => setFreitext((f) => ({ ...f, name: e.target.value }))} placeholder="z. B. Wichtiger Hinweis" />
           </div>
           <SheetEditableField
             label="Text"
@@ -761,12 +704,7 @@ export function PositionAddSheet({
         <div className="form-grid">
           <div className="field" style={{ gridColumn: '1 / -1' }}>
             <div className="field-label">Bezeichnung</div>
-            <input
-              className="txt"
-              value={nachlass.name}
-              onChange={(e) => setNachlass((n) => ({ ...n, name: e.target.value }))}
-              placeholder="Nachlass"
-            />
+            <MockInput className="txt" value={nachlass.name} onChange={(e) => setNachlass((n) => ({ ...n, name: e.target.value }))} placeholder="Nachlass" />
           </div>
           <NachlassModusFields
             modus={nachlass.nachlassModus as GesamtrabattModus}
@@ -789,21 +727,17 @@ export function PositionAddSheet({
           {stammdatenGewerke.length > 0 ? (
             <div className="field">
               <div className="field-label">Aus Stammdaten</div>
-              <select
-                className="sel"
-                value={gewerkPick}
-                onChange={(e) => {
+              <MockSelect className="sel" value={gewerkPick} onChange={(e) => {
                   setGewerkPick(e.target.value)
                   if (e.target.value) setGewerkCustom('')
-                }}
-              >
+                }}>
                 <option value="">Gewerk wählen…</option>
                 {stammdatenGewerke.map((g) => (
                   <option key={g} value={g}>
                     {g}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </div>
           ) : (
             <p className="text-[length:var(--fs-text)] text-bw-text-muted">
@@ -812,15 +746,10 @@ export function PositionAddSheet({
           )}
           <div className="field">
             <div className="field-label">Oder freie Bezeichnung</div>
-            <input
-              className="txt"
-              value={gewerkCustom}
-              onChange={(e) => {
+            <MockInput className="txt" value={gewerkCustom} onChange={(e) => {
                 setGewerkCustom(e.target.value)
                 if (e.target.value.trim()) setGewerkPick('')
-              }}
-              placeholder="z.B. Trockenbau · 1. OG"
-            />
+              }} placeholder="z.B. Trockenbau · 1. OG" />
           </div>
           <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             Anschließend kannst du direkt Positionen für dieses Gewerk hinzufügen.

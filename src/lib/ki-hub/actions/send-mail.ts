@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { sendMail } from '@/lib/mail-service'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -36,11 +37,12 @@ async function resolveRecipient(input: KiHubSendMailInput): Promise<{
     return { to: '', name: null, leadId: null }
   }
 
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('leads')
     .select('id, kontakt_name, kontakt_email')
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/ki-hub/actions/send-mail:leads', error)
 
   return {
     to: (data?.kontakt_email as string | null)?.trim() ?? '',
@@ -85,7 +87,7 @@ export async function kiHubSendMail(input: KiHubSendMailInput): Promise<KiHubSen
   }
 
   if (input.empfehlung_id) {
-    await supabaseAdmin.from('system_events').insert({
+    const { error: __dbErr1 } = await supabaseAdmin.from('system_events').insert({
       quelle: 'ki_hub',
       event_typ: 'mail_gesendet',
       severity: 'info',
@@ -96,6 +98,7 @@ export async function kiHubSendMail(input: KiHubSendMailInput): Promise<KiHubSen
         resend_id: result.resendId ?? null,
       },
     })
+    if (__dbErr1) logDbError('lib/ki-hub/actions/send-mail:system_events', __dbErr1)
   }
 
   return { ok: true, preview: false, gesendet: true, resendId: result.resendId }

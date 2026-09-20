@@ -1,8 +1,8 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import Link from 'next/link'
 
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { STAGING_WEBSITE_ORIGIN } from '@/lib/auth/staging-admin'
 import { publicWebsiteBaseUrl } from '@/lib/portal-utils'
@@ -57,7 +57,7 @@ export function HvWarteFreigabeSheet({
           oder die Hausmeister-Prüfung abgeschlossen ist.
         </p>
 
-        <div className="rounded-lg border border-bw-border bg-bw-bg-soft px-3 py-2">
+        <div className="rounded-card border border-bw-border bg-bw-bg-soft px-3 py-2">
           <p className="m-0 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
             Aktueller Status
           </p>
@@ -102,7 +102,7 @@ export function HvWarteFreigabeSheet({
             </Link>
           ) : null}
           <MockBtn kind="ghost" onClick={onClose}>
-            Schließen
+            Abbrechen
           </MockBtn>
         </div>
 

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type InsertLeadTimelineInput = {
@@ -27,6 +28,7 @@ export async function insertLeadTimelineEvent(
     })
     .select('id')
     .single()
+  if (error) logDbError('lib/lead-timeline:lead_timeline', error)
 
   if (error || !data) {
     return { ok: false, message: error?.message ?? 'Timeline-Eintrag fehlgeschlagen' }

@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
@@ -8,6 +10,7 @@ import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/ac
 import { handwerkerHatGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import { BEREICH_LABELS, cn } from '@/lib/utils'
 import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function gewerkeLabel(h: HandwerkerGewerkListeEintrag): string {
   const raw = h.gewerke ?? []
@@ -37,6 +40,7 @@ export function HandwerkerSuchenSheet({
   selectedIds: Set<string>
   onConfirm: (ids: Set<string>, rows: HandwerkerGewerkListeEintrag[]) => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors } = useFieldErrors()
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState<HandwerkerGewerkListeEintrag[]>([])
   const [q, setQ] = useState('')
@@ -50,7 +54,8 @@ export function HandwerkerSuchenSheet({
     setQ('')
     setDraft(new Set(selectedIds))
     setGewerkFilter(preferredGewerkSlug?.trim() || null)
-  }, [open, preferredGewerkSlug, selectedKey]) // eslint-disable-line react-hooks/exhaustive-deps -- sync draft only when sheet opens / selection key changes
+    clearFieldErrors()
+  }, [open, preferredGewerkSlug, selectedKey, clearFieldErrors]) // eslint-disable-line react-hooks/exhaustive-deps -- sync draft only when sheet opens / selection key changes
 
   useEffect(() => {
     if (!open) return
@@ -59,7 +64,7 @@ export function HandwerkerSuchenSheet({
     void listHandwerkerAuswahlFuerGewerk({ gewerkId: null, gewerkSlug: null }).then((r) => {
       if (cancelled) return
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         setRows([])
         setLoading(false)
         return
@@ -111,6 +116,7 @@ export function HandwerkerSuchenSheet({
   }, [rows, q, gewerkFilter])
 
   function toggle(id: string) {
+    clearFieldErrors()
     setDraft((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -120,6 +126,10 @@ export function HandwerkerSuchenSheet({
   }
 
   function confirm() {
+    if (draft.size === 0) {
+      applyFieldErrors({ _form: 'Bitte mindestens einen Partner auswählen.' })
+      return
+    }
     onConfirm(
       draft,
       rows.filter((h) => draft.has(h.id))
@@ -138,44 +148,33 @@ export function HandwerkerSuchenSheet({
       /* Eigenes History nur wenn offen — sonst Back schließt die Zuweisung darunter */
       manageHistory={open}
       onConfirm={confirm}
-      confirmDisabled={draft.size === 0}
       bodyClassName="hw-suchen-body"
     >
       <div className="space-y-3">
+        {fieldErrors._form ? (
+          <p className="field-error" role="alert">
+            {fieldErrors._form}
+          </p>
+        ) : null}
         {chipGewerke.length > 0 ? (
           <div className="picker-sheet__chips" role="group" aria-label="Gewerk">
-            <button
-              type="button"
-              className={cn('picker-sheet__chip', !gewerkFilter && 'is-active')}
-              onClick={() => setGewerkFilter(null)}
-            >
+            <MockBtn className={cn('picker-sheet__chip', !gewerkFilter && 'is-active')} type="button" onClick={() => setGewerkFilter(null)}>
               Alle
-            </button>
+            </MockBtn>
             {chipGewerke.map((g) => (
-              <button
-                key={g.slug}
-                type="button"
-                className={cn('picker-sheet__chip', gewerkFilter === g.slug && 'is-active')}
-                onClick={() => setGewerkFilter(g.slug)}
-              >
+              <MockBtn className={cn('picker-sheet__chip', gewerkFilter === g.slug && 'is-active')} key={g.slug} type="button" onClick={() => setGewerkFilter(g.slug)}>
                 {g.name}
-              </button>
+              </MockBtn>
             ))}
           </div>
         ) : null}
 
-        <input
-          className="sel w-full"
-          placeholder="Partner suchen…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          /* Kein autoFocus — sonst Keyboard + Sheet-Höhe springen beim erneuten Öffnen */
-        />
+        <MockInput className="sel w-full" placeholder="Partner suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
 
         {loading ? (
           <p className="picker-sheet__empty">Lädt…</p>
         ) : filtered.length === 0 ? (
-          <p className="picker-sheet__empty">Keine Treffer.</p>
+          <MockEmpty title="Keine Treffer." />
         ) : (
           <ul className="hw-anfrage-list hw-anfrage-list--picker">
             {filtered.map((h) => {
@@ -185,11 +184,7 @@ export function HandwerkerSuchenSheet({
               const rating = h.bewertung ?? null
               return (
                 <li key={h.id}>
-                  <button
-                    type="button"
-                    className={cn('hw-anfrage-row', checked && 'is-selected')}
-                    onClick={() => toggle(h.id)}
-                  >
+                  <MockBtn className={cn('hw-anfrage-row', checked && 'is-selected')} type="button" onClick={() => toggle(h.id)}>
                     <span className={cn('hw-anfrage-check', checked && 'is-checked')} aria-hidden>
                       {checked ? '✓' : ''}
                     </span>
@@ -208,7 +203,7 @@ export function HandwerkerSuchenSheet({
                         ) : null}
                       </span>
                     </span>
-                  </button>
+                  </MockBtn>
                 </li>
               )
             })}

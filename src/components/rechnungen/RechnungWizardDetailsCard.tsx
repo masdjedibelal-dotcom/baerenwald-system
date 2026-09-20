@@ -1,9 +1,11 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useState } from 'react'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { DateInput } from '@/components/ui/DateInput'
 import { Card } from '@/components/ui/Card'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import {
   Ustg13bHilfeSheet,
@@ -32,41 +34,24 @@ export function RechnungWizardDetailsCard({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="field">
           <span className="field-l">Rechnungsdatum</span>
-          <Input
-            type="date"
-            value={meta.rechnungsdatum}
-            onChange={(e) => onRechnungsdatumChange(e.target.value)}
-          />
+          <DateInput value={meta.rechnungsdatum} onChange={(e) => onRechnungsdatumChange(e.target.value)} />
         </label>
         <label className="field">
           <span className="field-l">Fällig am</span>
-          <Input
-            type="date"
-            value={meta.faellig_am}
-            onChange={(e) => onMetaChange({ faellig_am: e.target.value })}
-          />
+          <DateInput value={meta.faellig_am} onChange={(e) => onMetaChange({ faellig_am: e.target.value })} />
         </label>
         <label className="field">
           <span className="field-l">Leistungszeitraum von</span>
-          <Input
-            type="date"
-            value={meta.leistungszeitraum_von}
-            onChange={(e) => onMetaChange({ leistungszeitraum_von: e.target.value })}
-          />
+          <DateInput value={meta.leistungszeitraum_von} onChange={(e) => onMetaChange({ leistungszeitraum_von: e.target.value })} />
         </label>
         <label className="field">
           <span className="field-l">Leistungszeitraum bis</span>
-          <Input
-            type="date"
-            value={meta.leistungszeitraum_bis}
-            onChange={(e) => onMetaChange({ leistungszeitraum_bis: e.target.value })}
-          />
+          <DateInput value={meta.leistungszeitraum_bis} onChange={(e) => onMetaChange({ leistungszeitraum_bis: e.target.value })} />
         </label>
       </div>
       <div className="space-y-2.5">
-        <label className="flex cursor-pointer flex-wrap items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
-          <input
-            type="checkbox"
+        <label className="flex cursor-pointer flex-wrap items-start gap-2 rounded-card border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
+          <MockCheckbox
             className="mt-0.5"
             checked={meta.hinweis_35a}
             onChange={(e) => onMetaChange({ hinweis_35a: e.target.checked })}
@@ -79,9 +64,8 @@ export function RechnungWizardDetailsCard({
             </span>
           </span>
         </label>
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
-          <input
-            type="checkbox"
+        <label className="flex cursor-pointer items-start gap-2 rounded-card border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
+          <MockCheckbox
             className="mt-0.5"
             checked={meta.reverse_charge_13b}
             onChange={(e) => onMetaChange({ reverse_charge_13b: e.target.checked })}
@@ -99,36 +83,21 @@ export function RechnungWizardDetailsCard({
       </div>
       <label className="field">
         <span className="field-l">Einleitung (PDF)</span>
-        <Textarea
-          rows={3}
-          value={meta.einleitung}
-          onChange={(e) => onMetaChange({ einleitung: e.target.value })}
-        />
+        <RichTextEditor value={typeof (meta.einleitung) === 'string' ? (meta.einleitung) : ''} onChange={(__v) => onMetaChange({ einleitung: __v })} minHeight={120} />
       </label>
       <label className="field">
         <span className="field-l">Zusätzliche Hinweise (PDF)</span>
-        <Textarea
-          rows={2}
-          value={meta.hinweise}
-          onChange={(e) => onMetaChange({ hinweise: e.target.value })}
-        />
+        <RichTextEditor value={typeof (meta.hinweise) === 'string' ? (meta.hinweise) : ''} onChange={(__v) => onMetaChange({ hinweise: __v })} minHeight={120} />
       </label>
       {showMailFields ? (
         <>
           <label className="field">
             <span className="field-l">Mail-Einleitung</span>
-            <Textarea
-              rows={3}
-              value={meta.mail_einleitung}
-              onChange={(e) => onMetaChange({ mail_einleitung: e.target.value })}
-            />
+            <RichTextEditor value={typeof (meta.mail_einleitung) === 'string' ? (meta.mail_einleitung) : ''} onChange={(__v) => onMetaChange({ mail_einleitung: __v })} minHeight={120} />
           </label>
           <label className="field">
             <span className="field-l">Mail-Betreff</span>
-            <Input
-              value={meta.mail_betreff}
-              onChange={(e) => onMetaChange({ mail_betreff: e.target.value })}
-            />
+            <MockInput value={meta.mail_betreff} onChange={(e) => onMetaChange({ mail_betreff: e.target.value })} />
           </label>
         </>
       ) : null}

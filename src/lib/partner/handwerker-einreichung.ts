@@ -24,11 +24,11 @@ export function hwStatusLabel(status: string | null | undefined): string {
 
 export function hwStatusBadgeClass(status: string | null | undefined): string {
   const v = (status ?? '').toLowerCase()
-  if (v === 'eingereicht') return 'bg-blue-100 text-blue-900'
-  if (v === 'bestaetigt') return 'bg-violet-100 text-violet-900'
-  if (v === 'uebernommen') return 'bg-emerald-100 text-emerald-900'
-  if (v === 'abgelehnt') return 'bg-red-100 text-red-900'
-  if (v === 'rueckfrage') return 'bg-amber-100 text-amber-950'
+  if (v === 'eingereicht') return 'bg-status-new-bg text-status-new-text'
+  if (v === 'bestaetigt') return 'bg-status-new-bg text-status-new-text'
+  if (v === 'uebernommen') return 'bg-status-order-bg text-status-order-text'
+  if (v === 'abgelehnt') return 'bg-status-cancel-bg text-status-cancel-text'
+  if (v === 'rueckfrage') return 'bg-status-contact-bg text-status-contact-text'
   return 'bg-canvas text-muted'
 }
 

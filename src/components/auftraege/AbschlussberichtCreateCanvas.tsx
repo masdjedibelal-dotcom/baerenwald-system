@@ -1,14 +1,17 @@
 'use client'
+
+import { MockEmpty } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { createAbschlussberichtPdf } from '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 export type AbschlussCanvasLeistung = {
   id: string
@@ -74,42 +77,30 @@ export function AbschlussberichtCreateCanvas({
 
   function erstellen() {
     if (!canCreate) {
-      toast.error('Abschlussbericht erst nach signiertem Abnahmeprotokoll möglich.')
+      toast.error(TOAST.abschlussbericht_erst_nach_signiertem_abnahmepro)
       return
     }
     startTransition(async () => {
       const r = await createAbschlussberichtPdf(auftragId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Abschlussbericht erstellt')
+      toast.success(TOAST.abschlussbericht_erstellt)
       router.push(`/auftraege/${auftragId}`)
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
-  const footerCta = (
-    <div className="abschluss-canvas-footer">
-      <MockBtn
-        kind="primary"
-        icon="file-text"
-        disabled={!canCreate || pending}
-        onClick={erstellen}
-      >
-        {pending ? '…' : 'Bericht erstellen'}
-      </MockBtn>
-      {!canCreate ? (
-        <p className="abschluss-canvas-footer__hint">
-          Der Bericht kann erstellt werden, sobald das Abnahmeprotokoll signiert ist.
-        </p>
-      ) : hasAbschlussbericht && abschlussUrl ? (
-        <p className="abschluss-canvas-footer__hint">
-          Es liegt bereits ein Bericht vor — erneut erstellen überschreibt ihn.
-        </p>
-      ) : null}
-    </div>
-  )
+  const footerCta = !canCreate ? (
+    <p className="abschluss-canvas-footer__hint">
+      Der Bericht kann erstellt werden, sobald das Abnahmeprotokoll signiert ist.
+    </p>
+  ) : hasAbschlussbericht && abschlussUrl ? (
+    <p className="abschluss-canvas-footer__hint">
+      Es liegt bereits ein Bericht vor — erneut erstellen überschreibt ihn.
+    </p>
+  ) : null
 
   return (
     <DocumentCanvas
@@ -118,14 +109,38 @@ export function AbschlussberichtCreateCanvas({
       title="Abschlussbericht"
       subtitle={subtitle || undefined}
       onClose={onClose}
-      onSave={canCreate ? erstellen : undefined}
-      saveBusy={pending}
       footerCta={footerCta}
       className="wizard-flow abschluss-canvas"
+      sections={[
+        {
+          id: 'abnahme',
+          label: 'Abnahme',
+          complete: hasAbnahme,
+        },
+        {
+          id: 'leistungen',
+          label: 'Leistungen',
+          complete: gewerkGruppen.length > 0,
+        },
+      ]}
+      primaryAction={{
+        label: 'Bericht erstellen',
+        onClick: erstellen,
+        busy: pending,
+        getGaps: () =>
+          canCreate
+            ? []
+            : [
+                {
+                  id: 'abnahme',
+                  label: 'signiertes Abnahmeprotokoll',
+                },
+              ],
+      }}
     >
-      <div className="abschluss-canvas-card">
-        <div className="abschluss-canvas-card__head">
-          <h2 className="abschluss-canvas-card__title">
+      <div className="abschluss-canvas">
+        <div className="abschluss-canvas__head">
+          <h2 className="abschluss-canvas__title">
             <MockIcon ctx="default" n="file-text" size={18} />
             Abschlussbericht
           </h2>
@@ -155,10 +170,10 @@ export function AbschlussberichtCreateCanvas({
           </div>
         </div>
 
-        <section className="abschluss-canvas-sec">
+        <section className="abschluss-canvas-sec" data-doc-section="leistungen">
           <h3 className="abschluss-canvas-sec__h">Ausgeführte Leistungen</h3>
           {gewerkGruppen.length === 0 ? (
-            <p className="abschluss-canvas-empty">Keine Leistungen vorhanden.</p>
+            <MockEmpty title="Keine Leistungen vorhanden." />
           ) : (
             <div className="abschluss-canvas-leistungen">
               {gewerkGruppen.map((g) => (
@@ -201,7 +216,7 @@ export function AbschlussberichtCreateCanvas({
           )}
         </section>
 
-        <section className="abschluss-canvas-sec">
+        <section className="abschluss-canvas-sec" data-doc-section="abnahme">
           <h3 className="abschluss-canvas-sec__h">Abnahme</h3>
           {hasAbnahme ? (
             <div className="abschluss-canvas-abnahme abschluss-canvas-abnahme--ok" role="status">

@@ -1,12 +1,12 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
-
-import { MockField } from '@/components/mock-ui/MockForm'
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { DateInput } from '@/components/ui/DateInput'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
 import {
   OBJEKT_ANLAGE_STATUS,
   OBJEKT_ANLAGE_STATUS_LABELS,
@@ -18,6 +18,7 @@ import type { ObjektAnlageWartungsintervall } from '@/lib/objektakte/labels'
 import type { Gewerk } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 export type ObjektAnlageFormState = {
   bezeichnung: string
@@ -199,9 +200,9 @@ export function ObjektAnlageFormFields({
     try {
       const url = await uploadKundeDatei(kundeId, file)
       patch({ fotoUrl: url })
-      toast.success('Foto hochgeladen')
+      toast.success(TOAST.foto_hochgeladen)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploading(false)
       if (fotoRef.current) fotoRef.current.value = ''
@@ -220,7 +221,7 @@ export function ObjektAnlageFormFields({
       patch({ dokumentUrls: [...state.dokumentUrls, ...urls].slice(0, 20) })
       toast.success(list.length === 1 ? 'Dokument hochgeladen' : `${list.length} Dokumente hochgeladen`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploading(false)
       if (dokRef.current) dokRef.current.value = ''
@@ -242,14 +243,9 @@ export function ObjektAnlageFormFields({
           }}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="btn sm ghost"
-            disabled={disabled || uploading}
-            onClick={() => fotoRef.current?.click()}
-          >
+          <MockBtn kind="ghost" sm type="button" disabled={disabled || uploading} onClick={() => fotoRef.current?.click()}>
             {state.fotoUrl ? 'Foto ersetzen' : 'Foto hochladen'}
-          </button>
+          </MockBtn>
           {state.fotoUrl ? (
             <>
               <a
@@ -260,69 +256,35 @@ export function ObjektAnlageFormFields({
               >
                 Ansehen
               </a>
-              <button
-                type="button"
-                className="btn sm ghost"
-                disabled={disabled}
-                onClick={() => patch({ fotoUrl: '' })}
-              >
-                Entfernen
-              </button>
+              <MockBtn kind="ghost" sm type="button" disabled={disabled} onClick={() => patch({ fotoUrl: '' })}>
+                Löschen
+              </MockBtn>
             </>
           ) : null}
         </div>
       </MockField>
 
       <MockField label="Notiz">
-        <Textarea
-          value={state.notiz}
-          onChange={(e) => patch({ notiz: e.target.value })}
-          rows={3}
-          placeholder="Besonderheiten, Zugang …"
-          disabled={disabled}
-        />
+        <RichTextEditor value={typeof (state.notiz) === 'string' ? (state.notiz) : ''} onChange={(__v) => patch({ notiz: __v })} disabled={disabled} placeholder="Besonderheiten, Zugang …" minHeight={120} aria-label="Besonderheiten, Zugang …" />
       </MockField>
 
       <MockField label="Status">
-        <Select
-          value={state.status}
-          onChange={(e) => patch({ status: e.target.value as ObjektAnlageStatus })}
-          disabled={disabled}
-          options={OBJEKT_ANLAGE_STATUS.map((s) => ({
+        <Combobox disabled={disabled} options={OBJEKT_ANLAGE_STATUS.map((s) => ({
             value: s,
             label: OBJEKT_ANLAGE_STATUS_LABELS[s],
-          }))}
-        />
+          }))} value={state.status == null ? '' : String(state.status)} placeholder="Auswählen…" onChange={(next) => { patch({ status: next as ObjektAnlageStatus }); }} />
       </MockField>
 
       <MockField label="Hersteller">
-        <input
-          className="input"
-          value={state.hersteller}
-          onChange={(e) => patch({ hersteller: e.target.value })}
-          placeholder="z. B. Viessmann"
-          disabled={disabled}
-        />
+        <MockInput value={state.hersteller} onChange={(e) => patch({ hersteller: e.target.value })} placeholder="z. B. Viessmann" disabled={disabled} />
       </MockField>
 
       <MockField label="Modell / Typ">
-        <input
-          className="input"
-          value={state.modell}
-          onChange={(e) => patch({ modell: e.target.value })}
-          placeholder="z. B. Vitodens 200-W"
-          disabled={disabled}
-        />
+        <MockInput value={state.modell} onChange={(e) => patch({ modell: e.target.value })} placeholder="z. B. Vitodens 200-W" disabled={disabled} />
       </MockField>
 
       <MockField label="Seriennummer">
-        <input
-          className="input"
-          value={state.seriennummer}
-          onChange={(e) => patch({ seriennummer: e.target.value })}
-          placeholder="Optional"
-          disabled={disabled}
-        />
+        <MockInput value={state.seriennummer} onChange={(e) => patch({ seriennummer: e.target.value })} placeholder="Optional" disabled={disabled} />
       </MockField>
 
       <MockField label="Einbaudatum">
@@ -334,14 +296,7 @@ export function ObjektAnlageFormFields({
       </MockField>
 
       <MockField label="Anschaffungs-/Neuwert (€)">
-        <input
-          className="input"
-          inputMode="decimal"
-          value={state.anschaffungswert}
-          onChange={(e) => patch({ anschaffungswert: e.target.value })}
-          placeholder="Optional"
-          disabled={disabled}
-        />
+        <MockInput inputMode="decimal" value={state.anschaffungswert} onChange={(e) => patch({ anschaffungswert: e.target.value })} placeholder="Optional" disabled={disabled} />
       </MockField>
 
       <MockField label="Garantie bis">
@@ -361,22 +316,15 @@ export function ObjektAnlageFormFields({
       </MockField>
 
       <MockField label="Wartungsintervall">
-        <Select
-          value={state.wartungsintervall}
-          onChange={(e) =>
-            patch({
-              wartungsintervall: e.target.value as ObjektAnlageWartungsintervall | '',
-            })
-          }
-          disabled={disabled}
-          options={[
+        <Combobox disabled={disabled} options={[
             { value: '', label: '—' },
             ...OBJEKT_ANLAGE_WARTUNGSINTERVALL.map((w) => ({
               value: w,
               label: OBJEKT_ANLAGE_WARTUNGSINTERVALL_LABELS[w],
             })),
-          ]}
-        />
+          ]} value={state.wartungsintervall == null ? '' : String(state.wartungsintervall)} placeholder="Auswählen…" onChange={(next) => { patch({
+              wartungsintervall: next as ObjektAnlageWartungsintervall | '',
+            }); }} />
       </MockField>
 
       <MockField label="Letzte Wartung am">
@@ -400,14 +348,9 @@ export function ObjektAnlageFormFields({
           }}
         />
         <div className="space-y-2">
-          <button
-            type="button"
-            className="btn sm ghost"
-            disabled={disabled || uploading}
-            onClick={() => dokRef.current?.click()}
-          >
+          <MockBtn kind="ghost" sm type="button" disabled={disabled || uploading} onClick={() => dokRef.current?.click()}>
             Dokumente hinzufügen
-          </button>
+          </MockBtn>
           {state.dokumentUrls.length ? (
             <ul className="space-y-1">
               {state.dokumentUrls.map((url, i) => (
@@ -420,18 +363,12 @@ export function ObjektAnlageFormFields({
                   >
                     Dokument {i + 1}
                   </a>
-                  <button
-                    type="button"
-                    className="btn sm ghost shrink-0"
-                    disabled={disabled}
-                    onClick={() =>
+                  <MockBtn kind="ghost" sm className="shrink-0" type="button" disabled={disabled} onClick={() =>
                       patch({
                         dokumentUrls: state.dokumentUrls.filter((_, idx) => idx !== i),
-                      })
-                    }
-                  >
-                    Entfernen
-                  </button>
+                      })}>
+                    Löschen
+                  </MockBtn>
                 </li>
               ))}
             </ul>
@@ -448,82 +385,41 @@ export function ObjektAnlageFormFields({
   return (
     <div className="space-y-3">
       <MockField label="Bezeichnung" required>
-        <input
-          className="input"
-          value={state.bezeichnung}
-          onChange={(e) => patch({ bezeichnung: e.target.value })}
-          placeholder="z. B. Umwälzpumpe Heizungskeller"
-          disabled={disabled}
-        />
+        <MockInput value={state.bezeichnung} onChange={(e) => patch({ bezeichnung: e.target.value })} placeholder="z. B. Umwälzpumpe Heizungskeller" disabled={disabled} />
       </MockField>
 
       <MockField label="Gewerk" required>
-        <Select
-          value={state.gewerkId}
-          onChange={(e) => patch({ gewerkId: e.target.value })}
-          disabled={disabled}
-          options={[{ value: '', label: 'Gewerk wählen …' }, ...gewerkOptions]}
-        />
+        <Combobox disabled={disabled} options={[{ value: '', label: 'Gewerk wählen …' }, ...gewerkOptions]} value={state.gewerkId == null ? '' : String(state.gewerkId)} placeholder="Auswählen…" onChange={(next) => { patch({ gewerkId: next }); }} />
       </MockField>
 
       {!compact ? (
         <>
           <MockField label="Standort im Objekt">
-            <input
-              className="input"
-              value={state.standort}
-              onChange={(e) => patch({ standort: e.target.value })}
-              placeholder="z. B. Keller, Raum 2"
-              disabled={disabled}
-            />
+            <MockInput value={state.standort} onChange={(e) => patch({ standort: e.target.value })} placeholder="z. B. Keller, Raum 2" disabled={disabled} />
           </MockField>
           {einheitOptions.length ? (
             <MockField label="Einheit (optional)">
-              <Select
-                value={state.einheitId}
-                onChange={(e) => patch({ einheitId: e.target.value })}
-                disabled={disabled}
-                options={[{ value: '', label: 'Keine Einheit' }, ...einheitOptions]}
-              />
+              <Combobox disabled={disabled} options={[{ value: '', label: 'Ohne Einheit' }, ...einheitOptions]} value={state.einheitId == null ? '' : String(state.einheitId)} placeholder="Auswählen…" onChange={(next) => { patch({ einheitId: next }); }} />
             </MockField>
           ) : null}
         </>
       ) : null}
 
       <div className="rounded-[10px] border border-[var(--line)]">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
-          onClick={() => setDetailsOpen((o) => !o)}
-          aria-expanded={detailsOpen}
-        >
+        <MockBtn fullWidth className="flex items-center justify-between gap-2 px-3 py-2.5 text-left" type="button" onClick={() => setDetailsOpen((o) => !o)} aria-expanded={detailsOpen}>
           <span className="font-medium text-[length:var(--fs-text)]">Weitere Details</span>
-          <ChevronDown
-            className={cn('h-4 w-4 shrink-0 transition-transform', detailsOpen && 'rotate-180')}
-            aria-hidden
-          />
-        </button>
+          <MockIcon n="chevron-down" ctx="default" className={cn('h-4 w-4 shrink-0 transition-transform', detailsOpen && 'rotate-180')} aria-hidden />
+        </MockBtn>
         {detailsOpen ? (
           <div className="space-y-3 border-t border-[var(--line)] px-3 py-3">
             {compact ? (
               <>
                 <MockField label="Standort im Objekt">
-                  <input
-                    className="input"
-                    value={state.standort}
-                    onChange={(e) => patch({ standort: e.target.value })}
-                    placeholder="z. B. Keller, Raum 2"
-                    disabled={disabled}
-                  />
+                  <MockInput value={state.standort} onChange={(e) => patch({ standort: e.target.value })} placeholder="z. B. Keller, Raum 2" disabled={disabled} />
                 </MockField>
                 {einheitOptions.length ? (
                   <MockField label="Einheit (optional)">
-                    <Select
-                      value={state.einheitId}
-                      onChange={(e) => patch({ einheitId: e.target.value })}
-                      disabled={disabled}
-                      options={[{ value: '', label: 'Keine Einheit' }, ...einheitOptions]}
-                    />
+                    <Combobox disabled={disabled} options={[{ value: '', label: 'Ohne Einheit' }, ...einheitOptions]} value={state.einheitId == null ? '' : String(state.einheitId)} placeholder="Auswählen…" onChange={(next) => { patch({ einheitId: next }); }} />
                   </MockField>
                 ) : null}
               </>

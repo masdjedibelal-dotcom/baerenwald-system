@@ -1,3 +1,4 @@
+import { formatMonatKurzJahr } from '@/lib/utils'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import { kundeUmsatzEvents } from '@/lib/kunden/kunde-umsatz'
 
@@ -43,7 +44,7 @@ function monthKey(d: Date): string {
 }
 
 function monthLabel(d: Date): string {
-  return d.toLocaleDateString('de-DE', { month: 'short' }).replace(/\.$/, '')
+  return formatMonatKurzJahr(d, { withYear: false })
 }
 
 /** Zeitraum-Grenzen [start, endExclusive). start=null → unbeschränkt. */

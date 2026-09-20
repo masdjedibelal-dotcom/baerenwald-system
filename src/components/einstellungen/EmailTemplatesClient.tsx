@@ -1,12 +1,17 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
-
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useMemo, useRef, useState } from 'react'
-import { Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { toast } from '@/components/ui/app-toast'
@@ -19,6 +24,8 @@ import {
   EinstellungenMeta,
 } from '@/components/einstellungen/EinstellungenUi'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 const VARIABLES = [
   'kundenname',
@@ -47,6 +54,7 @@ type Props = { templates: EmailTemplateRow[]; previewVars: EmailPreviewVars }
 
 export function EmailTemplatesClient({ templates, previewVars }: Props) {
   const [open, setOpen] = useState<EmailTemplateRow | null>(null)
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [betreff, setBetreff] = useState('')
   const [bodyHtml, setBodyHtml] = useState('')
   const [tab, setTab] = useState<'edit' | 'preview'>('edit')
@@ -91,10 +99,10 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
     startTransition(async () => {
       const r = await saveEmailTemplate(open.id, { betreff, body_html: bodyHtml })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Gespeichert')
+      toast.success(TOAST.gespeichert)
       setOpen(null)
     })
   }
@@ -103,7 +111,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
     if (!open) return
     const to = testEmail.trim()
     if (!to) {
-      toast.error('Bitte Test-E-Mail eingeben')
+      applyFieldErrors({ _form: TOAST.bitte_test_e_mail_eingeben })
       return
     }
     setTestBusy(true)
@@ -118,7 +126,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
         toast.error(j.error ?? 'Versand fehlgeschlagen')
         return
       }
-      toast.success('Test-Mail gesendet')
+      toast.success(TOAST.test_mail_gesendet)
     } finally {
       setTestBusy(false)
     }
@@ -126,7 +134,7 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
 
   return (
     <div className="space-y-4">
-      <Card title="System-E-Mails" className="einst-list-card">
+      <Card title="System-E-Mails" className="einst-list">
         <EinstellungenListBody empty={templates.length === 0 ? 'Keine Templates konfiguriert.' : undefined}>
           {templates.map((t) => (
             <EinstellungenListItem key={t.id}>
@@ -134,10 +142,14 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                 <p className="einst-list-title">{t.name}</p>
                 <EinstellungenListMeta>{t.beschreibung ?? '—'}</EinstellungenListMeta>
               </div>
-              <Button type="button" variant="secondary" size="sm" onClick={() => openModal(t)}>
+              <MockBtn type="button" kind="secondary" sm onClick={() => openModal(t)}>
+<<<<<<< Updated upstream
+                <MockIcon n="pencil" ctx="default" className="mr-1.5 h-4 w-4" aria-hidden />
+=======
                 <Pencil className="mr-1.5 h-4 w-4" aria-hidden />
+>>>>>>> Stashed changes
                 Bearbeiten
-              </Button>
+              </MockBtn>
             </EinstellungenListItem>
           ))}
         </EinstellungenListBody>
@@ -152,29 +164,22 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
         confirmBusy={pending}
         onConfirm={() => save()}
       >
-        {open ? (
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                {open ? (
           <div className="space-y-4">
             <div className="flex gap-2 border-b border-bw-border pb-2">
-              <button
-                type="button"
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
+              <MockBtn className={cn(
+                  'rounded-button px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
                   tab === 'edit' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-text-muted hover:text-bw-text'
-                )}
-                onClick={() => setTab('edit')}
-              >
+                )} type="button" onClick={() => setTab('edit')}>
                 Bearbeiten
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
+              </MockBtn>
+              <MockBtn className={cn(
+                  'rounded-button px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
                   tab === 'preview' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-text-muted hover:text-bw-text'
-                )}
-                onClick={() => setTab('preview')}
-              >
+                )} type="button" onClick={() => setTab('preview')}>
                 Vorschau
-              </button>
+              </MockBtn>
             </div>
 
             {tab === 'edit' ? (
@@ -187,23 +192,14 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                     extraHint="E-Mail-Vorlage Betreff (kann {{Variablen}} enthalten)."
                     multiline={false}
                   >
-                    <Input
-                      ref={betreffRef}
-                      value={betreff}
-                      onChange={(e) => setBetreff(e.target.value)}
-                    />
+                    <MockInput ref={betreffRef} value={betreff} onChange={(e) => setBetreff(e.target.value)} />
                   </KiAssistFieldLabel>
                   <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">Variablen:</p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {VARIABLES.map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        className="chip text-[length:var(--fs-meta)]"
-                        onClick={() => chipBetreff(v)}
-                      >
+                      <MockBtn className="chip text-[length:var(--fs-meta)]" key={v} type="button" onClick={() => chipBetreff(v)}>
                         {`{{${v}}}`}
-                      </button>
+                      </MockBtn>
                     ))}
                   </div>
                 </div>
@@ -216,23 +212,12 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                   >
                     <div className="mb-2 flex flex-wrap gap-1">
                       {VARIABLES.map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          className="chip text-[length:var(--fs-meta)]"
-                          onClick={() => chipBody(v)}
-                        >
+                        <MockBtn className="chip text-[length:var(--fs-meta)]" key={v} type="button" onClick={() => chipBody(v)}>
                           {`{{${v}}}`}
-                        </button>
+                        </MockBtn>
                       ))}
                     </div>
-                    <Textarea
-                      ref={bodyRef}
-                      rows={14}
-                      value={bodyHtml}
-                      onChange={(e) => setBodyHtml(e.target.value)}
-                      className="font-mono text-[length:var(--fs-text)]"
-                    />
+                    <RichTextEditor value={typeof (bodyHtml) === 'string' ? (bodyHtml) : ''} onChange={(__v) => setBodyHtml(__v)} minHeight={336} className=" font-mono text-[length:var(--fs-text)]" />
                   </KiAssistFieldLabel>
                 </div>
               </>
@@ -243,13 +228,16 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                   {previewSubject}
                 </EinstellungenMeta>
                 <div
-                  className="max-w-none rounded-lg border border-bw-border bg-bw-canvas p-4 text-[length:var(--fs-text)] leading-relaxed text-bw-text [&_a]:text-bw-link [&_p]:mb-2"
+                  className="max-w-none rounded-card border border-bw-border bg-bw-canvas p-4 text-[length:var(--fs-text)] leading-relaxed text-bw-text [&_a]:text-bw-link [&_p]:mb-2"
                   dangerouslySetInnerHTML={{ __html: previewHtml }}
                 />
               </div>
             )}
 
             <div className="flex flex-wrap items-end gap-3 border-t border-bw-border pt-4">
+<<<<<<< Updated upstream
+              <MockField label="Test-Mail an"><MockInput type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} className="min-w-[200px] flex-1" /></MockField>
+=======
               <Input
                 label="Test-Mail an"
                 type="email"
@@ -257,9 +245,10 @@ export function EmailTemplatesClient({ templates, previewVars }: Props) {
                 value={testEmail}
                 onChange={(e) => setTestEmail(e.target.value)}
               />
-              <Button type="button" variant="secondary" loading={testBusy} onClick={() => void sendTest()}>
+>>>>>>> Stashed changes
+              <MockBtn type="button" kind="secondary" loading={testBusy} onClick={() => void sendTest()}>
                 Test senden
-              </Button>
+              </MockBtn>
             </div>
           </div>
         ) : null}

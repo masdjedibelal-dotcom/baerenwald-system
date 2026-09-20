@@ -1,0 +1,1612 @@
+{
+  "summary": {
+    "touch_zu_klein": 0,
+    "horizontal_scroll": 0,
+    "fixed_overlap": 0,
+    "screens_ok": 80,
+    "screens_total": 80
+  },
+  "results": [
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "01-dashboard",
+      "path": "/",
+      "url": "http://localhost:3000/",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-01-dashboard.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "02-vorgaenge",
+      "path": "/vorgaenge",
+      "url": "http://localhost:3000/vorgaenge",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-02-vorgaenge.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 5,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "03-anfragen",
+      "path": "/anfragen",
+      "url": "http://localhost:3000/vorgaenge?tab=anfrage",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-03-anfragen.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "04-angebote",
+      "path": "/angebote",
+      "url": "http://localhost:3000/vorgaenge?tab=angebot",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-04-angebote.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "05-auftraege",
+      "path": "/auftraege",
+      "url": "http://localhost:3000/vorgaenge?tab=auftrag",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-05-auftraege.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "06-rechnungen",
+      "path": "/rechnungen",
+      "url": "http://localhost:3000/vorgaenge?tab=rechnung",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-06-rechnungen.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "07-kunden",
+      "path": "/kunden",
+      "url": "http://localhost:3000/kunden",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-07-kunden.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "08-handwerker",
+      "path": "/handwerker",
+      "url": "http://localhost:3000/handwerker",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-08-handwerker.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "09-partner",
+      "path": "/partner",
+      "url": "http://localhost:3000/handwerker",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-09-partner.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "10-kalender",
+      "path": "/kalender",
+      "url": "http://localhost:3000/kalender",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-10-kalender.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "11-mehr",
+      "path": "/mehr",
+      "url": "http://localhost:3000/mehr",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-11-mehr.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "12-einstellungen",
+      "path": "/einstellungen",
+      "url": "http://localhost:3000/einstellungen/firma",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-12-einstellungen.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 1,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "13-anfrage-detail",
+      "path": "/anfragen/7efe17f9-9976-4dc3-a8c4-557e6ff227d9",
+      "url": "http://localhost:3000/anfragen/7efe17f9-9976-4dc3-a8c4-557e6ff227d9",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-13-anfrage-detail.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "14-auftrag-detail",
+      "path": "/auftraege/0dc0180a-7749-4422-b9ee-c421b96910d8",
+      "url": "http://localhost:3000/auftraege/0dc0180a-7749-4422-b9ee-c421b96910d8",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-14-auftrag-detail.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "15-kunde-detail",
+      "path": "/kunden/0f2a7883-3f39-4604-bbeb-81f49740f97e",
+      "url": "http://localhost:3000/kunden/0f2a7883-3f39-4604-bbeb-81f49740f97e",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-15-kunde-detail.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "16-angebot-detail",
+      "path": "/angebote/16f0b0a9-ff9d-446a-b396-b32c7191f567",
+      "url": "http://localhost:3000/angebote/16f0b0a9-ff9d-446a-b396-b32c7191f567",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-16-angebot-detail.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "17-rechnung-detail",
+      "path": "/rechnungen/781de901-81c0-4915-b00f-da61ce2b7b80",
+      "url": "http://localhost:3000/rechnungen/781de901-81c0-4915-b00f-da61ce2b7b80",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-17-rechnung-detail.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "18-angebotswizard",
+      "path": "/angebote/16f0b0a9-ff9d-446a-b396-b32c7191f567",
+      "url": "http://localhost:3000/angebote/16f0b0a9-ff9d-446a-b396-b32c7191f567",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-18-angebotswizard.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "19-termin-sheet",
+      "path": "/kalender",
+      "url": "http://localhost:3000/kalender",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-19-termin-sheet.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "iphone13",
+      "screen": "20-kunde-anlegen-sheet",
+      "path": "/kunden",
+      "url": "http://localhost:3000/kunden",
+      "screenshot": "docs/mobile-audit/screenshots/crm-iphone13-20-kunde-anlegen-sheet.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "01-hv-uebersicht",
+      "path": "/portal?section=uebersicht",
+      "url": "http://localhost:3001/portal?section=uebersicht",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-01-hv-uebersicht.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "02-hv-vorgaenge",
+      "path": "/portal?section=vorgaenge",
+      "url": "http://localhost:3001/portal?section=vorgaenge",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-02-hv-vorgaenge.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 4,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "03-hv-objekte",
+      "path": "/portal?section=objekte",
+      "url": "http://localhost:3001/portal?section=objekte",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-03-hv-objekte.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "04-hv-leistungen",
+      "path": "/portal?section=leistungen",
+      "url": "http://localhost:3001/portal?section=leistungen",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-04-hv-leistungen.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "05-hv-profil",
+      "path": "/portal?section=profil",
+      "url": "http://localhost:3001/portal?section=profil",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-05-hv-profil.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "05b-hv-vorgang-detail",
+      "path": "/portal?section=vorgaenge",
+      "url": "http://localhost:3001/portal?section=vorgaenge&filter=alle&id=a53e060b-ba89-4930-b3ad-f2f391465bc7",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-05b-hv-vorgang-detail.png",
+      "viewport": {
+        "w": 406,
+        "h": 692
+      },
+      "docWidth": 406,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "06-partner-uebersicht",
+      "path": "/partner?section=uebersicht",
+      "url": "http://localhost:3001/partner?section=uebersicht",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-06-partner-uebersicht.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "07-partner-vorgaenge",
+      "path": "/partner?section=vorgaenge",
+      "url": "http://localhost:3001/partner?section=vorgaenge",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-07-partner-vorgaenge.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "08-partner-auftraege",
+      "path": "/partner?section=auftraege",
+      "url": "http://localhost:3001/partner?section=auftraege",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-08-partner-auftraege.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "09-partner-anfragen",
+      "path": "/partner?section=anfragen",
+      "url": "http://localhost:3001/partner?section=anfragen",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-09-partner-anfragen.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "10-partner-profil",
+      "path": "/partner?section=profil",
+      "url": "http://localhost:3001/partner?section=profil",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-10-partner-profil.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "10b-partner-auftrag-detail",
+      "path": "/partner?section=auftraege",
+      "url": "http://localhost:3001/partner?section=auftraege",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-10b-partner-auftrag-detail.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "11-kunde-uebersicht",
+      "path": "/portal?section=uebersicht",
+      "url": "http://localhost:3001/portal?section=uebersicht",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-11-kunde-uebersicht.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "12-kunde-vorgaenge",
+      "path": "/portal?section=vorgaenge",
+      "url": "http://localhost:3001/portal?section=vorgaenge",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-12-kunde-vorgaenge.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 1,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "13-kunde-profil",
+      "path": "/portal?section=profil",
+      "url": "http://localhost:3001/portal?section=profil",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-13-kunde-profil.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "14-portal-login",
+      "path": "/portal/login",
+      "url": "http://localhost:3001/portal/login",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-14-portal-login.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": true,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "15-partner-login",
+      "path": "/partner/login",
+      "url": "http://localhost:3001/partner",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-15-partner-login.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "16-melde-funnel-start",
+      "path": "/melden",
+      "url": "http://localhost:3001/melden",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-16-melde-funnel-start.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "17-melde-funnel-fotos",
+      "path": "/melden",
+      "url": "http://localhost:3001/melden",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-17-melde-funnel-fotos.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "iphone13",
+      "screen": "18-melde-funnel-kontakt",
+      "path": "/melden",
+      "url": "http://localhost:3001/melden",
+      "screenshot": "docs/mobile-audit/screenshots/portal-iphone13-18-melde-funnel-kontakt.png",
+      "viewport": {
+        "w": 390,
+        "h": 664
+      },
+      "docWidth": 390,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "01-dashboard",
+      "path": "/",
+      "url": "http://localhost:3000/",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-01-dashboard.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "02-vorgaenge",
+      "path": "/vorgaenge",
+      "url": "http://localhost:3000/vorgaenge",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-02-vorgaenge.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 5,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "03-anfragen",
+      "path": "/anfragen",
+      "url": "http://localhost:3000/vorgaenge?tab=anfrage",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-03-anfragen.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "04-angebote",
+      "path": "/angebote",
+      "url": "http://localhost:3000/vorgaenge?tab=angebot",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-04-angebote.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "05-auftraege",
+      "path": "/auftraege",
+      "url": "http://localhost:3000/vorgaenge?tab=auftrag",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-05-auftraege.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "06-rechnungen",
+      "path": "/rechnungen",
+      "url": "http://localhost:3000/rechnungen",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-06-rechnungen.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "07-kunden",
+      "path": "/kunden",
+      "url": "http://localhost:3000/kunden",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-07-kunden.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "08-handwerker",
+      "path": "/handwerker",
+      "url": "http://localhost:3000/handwerker",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-08-handwerker.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "09-partner",
+      "path": "/partner",
+      "url": "http://localhost:3000/handwerker",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-09-partner.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "10-kalender",
+      "path": "/kalender",
+      "url": "http://localhost:3000/kalender",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-10-kalender.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "11-mehr",
+      "path": "/mehr",
+      "url": "http://localhost:3000/mehr",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-11-mehr.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "12-einstellungen",
+      "path": "/einstellungen",
+      "url": "http://localhost:3000/einstellungen/firma",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-12-einstellungen.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "13-anfrage-detail",
+      "path": "/anfragen/7efe17f9-9976-4dc3-a8c4-557e6ff227d9",
+      "url": "http://localhost:3000/anfragen/7efe17f9-9976-4dc3-a8c4-557e6ff227d9",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-13-anfrage-detail.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "14-auftrag-detail",
+      "path": "/auftraege/0dc0180a-7749-4422-b9ee-c421b96910d8",
+      "url": "http://localhost:3000/auftraege/0dc0180a-7749-4422-b9ee-c421b96910d8",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-14-auftrag-detail.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "15-kunde-detail",
+      "path": "/kunden/0f2a7883-3f39-4604-bbeb-81f49740f97e",
+      "url": "http://localhost:3000/kunden/0f2a7883-3f39-4604-bbeb-81f49740f97e",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-15-kunde-detail.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "16-angebot-detail",
+      "path": "/angebote/16f0b0a9-ff9d-446a-b396-b32c7191f567",
+      "url": "http://localhost:3000/angebote/16f0b0a9-ff9d-446a-b396-b32c7191f567",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-16-angebot-detail.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "17-rechnung-detail",
+      "path": "/rechnungen/781de901-81c0-4915-b00f-da61ce2b7b80",
+      "url": "http://localhost:3000/rechnungen/781de901-81c0-4915-b00f-da61ce2b7b80",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-17-rechnung-detail.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "18-angebotswizard",
+      "path": "/angebote/16f0b0a9-ff9d-446a-b396-b32c7191f567",
+      "url": "http://localhost:3000/angebote/16f0b0a9-ff9d-446a-b396-b32c7191f567",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-18-angebotswizard.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "19-termin-sheet",
+      "path": "/kalender",
+      "url": "http://localhost:3000/kalender",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-19-termin-sheet.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "crm",
+      "device": "pixel7",
+      "screen": "20-kunde-anlegen-sheet",
+      "path": "/kunden",
+      "url": "http://localhost:3000/kunden",
+      "screenshot": "docs/mobile-audit/screenshots/crm-pixel7-20-kunde-anlegen-sheet.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "01-hv-uebersicht",
+      "path": "/portal?section=uebersicht",
+      "url": "http://localhost:3001/portal?section=uebersicht",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-01-hv-uebersicht.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "02-hv-vorgaenge",
+      "path": "/portal?section=vorgaenge",
+      "url": "http://localhost:3001/portal?section=vorgaenge",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-02-hv-vorgaenge.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 3,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "03-hv-objekte",
+      "path": "/portal?section=objekte",
+      "url": "http://localhost:3001/portal?section=objekte",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-03-hv-objekte.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "04-hv-leistungen",
+      "path": "/portal?section=leistungen",
+      "url": "http://localhost:3001/portal?section=leistungen",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-04-hv-leistungen.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "05-hv-profil",
+      "path": "/portal?section=profil",
+      "url": "http://localhost:3001/portal?section=profil",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-05-hv-profil.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "05b-hv-vorgang-detail",
+      "path": "/portal?section=vorgaenge",
+      "url": "http://localhost:3001/portal?section=vorgaenge&filter=alle&id=a53e060b-ba89-4930-b3ad-f2f391465bc7",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-05b-hv-vorgang-detail.png",
+      "viewport": {
+        "w": 428,
+        "h": 872
+      },
+      "docWidth": 428,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "06-partner-uebersicht",
+      "path": "/partner?section=uebersicht",
+      "url": "http://localhost:3001/partner?section=uebersicht",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-06-partner-uebersicht.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "07-partner-vorgaenge",
+      "path": "/partner?section=vorgaenge",
+      "url": "http://localhost:3001/partner?section=vorgaenge",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-07-partner-vorgaenge.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "08-partner-auftraege",
+      "path": "/partner?section=auftraege",
+      "url": "http://localhost:3001/partner?section=auftraege",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-08-partner-auftraege.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "09-partner-anfragen",
+      "path": "/partner?section=anfragen",
+      "url": "http://localhost:3001/partner?section=anfragen",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-09-partner-anfragen.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "10-partner-profil",
+      "path": "/partner?section=profil",
+      "url": "http://localhost:3001/partner?section=profil",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-10-partner-profil.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "10b-partner-auftrag-detail",
+      "path": "/partner?section=auftraege",
+      "url": "http://localhost:3001/partner?section=auftraege",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-10b-partner-auftrag-detail.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "11-kunde-uebersicht",
+      "path": "/portal?section=uebersicht",
+      "url": "http://localhost:3001/portal?section=uebersicht",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-11-kunde-uebersicht.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "12-kunde-vorgaenge",
+      "path": "/portal?section=vorgaenge",
+      "url": "http://localhost:3001/portal?section=vorgaenge",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-12-kunde-vorgaenge.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 1,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "13-kunde-profil",
+      "path": "/portal?section=profil",
+      "url": "http://localhost:3001/portal?section=profil",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-13-kunde-profil.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "14-portal-login",
+      "path": "/portal/login",
+      "url": "http://localhost:3001/portal/login",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-14-portal-login.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": true,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "15-partner-login",
+      "path": "/partner/login",
+      "url": "http://localhost:3001/partner",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-15-partner-login.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "16-melde-funnel-start",
+      "path": "/melden",
+      "url": "http://localhost:3001/melden",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-16-melde-funnel-start.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "17-melde-funnel-fotos",
+      "path": "/melden",
+      "url": "http://localhost:3001/melden",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-17-melde-funnel-fotos.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    },
+    {
+      "app": "portal",
+      "device": "pixel7",
+      "screen": "18-melde-funnel-kontakt",
+      "path": "/melden",
+      "url": "http://localhost:3001/melden",
+      "screenshot": "docs/mobile-audit/screenshots/portal-pixel7-18-melde-funnel-kontakt.png",
+      "viewport": {
+        "w": 412,
+        "h": 839
+      },
+      "docWidth": 412,
+      "horizontal_scroll": false,
+      "touch_zu_klein": 0,
+      "touch_samples": [],
+      "truncated_main": 0,
+      "fixed_overlap": 0,
+      "onLoginPage": false,
+      "ok": true
+    }
+  ],
+  "at": "2026-09-20T14:03:05.194Z"
+}

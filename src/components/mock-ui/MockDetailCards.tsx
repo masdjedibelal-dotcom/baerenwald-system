@@ -1,8 +1,10 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockTextarea } from '@/components/mock-ui/MockForm'
+import type { ReactNode } from 'react'
 import { ActionIcon } from '@/components/ui/ActionIcon'
 import { ACTIVITY_TAB_LABEL } from '@/lib/crm-labels'
 
@@ -58,7 +60,7 @@ export function MockNotizenCard({
     <MockCard title={`Notizen · ${notes.length}`} icon="messages" className="dshell-framed">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: notes.length ? 14 : 0 }}>
         {notes.length === 0 ? (
-          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
+          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '0.25rem 0' }}>
             {emptyHint ?? 'Noch keine Notizen — schreibe die erste unten.'}
           </div>
         ) : (
@@ -110,34 +112,20 @@ export function MockNotizComposer({
   const canSend = Boolean(value.trim()) && !disabled
   return (
     <div className="note-composer">
-      <textarea
-        rows={1}
-        value={value}
-        disabled={disabled}
-        ref={(el) => {
+      <MockTextarea rows={1} value={value} disabled={disabled} ref={(el) => {
           if (el) resizeNotizTextarea(el)
-        }}
-        onChange={(e) => {
+        }} onChange={(e) => {
           onChange(e.target.value)
           resizeNotizTextarea(e.target)
-        }}
-        onKeyDown={(e) => {
+        }} onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             if (canSend) onSubmit()
           }
-        }}
-        placeholder={placeholder}
-      />
-      <button
-        type="button"
-        className="note-send"
-        disabled={!canSend}
-        onClick={onSubmit}
-        title="Notiz speichern"
-      >
+        }} placeholder={placeholder} />
+      <MockBtn className="note-send" type="button" disabled={!canSend} onClick={onSubmit} title="Notiz speichern">
         <ActionIcon n="send" size={16} />
-      </button>
+      </MockBtn>
     </div>
   )
 }

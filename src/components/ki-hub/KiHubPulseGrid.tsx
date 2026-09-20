@@ -3,10 +3,10 @@
 import type { KiHubPulseCard } from '@/lib/ki-hub/types'
 
 const STATUS_DOT: Record<KiHubPulseCard['status'], string> = {
-  ok: 'bg-emerald-500',
-  warn: 'bg-amber-500',
-  critical: 'bg-red-500',
-  neutral: 'bg-gray-300',
+  ok: 'bg-bw-success',
+  warn: 'bg-status-contact-bg',
+  critical: 'bg-danger',
+  neutral: 'bg-status-done-bg',
 }
 
 type Props = {
@@ -19,12 +19,12 @@ export function KiHubPulseGrid({ cards }: Props) {
       {cards.map((card) => (
         <div
           key={card.id}
-          className="rounded-xl border border-bw-border bg-bw-card p-4 shadow-sm"
+          className="rounded-sheet border border-bw-border bg-surface p-4 shadow-sm"
         >
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-bw-text">{card.label}</p>
             <span
-              className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[card.status]}`}
+              className={`h-2.5 w-2.5 shrink-0 rounded-pill ${STATUS_DOT[card.status]}`}
               aria-hidden
             />
           </div>
@@ -37,7 +37,7 @@ export function KiHubPulseGrid({ cards }: Props) {
             ))}
           </dl>
           {card.hint ? (
-            <p className="mt-2 text-xs text-amber-800">{card.hint}</p>
+            <p className="mt-2 text-xs text-status-contact-text">{card.hint}</p>
           ) : null}
         </div>
       ))}

@@ -1,13 +1,23 @@
 'use client'
+import { MockField, MockFormSection, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { z } from 'zod'
 import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { toast } from '@/components/ui/app-toast'
 import { composeHandwerkerAdresse } from '@/lib/handwerker-anschrift'
+import { TOAST } from '@/lib/copy'
+import { parseForm, useFieldErrors } from '@/lib/validation/form-schema'
+
+/* FORM_VALIDATION: partner-create */
+const partnerCreateSchema = z.object({
+  firma: z.string().trim().min(1, 'Firmenname ist Pflicht.'),
+  gewerkSlug: z.string().trim().min(1, 'Gewerk ist Pflicht.'),
+  tel: z.string().trim().min(1, 'Telefon ist Pflicht.'),
+})
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -27,6 +37,7 @@ export function PartnerCreateSheet({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useLocalTransition()
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [firma, setFirma] = useState('')
   const [gewerkSlug, setGewerkSlug] = useState('')
   const [vorname, setVorname] = useState('')
@@ -38,7 +49,6 @@ export function PartnerCreateSheet({
   const [tel, setTel] = useState('')
   const [mail, setMail] = useState('')
   const [notizen, setNotizen] = useState('')
-  const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const wasOpenRef = useRef(false)
 
@@ -58,9 +68,9 @@ export function PartnerCreateSheet({
     setTel('')
     setMail('')
     setNotizen('')
-    setErr(null)
+    clearFieldErrors()
     setDirty(false)
-  }, [open])
+  }, [open, clearFieldErrors])
 
   function mark(updater: () => void) {
     updater()
@@ -68,17 +78,9 @@ export function PartnerCreateSheet({
   }
 
   function submit() {
-    setErr(null)
-    if (!firma.trim()) {
-      setErr('Firmenname ist Pflicht.')
-      return
-    }
-    if (!gewerkSlug.trim()) {
-      setErr('Gewerk ist Pflicht.')
-      return
-    }
-    if (!tel.trim()) {
-      setErr('Telefon ist Pflicht.')
+    const parsed = parseForm(partnerCreateSchema, { firma, gewerkSlug, tel })
+    if (!parsed.ok) {
+      applyFieldErrors(parsed.fieldErrors)
       return
     }
 
@@ -114,12 +116,12 @@ export function PartnerCreateSheet({
         notizen: notizen.trim() || null,
       })
       if (!r.ok) {
-        setErr(r.message)
-        toast.error(r.message)
+        applyFieldErrors({ _form: r.message })
+        toast.systemError(r)
         return
       }
 
-      toast.success('Handwerker angelegt')
+      toast.success(TOAST.partner_angelegt)
       setDirty(false)
       onSaved?.(r.id)
       if (!stayOnPage) {
@@ -134,34 +136,42 @@ export function PartnerCreateSheet({
     <EditorSheet
       open={open}
       onClose={onClose}
-      title="Handwerker anlegen"
-      crumb="Handwerker >"
+      title="Partner anlegen"
+      crumb="Partner >"
       context="detail"
       dirty={dirty}
       size="lg"
       onConfirm={submit}
       confirmBusy={pending}
-      confirmDisabled={pending || !firma.trim() || !gewerkSlug.trim() || !tel.trim()}
+      confirmDisabled={pending}
       className="hw-create-sheet"
     >
       <div className="hw-create">
-        {err ? <p className="hw-create__err">{err}</p> : null}
+        {fieldErrors._form ? (
+          <p className="field-error" role="alert">
+            {fieldErrors._form}
+          </p>
+        ) : null}
 
         <MockFormSection title="Betrieb" icon="tool">
-          <MockField label="Firmenname" required full>
-            <input
-              className="input"
+          <MockField label="Firmenname" required full name="firma" error={fieldErrors.firma}>
+            <MockInput
               value={firma}
-              onChange={(e) => mark(() => setFirma(e.target.value))}
+              onChange={(e) => {
+                clearField('firma')
+                mark(() => setFirma(e.target.value))
+              }}
               placeholder="Max Sanitär GmbH"
               autoComplete="organization"
             />
           </MockField>
-          <MockField label="Gewerk" required full>
-            <select
-              className="input"
+          <MockField label="Gewerk" required full name="gewerkSlug" error={fieldErrors.gewerkSlug}>
+            <MockSelect
               value={gewerkSlug}
-              onChange={(e) => mark(() => setGewerkSlug(e.target.value))}
+              onChange={(e) => {
+                clearField('gewerkSlug')
+                mark(() => setGewerkSlug(e.target.value))
+              }}
               aria-label="Gewerk"
             >
               <option value="">Gewerk wählen…</option>
@@ -170,105 +180,57 @@ export function PartnerCreateSheet({
                   {g.name}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </MockField>
         </MockFormSection>
 
         <MockFormSection title="Ansprechpartner" icon="user" columns={2}>
           <MockField label="Vorname">
-            <input
-              className="input"
-              value={vorname}
-              onChange={(e) => mark(() => setVorname(e.target.value))}
-              placeholder="Max"
-              autoComplete="given-name"
-            />
+            <MockInput value={vorname} onChange={(e) => mark(() => setVorname(e.target.value))} placeholder="Max" autoComplete="given-name" />
           </MockField>
           <MockField label="Nachname">
-            <input
-              className="input"
-              value={nachname}
-              onChange={(e) => mark(() => setNachname(e.target.value))}
-              placeholder="Mustermann"
-              autoComplete="family-name"
-            />
+            <MockInput value={nachname} onChange={(e) => mark(() => setNachname(e.target.value))} placeholder="Mustermann" autoComplete="family-name" />
           </MockField>
         </MockFormSection>
 
         <MockFormSection title="Anschrift" icon="map-pin" columns={2}>
           <MockField label="Straße">
-            <input
-              className="input"
-              value={strasse}
-              onChange={(e) => mark(() => setStrasse(e.target.value))}
-              placeholder="Musterstraße"
-              autoComplete="address-line1"
-            />
+            <MockInput value={strasse} onChange={(e) => mark(() => setStrasse(e.target.value))} placeholder="Musterstraße" autoComplete="address-line1" />
           </MockField>
           <MockField label="Hausnummer">
-            <input
-              className="input"
-              value={hausnummer}
-              onChange={(e) => mark(() => setHausnummer(e.target.value))}
-              placeholder="12"
-              autoComplete="address-line2"
-            />
+            <MockInput value={hausnummer} onChange={(e) => mark(() => setHausnummer(e.target.value))} placeholder="12" autoComplete="address-line2" />
           </MockField>
           <div className="kunde-create__plz-ort full">
             <MockField label="PLZ">
-              <input
-                className="input"
-                value={plz}
-                onChange={(e) => mark(() => setPlz(e.target.value))}
-                placeholder="80331"
-                autoComplete="postal-code"
-                inputMode="numeric"
-              />
+              <MockInput value={plz} onChange={(e) => mark(() => setPlz(e.target.value))} placeholder="80331" autoComplete="postal-code" inputMode="numeric" />
             </MockField>
             <MockField label="Ort">
-              <input
-                className="input"
-                value={ort}
-                onChange={(e) => mark(() => setOrt(e.target.value))}
-                placeholder="München"
-                autoComplete="address-level2"
-              />
+              <MockInput value={ort} onChange={(e) => mark(() => setOrt(e.target.value))} placeholder="München" autoComplete="address-level2" />
             </MockField>
           </div>
         </MockFormSection>
 
         <MockFormSection title="Kontakt" icon="phone" columns={2}>
-          <MockField label="Telefon" required>
-            <input
-              className="input"
+          <MockField label="Telefon" required name="tel" error={fieldErrors.tel}>
+            <MockInput
               type="tel"
               value={tel}
-              onChange={(e) => mark(() => setTel(e.target.value))}
+              onChange={(e) => {
+                clearField('tel')
+                mark(() => setTel(e.target.value))
+              }}
               placeholder="0170 123 456"
               autoComplete="tel"
             />
           </MockField>
           <MockField label="E-Mail">
-            <input
-              className="input"
-              type="email"
-              value={mail}
-              onChange={(e) => mark(() => setMail(e.target.value))}
-              placeholder="info@…"
-              autoComplete="email"
-            />
+            <MockInput type="email" value={mail} onChange={(e) => mark(() => setMail(e.target.value))} placeholder="info@…" autoComplete="email" />
           </MockField>
         </MockFormSection>
 
         <MockFormSection title="Notiz" icon="messages">
           <MockField label="Interne Notiz" full>
-            <textarea
-              className="input ta"
-              rows={4}
-              value={notizen}
-              onChange={(e) => mark(() => setNotizen(e.target.value))}
-              placeholder="z.B. besonders sauber, kommt pünktlich…"
-            />
+            <MockTextarea className="ta" rows={4} value={notizen} onChange={(e) => mark(() => setNotizen(e.target.value))} placeholder="z.B. besonders sauber, kommt pünktlich…" />
           </MockField>
         </MockFormSection>
       </div>

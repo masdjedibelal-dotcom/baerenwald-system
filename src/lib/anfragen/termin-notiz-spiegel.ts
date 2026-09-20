@@ -1,12 +1,14 @@
 import 'server-only'
+import { C } from '@/lib/tokens/colors'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatDatum } from '@/lib/utils'
 
 function escHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -16,7 +18,7 @@ export function buildTerminNotizSpiegelInhalt(input: {
   titel: string | null
   inhalt: string
 }): string {
-  const label = `<p style="margin:0 0 8px;font-size:12px;color:#6B7280;">Termin-Notiz · ${escHtml(input.terminLabel)}</p>`
+  const label = `<p style="margin:0 0 8px;font-size:12px;color:${C.gray500};">Termin-Notiz · ${escHtml(input.terminLabel)}</p>`
   const titelBlock = input.titel?.trim()
     ? `<p style="margin:0 0 8px;font-weight:600;">${escHtml(input.titel.trim())}</p>`
     : ''
@@ -33,11 +35,12 @@ async function loadTerminLabel(
   supabase: SupabaseClient,
   terminId: string
 ): Promise<string> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('kalender_termine')
     .select('titel, datum, uhrzeit_von')
     .eq('id', terminId)
     .maybeSingle()
+  if (error) logDbError('lib/anfragen/termin-notiz-spiegel:kalender_termine', error)
 
   if (!data) return 'Termin'
 
@@ -79,22 +82,25 @@ export async function syncTerminNotizSpiegel(
     kalender_termin_id: null,
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error } = await supabase
     .from('lead_notizen')
     .select('id')
     .eq('quelle_notiz_id', input.terminNotizId)
     .maybeSingle()
+  if (error) logDbError('lib/anfragen/termin-notiz-spiegel:lead_notizen', error)
 
   if (existing?.id) {
     const { error } = await supabase.from('lead_notizen').update(spiegelRow).eq('id', existing.id)
+    if (error) logDbError('lib/anfragen/termin-notiz-spiegel:lead_notizen', error)
     if (error) return { ok: false, message: error.message }
     return { ok: true }
   }
 
-  const { error } = await supabase.from('lead_notizen').insert({
+  const { error: error2 } = await supabase.from('lead_notizen').insert({
     ...spiegelRow,
     erstellt_von: input.erstellt_von,
   })
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('lib/anfragen/termin-notiz-spiegel:lead_notizen', error2)
+  if (error2) return { ok: false, message: error2.message }
   return { ok: true }
 }

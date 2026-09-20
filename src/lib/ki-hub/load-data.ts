@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { latestAnalysenPerBereich } from '@/lib/ki/queries'
 import type { KiClusterAnalyseRow } from '@/lib/ki/types'
 import { loadNeuesteEmpfehlungen, loadUmgesetzteEmpfehlungen7d } from '@/lib/ki-hub/queries'
@@ -47,6 +48,7 @@ export async function loadKiHubData(): Promise<KiHubLoadPayload> {
     netlify,
     metricsRows,
   ] = await Promise.all([
+    // logDbError: Ergebnisse direkt nach Promise.all
     supabaseAdmin
       .from('ki_cluster_analysen')
       .select('*')
@@ -67,6 +69,7 @@ export async function loadKiHubData(): Promise<KiHubLoadPayload> {
       .in('status_einfach', ['entwurf', 'gesendet'])
       .order('created_at', { ascending: false })
       .limit(30),
+    // logDbError: Ergebnisse direkt nach Promise.all
     supabaseAdmin
       .from('angebote')
       .select('id', { count: 'exact', head: true })
@@ -93,6 +96,21 @@ export async function loadKiHubData(): Promise<KiHubLoadPayload> {
     fetchNetlifyDeployStatus(),
     loadLatestMarketingMetrics(),
   ])
+
+  for (const [ctx, res] of [
+    ['ki_cluster_analysen', clusterRaw],
+    ['leads_offen', leadsOffen],
+    ['leads_30d', leads30],
+    ['angebote_offen', angeboteOffen],
+    ['angebote_30d', angebote30],
+    ['auftraege_aktiv', auftraegeAktiv],
+    ['handwerker_aktiv', handwerkerAktiv],
+    ['system_events', systemEvents],
+  ] as const) {
+    if (res && typeof res === 'object' && 'error' in res && res.error) {
+      logDbError(`lib/ki-hub/load-data:${ctx}`, res.error)
+    }
+  }
 
   const cluster = latestAnalysenPerBereich((clusterRaw.data ?? []) as KiClusterAnalyseRow[])
 

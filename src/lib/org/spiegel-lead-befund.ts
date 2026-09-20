@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 type BefundPunkt = {
@@ -29,33 +30,36 @@ export async function spiegelLeadBefundNachAuftrag(input: {
     return { ok: false, message: 'leadId/auftragId fehlen.' }
   }
 
-  const { data: befund } = await supabaseAdmin
+  const { data: befund, error } = await supabaseAdmin
     .from('lead_befunde')
     .select('id, durchgefuehrt_am')
     .eq('lead_id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/org/spiegel-lead-befund:lead_befunde', error)
 
   if (!befund?.id) {
     return { ok: true, inserted: 0 }
   }
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error: error2 } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .select('id')
     .eq('auftrag_id', auftragId)
     .eq('eintrag_typ', 'befund')
     .limit(1)
     .maybeSingle()
+  if (error2) logDbError('lib/org/spiegel-lead-befund:auftrag_bautagebuch_eintraege', error2)
 
   if (existing?.id) {
     return { ok: true, inserted: 0 }
   }
 
-  const { data: punkte } = await supabaseAdmin
+  const { data: punkte, error: error3 } = await supabaseAdmin
     .from('lead_befund_punkte')
     .select('titel, status, notiz, foto_refs, sort_order')
     .eq('befund_id', befund.id)
     .order('sort_order', { ascending: true })
+  if (error3) logDbError('lib/org/spiegel-lead-befund:lead_befund_punkte', error3)
 
   const rows = (punkte ?? []) as BefundPunkt[]
   const auffaellig = rows.filter(
@@ -87,10 +91,11 @@ export async function spiegelLeadBefundNachAuftrag(input: {
     return { ok: true, inserted: 0 }
   }
 
-  const { error } = await supabaseAdmin
+  const { error: error4 } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .insert(payload)
+  if (error4) logDbError('lib/org/spiegel-lead-befund:auftrag_bautagebuch_eintraege', error4)
 
-  if (error) return { ok: false, message: error.message }
+  if (error4) return { ok: false, message: error4.message }
   return { ok: true, inserted: payload.length }
 }

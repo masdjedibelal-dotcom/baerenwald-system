@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateEinstellungenPath } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import type { CustomFieldDefinition } from '@/lib/custom-fields'
 
@@ -11,6 +17,7 @@ export async function loadAllCustomFieldDefinitions(): Promise<CustomFieldDefini
     .select('*')
     .order('objekt_typ', { ascending: true })
     .order('sort_order', { ascending: true })
+  if (error) logDbError('app/einstellungen/felder/actions:custom_field_definitions', error)
   if (error) {
     console.warn('loadAllCustomFieldDefinitions', error.message)
     return []
@@ -37,6 +44,7 @@ export async function saveCustomFieldDefinition(input: {
         pflicht: input.pflicht,
       })
       .eq('id', input.id)
+    if (error) logDbError('app/einstellungen/felder/actions:custom_field_definitions', error)
     if (error) return { ok: false, message: error.message }
   } else {
     const { data, error } = await supabase
@@ -52,19 +60,21 @@ export async function saveCustomFieldDefinition(input: {
       })
       .select('id')
       .single()
+    if (error) logDbError('app/einstellungen/felder/actions:custom_field_definitions', error)
     if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-    revalidatePath('/einstellungen/felder')
+    revalidateEinstellungenPath('/einstellungen/felder')
     return { ok: true, id: data.id as string }
   }
-  revalidatePath('/einstellungen/felder')
+  revalidateEinstellungenPath('/einstellungen/felder')
   return { ok: true }
 }
 
 export async function softDeleteCustomField(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const { error } = await supabase.from('custom_field_definitions').update({ aktiv: false }).eq('id', id)
+  if (error) logDbError('app/einstellungen/felder/actions:custom_field_definitions', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/felder')
+  revalidateEinstellungenPath('/einstellungen/felder')
   return { ok: true }
 }
 
@@ -79,8 +89,9 @@ export async function reorderCustomFields(
       .update({ sort_order: i * 10 })
       .eq('id', orderedIds[i])
       .eq('objekt_typ', objektTyp)
+    if (error) logDbError('app/einstellungen/felder/actions:custom_field_definitions', error)
     if (error) return { ok: false, message: error.message }
   }
-  revalidatePath('/einstellungen/felder')
+  revalidateEinstellungenPath('/einstellungen/felder')
   return { ok: true }
 }

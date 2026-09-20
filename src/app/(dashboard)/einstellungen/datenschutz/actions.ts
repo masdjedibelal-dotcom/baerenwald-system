@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateEinstellungenPath, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -36,8 +42,9 @@ export async function updateDatenschutzFrist(
     .from('datenschutz_fristen')
     .update({ frist_monate: input.frist_monate, aktiv: input.aktiv })
     .eq('id', id)
+  if (error) logDbError('app/einstellungen/datenschutz/actions:datenschutz_fristen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/integration')
+  revalidateEinstellungenPath('/einstellungen/integration')
   return { ok: true }
 }
 
@@ -57,8 +64,9 @@ export async function addDatenschutzAufschub(input: {
     begrundung: input.begrundung.trim(),
     erstellt_von: uid,
   })
+  if (error) logDbError('app/einstellungen/datenschutz/actions:datenschutz_aufschub', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/integration')
+  revalidateEinstellungenPath('/einstellungen/integration')
   return { ok: true }
 }
 
@@ -80,8 +88,9 @@ export async function createDatenschutzAnfrage(input: {
     kontext: input.kontext ?? null,
     status: 'offen',
   })
+  if (error) logDbError('app/einstellungen/datenschutz/actions:datenschutz_anfragen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/integration')
+  revalidateEinstellungenPath('/einstellungen/integration')
   return { ok: true }
 }
 
@@ -126,8 +135,8 @@ export async function loescheMelderDaten(
     userId: uid,
   })
   if (!r.ok) return r
-  revalidatePath('/einstellungen/integration')
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateEinstellungenPath('/einstellungen/integration')
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -140,7 +149,7 @@ export async function anonymisiereKunde(
   if (!uid) return { ok: false, message: 'Nicht angemeldet' }
   const r = await anonymisiereKundeLib(kundeId, uid, grund)
   if (!r.ok) return r
-  revalidatePath('/einstellungen/integration')
+  revalidateEinstellungenPath('/einstellungen/integration')
   return { ok: true }
 }
 
@@ -160,7 +169,8 @@ export async function updateDatenschutzAnfrage(
   }
 
   const { error } = await supabaseAdmin.from('datenschutz_anfragen').update(patch).eq('id', id)
+  if (error) logDbError('app/einstellungen/datenschutz/actions:datenschutz_anfragen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/integration')
+  revalidateEinstellungenPath('/einstellungen/integration')
   return { ok: true }
 }

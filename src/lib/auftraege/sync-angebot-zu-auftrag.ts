@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
@@ -52,13 +53,14 @@ export async function syncAngebotPositionenZuAuftrag(input: {
     (p) => !istGewerkBeschreibungPosition(p)
   )
   if (!positionen.length) {
-    return { ok: false, message: 'Keine Leistungspositionen zum Übernehmen.' }
+    return { ok: false, message: 'Keine Leistungspositionen zum Speichern.' }
   }
 
   const { data: existing, error: loadErr } = await supabaseAdmin
     .from('auftrag_positionen')
     .select('*')
     .eq('auftrag_id', auftragId)
+  if (loadErr) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftrag_positionen', loadErr)
 
   if (loadErr) return { ok: false, message: loadErr.message }
 
@@ -155,6 +157,7 @@ export async function syncAngebotPositionenZuAuftrag(input: {
       }
 
       const { error } = await supabaseAdmin.from('auftrag_positionen').update(patch).eq('id', match.id)
+      if (error) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftrag_positionen', error)
       if (!error) aktualisiert++
       continue
     }
@@ -169,6 +172,7 @@ export async function syncAngebotPositionenZuAuftrag(input: {
       })
       .select('id')
       .maybeSingle()
+    if (error) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftrag_positionen', error)
     sortCursor += 10
     if (!error) {
       neu++
@@ -199,9 +203,11 @@ export async function syncAngebotPositionenZuAuftrag(input: {
           .from('auftrag_positionen')
           .update({ aenderung_typ: 'entfernt' })
           .eq('id', p.id)
+        if (error) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftrag_positionen', error)
         if (!error) entfernt++
       } else {
         const { error } = await supabaseAdmin.from('auftrag_positionen').delete().eq('id', p.id)
+        if (error) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftrag_positionen', error)
         if (!error) entfernt++
       }
     }
@@ -209,16 +215,18 @@ export async function syncAngebotPositionenZuAuftrag(input: {
 
   const gewerkNamen = Array.from(new Set(positionen.map((p) => p.gewerk_name).filter(Boolean)))
   if (gewerkNamen.length) {
-    const { data: auftrag } = await supabaseAdmin
+    const { data: auftrag, error } = await supabaseAdmin
       .from('auftraege')
       .select('titel, kunden(name)')
       .eq('id', auftragId)
       .maybeSingle()
+    if (error) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftraege', error)
     if (auftrag) {
       const kRaw = auftrag.kunden as { name?: string } | { name?: string }[] | null
       const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
       const titel = `${gewerkNamen.join(', ')} — ${kunde?.name ?? 'Kunde'}`.slice(0, 240)
-      await supabaseAdmin.from('auftraege').update({ titel }).eq('id', auftragId)
+      const { error: __dbErr1 } = await supabaseAdmin.from('auftraege').update({ titel }).eq('id', auftragId)
+      if (__dbErr1) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftraege', __dbErr1)
     }
   }
 
@@ -229,19 +237,21 @@ export async function syncAngebotPositionenZuAuftrag(input: {
   )
   for (const h of hwRows) {
     if (!h.handwerker_id || !h.gewerk_id) continue
-    const { data: existingAh } = await supabaseAdmin
+    const { data: existingAh, error } = await supabaseAdmin
       .from('auftrag_handwerker')
       .select('id')
       .eq('auftrag_id', auftragId)
       .eq('handwerker_id', h.handwerker_id)
       .maybeSingle()
+    if (error) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftrag_handwerker', error)
     if (existingAh?.id) continue
-    await supabaseAdmin.from('auftrag_handwerker').insert({
+    const { error: __dbErr2 } = await supabaseAdmin.from('auftrag_handwerker').insert({
       auftrag_id: auftragId,
       handwerker_id: h.handwerker_id,
       gewerk_id: h.gewerk_id,
       status: 'zugewiesen',
     })
+    if (__dbErr2) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftrag_handwerker', __dbErr2)
   }
 
   provisionProjektvertragFireAndForget(auftragId)

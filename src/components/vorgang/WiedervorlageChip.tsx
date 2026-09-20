@@ -1,4 +1,7 @@
 'use client'
+import { DateInput } from '@/components/ui/DateInput'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -94,7 +97,7 @@ export function WiedervorlageChip({
         notiz: nextNotiz,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       toast.success(nextDatum ? 'Wiedervorlage gesetzt' : 'Wiedervorlage entfernt', {
@@ -118,22 +121,16 @@ export function WiedervorlageChip({
   }
 
   const chip = (
-    <button
-      type="button"
-      className={cn(
+    <MockBtn className={cn(
         'wv-chip',
         faellig && 'due',
         !datum && 'border-dashed bg-transparent',
         className
-      )}
-      title={notiz?.trim() || (editable ? 'Wiedervorlage setzen' : undefined)}
-      onClick={() => editable && setOpen((v) => !v)}
-      disabled={!editable}
-    >
+      )} type="button" title={notiz?.trim() || (editable ? 'Wiedervorlage setzen' : undefined)} onClick={() => editable && setOpen((v) => !v)} disabled={!editable}>
       <span aria-hidden>◷</span>
       <span className="truncate">{datum ? `WV ${formatDatum(datum)}` : 'WV setzen'}</span>
       {faellig ? <span className="font-semibold">fällig</span> : null}
-    </button>
+    </MockBtn>
   )
 
   if (!editable) {
@@ -145,57 +142,32 @@ export function WiedervorlageChip({
     <div ref={rootRef} className="relative inline-flex">
       {chip}
       {open ? (
-        <div className="absolute left-0 top-full z-40 mt-1 w-[min(100vw-2rem,280px)] rounded-lg border border-bw-border bg-white p-3 shadow-lg">
+        <div className="absolute left-0 top-full z-40 mt-1 w-[min(100vw-2rem,280px)] rounded-card border border-bw-border bg-white p-3 shadow-lg">
           <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text">Wiedervorlage</p>
           <div className="mb-2 flex flex-wrap gap-1.5">
             {QUICK.map((q) => (
-              <button
-                key={q.label}
-                type="button"
-                className="rounded-full border border-bw-border px-2 py-0.5 text-[length:var(--fs-meta)] hover:bg-bw-surface-2"
-                onClick={() => setDraftDatum(plusDaysYmd(q.days))}
-              >
+              <MockBtn className="rounded-pill border border-bw-border px-2 py-0.5 text-[length:var(--fs-meta)] hover:bg-bw-surface-2" key={q.label} type="button" onClick={() => setDraftDatum(plusDaysYmd(q.days))}>
                 {q.label}
-              </button>
+              </MockBtn>
             ))}
           </div>
           <label className="mb-2 block text-[length:var(--fs-meta)] text-bw-text-muted">
             Datum
-            <input
-              type="date"
-              className="mt-0.5 w-full rounded-md border border-bw-border px-2 py-1.5 text-[length:var(--fs-text)]"
-              value={draftDatum}
-              onChange={(e) => setDraftDatum(e.target.value)}
-            />
+            <DateInput className="mt-0.5 w-full rounded-field border border-bw-border px-2 py-1.5 text-[length:var(--fs-text)]" value={draftDatum} onChange={(e) => setDraftDatum(e.target.value)} />
           </label>
           <label className="mb-3 block text-[length:var(--fs-meta)] text-bw-text-muted">
             Notiz
-            <input
-              className="mt-0.5 w-full rounded-md border border-bw-border px-2 py-1.5 text-[length:var(--fs-text)]"
-              value={draftNotiz}
-              onChange={(e) => setDraftNotiz(e.target.value)}
-              placeholder="Optional"
-            />
+            <MockInput className="mt-0.5 w-full rounded-field border border-bw-border px-2 py-1.5 text-[length:var(--fs-text)]" value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} placeholder="Optional" />
           </label>
           <div className="flex flex-wrap justify-end gap-2">
             {datum ? (
-              <button
-                type="button"
-                className="text-[length:var(--fs-meta)] text-bw-text-muted underline"
-                disabled={pending}
-                onClick={() => save(null, null)}
-              >
-                Entfernen
-              </button>
+              <MockBtn className="text-[length:var(--fs-meta)] text-bw-text-muted underline" type="button" disabled={pending} onClick={() => save(null, null)}>
+                Löschen
+              </MockBtn>
             ) : null}
-            <button
-              type="button"
-              className="rounded-md bg-bw-text px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-white disabled:opacity-50"
-              disabled={pending || !draftDatum}
-              onClick={() => save(draftDatum, draftNotiz || null)}
-            >
+            <MockBtn className="rounded-button bg-bw-text px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-white disabled:opacity-50" type="button" disabled={pending || !draftDatum} onClick={() => save(draftDatum, draftNotiz || null)}>
               Speichern
-            </button>
+            </MockBtn>
           </div>
         </div>
       ) : null}

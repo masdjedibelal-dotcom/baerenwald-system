@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { FunnelOverviewErgebnis } from '@/lib/ki/types'
 import { KiCardShell } from '@/components/ki/KiCardShell'
 import { KiHeroStat, type KiCardProps } from '@/components/ki/ki-card-shared'
@@ -23,10 +23,10 @@ export function KiFunnelBanner({ analyse, onGenerateKi, kiLoading }: KiCardProps
           { label: 'Abgeschlossen', value: k?.auftraege_abgeschlossen ?? 0 },
         ].map((step, i) => (
           <div key={step.label} className="flex items-center gap-2">
-            {i > 0 ? <ArrowRight className="h-4 w-4 shrink-0 text-muted" aria-hidden /> : null}
-            <div className="min-w-[5rem] rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-center">
+            {i > 0 ? <MockIcon n="arrow-right" ctx="default" className="h-4 w-4 shrink-0 text-muted" aria-hidden /> : null}
+            <div className="min-w-[5rem] rounded-card border border-bw-border bg-bw-bg px-3 py-2 text-center">
               <p className="text-lg font-semibold tabular-nums">{step.value}</p>
-              <p className="text-[11px] text-muted">{step.label}</p>
+              <p className="text-fs-caption text-muted">{step.label}</p>
             </div>
           </div>
         ))}

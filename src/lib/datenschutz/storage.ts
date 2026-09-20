@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 /** Bekannte öffentliche Storage-Pfade (Supabase) — Bucket aus URL extrahieren. */
@@ -32,6 +33,7 @@ export async function deleteStorageObjectsFromUrls(urls: string[]): Promise<{ re
     const list = Array.from(paths)
     if (!list.length) continue
     const { error } = await supabaseAdmin.storage.from(bucket).remove(list)
+    if (error) logDbError('lib/datenschutz/storage:query', error)
     if (error) errors.push(`${bucket}: ${error.message}`)
     else removed += list.length
   }

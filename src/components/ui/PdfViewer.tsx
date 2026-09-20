@@ -1,7 +1,5 @@
 'use client'
-
-import { Download } from 'lucide-react'
-import { Modal } from '@/components/ui/Modal'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
 interface PdfViewerProps {
   open: boolean
@@ -12,30 +10,21 @@ interface PdfViewerProps {
 
 export function PdfViewer({ open, onClose, url, title }: PdfViewerProps) {
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
       title={title}
       size="lg"
-      footer={
-        <div className="flex w-full justify-between gap-2">
-          <button type="button" onClick={onClose} className="btn ghost">
-            Schließen
-          </button>
-          <a href={url} download className="btn primary inline-flex items-center gap-2">
-            <Download className="h-4 w-4" aria-hidden />
-            Herunterladen
-          </a>
-        </div>
-      }
+      secondary={{ label: 'Schließen', onClick: onClose, kind: 'ghost' }}
+      primary={{ label: 'Herunterladen', href: url, download: true }}
     >
       <div className="h-96 w-full md:h-[600px]">
         <iframe
           src={`${url}#toolbar=0`}
-          className="h-full w-full rounded-lg border border-bw-border"
+          className="h-full w-full rounded-card border border-bw-border"
           title={title}
         />
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

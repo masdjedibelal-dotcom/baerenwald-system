@@ -1,5 +1,5 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { notFound } from 'next/navigation'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { createClient } from '@/lib/supabase-server'
 import { RechnungDetailClient } from '@/components/rechnungen/RechnungDetailClient'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -30,15 +30,13 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
   const [firm, wizardCtx, { data, error }] = await Promise.all([
     fetchFirmenEinstellungen(supabase),
     loadWizardContext(supabase),
-    withCrmReadFallback(async (db) =>
-      db
+    await (() => { const db = createClient(); return db
         .from('rechnungen')
         .select(
           '*, kunden(id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ, ust_id), auftraege(id, titel), angebote(id, leistungsumfang, notizen)'
         )
         .eq('id', params.id)
-        .maybeSingle()
-    ),
+        .maybeSingle() })(),
   ])
   const gwRes = { data: wizardCtx.gewerke.map((g) => ({ id: g.id, name: g.name, slug: g.slug })) }
   const plRes = { data: wizardCtx.preislisten as Preisliste[] }
@@ -223,12 +221,13 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
         .filter((m) => !siblingRows.some((s) => s.id === m.id) && m.id !== params.id)
         .map((m) => m.id)
       if (missing.length) {
-        const { data: extra } = await supabase
+        const {data: extra, error} = await supabase
           .from('rechnungen')
           .select(
             'id, created_at, status, beleg_typ, bezug_rechnung_id, korrektur_von, ersetzt_durch, rechnungsnummer, brutto'
           )
           .in('id', missing)
+        if (error) logDbError('app/rechnungen/[id]/page:rechnungen', error)
         const merged = [...siblingRows, ...((extra ?? []) as RechnungKorrekturKetteSiblingRow[])]
         korrekturKette = buildRechnungKorrekturKetteUi(
           {

@@ -1,12 +1,14 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import type { ReactNode } from 'react'
-import { AlignLeft, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { cn } from '@/lib/utils'
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
-import { Textarea } from '@/components/ui/Textarea'
 import {
   artikelZeilenNetto,
   formatEurBetrag,
@@ -96,10 +98,7 @@ export function LexofficeDokumentEditor({
                 </div>
                 <LexField label="Leistung" className="lex-col-artikel">
                   {gewerke.length > 0 ? (
-                    <select
-                      className="input w-full"
-                      value={z.gewerk_id ?? ''}
-                      onChange={(e) => {
+                    <MockSelect className="w-full" value={z.gewerk_id ?? ''} onChange={(e) => {
                         const gid = e.target.value
                         const g = gewerkById(gewerke, gid)
                         const hinweis = g ? getHinweisForPosition(g.id, gewerke) : ''
@@ -109,8 +108,7 @@ export function LexofficeDokumentEditor({
                           gewerk_slug: g?.slug ?? (gid ? '' : 'frei'),
                           positionBeschreibung: hinweis || undefined,
                         } as Partial<DokumentArtikelZeile>)
-                      }}
-                    >
+                      }}>
                       <option value="">Freie Leistung</option>
                       {gewerke
                         .filter((g) => g.aktiv !== false)
@@ -119,9 +117,9 @@ export function LexofficeDokumentEditor({
                             {g.name}
                           </option>
                         ))}
-                    </select>
+                    </MockSelect>
                   ) : z.gewerkName ? (
-                    <span className="mb-1 block text-[10px] text-bw-text-muted">{z.gewerkName}</span>
+                    <span className="mb-1 block text-fs-caption text-bw-text-muted">{z.gewerkName}</span>
                   ) : null}
                   <div className="mb-1 flex flex-wrap items-center gap-1">
                     {(() => {
@@ -132,7 +130,7 @@ export function LexofficeDokumentEditor({
                       return badge ? (
                         <span
                           className={cn(
-                            'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                            'rounded-pill px-1.5 py-0.5 text-fs-caption font-medium',
                             badge.className
                           )}
                         >
@@ -141,14 +139,8 @@ export function LexofficeDokumentEditor({
                       ) : null
                     })()}
                   </div>
-                  <input
-                    className="input w-full"
-                    value={z.bezeichnung}
-                    placeholder="Leistung / Positionsbezeichnung"
-                    onChange={(e) =>
-                      patchZeile(z.id, { bezeichnung: e.target.value } as Partial<DokumentArtikelZeile>)
-                    }
-                  />
+                  <MockInput className="w-full" value={z.bezeichnung} placeholder="Leistung / Positionsbezeichnung" onChange={(e) =>
+                      patchZeile(z.id, { bezeichnung: e.target.value } as Partial<DokumentArtikelZeile>)} />
                   {(() => {
                     const hinweis = z.positionBeschreibung?.trim() ?? ''
                     const leistung = z.bezeichnung.trim()
@@ -159,16 +151,9 @@ export function LexofficeDokumentEditor({
                       Boolean(hinweis && hinweis !== leistung) || Boolean(fachbetriebGewerk)
                     if (!showHinweisField) return null
                     return (
-                      <Textarea
-                        rows={2}
-                        placeholder="Zusatz-Hinweis (z. B. Fachbetrieb)"
-                        value={z.positionBeschreibung ?? ''}
-                        onChange={(e) =>
-                          patchZeile(z.id, {
-                            positionBeschreibung: e.target.value,
-                          } as Partial<DokumentArtikelZeile>)
-                        }
-                      />
+                      <RichTextEditor value={typeof (z.positionBeschreibung ?? '') === 'string' ? (z.positionBeschreibung ?? '') : ''} onChange={(__v) => patchZeile(z.id, {
+                            positionBeschreibung: __v,
+                          } as Partial<DokumentArtikelZeile>)} placeholder="Zusatz-Hinweis (z. B. Fachbetrieb)" minHeight={120} aria-label="Zusatz-Hinweis (z. B. Fachbetrieb)" />
                     )
                   })()}
                 </LexField>
@@ -183,14 +168,8 @@ export function LexofficeDokumentEditor({
                   />
                 </LexField>
                 <LexField label="Einheit" className="lex-col-einheit">
-                  <input
-                    className="input w-full"
-                    value={z.einheit}
-                    placeholder="Stk."
-                    onChange={(e) =>
-                      patchZeile(z.id, { einheit: e.target.value } as Partial<DokumentArtikelZeile>)
-                    }
-                  />
+                  <MockInput className="w-full" value={z.einheit} placeholder="Stk." onChange={(e) =>
+                      patchZeile(z.id, { einheit: e.target.value } as Partial<DokumentArtikelZeile>)} />
                 </LexField>
                 <LexField label="VK (Netto)" className="lex-col-vk">
                   <EuroNettoInput
@@ -211,41 +190,31 @@ export function LexofficeDokumentEditor({
                         patchZeile(z.id, { rabattProzent } as Partial<DokumentArtikelZeile>)
                       }
                     />
-                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-bw-text-muted">
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-fs-caption text-bw-text-muted">
                       %
                     </span>
                   </div>
                 </LexField>
                 <div className="lex-col-summe lex-form-field form-field min-w-0">
                   <span className="form-field-label">Summe</span>
-                  <span className="block text-right text-[13px] font-semibold tabular-nums text-bw-text">
+                  <span className="block text-right text-fs-text font-semibold tabular-nums text-bw-text">
                     {formatEurBetrag(netto)}
                   </span>
                   <span className="form-field-label mt-1">USt</span>
-                  <select
-                    className="input w-full"
-                    value={z.mwstSatz}
-                    onChange={(e) =>
+                  <MockSelect className="w-full" value={z.mwstSatz} onChange={(e) =>
                       patchZeile(z.id, {
                         mwstSatz: Number(e.target.value) as MwstSatzOption,
-                      } as Partial<DokumentArtikelZeile>)
-                    }
-                  >
+                      } as Partial<DokumentArtikelZeile>)}>
                     {MWST_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
                     ))}
-                  </select>
+                  </MockSelect>
                 </div>
-                <button
-                  type="button"
-                  className="lex-col-del flex h-10 w-9 items-center justify-center text-bw-text-muted hover:text-status-cancel-text"
-                  onClick={() => removeZeile(z.id)}
-                  aria-label="Zeile löschen"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <MockBtn className="lex-col-del flex h-10 w-9 items-center justify-center text-bw-text-muted hover:text-status-cancel-text" type="button" onClick={() => removeZeile(z.id)} aria-label="Zeile löschen">
+                  <MockIcon n="trash" ctx="default" className="h-4 w-4" />
+                </MockBtn>
               </div>
             )
           }
@@ -254,36 +223,20 @@ export function LexofficeDokumentEditor({
             return (
               <div key={z.id} className="lex-zeile lex-zeile--freitext">
                 <div className="lex-zeile-icon text-bw-text-muted" aria-hidden>
-                  <AlignLeft className="h-4 w-4" />
+                  <MockIcon n="list" ctx="default" className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <LexField label="Titel (optional)" className="block">
-                    <input
-                      className="input w-full"
-                      value={z.titel}
-                      onChange={(e) =>
-                        patchZeile(z.id, { titel: e.target.value } as Partial<DokumentFreitextZeile>)
-                      }
-                    />
+                    <MockInput className="w-full" value={z.titel} onChange={(e) =>
+                        patchZeile(z.id, { titel: e.target.value } as Partial<DokumentFreitextZeile>)} />
                   </LexField>
                   <LexField label="Text (optional)" className="block">
-                    <Textarea
-                      rows={2}
-                      value={z.text}
-                      onChange={(e) =>
-                        patchZeile(z.id, { text: e.target.value } as Partial<DokumentFreitextZeile>)
-                      }
-                    />
+                    <RichTextEditor value={typeof (z.text) === 'string' ? (z.text) : ''} onChange={(__v) => patchZeile(z.id, { text: __v } as Partial<DokumentFreitextZeile>)} minHeight={120} />
                   </LexField>
                 </div>
-                <button
-                  type="button"
-                  className="flex h-10 w-9 shrink-0 items-center justify-center self-start text-bw-text-muted hover:text-status-cancel-text"
-                  onClick={() => removeZeile(z.id)}
-                  aria-label="Freitext löschen"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <MockBtn className="flex h-10 w-9 shrink-0 items-center justify-center self-start text-bw-text-muted hover:text-status-cancel-text" type="button" onClick={() => removeZeile(z.id)} aria-label="Freitext löschen">
+                  <MockIcon n="trash" ctx="default" className="h-4 w-4" />
+                </MockBtn>
               </div>
             )
           }
@@ -293,22 +246,14 @@ export function LexofficeDokumentEditor({
       </div>
 
       <div className="lex-doc-actions mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="btn ghost sm gap-1.5 border-bw-primary/40 text-bw-primary"
-          onClick={() => onChange([...zeilen, neueArtikelZeile()])}
-        >
-          <Plus className="h-3.5 w-3.5" />
+        <MockBtn kind="ghost" sm className="gap-1.5 border-bw-primary/40 text-bw-primary" type="button" onClick={() => onChange([...zeilen, neueArtikelZeile()])}>
+          <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" />
           Artikel
-        </button>
-        <button
-          type="button"
-          className="btn ghost sm gap-1.5"
-          onClick={() => onChange([...zeilen, neueFreitextZeile()])}
-        >
-          <GripVertical className="h-3.5 w-3.5" />
+        </MockBtn>
+        <MockBtn kind="ghost" sm className="gap-1.5" type="button" onClick={() => onChange([...zeilen, neueFreitextZeile()])}>
+          <MockIcon n="grip-vertical" ctx="default" className="h-3.5 w-3.5" />
           Freitext
-        </button>
+        </MockBtn>
         {extraActions}
       </div>
 

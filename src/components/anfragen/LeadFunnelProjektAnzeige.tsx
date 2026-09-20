@@ -1,7 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useRef, type ReactNode } from 'react'
-import { Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import {
   LeadProjektWasBlock,
@@ -136,14 +137,9 @@ export function LeadFunnelProjektAnzeige({
       collapsible={false}
       title="Projekt-Übersicht"
       action={
-        <button
-          type="button"
-          onClick={() => wasBlockRef.current?.addLeistung()}
-          className="btn ghost sm"
-          aria-label="Leistung hinzufügen"
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-        </button>
+        <MockBtn kind="ghost" sm type="button" onClick={() => wasBlockRef.current?.addLeistung()} aria-label="Leistung hinzufügen">
+          <MockIcon n="pencil" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+        </MockBtn>
       }
     >
       <div className="props">

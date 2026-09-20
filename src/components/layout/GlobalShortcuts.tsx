@@ -1,10 +1,9 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState } from 'react'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { CommandPalette } from '@/components/layout/CommandPalette'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false
   const tag = el.tagName
@@ -16,6 +15,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
 const SHORTCUTS = [
   { keys: '⌘K', label: 'Suche öffnen' },
   { keys: '⌘J', label: 'KI-Assistent' },
+  { keys: '⌘↵', label: 'Speichern (Sheet / Wizard)' },
   { keys: 'n', label: 'Neu erstellen' },
   { keys: '/', label: 'Suche fokussieren' },
   { keys: '?', label: 'Tastenkürzel-Übersicht' },
@@ -24,6 +24,7 @@ const SHORTCUTS = [
 
 /**
  * Spec §14 Desktop-Kürzel: ⌘K · ⌘J · n · / · ? · Esc
+ * Plus ⌘↵ in EditorSheet / DocumentCanvas.
  * ⌘K/ / öffnen CommandPalette; TopBarSearch bleibt per Klick.
  */
 export function GlobalShortcuts({ onNeu }: { onNeu?: () => void }) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { MockField } from '@/components/mock-ui/MockForm'
+import { MockField, MockSelect } from '@/components/mock-ui/MockForm'
 import { isValidEmail } from '@/lib/email-recipients'
 import type { KundeAnsprechpartner } from '@/lib/types'
 
@@ -75,15 +75,10 @@ export function KundenVersandEmailField({
       full
       hint="Leer = Mail des Ansprechpartners. Anrede bleibt unverändert."
     >
-      <select
-        className="sel sel--choice"
-        value={selectValue}
-        disabled={disabled}
-        onChange={(e) => {
+      <MockSelect className="sel sel--choice" value={selectValue} disabled={disabled} onChange={(e) => {
           const v = e.target.value.trim()
           onChange(v || null)
-        }}
-      >
+        }}>
         <option value="">
           {kontakt && isValidEmail(kontakt)
             ? `Wie Ansprechpartner (${kontakt})`
@@ -95,7 +90,7 @@ export function KundenVersandEmailField({
             {o.label}
           </option>
         ))}
-      </select>
+      </MockSelect>
     </MockField>
   )
 }

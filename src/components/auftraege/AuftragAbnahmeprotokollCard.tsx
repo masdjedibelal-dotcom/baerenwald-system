@@ -1,14 +1,18 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
+import { C } from '@/lib/tokens/colors'
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   ablehnenAbnahmeprotokoll,
   deleteAbnahmeprotokoll,
@@ -25,6 +29,7 @@ import {
 import { countOffeneMaengel } from '@/lib/auftraege/abnahme-maengel-helpers'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 function freigabeBadge(status: AbnahmeprotokollListeEintrag['freigabe_status'], gesendet: boolean) {
   if (gesendet) {
@@ -111,28 +116,28 @@ export function AuftragAbnahmeprotokollCard({
   }
 
   function loeschen(id: string) {
-    confirmDelete('Abnahmeprotokoll löschen?', async () => {
+    openDeleteConfirm('Abnahmeprotokoll löschen?', async () => {
       const r = await deleteAbnahmeprotokoll(id, auftragId)
       if (!r?.ok) {
-        toast.error(r?.message ?? 'Löschen fehlgeschlagen')
+        toast.systemError(r, 'ui', 'Löschen fehlgeschlagen')
         throw new Error(r?.message ?? 'Löschen fehlgeschlagen')
       }
-      toast.success('Protokoll gelöscht')
+      toast.success(TOAST.protokoll_geloescht)
       reload()
-      onChanged?.()
-      router.refresh()
+      if (onChanged) onChanged()
+      else afterServerActionRefresh()
     })
   }
 
   function freigeben(id: string) {
     startTransition(async () => {
       const r = await freigebenAbnahmeprotokoll(id, auftragId)
-      if (!r?.ok) toast.error(r?.message ?? 'Freigabe fehlgeschlagen')
+      if (!r?.ok) toast.systemError(r, 'ui', 'Freigabe fehlgeschlagen')
       else {
-        toast.success('Freigegeben — Versand optional danach')
+        toast.success(TOAST.freigegeben_versand_optional_danach)
         reload()
-        onChanged?.()
-        router.refresh()
+        if (onChanged) onChanged()
+        else afterServerActionRefresh()
       }
     })
   }
@@ -145,12 +150,12 @@ export function AuftragAbnahmeprotokollCard({
         auftragId,
         notiz: notiz.trim() || null,
       })
-      if (!r?.ok) toast.error(r?.message ?? 'Ablehnen fehlgeschlagen')
+      if (!r?.ok) toast.systemError(r, 'ui', 'Ablehnen fehlgeschlagen')
       else {
-        toast.success('Abgelehnt — Nacharbeit / Mängel')
+        toast.success(TOAST.abgelehnt_nacharbeit_maengel)
         reload()
-        onChanged?.()
-        router.refresh()
+        if (onChanged) onChanged()
+        else afterServerActionRefresh()
       }
     })
   }
@@ -278,11 +283,11 @@ export function AuftragAbnahmeprotokollCard({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: '10px 12px',
-                  border: '0.5px solid var(--border)',
+                  padding: '0.6250remrem 0.75rem',
+                  border: '0.0.3125remrem solid var(--border)',
                   borderRadius: 8,
                   background:
-                    z.freigabeStatus === 'zur_freigabe' ? 'var(--amber-50, #fff8eb)' : 'var(--card)',
+                    z.freigabeStatus === 'zur_freigabe' ? `var(--amber-50, ${C.accentBg})` : 'var(--card)',
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -315,7 +320,7 @@ export function AuftragAbnahmeprotokollCard({
           {!gesamtOk && gesamtMsg ? (
             <p
               style={{
-                margin: '10px 0 0',
+                margin: '0.6250remrem 0 0',
                 fontSize: 'var(--fs-meta)',
                 color: 'var(--text-3)',
               }}
@@ -330,10 +335,10 @@ export function AuftragAbnahmeprotokollCard({
         <div
           style={{
             marginBottom: 12,
-            padding: '10px 12px',
+            padding: '0.6250remrem 0.75rem',
             borderRadius: 10,
-            border: '0.5px solid var(--amber-border, #f0d9a8)',
-            background: 'var(--amber-50, #fff8eb)',
+            border: `0.0.3125remrem solid var(--amber-border, ${C.accentBg2})`,
+            background: `var(--amber-50, ${C.accentBg})`,
             fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
           }}
@@ -346,10 +351,10 @@ export function AuftragAbnahmeprotokollCard({
         <div
           style={{
             marginBottom: 12,
-            padding: '10px 12px',
+            padding: '0.6250remrem 0.75rem',
             borderRadius: 10,
-            border: '0.5px solid var(--amber-border, #f0d9a8)',
-            background: 'var(--amber-50, #fff8eb)',
+            border: `0.0.3125remrem solid var(--amber-border, ${C.accentBg2})`,
+            background: `var(--amber-50, ${C.accentBg})`,
             fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
           }}

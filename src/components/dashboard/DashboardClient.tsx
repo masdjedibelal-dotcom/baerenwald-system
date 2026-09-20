@@ -1,14 +1,18 @@
 'use client'
 
+import { MockBtn, MockChip, MockTable } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
-import { DashboardZeitraumFilterBar } from '@/components/dashboard/DashboardZeitraumFilterBar'
 import { DashboardLazyMount } from '@/components/dashboard/DashboardLazyMount'
 import {
+  buildDashboardZeitraumHref,
+  DASHBOARD_ZEITRAUM_OPTIONS,
   gewerkColor,
   type DashboardZeitraumFilter,
+  type DashboardZeitraumPreset,
   type FunnelStufe,
   type GewerkUmsatzZeile,
   type RankingZeile,
@@ -18,11 +22,15 @@ import {
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { formatWochentagDatumLang } from '@/lib/utils'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import {
   buildDashboardKpiSnapshot,
   DASHBOARD_KPI_ANALYSE_PROMPT,
 } from '@/lib/dashboard/dashboard-kpi-snapshot'
+import { formatEuro } from '@/lib/format/geld-datum'
+import { DateInput } from '@/components/ui/DateInput'
+import { C } from '@/lib/tokens/colors'
 
 export type DashboardKpi = {
   icon: string
@@ -31,14 +39,83 @@ export type DashboardKpi = {
   href: string
 }
 
-const UMSATZ_BAR_FILL = '#2E7D52'
+const UMSATZ_BAR_FILL = C.green
 
-/** Kompakt für enge Monatsspalten — ganze Euro, geschütztes Leerzeichen vor €. */
-function formatEurCompact(n: number): string {
-  const v = Number.isFinite(n) ? n : 0
-  return `${Math.round(v).toLocaleString('de-DE')}\u00A0€`
+const ZEITRAUM_PRESETS = DASHBOARD_ZEITRAUM_OPTIONS.filter((o) => o.value !== 'benutzerdefiniert')
+
+function DashboardZeitraumChips({ filter }: { filter: DashboardZeitraumFilter }) {
+  const router = useRouter()
+  const [customMode, setCustomMode] = useState(filter.preset === 'benutzerdefiniert')
+  const [draftVon, setDraftVon] = useState(filter.von)
+  const [draftBis, setDraftBis] = useState(filter.bis)
+
+  useEffect(() => {
+    setDraftVon(filter.von)
+    setDraftBis(filter.bis)
+    setCustomMode(filter.preset === 'benutzerdefiniert')
+  }, [filter.von, filter.bis, filter.preset])
+
+  function navigate(next: DashboardZeitraumFilter) {
+    router.replace(buildDashboardZeitraumHref(next))
+  }
+
+  function selectPreset(preset: DashboardZeitraumPreset) {
+    setCustomMode(false)
+    navigate({ preset, von: '', bis: '' })
+  }
+
+  function applyCustomRange() {
+    if (!draftVon.trim() || !draftBis.trim()) return
+    navigate({ preset: 'benutzerdefiniert', von: draftVon, bis: draftBis })
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col items-end gap-2">
+      <div className="chiprow" role="group" aria-label="Zeitraum">
+        {ZEITRAUM_PRESETS.map((o) => (
+          <MockChip
+            key={o.value}
+            active={!customMode && filter.preset === o.value}
+            onClick={() => selectPreset(o.value)}
+          >
+            {o.label}
+          </MockChip>
+        ))}
+        <MockChip active={customMode} onClick={() => setCustomMode(true)}>
+          Individuell
+        </MockChip>
+      </div>
+      {customMode ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <DateInput
+            size="sm"
+            value={draftVon}
+            onChange={(e) => setDraftVon(e.target.value)}
+            aria-label="Von"
+          />
+          <DateInput
+            size="sm"
+            value={draftBis}
+            min={draftVon || undefined}
+            onChange={(e) => setDraftBis(e.target.value)}
+            aria-label="Bis"
+          />
+          <MockBtn
+            kind="primary"
+            sm
+            type="button"
+            disabled={!draftVon.trim() || !draftBis.trim()}
+            onClick={applyCustomRange}
+          >
+            Anwenden
+          </MockBtn>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
+/** Kompakt für enge Monatsspalten — ganze Euro, geschütztes Leerzeichen vor €. */
 function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
   const safeMonths = Array.isArray(months) ? months : []
   const totals = safeMonths.map((m) => umsatzMonatGesamt(m))
@@ -62,14 +139,7 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
   }
 
   return (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">
-          <MockIcon ctx="emphasis" n="activity" size={16} />
-          Umsatzverlauf
-        </div>
-      </div>
-      <div className="card-b">
+    <MockCard title="Umsatzverlauf" icon="activity">
         <div className="mb-3">
           <div className="text-[length:var(--fs-head)] font-semibold tracking-tight tabular-nums">
             {formatEurBetrag(total)}
@@ -122,8 +192,7 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
           </svg>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[280px] border-collapse text-[11px] leading-tight">
+        <MockTable wrapClassName="mt-4 overflow-x-auto" className="w-full min-w-[280px] border-collapse text-fs-caption leading-tight">
             <thead>
               <tr className="border-b border-[var(--border)]">
                 <th className="px-1 py-1 text-left font-medium text-[var(--text-3)]"> </th>
@@ -145,15 +214,13 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
                     key={m.key}
                     className="whitespace-nowrap px-1 py-1 text-right tabular-nums text-[var(--text)]"
                   >
-                    {formatEurCompact(umsatzMonatGesamt(m))}
+                    {formatEuro(umsatzMonatGesamt(m), { rounded: true, decimals: 0 })}
                   </td>
                 ))}
               </tr>
             </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+        </MockTable>
+    </MockCard>
   )
 }
 
@@ -169,18 +236,17 @@ function VertriebsFunnel({
   const maxCount = Math.max(1, ...safeStufen.map((s) => Number(s.count) || 0), 1)
 
   return (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">
-          <MockIcon ctx="emphasis" n="filter" size={16} />
-          Vertriebs-Funnel
-        </div>
+    <MockCard
+      title="Vertriebs-Funnel"
+      icon="filter"
+      actions={
         <div className="text-[length:var(--fs-text)] text-[var(--text-2)]">
           Gesamt-Conversion{' '}
           <b className="tabular-nums text-[var(--text)]">{conversionGesamt}%</b>
         </div>
-      </div>
-      <div className="card-b space-y-2">
+      }
+      bodyClassName="space-y-2"
+    >
         {safeStufen.map((s) => {
           const width = Math.max(28, Math.round((s.count / maxCount) * 100))
           return (
@@ -205,7 +271,7 @@ function VertriebsFunnel({
                 </div>
               ) : (
                 <div
-                  className="relative flex items-center justify-between rounded-lg px-3 py-2.5 text-white"
+                  className="relative flex items-center justify-between rounded-card px-3 py-2.5 text-white"
                   style={{
                     width: `${width}%`,
                     minWidth: '40%',
@@ -221,8 +287,7 @@ function VertriebsFunnel({
             </div>
           )
         })}
-      </div>
-    </div>
+    </MockCard>
   )
 }
 
@@ -234,17 +299,15 @@ function GewerkUmsatzCard({
   gesamt: number
 }) {
   return (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">
-          <MockIcon ctx="emphasis" n="clock" size={16} />
-          Umsatz nach Gewerk
-        </div>
+    <MockCard
+      title="Umsatz nach Gewerk"
+      icon="clock"
+      actions={
         <div className="text-[length:var(--fs-title)] font-semibold tabular-nums text-[var(--text)]">
           {formatEurBetrag(gesamt)}
         </div>
-      </div>
-      <div className="card-b">
+      }
+    >
         {(zeilen ?? []).length === 0 ? (
           <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">
             Noch keine beauftragten Umsätze mit Gewerken.
@@ -260,9 +323,9 @@ function GewerkUmsatzCard({
                     <span className="text-[var(--text-3)]">({z.anteil}%)</span>
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-[var(--bg-2)]">
+                <div className="h-2 overflow-hidden rounded-pill bg-[var(--bg-2)]">
                   <div
-                    className="h-full rounded-full transition-[width]"
+                    className="h-full rounded-pill transition-[width]"
                     style={{
                       width: `${Math.max(z.anteil, z.netto > 0 ? 2 : 0)}%`,
                       background: gewerkColor(i),
@@ -273,8 +336,7 @@ function GewerkUmsatzCard({
             ))}
           </div>
         )}
-      </div>
-    </div>
+    </MockCard>
   )
 }
 
@@ -296,30 +358,20 @@ function TopRankingCard({
   const maxUmsatz = rows.length ? Math.max(1, ...rows.map((r) => Number(r.umsatz) || 0)) : 1
 
   return (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">
-          <MockIcon ctx="emphasis" n="trophy" size={16} />
-          Top-Ranking
-        </div>
+    <MockCard
+      title="Top-Ranking"
+      icon="trophy"
+      actions={
         <div className="seg" role="group" aria-label="Ranking-Modus">
-          <button
-            type="button"
-            className={mode === 'handwerker' ? 'on' : undefined}
-            onClick={() => setMode('handwerker')}
-          >
-            Handwerker
-          </button>
-          <button
-            type="button"
-            className={mode === 'kunden' ? 'on' : undefined}
-            onClick={() => setMode('kunden')}
-          >
+          <MockBtn className={mode === 'handwerker' ? 'on' : undefined} type="button" onClick={() => setMode('handwerker')}>
+            Partner
+          </MockBtn>
+          <MockBtn className={mode === 'kunden' ? 'on' : undefined} type="button" onClick={() => setMode('kunden')}>
             Kunden
-          </button>
+          </MockBtn>
         </div>
-      </div>
-      <div className="card-b">
+      }
+    >
         {rows.length === 0 ? (
           <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">
             Keine Daten im Zeitraum.
@@ -335,7 +387,7 @@ function TopRankingCard({
                   <div className="truncate text-[length:var(--fs-text)] font-medium">{r.name}</div>
                   <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[length:var(--fs-meta)] text-[var(--text-2)]">
                     <span className="whitespace-nowrap font-medium tabular-nums text-[var(--text)]">
-                      {formatEurCompact(r.umsatz)}
+                      {formatEuro(r.umsatz, { rounded: true, decimals: 0 })}
                     </span>
                     <span className="tabular-nums text-[var(--text-3)]">
                       {r.vorgaenge} {r.vorgaenge === 1 ? 'Vorgang' : 'Vorgänge'}
@@ -350,12 +402,12 @@ function TopRankingCard({
             <div
               className="list-row head"
               style={{
-                gridTemplateColumns: '32px minmax(140px, 1.5fr) 72px minmax(88px, 0.85fr)',
+                gridTemplateColumns: '2rem minmax(8.75rem, 1.5fr) 4.5rem minmax(5.5rem, 0.85fr)',
                 gap: 8,
               }}
             >
               <div>#</div>
-              <div>{mode === 'handwerker' ? 'Handwerker' : 'Kunde'}</div>
+              <div>{mode === 'handwerker' ? 'Partner' : 'Kunde'}</div>
               <div>Vorgänge</div>
               <div>Umsatz</div>
             </div>
@@ -364,7 +416,7 @@ function TopRankingCard({
                 key={r.id}
                 className="list-row"
                 style={{
-                  gridTemplateColumns: '32px minmax(140px, 1.5fr) 72px minmax(88px, 0.85fr)',
+                  gridTemplateColumns: '2rem minmax(8.75rem, 1.5fr) 4.5rem minmax(5.5rem, 0.85fr)',
                   gap: 8,
                   alignItems: 'center',
                 }}
@@ -378,11 +430,11 @@ function TopRankingCard({
                 <div className="text-[length:var(--fs-text)] tabular-nums">{r.vorgaenge}</div>
                 <div>
                   <div className="whitespace-nowrap text-[length:var(--fs-meta)] font-medium tabular-nums">
-                    {formatEurCompact(r.umsatz)}
+                    {formatEuro(r.umsatz, { rounded: true, decimals: 0 })}
                   </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--bg-2)]">
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-pill bg-[var(--bg-2)]">
                     <div
-                      className="h-full rounded-full"
+                      className="h-full rounded-pill"
                       style={{
                         width: `${Math.round((r.umsatz / maxUmsatz) * 100)}%`,
                         background: 'var(--green)',
@@ -394,8 +446,7 @@ function TopRankingCard({
             ))}
           </div>
         )}
-      </div>
-    </div>
+    </MockCard>
   )
 }
 
@@ -420,7 +471,7 @@ export function DashboardClient({
     conversionGesamt: number
   }
   gewerk: { zeilen: GewerkUmsatzZeile[]; gesamt: number }
-  rankingHandwerker: RankingZeile[]
+rankingHandwerker: RankingZeile[]
   rankingKunden: RankingZeile[]
 }) {
   const router = useRouter()
@@ -433,12 +484,7 @@ export function DashboardClient({
   }, [])
 
   const dateStr = useMemo(
-    () =>
-      new Date().toLocaleDateString('de-DE', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      }),
+    () => formatWochentagDatumLang(new Date(), { withYear: false }),
     []
   )
 
@@ -480,28 +526,17 @@ export function DashboardClient({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <DashboardZeitraumFilterBar filter={zeitraumFilter} />
-          <button
-            type="button"
-            className="ki-assist-icon-btn"
-            title="KPIs mit KI analysieren"
-            aria-label="KPIs mit KI analysieren"
-            onClick={openKpiAnalyse}
-          >
+          <DashboardZeitraumChips filter={zeitraumFilter} />
+          <MockBtn className="ki-assist-icon-btn" type="button" title="KPIs mit KI analysieren" aria-label="KPIs mit KI analysieren" onClick={openKpiAnalyse}>
             <MockIcon ctx="btn" n="sparkles" size={16} />
-          </button>
+          </MockBtn>
         </div>
       </header>
 
       <section className="dash-sec" aria-label="Heute">
         <div className="kpi-grid">
           {(kpis ?? []).map((k) => (
-            <button
-              key={k.label}
-              type="button"
-              className="kpi-card"
-              onClick={() => router.push(k.href)}
-            >
+            <MockBtn className="kpi-tile" key={k.label} type="button" onClick={() => router.push(k.href)}>
               <div className="kpi-ico">
                 <MockIcon ctx="default" n={k.icon} size={isMobile ? 15 : 19} />
               </div>
@@ -509,7 +544,7 @@ export function DashboardClient({
                 <div className="kpi-val">{k.value}</div>
                 <div className="kpi-label">{k.label}</div>
               </div>
-            </button>
+            </MockBtn>
           ))}
         </div>
       </section>

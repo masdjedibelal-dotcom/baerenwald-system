@@ -7,6 +7,7 @@ import {
 import { normalizeLeistungStatus } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { richTextToSafePdfHtml } from '@/lib/rich-text'
+import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -17,11 +18,12 @@ import {
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
+import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -31,7 +33,7 @@ function textToHtmlParagraphs(text: string): string {
     .split(/\n\n+/)
     .map((block) => block.replace(/\n/g, '<br/>'))
     .filter(Boolean)
-    .map((block) => `<p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${block}</p>`)
+    .map((block) => `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${block}</p>`)
     .join('')
 }
 
@@ -58,30 +60,30 @@ function gewerkPhaseStrip(
         blockIstAktuell(b, eintrag) ||
         (!eintrag.gewerk_id && !eintrag.gewerk_phase_key && inArbeit && !done)
 
-      let circleBg = '#FFFFFF'
-      let circleBorder = '#D1D5DB'
-      let circleColor = '#9CA3AF'
-      let labelColor = '#374151'
+      let circleBg: string = C.white
+      let circleBorder: string = C.gray300
+      let circleColor: string = C.gray400
+      let labelColor: string = C.gray700
 
       if (done) {
-        circleBg = '#2E7D52'
-        circleBorder = '#2E7D52'
-        circleColor = '#FFFFFF'
+        circleBg = C.green
+        circleBorder = C.green
+        circleColor = C.white
       } else if (isCurrent) {
-        circleBg = '#2E7D52'
-        circleBorder = '#2E7D52'
-        circleColor = '#FFFFFF'
-        labelColor = '#2E7D52'
+        circleBg = C.green
+        circleBorder = C.green
+        circleColor = C.white
+        labelColor = C.green
       } else if (inArbeit) {
-        circleBorder = '#2E7D52'
-        circleColor = '#2E7D52'
+        circleBorder = C.green
+        circleColor = C.green
       }
 
       const inner = done ? '✓' : String(i + 1)
       const connectorDone = done || isCurrent
       const connector =
         i < blocks.length - 1
-          ? `<td style="width:16px;vertical-align:middle;padding:0 2px;"><div style="height:2px;background:${connectorDone ? '#2E7D52' : '#E5E7EB'};border-radius:1px;"></div></td>`
+          ? `<td style="width:16px;vertical-align:middle;padding:0 2px;"><div style="height:2px;background:${connectorDone ? C.green : C.gray200};border-radius:1px;"></div></td>`
           : ''
       return `<td style="vertical-align:top;text-align:center;padding:0 4px;">
         <div style="width:28px;height:28px;margin:0 auto;border-radius:50%;border:2px solid ${circleBorder};background:${circleBg};color:${circleColor};font-size:${done ? '14px' : '12px'};font-weight:700;line-height:24px;text-align:center;">${inner}</div>
@@ -90,8 +92,8 @@ function gewerkPhaseStrip(
     })
     .join('')
 
-  return `<div style="margin:0 0 20px;padding:12px 8px;background:#F9FAFB;border-radius:8px;overflow-x:auto;">
-    <p style="font-size:10px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 10px;text-align:center;">Gewerke</p>
+  return `<div style="margin:0 0 20px;padding:12px 8px;background:${C.gray50};border-radius:8px;overflow-x:auto;">
+    <p style="font-size:10px;font-weight:600;color:${C.gray500};text-transform:uppercase;letter-spacing:0.08em;margin:0 0 10px;text-align:center;">Gewerke</p>
     <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;border-collapse:collapse;"><tr>${cells}</tr></table>
   </div>`
 }
@@ -104,20 +106,20 @@ function updateBlock(
   const datum = esc(formatDatum(eintrag.datum))
   const label = anrede === 'du' ? 'Aktuelles Update' : 'Aktuelles Update'
   const beschreibungHtml = eintrag.beschreibung?.trim()
-    ? `<div style="font-size:14px;color:#374151;line-height:1.6;margin:8px 0 0;">${richTextToSafePdfHtml(eintrag.beschreibung)}</div>`
+    ? `<div style="font-size:14px;color:${C.gray700};line-height:1.6;margin:8px 0 0;">${richTextToSafePdfHtml(eintrag.beschreibung)}</div>`
     : ''
   const fotos = (eintrag.foto_urls ?? []).filter(Boolean)
   const fotoHinweis =
     fotos.length > 0
       ? anrede === 'du'
-        ? `<p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in MeinBärenwald ansehen.</p>`
-        : `<p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in MeinBärenwald ansehen.</p>`
+        ? `<p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in MeinBärenwald ansehen.</p>`
+        : `<p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in MeinBärenwald ansehen.</p>`
       : ''
 
   return `${mailSummaryBlock({
     label,
     title: titel,
-    metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Datum:</strong> ${datum}</p>`,
+    metaHtml: `<p style="font-size:13px;color:${C.gray700};margin:8px 0 0;"><strong>Datum:</strong> ${datum}</p>`,
   })}${beschreibungHtml}${fotoHinweis}`
 }
 
@@ -148,13 +150,13 @@ Details, Fotos und den Verlauf finden Sie in MeinBärenwald.`
 }
 
 export function bautagebuchKundenMailBetreff(
-  eintragTitel: string,
-  projektTitel: string,
-  firmenname: string
+  eintragTitel: string | null | undefined,
+  projektTitel: string | null | undefined
 ): string {
-  const titel = projektTitel.trim() || 'Ihr Projekt'
-  const update = eintragTitel.trim() || 'Update'
-  return `Projekt-Update — ${update} · ${titel} · ${firmenname}`
+  return buildSubject({
+    objekt: projektTitel,
+    ereignis: eintragTitel?.trim() || 'Projekt-Update',
+  })
 }
 
 export type BautagebuchKundenMailInput = {
@@ -189,11 +191,11 @@ export function buildBautagebuchKundenMail(
   const preheader = `${data.eintrag.titel.trim()} · ${data.projektTitel.trim() || 'Projekt-Update'}`
 
   const html = mailHtmlBase(
-    `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
+    `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
       ${nachrichtHtml}
       ${uebersicht}
-      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
-      <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
+      <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,
     disclaimer,
@@ -201,7 +203,7 @@ export function buildBautagebuchKundenMail(
   )
 
   return {
-    betreff: bautagebuchKundenMailBetreff(data.eintrag.titel, data.projektTitel, b.firmenname),
+    betreff: bautagebuchKundenMailBetreff(data.eintrag.titel, data.projektTitel),
     html,
   }
 }

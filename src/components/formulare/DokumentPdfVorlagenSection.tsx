@@ -1,9 +1,10 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { C } from '@/lib/tokens/colors'
 
 import { useState, type ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockModal } from '@/components/mock-ui/MockModal'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import type { DokumentPdfMusterEintrag } from '@/lib/templates/dokument-pdf-muster'
 
@@ -147,29 +148,28 @@ export function DokumentPdfVorlagenSection({
       </Sec>
 
       {preview ? (
-        <MockModal
+        <EditorSheet
           open
           onClose={() => setPreview(null)}
-          icon={preview.icon}
           title={preview.title}
           className="wide"
         >
           <div
             style={{
-              border: '0.5px solid var(--border)',
+              border: '0.0.3125remrem solid var(--border)',
               borderRadius: 8,
               overflow: 'hidden',
-              background: '#fff',
-              height: 'min(70vh, 720px)',
+              background: C.white,
+              height: 'min(70vh, 45rem)',
             }}
           >
             <iframe
               title={`Vorschau ${preview.title}`}
               srcDoc={preview.html}
-              style={{ width: '100%', height: '100%', border: 0, background: '#fff' }}
+              style={{ width: '100%', height: '100%', border: 0, background: C.white }}
             />
           </div>
-        </MockModal>
+        </EditorSheet>
       ) : null}
     </>
   )

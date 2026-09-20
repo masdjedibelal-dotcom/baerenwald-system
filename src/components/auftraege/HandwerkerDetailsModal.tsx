@@ -1,19 +1,25 @@
 'use client'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { Modal } from '@/components/ui/Modal'
 import { FormSheet } from '@/components/ui/FormSheet'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
-import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   updateAuftragHandwerkerDetails,
   updateAuftragPositionDetails,
 } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import type { AuftragHandwerkerRow, AuftragPosition } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 export function HandwerkerDetailsModal({
   open,
@@ -32,7 +38,6 @@ export function HandwerkerDetailsModal({
   position?: AuftragPosition | null
   onSaved: () => void
 }) {
-  const isMobile = useIsMobile()
   const [pending, startTransition] = useLocalTransition()
   const [preis, setPreis] = useState('')
   const [absprachen, setAbsprachen] = useState('')
@@ -77,55 +82,48 @@ export function HandwerkerDetailsModal({
                 notizen_intern: notizen,
               })
             : { ok: false as const, message: 'Ungültig' }
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Gespeichert')
+        toast.success(TOAST.gespeichert)
         onSaved()
         onClose()
       }
     })
   }
 
+<<<<<<< Updated upstream
+  return (
+    <EditorSheet
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="md"
+      secondary={{ label: 'Abbrechen' }}
+      primary={{ label: 'Speichern', busy: pending, onClick: save }}
+    >
+=======
   const footer = (
     <div className="flex gap-2">
-      <Button type="button" variant="secondary" onClick={onClose}>
+      <MockBtn type="button" kind="secondary" onClick={onClose}>
         Abbrechen
-      </Button>
-      <Button type="button" variant="primary" loading={pending} onClick={save}>
+      </MockBtn>
+      <MockBtn type="button" kind="primary" loading={pending} onClick={save}>
         Speichern
-      </Button>
+      </MockBtn>
     </div>
   )
 
   const body = (
     <>
+>>>>>>> Stashed changes
       <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
-        Intern: Preis, Absprachen und Notizen zur Handwerker-Zuweisung.
+        Intern: Preis, Absprachen und Notizen zur Partner-Zuweisung.
       </p>
       <div className="space-y-3">
-        <Input
-          label={mode === 'gewerk' ? 'Vereinbarter Preis (€)' : 'Preis Leistung (€)'}
-          type="number"
-          value={preis}
-          onChange={(e) => setPreis(e.target.value)}
-        />
-        <Textarea label="Absprachen" value={absprachen} onChange={(e) => setAbsprachen(e.target.value)} rows={3} />
-        <Textarea label="Notizen (intern)" value={notizen} onChange={(e) => setNotizen(e.target.value)} rows={3} />
+        <MockField label={mode === 'gewerk' ? 'Vereinbarter Preis (€)' : 'Preis Leistung (€)'}><MockInput type="number" value={preis} onChange={(e) => setPreis(e.target.value)} /></MockField>
+        <MockField label="Absprachen"><RichTextEditor value={typeof (absprachen) === 'string' ? (absprachen) : ''} onChange={(__v) => setAbsprachen(__v)} minHeight={120} aria-label="Absprachen" /></MockField>
+        <MockField label="Notizen (intern)"><RichTextEditor value={typeof (notizen) === 'string' ? (notizen) : ''} onChange={(__v) => setNotizen(__v)} minHeight={120} aria-label="Notizen (intern)" /></MockField>
       </div>
-    </>
-  )
-
-  if (isMobile) {
-    return (
-      <FormSheet open={open} onClose={onClose} breadcrumb="Auftrag" title={title} footer={footer}>
-        {body}
-      </FormSheet>
-    )
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title={title} size="md" footer={footer}>
-      {body}
-    </Modal>
+    </EditorSheet>
   )
 }

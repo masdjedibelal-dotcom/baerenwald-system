@@ -1,8 +1,10 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockTextarea } from '@/components/mock-ui/MockForm'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import { addLeadNotizRow } from '@/app/(dashboard)/anfragen/actions'
@@ -18,6 +20,8 @@ import {
 import { INDIVIDUELL_TYP_SLUG } from '@/lib/handwerker/compliance-katalog'
 import { createClient } from '@/lib/supabase'
 import type { QuickBarAction } from '@/components/vorgang/DetailQuickBar'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 const DOC_ACCEPT =
   '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
@@ -64,6 +68,7 @@ export function useDetailQuickActions({
   dokument?: DetailQuickDokumentTarget | null
   onSaved?: () => void
 }): { quickBar: QuickBarAction[]; sheets: ReactNode } {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [notizOpen, setNotizOpen] = useState(false)
   const [notizText, setNotizText] = useState('')
   const [pending, setPending] = useState(false)
@@ -92,7 +97,7 @@ export function useDetailQuickActions({
     if (!notiz || pending) return
     const text = notizText.trim()
     if (!text) {
-      toast.error('Bitte Notiz eingeben.')
+      applyFieldErrors({ _form: TOAST.bitte_notiz_eingeben })
       return
     }
     setPending(true)
@@ -101,13 +106,13 @@ export function useDetailQuickActions({
         if (notiz.kind === 'lead') {
           const r = await addLeadNotizRow(notiz.leadId, text)
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
         } else if (notiz.kind === 'kunde') {
           const r = await addKundenNotiz(notiz.kundeId, text)
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
         } else if (notiz.kind === 'handwerker') {
@@ -116,7 +121,7 @@ export function useDetailQuickActions({
             : text
           const r = await updateHandwerkerNotizen(notiz.handwerkerId, next)
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
         } else {
@@ -125,11 +130,11 @@ export function useDetailQuickActions({
             : text
           const r = await updateAuftragNotizen(notiz.auftragId, next)
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
         }
-        toast.success('Notiz gespeichert')
+        toast.success(TOAST.notiz_gespeichert)
         setNotizOpen(false)
         setNotizText('')
         onSaved?.()
@@ -203,6 +208,7 @@ export function useDetailQuickActions({
                     upsert: false,
                     contentType: file.type || undefined,
                   })
+                if (upErr) logDbError('components/vorgang/DetailQuickActions:query', upErr)
                 if (upErr) throw new Error(upErr.message)
                 const ins = await insertPartnerDokument({
                   handwerker_id: dokument.handwerkerId,
@@ -249,7 +255,7 @@ export function useDetailQuickActions({
           }
         )
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+        toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
       } finally {
         setUploading(false)
         if (fileRef.current) fileRef.current.value = ''
@@ -312,33 +318,23 @@ export function useDetailQuickActions({
         title="Notiz schreiben"
         size="md"
         dirty={notizText.trim().length > 0}
-        footer={
-          <div className="phase-sheet-footer">
-            <MockBtn kind="ghost" disabled={pending} onClick={() => setNotizOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn
-              kind="primary"
-              icon={pending ? undefined : 'check'}
-              disabled={pending || !notizText.trim()}
-              onClick={saveNotiz}
-            >
-              {pending ? 'Speichern…' : 'Speichern'}
-            </MockBtn>
-          </div>
-        }
+        secondary={{
+          label: 'Abbrechen',
+          onClick: () => setNotizOpen(false),
+          disabled: pending,
+          kind: 'ghost',
+        }}
+        primary={{
+          label: pending ? 'Speichern…' : 'Speichern',
+          onClick: saveNotiz,
+          disabled: pending || !notizText.trim(),
+          busy: pending,
+        }}
       >
-        <label className="field">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                <label className="field">
           <span>Notiz</span>
-          <textarea
-            className="input"
-            rows={6}
-            value={notizText}
-            onChange={(e) => setNotizText(e.target.value)}
-            placeholder="Kurz notieren…"
-            autoFocus
-            disabled={pending}
-          />
+          <MockTextarea rows={6} value={notizText} onChange={(e) => setNotizText(e.target.value)} placeholder="Kurz notieren…" autoFocus disabled={pending} />
         </label>
       </EditorSheet>
     </>

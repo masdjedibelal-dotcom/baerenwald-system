@@ -1,7 +1,8 @@
 'use client'
 
-import { useId, useRef, useState, type ReactNode } from 'react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -27,26 +28,17 @@ export function MockInfoTip({
 
   return (
     <span className={cn('mock-info-tip', className)} style={{ position: 'relative', display: 'inline-flex' }}>
-      <button
-        type="button"
-        className="mock-info-tip__btn"
-        aria-label={label}
-        aria-expanded={open}
-        aria-controls={id}
-        title={typeof tip === 'string' ? tip : label}
-        onClick={(e) => {
+      <MockBtn className="mock-info-tip__btn" type="button" aria-label={label} aria-expanded={open} aria-controls={id} title={typeof tip === 'string' ? tip : label} onClick={(e) => {
           e.stopPropagation()
           setOpen((o) => !o)
-        }}
-        onBlur={() => {
+        }} onBlur={() => {
           // Delay: Klick auf Tip-Inhalt noch erlauben
           window.setTimeout(() => {
             if (!tipRef.current?.contains(document.activeElement)) setOpen(false)
           }, 0)
-        }}
-      >
+        }}>
         <MockIcon ctx="btn" n="info-circle" size={15} />
-      </button>
+      </MockBtn>
       {open ? (
         <span
           ref={tipRef}

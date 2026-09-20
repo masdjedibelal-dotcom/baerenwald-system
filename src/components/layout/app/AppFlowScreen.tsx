@@ -70,7 +70,7 @@ export function AppFlowStepDots({
         <span
           key={i}
           className={cn(
-            'rounded-full transition-all',
+            'rounded-pill transition-all',
             compact ? 'h-1' : 'h-1.5',
             i + 1 === current
               ? compact

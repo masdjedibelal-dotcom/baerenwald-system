@@ -1,9 +1,15 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+<<<<<<< Updated upstream
+=======
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import {
   istEigeneUnterlageTyp,
   standardDokumente,
@@ -82,10 +88,10 @@ export function HandwerkerComplianceUnterlagenTable({
           </h2>
         </div>
         {hochgeladen.length > 0 ? (
-          <Button type="button" variant="primary" size="sm" onClick={openAdd}>
+          <MockBtn type="button" kind="primary" sm onClick={openAdd}>
             <MockIcon ctx="btn" n="upload" size={14} />
             Upload
-          </Button>
+          </MockBtn>
         ) : null}
       </div>
 
@@ -94,10 +100,10 @@ export function HandwerkerComplianceUnterlagenTable({
           <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
             Noch keine Unterlagen.
           </p>
-          <Button type="button" variant="primary" onClick={openAdd}>
+          <MockBtn type="button" kind="primary" onClick={openAdd}>
             <MockIcon ctx="btn" n="upload" size={16} />
             Dokument oder Foto hochladen
-          </Button>
+          </MockBtn>
         </div>
       ) : (
         <div className="dok-list">
@@ -129,7 +135,7 @@ export function HandwerkerComplianceUnterlagenTable({
                 </div>
                 <span
                   className={cn(
-                    'dok-card__tag shrink-0 self-center text-center',
+                    'dok-mobile__tag shrink-0 self-center text-center',
                     status.tone === 'ok' && 'is-kunde',
                     (status.tone === 'warn' || status.tone === 'neutral') && 'is-warn',
                     status.tone === 'bad' && 'is-bad'
@@ -157,7 +163,7 @@ export function HandwerkerComplianceUnterlagenTable({
         onSaved={() => {
           setSheetOpen(false)
           setEditDoc(null)
-          router.refresh()
+          afterServerActionRefresh()
         }}
       />
     </div>

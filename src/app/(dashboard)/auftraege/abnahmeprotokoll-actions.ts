@@ -1,8 +1,15 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { planAbnahmeWrite } from '@/lib/status/write-auftrag-status'
 import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
 import type { AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import {
@@ -15,6 +22,7 @@ import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailText, type MailAnrede } from '@/lib/mail/anrede'
+import { buildSubject } from '@/lib/mail/build-subject'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import { renderAbnahmeProtokollPdfBuffer } from '@/lib/auftraege/render-abnahme-protokoll-pdf'
 import {
@@ -46,6 +54,7 @@ import {
   notifyPartnerUnified,
   partnerVorgangLink,
 } from '@/lib/partner/notify-partner-unified'
+import { C } from '@/lib/tokens/colors'
 
 async function getAuthUserId(): Promise<string | null> {
   const supabase = createClient()
@@ -59,7 +68,7 @@ function prepareAbnahmePayload(input: {
   punkte: AbnahmePunkt[]
   maengel: AbnahmeMangel[]
 }): { punkte: AbnahmePunkt[]; maengel: AbnahmeMangel[] } {
-  const punkteNorm = input.punkte.map((p) => {
+const punkteNorm = input.punkte.map((p) => {
     const st = String(p.status ?? 'offen').toLowerCase()
     const status =
       st === 'ok' || st === 'mangel' || st === 'offen' ? (st as AbnahmePunkt['status']) : 'offen'
@@ -93,6 +102,7 @@ async function persistAbnahmeSignatureUrls(
     const { error } = await supabaseAdmin.storage
       .from('protokolle')
       .upload(path, buf, { contentType: mime, upsert: true })
+    if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:protokolle', error)
     if (error) {
       console.warn('[persistAbnahmeSignatureUrls]', kind, error.message)
       return s
@@ -184,10 +194,11 @@ async function persistProtokollPdfForRow(
       updated_at: new Date().toISOString(),
     })
     .eq('id', protokollId)
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
 
   if (error) return { ok: false, message: error.message }
 
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('auftraege')
     .update({
       abnahme_protokoll_url: stored.publicUrl,
@@ -195,6 +206,7 @@ async function persistProtokollPdfForRow(
       updated_at: new Date().toISOString(),
     })
     .eq('id', auftragId)
+  if (__dbErr1) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr1)
 
   return { ok: true, publicUrl: stored.publicUrl }
 }
@@ -244,6 +256,7 @@ async function persistPdf(auftragId: string, buffer: Buffer): Promise<
   const { error: upErr } = await supabaseAdmin.storage
     .from('protokolle')
     .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
+  if (upErr) logDbError('app/auftraege/abnahmeprotokoll-actions:protokolle', upErr)
   if (upErr) return { ok: false, message: upErr.message }
 
   const { data: pub } = supabaseAdmin.storage.from('protokolle').getPublicUrl(path)
@@ -328,6 +341,7 @@ export async function previewAbnahmeprotokollPdf(input: {
         updated_at: new Date().toISOString(),
       })
       .eq('id', draft.protokollId)
+    if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
     if (error) return { ok: false, message: error.message }
 
     return {
@@ -379,11 +393,12 @@ export async function getAbnahmeprotokollMailDefaults(
     }
   | { ok: false; message: string }
 > {
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, kunden(name, typ)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', error)
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
   const kunde = auf.kunden as { name?: string; typ?: string | null } | null
   const kundeName = kunde?.name?.trim() || 'Kundin/Kunde'
@@ -410,7 +425,10 @@ export async function getAbnahmeprotokollMailDefaults(
   return {
     ok: true,
     defaultAnrede,
-    defaultBetreff: `Abnahmeprotokoll — ${kundeName}`,
+    defaultBetreff: buildSubject({
+      objekt: kundeName,
+      ereignis: 'Abnahmeprotokoll',
+    }),
     defaultNachricht: defaultAbnahmeprotokollNachricht(defaultAnrede, {
       bitteZurueckUnterschreiben,
     }),
@@ -435,11 +453,12 @@ async function buildAbnahmeMail(input: {
   nachricht: string
   anrede: 'du' | 'sie'
 }) {
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, kunden(name, email)')
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', error)
   if (!auf) return { ok: false as const, message: 'Auftrag nicht gefunden' }
   const kunde = auf.kunden as { name?: string; email?: string } | null
   if (!kunde?.email?.trim()) return { ok: false as const, message: 'Keine Kunden-E-Mail' }
@@ -450,8 +469,8 @@ async function buildAbnahmeMail(input: {
   const textHtml = escapeHtml(input.nachricht.trim()).replace(/\n/g, '<br/>')
   const branding = await getMailBranding(supabaseAdmin)
   const html = mailHtmlBase(
-    `<p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 14px;">${escapeHtml(anredeLine)}</p>
-    <p style="font-size:15px;color:#374151;line-height:1.6;margin:0;">${textHtml}</p>`,
+    `<p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 14px;">${escapeHtml(anredeLine)}</p>
+    <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0;">${textHtml}</p>`,
     input.betreff.trim(),
     branding,
     undefined,
@@ -550,6 +569,7 @@ export async function saveAndSendAbnahmeprotokoll(input: {
       .from('auftrag_abnahmeprotokolle')
       .update(row)
       .eq('id', existing.id)
+    if (upErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', upErr)
     if (upErr) return { ok: false, message: upErr.message }
   } else {
     const { data: inserted, error: insErr } = await supabaseAdmin
@@ -561,6 +581,7 @@ export async function saveAndSendAbnahmeprotokoll(input: {
       })
       .select('id')
       .single()
+    if (insErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', insErr)
     if (insErr) {
       if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
         return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
@@ -580,7 +601,7 @@ export async function saveAndSendAbnahmeprotokoll(input: {
     })
   }
 
-  await supabaseAdmin
+  const { error: __dbErr2 } = await supabaseAdmin
     .from('auftraege')
     .update({
       abnahme_protokoll_url: stored.publicUrl,
@@ -589,6 +610,7 @@ export async function saveAndSendAbnahmeprotokoll(input: {
       /* Kein Status-Bump: Abnahme-PDF an Kunden ≠ Auftrag erledigt/abgeschlossen */
     })
     .eq('id', input.auftragId)
+  if (__dbErr2) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr2)
 
   const mail = await sendMail({
     typ: 'abnahmeprotokoll',
@@ -630,7 +652,7 @@ export async function saveAndSendAbnahmeprotokoll(input: {
     console.warn('[saveAndSendAbnahmeprotokoll] Unterlagen-Verteilung:', e)
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return {
     ok: true,
     pdfBase64: built.buffer.toString('base64'),
@@ -743,6 +765,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
       .from('auftrag_abnahmeprotokolle')
       .update(rowPatch)
       .eq('id', existing.id)
+    if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
     if (error) return { ok: false, message: error.message }
   } else {
     const { data: inserted, error: insErr } = await supabaseAdmin
@@ -753,6 +776,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
       })
       .select('id')
       .single()
+    if (insErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', insErr)
 
     if (insErr) {
       if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
@@ -764,22 +788,26 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
   }
 
   if (!input.skipAuftragStatusBump) {
-    await supabaseAdmin
+    const base = {
+      abnahme_protokoll_url: stored.publicUrl,
+      abnahme_datum: input.abnahmeDatum.slice(0, 10),
+      updated_at: new Date().toISOString(),
+    }
+    const patch =
+      !hatMaengel && ebene === 'gesamt' ? { ...base, ...planAbnahmeWrite({ fortschritt: 85 }) } : base
+    const { error: __dbErr3 } = await supabaseAdmin
       .from('auftraege')
-      .update({
-        abnahme_protokoll_url: stored.publicUrl,
-        abnahme_datum: input.abnahmeDatum.slice(0, 10),
-        updated_at: new Date().toISOString(),
-        ...(!hatMaengel && ebene === 'gesamt' ? { status: 'abnahme', fortschritt: 85 } : {}),
-      })
+      .update(patch)
       .eq('id', input.auftragId)
+    if (__dbErr3) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr3)
   } else {
-    await supabaseAdmin
+    const { error: __dbErr4 } = await supabaseAdmin
       .from('auftraege')
       .update({
         updated_at: new Date().toISOString(),
       })
       .eq('id', input.auftragId)
+    if (__dbErr4) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr4)
   }
 
   await afterAbnahmePersist({
@@ -819,7 +847,7 @@ export async function saveAbnahmeprotokollPdfOnly(input: {
     }
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
 
   return {
     ok: true,
@@ -934,10 +962,11 @@ export async function saveAbnahmeAndAbschliessen(input: {
         if (!mail.success) {
           sendWarning = mail.error ?? 'E-Mail fehlgeschlagen'
         } else {
-          await supabaseAdmin
+          const { error: __dbErr5 } = await supabaseAdmin
             .from('auftrag_abnahmeprotokolle')
             .update({ an_kunde_gesendet_at: new Date().toISOString() })
             .eq('id', saved.protokollId)
+          if (__dbErr5) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', __dbErr5)
 
           await insertAuftragTimelineEvent({
             auftrag_id: input.auftragId,
@@ -967,23 +996,21 @@ export async function saveAbnahmeAndAbschliessen(input: {
     }
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
-  revalidatePath('/auftraege')
-  revalidatePath('/vorgaenge')
-
+  revalidateAuftragDetail(input.auftragId)
   return { ...saved, previousStatus, sentToKunde, sendWarning }
 }
 
 async function syncAuftragAbnahmeDenorm(auftragId: string): Promise<void> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
     .select('abnahme_datum, pdf_url')
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
 
-  await supabaseAdmin
+  const { error: __dbErr6 } = await supabaseAdmin
     .from('auftraege')
     .update({
       abnahme_protokoll_url: (data?.pdf_url as string | null) ?? null,
@@ -991,6 +1018,7 @@ async function syncAuftragAbnahmeDenorm(auftragId: string): Promise<void> {
       updated_at: new Date().toISOString(),
     })
     .eq('id', auftragId)
+  if (__dbErr6) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr6)
 }
 
 export type AbnahmeprotokollListeEintrag = {
@@ -1016,14 +1044,16 @@ export async function loadAbnahmeprotokolleListe(
     )
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
 
   if (error || !data?.length) {
     // Fallback ohne neue Spalten
-    const { data: legacy } = await supabaseAdmin
+    const { data: legacy, error } = await supabaseAdmin
       .from('auftrag_abnahmeprotokolle')
       .select('id, abnahme_datum, notizen, pdf_url, created_at, an_kunde_gesendet_at')
       .eq('auftrag_id', auftragId)
       .order('created_at', { ascending: false })
+    if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
     if (!legacy?.length) return []
     return legacy.map((row) => ({
       id: row.id as string,
@@ -1068,11 +1098,12 @@ export async function deleteAbnahmeprotokoll(
     .delete()
     .eq('id', protokollId)
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
 
   if (error) return { ok: false, message: error.message }
 
   await syncAuftragAbnahmeDenorm(auftragId)
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -1245,6 +1276,7 @@ export async function saveAbnahmeprotokollDraft(input: {
         .from('auftrag_abnahmeprotokolle')
         .update(rowPatch)
         .eq('id', target.id)
+      if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
       if (error) return { ok: false, message: error.message }
       protokollId = target.id
     } else {
@@ -1259,6 +1291,7 @@ export async function saveAbnahmeprotokollDraft(input: {
         })
         .select('id')
         .single()
+      if (insErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', insErr)
       if (insErr) {
         if (insErr.code === 'PGRST205' || insErr.code === '42P01') {
           return { ok: false, message: 'Tabelle auftrag_abnahmeprotokolle fehlt — Migration ausführen.' }
@@ -1269,13 +1302,14 @@ export async function saveAbnahmeprotokollDraft(input: {
     }
 
     // Nur Datum merken — kein Status „abnahme“ / keine Punch-List beim reinen Entwurf
-    await supabaseAdmin
+    const { error: __dbErr7 } = await supabaseAdmin
       .from('auftraege')
       .update({
         abnahme_datum: input.abnahmeDatum.slice(0, 10),
         updated_at: now,
       })
       .eq('id', input.auftragId)
+    if (__dbErr7) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr7)
 
     if (input.regeneratePdf && protokollId) {
       const pdf = await persistProtokollPdfForRow(input.auftragId, protokollId, {
@@ -1289,7 +1323,7 @@ export async function saveAbnahmeprotokollDraft(input: {
       if (!pdf.ok) return pdf
     }
 
-    revalidatePath(`/auftraege/${input.auftragId}`)
+    revalidateAuftragDetail(input.auftragId)
     return { ok: true, protokollId, meta }
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Entwurf speichern fehlgeschlagen'
@@ -1322,6 +1356,7 @@ export async function loadOffenenAbnahmeEntwurf(
     .in('freigabe_status', ['entwurf', 'abgelehnt'])
     .order('updated_at', { ascending: false })
     .limit(10)
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
 
   if (error || !data?.length) return null
 
@@ -1392,6 +1427,7 @@ export async function updateAbnahmeMaengel(input: {
       updated_at: now,
     })
     .eq('id', summary.id)
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
 
   if (error) return { ok: false, message: error.message }
 
@@ -1427,7 +1463,7 @@ export async function updateAbnahmeMaengel(input: {
   })
   if (!pdf.ok) return pdf
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -1452,7 +1488,7 @@ export async function regenerateAbnahmeprotokollPdf(
   })
   if (!pdf.ok) return pdf
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true, publicUrl: pdf.publicUrl }
 }
 
@@ -1460,12 +1496,13 @@ export async function regenerateAbnahmeprotokollPdf(
 export async function loadAbnahmeHwFreigabeZeilen(
   auftragId: string
 ): Promise<AbnahmeHwFreigabeZeile[]> {
-  const { data: zuweisungen } = await supabaseAdmin
+  const { data: zuweisungen, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select(
       'handwerker_id, abnahme_signiert_am, abnahme_protokoll_id, handwerker:handwerker_id(id, name)'
     )
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_handwerker', error)
 
   if (!zuweisungen?.length) return []
 
@@ -1480,7 +1517,7 @@ export async function loadAbnahmeHwFreigabeZeilen(
     meta: unknown
     created_at: string
   }
-  const { data: protokolle } = await supabaseAdmin
+  const { data: protokolle, error: error2 } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
     .select(
       'id, handwerker_id, freigabe_status, abnahme_datum, pdf_url, maengel, punkte, meta, created_at'
@@ -1488,6 +1525,7 @@ export async function loadAbnahmeHwFreigabeZeilen(
     .eq('auftrag_id', auftragId)
     .eq('ebene', 'handwerker')
     .order('created_at', { ascending: false })
+  if (error2) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error2)
 
   const protRows = (protokolle ?? []) as ProtRow[]
   const latestByHw = new Map<string, ProtRow>()
@@ -1561,6 +1599,7 @@ export async function freigebenAbnahmeprotokoll(
     .eq('id', protokollId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (loadErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', loadErr)
   if (loadErr || !row) return { ok: false, message: 'Protokoll nicht gefunden.' }
 
   const status = normalizeAbnahmeFreigabeStatus(row.freigabe_status)
@@ -1575,7 +1614,7 @@ export async function freigebenAbnahmeprotokoll(
     return { ok: false, message: 'Protokoll kann nicht freigegeben werden.' }
   }
 
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
     .update({
       freigabe_status: 'freigegeben',
@@ -1587,7 +1626,8 @@ export async function freigebenAbnahmeprotokoll(
       updated_at: now,
     })
     .eq('id', protokollId)
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,
@@ -1605,11 +1645,12 @@ export async function freigebenAbnahmeprotokoll(
   const gate = await getGesamtabnahmeGate(auftragId)
 
   if (hwId) {
-    const { data: auftrag } = await supabaseAdmin
+    const { data: auftrag, error } = await supabaseAdmin
       .from('auftraege')
       .select('titel, projekt_name, lead_id')
       .eq('id', auftragId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', error)
     const projekt =
       String(auftrag?.titel ?? auftrag?.projekt_name ?? '').trim() || 'Auftrag'
     await notifyPartnerUnified({
@@ -1622,8 +1663,7 @@ export async function freigebenAbnahmeprotokoll(
       sendMail: true,
     })
 
-    const [{ data: hw }, { data: protoFull }, { data: protokolle }] =
-      await Promise.all([
+    const [{ data: hw }, { data: protoFull }, { data: protokolle }] = await Promise.all([
         supabaseAdmin.from('handwerker').select('name').eq('id', hwId).maybeSingle(),
         supabaseAdmin
           .from('auftrag_abnahmeprotokolle')
@@ -1636,7 +1676,6 @@ export async function freigebenAbnahmeprotokoll(
           .eq('auftrag_id', auftragId)
           .eq('handwerker_id', hwId),
       ])
-
     const punkteRaw = Array.isArray(protoFull?.punkte) ? protoFull.punkte : []
     const leistungen = punkteRaw
       .map((p: unknown) => {
@@ -1664,21 +1703,25 @@ export async function freigebenAbnahmeprotokoll(
   const bereitZumAbschliessen = hatHwAbnahmeZurAbschlussVorschau(gate.zeilen)
   if (gate.ok) {
     /* Status „abnahme“ → Primary-CTA bleibt grün „Auftrag abschließen“ */
+    const abnahmePatch = planAbnahmeWrite()
     const { error: stErr } = await supabaseAdmin
       .from('auftraege')
-      .update({ status: 'abnahme', updated_at: new Date().toISOString() })
+      .update(abnahmePatch)
       .eq('id', auftragId)
       .in('status', ['in_arbeit', 'offen', 'geplant', 'aktiv', 'abnahme'])
+    if (stErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', stErr)
     if (stErr && /updated_at/i.test(stErr.message)) {
-      await supabaseAdmin
+      const { updated_at: _ua, ...abnahmeOhneTs } = abnahmePatch
+      const { error: __dbErr8 } = await supabaseAdmin
         .from('auftraege')
-        .update({ status: 'abnahme' })
+        .update(abnahmeOhneTs)
         .eq('id', auftragId)
         .in('status', ['in_arbeit', 'offen', 'geplant', 'aktiv', 'abnahme'])
+      if (__dbErr8) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr8)
     }
   }
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true, bereitZumAbschliessen }
 }
 
@@ -1697,9 +1740,10 @@ export async function ablehnenAbnahmeprotokoll(input: {
     .eq('id', input.protokollId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
+  if (loadErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', loadErr)
   if (loadErr || !row) return { ok: false, message: 'Protokoll nicht gefunden.' }
 
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
     .update({
       freigabe_status: 'abgelehnt',
@@ -1711,18 +1755,20 @@ export async function ablehnenAbnahmeprotokoll(input: {
       updated_at: now,
     })
     .eq('id', input.protokollId)
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   const hwId = String(row.handwerker_id ?? '').trim()
   /* Signatur zurücksetzen — Partner kann erneut „Auftrag abschließen“ */
   if (hwId) {
-    await supabaseAdmin
+    const { error: __dbErr9 } = await supabaseAdmin
       .from('auftrag_handwerker')
       .update({
         abnahme_signiert_am: null,
       })
       .eq('auftrag_id', input.auftragId)
       .eq('handwerker_id', hwId)
+    if (__dbErr9) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_handwerker', __dbErr9)
   }
 
   try {
@@ -1746,11 +1792,12 @@ export async function ablehnenAbnahmeprotokoll(input: {
   })
 
   if (hwId) {
-    const { data: auftrag } = await supabaseAdmin
+    const { data: auftrag, error } = await supabaseAdmin
       .from('auftraege')
       .select('titel, projekt_name')
       .eq('id', input.auftragId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', error)
     const projekt =
       String(auftrag?.titel ?? auftrag?.projekt_name ?? '').trim() || 'Auftrag'
     await notifyPartnerUnified({
@@ -1764,7 +1811,7 @@ export async function ablehnenAbnahmeprotokoll(input: {
     })
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -1873,7 +1920,7 @@ export async function abschliessenMitHwProtokoll(input: {
   if (!hatHwAbnahmeZurAbschlussVorschau(zeilen)) {
     return {
       ok: false,
-      message: 'Kein Handwerker-Abnahmeprotokoll vorhanden — bitte manuell erstellen.',
+      message: 'Kein Partner-Abnahmeprotokoll vorhanden — bitte manuell erstellen.',
     }
   }
 
@@ -1883,7 +1930,7 @@ export async function abschliessenMitHwProtokoll(input: {
     return {
       ok: false,
       message:
-        'Es gibt abgelehnte Teilabnahmen — Handwerker muss erneut abschließen, bevor der Auftrag beendet werden kann.',
+        'Es gibt abgelehnte Teilabnahmen — Partner muss erneut abschließen, bevor der Auftrag beendet werden kann.',
     }
   }
 
@@ -1906,6 +1953,7 @@ export async function abschliessenMitHwProtokoll(input: {
         updated_at: now,
       })
       .eq('id', z.protokollId!)
+    if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
     if (error) return { ok: false, message: error.message }
   }
 
@@ -1917,7 +1965,7 @@ export async function abschliessenMitHwProtokoll(input: {
         toFreigeben.length === 1
           ? 'Teilabnahme freigegeben'
           : 'Teilabnahmen freigegeben',
-      beschreibung: 'Freigabe beim Auftrag abschließen (Handwerker-Protokoll).',
+      beschreibung: 'Freigabe beim Auftrag abschließen (Partner-Protokoll).',
       erstellt_von: uid,
       sichtbar_fuer_kunde: false,
     })
@@ -1956,7 +2004,7 @@ export async function abschliessenMitHwProtokoll(input: {
     summary = (await loadAbnahmeprotokollSummary(input.auftragId, summary.id)) ?? summary
   }
 
-  await supabaseAdmin
+  const { error: __dbErr10 } = await supabaseAdmin
     .from('auftrag_abnahmeprotokolle')
     .update({
       freigabe_status: 'freigegeben',
@@ -1966,6 +2014,7 @@ export async function abschliessenMitHwProtokoll(input: {
       updated_at: now,
     })
     .eq('id', summary.id)
+  if (__dbErr10) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', __dbErr10)
 
   await syncAuftragAbnahmeDenorm(input.auftragId)
 
@@ -2037,10 +2086,11 @@ export async function abschliessenMitHwProtokoll(input: {
           if (!mail.success) {
             sendWarning = mail.error ?? 'E-Mail fehlgeschlagen'
           } else {
-            await supabaseAdmin
+            const { error: __dbErr11 } = await supabaseAdmin
               .from('auftrag_abnahmeprotokolle')
               .update({ an_kunde_gesendet_at: new Date().toISOString() })
               .eq('id', summary.id)
+            if (__dbErr11) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', __dbErr11)
 
             await insertAuftragTimelineEvent({
               auftrag_id: input.auftragId,
@@ -2073,10 +2123,7 @@ export async function abschliessenMitHwProtokoll(input: {
     }
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
-  revalidatePath('/auftraege')
-  revalidatePath('/vorgaenge')
-
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, sentToKunde, sendWarning, publicUrl }
 }
 
@@ -2115,9 +2162,10 @@ async function regenerateAbnahmeprotokollPdfForId(
       updated_at: new Date().toISOString(),
     })
     .eq('id', protokollId)
+  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
   if (error) return { ok: false, message: error.message }
 
-  await supabaseAdmin
+  const { error: __dbErr12 } = await supabaseAdmin
     .from('auftraege')
     .update({
       abnahme_protokoll_url: stored.publicUrl,
@@ -2125,6 +2173,7 @@ async function regenerateAbnahmeprotokollPdfForId(
       updated_at: new Date().toISOString(),
     })
     .eq('id', auftragId)
+  if (__dbErr12) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr12)
 
   return {
     ok: true,

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 
 import { recordHwAuftragErledigtGemeldet } from '@/lib/auftraege/record-hw-auftrag-erledigt'
@@ -42,11 +43,12 @@ export async function POST(req: Request) {
     )
   }
 
-  const { data: auf } = await supabaseAdmin
+  const {data: auf, error} = await supabaseAdmin
     .from('auftraege')
     .select('id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/api/internal/partner-auftrag-erledigt/route:auftraege', error)
   if (!auf) {
     return NextResponse.json({ ok: false, error: 'Auftrag unbekannt' }, { status: 404 })
   }

@@ -1,6 +1,15 @@
+import { formatEuro } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
+import {
+  PDF_BOTTOM_MARGIN_MM,
+  PDF_FS,
+  pdfAbsenderFromReportFirm,
+  pdfFussPuppeteerTemplate,
+  pdfShellCss,
+} from '@/lib/pdf/chrome'
 /**
- * Statisches HTML für Angebots-PDF (Druck/A4).
- * Daten kommen aus dem CRM (Siehe angebot-html-payload.ts → buildAngebotHtml Aufruf).
+ * Statisches HTML für Angebots-/Rechnungs-PDF (Druck/A4).
+ * Beleg-Familie — gemeinsame Chrome-Bausteine in `lib/pdf/chrome`.
  */
 
 import {
@@ -26,14 +35,14 @@ import {
 import { kiVisualisierungPdfHtml } from '@/lib/visualize/pdf-html'
 import type { KiVizPdfPage } from '@/lib/visualize/pdf-data'
 
-const PROJEKT_ACCENT = '#1A3D2B'
-const PROJEKT_TINT = '#F3F7F4'
-const TEXT_PRIMARY = '#111111'
-const TEXT_MUTED = '#333333'
-const GREEN_SUM = '#2E7D52'
+const PROJEKT_ACCENT = C.greenDark
+const PROJEKT_TINT = C.greenTint
+const TEXT_PRIMARY = C.gray900
+const TEXT_MUTED = C.grayNeutral5
+const GREEN_SUM = C.green
 
 /** Unterer PDF-Rand bei Puppeteer footerTemplate (Höhe der Fußzeile + Puffer) */
-export const ANGEBOT_PDF_BOTTOM_MARGIN_MM = 36
+export const ANGEBOT_PDF_BOTTOM_MARGIN_MM = PDF_BOTTOM_MARGIN_MM
 
 export type AngebotTemplatePosition = {
   pos: number
@@ -129,7 +138,7 @@ export type AngebotHtmlInput = {
   dokument_typ?: 'einfach' | 'projekt'
   projektbeschreibung?: string | null
   dokumentation_bilder?: Array<{ url: string; beschreibung?: string | null }> | null
-  /** Zweite Preistabelle (Variante B) */
+/** Zweite Preistabelle (Variante B) */
   variant_block?: {
     titel: string
     positionen: AngebotTemplatePosition[]
@@ -178,18 +187,11 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-function euro(n: number): string {
-  return `${n.toLocaleString('de-DE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} €`
-}
-
 const FACHBETRIEB_POS_ZEILE =
   `<span style="display:block;font-size:8pt;color:${TEXT_PRIMARY};margin-top:3pt;font-weight:400;">Ausführung durch zugelassenen Fachbetrieb</span>`
 
 const FACHBETRIEB_GLOBAL_BLOCK = `
-  <div class="avoid-fuss-overlap" style="margin:20px 0 0;padding:10pt 12pt;border:1pt solid #185FA5;border-radius:4pt;background:#F0F7FF;font-size:9pt;color:${TEXT_PRIMARY};line-height:1.55;font-weight:400;page-break-inside:avoid;">
+  <div class="avoid-fuss-overlap" style="margin:20px 0 0;padding:10pt 12pt;border:1pt solid ${C.blue3};border-radius:4pt;background:${C.blueBg2};font-size:9pt;color:${TEXT_PRIMARY};line-height:1.55;font-weight:400;page-break-inside:avoid;">
     <strong style="font-weight:700;">Hinweis zur Leistungserbringung:</strong>
     Gekennzeichnete Leistungen werden durch zugelassene und geprüfte Fachbetriebe
     unter der Projektverantwortung von Bärenwald München ausgeführt.
@@ -204,28 +206,28 @@ function positionRowHtml(p: AngebotTemplatePosition): string {
     beschPlain && beschPlain !== p.bezeichnung.trim() ? beschRaw : ''
   return `
 <tr>
-  <td style="padding:7px 6px;border-bottom:1px solid #D1D5DB;">${p.pos}</td>
-  <td style="padding:7px 6px;border-bottom:1px solid #D1D5DB;">
+  <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};">${p.pos}</td>
+  <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};">
     <strong>${esc(p.bezeichnung)}</strong>
     ${besch ? `<div style="font-size:10pt;color:${TEXT_PRIMARY};margin-top:3pt;font-weight:400;">${richTextToSafePdfHtml(besch)}</div>` : ''}
     ${p.ist_fachbetrieb ? FACHBETRIEB_POS_ZEILE : ''}
   </td>
-  <td style="padding:7px 6px;border-bottom:1px solid #D1D5DB;text-align:right;">${esc(String(p.menge))}</td>
-  <td style="padding:7px 6px;border-bottom:1px solid #D1D5DB;">${esc(p.einheit)}</td>
-  <td style="padding:7px 6px;border-bottom:1px solid #D1D5DB;text-align:right;white-space:nowrap;">${euro(p.einzelpreis_netto)}</td>
-  <td style="padding:7px 6px;border-bottom:1px solid #D1D5DB;text-align:right;white-space:nowrap;font-weight:600;">${euro(p.gesamt_netto)}</td>
+  <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};text-align:right;">${esc(String(p.menge))}</td>
+  <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};">${esc(p.einheit)}</td>
+  <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};text-align:right;white-space:nowrap;">${formatEuro(p.einzelpreis_netto)}</td>
+  <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};text-align:right;white-space:nowrap;font-weight:600;">${formatEuro(p.gesamt_netto)}</td>
 </tr>`
 }
 
 const POSITION_TABLE_HEAD = `
     <thead>
-      <tr style="background:#f3f4f6;font-size:9pt;color:${TEXT_PRIMARY};font-weight:700;">
-        <th style="padding:6px;text-align:left;width:28px;border-bottom:1px solid #9CA3AF;">Pos.</th>
-        <th style="padding:6px;text-align:left;border-bottom:1px solid #9CA3AF;">Bezeichnung</th>
-        <th style="padding:6px;text-align:right;width:48px;border-bottom:1px solid #9CA3AF;">Menge</th>
-        <th style="padding:6px;text-align:left;width:56px;border-bottom:1px solid #9CA3AF;">Einheit</th>
-        <th style="padding:6px;text-align:right;width:72px;border-bottom:1px solid #9CA3AF;">Einzel €</th>
-        <th style="padding:6px;text-align:right;width:76px;border-bottom:1px solid #9CA3AF;">Gesamt €</th>
+      <tr style="background:${C.gray100};font-size:9pt;color:${TEXT_PRIMARY};font-weight:700;">
+        <th style="padding:6px;text-align:left;width:28px;border-bottom:1px solid ${C.gray400};">Pos.</th>
+        <th style="padding:6px;text-align:left;border-bottom:1px solid ${C.gray400};">Bezeichnung</th>
+        <th style="padding:6px;text-align:right;width:48px;border-bottom:1px solid ${C.gray400};">Menge</th>
+        <th style="padding:6px;text-align:left;width:56px;border-bottom:1px solid ${C.gray400};">Einheit</th>
+        <th style="padding:6px;text-align:right;width:72px;border-bottom:1px solid ${C.gray400};">Einzel €</th>
+        <th style="padding:6px;text-align:right;width:76px;border-bottom:1px solid ${C.gray400};">Gesamt €</th>
       </tr>
     </thead>`
 
@@ -240,7 +242,7 @@ export function freitextBlockHtml(ft: { titel: string; text: string }): string {
   const titel = ft.titel.trim()
   const text = ft.text.trim()
   if (!titel && !text) return ''
-  return `<div class="angebot-freitext" style="margin:12px 0;padding:12px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:4px;page-break-inside:avoid;">
+  return `<div class="angebot-freitext" style="margin:12px 0;padding:12px 14px;background:${C.gray50};border:1px solid ${C.gray200};border-radius:4px;page-break-inside:avoid;">
     ${
       titel
         ? `<p style="margin:0 0 6px;font-size:10pt;font-weight:700;color:${PROJEKT_ACCENT};">${esc(titel)}</p>`
@@ -350,12 +352,12 @@ function kostenaufstellungPlain(
   const rows: string[] = []
   if (ka.lohn_netto > 0) {
     rows.push(
-      `<div style="display:flex;justify-content:space-between;"><span>Arbeitskosten (netto)</span><span>${euro(ka.lohn_netto)}</span></div>`
+      `<div style="display:flex;justify-content:space-between;"><span>Arbeitskosten (netto)</span><span>${formatEuro(ka.lohn_netto)}</span></div>`
     )
   }
   if (ka.material_netto > 0) {
     rows.push(
-      `<div style="display:flex;justify-content:space-between;"><span>Materialkosten (netto)</span><span>${euro(ka.material_netto)}</span></div>`
+      `<div style="display:flex;justify-content:space-between;"><span>Materialkosten (netto)</span><span>${formatEuro(ka.material_netto)}</span></div>`
     )
   }
   if (!rows.length) return ''
@@ -381,10 +383,10 @@ function rechtshinweisePlain(
       : 0
   const pStyle = `margin:0 0 8px;font-size:8pt;color:${TEXT_PRIMARY};line-height:1.55;text-align:left;font-weight:400;`
   if (rh.hinweis_35a) {
-    const betrag = lohn > 0 ? ` in Höhe von ${euro(lohn)}` : ''
+    const betrag = lohn > 0 ? ` in Höhe von ${formatEuro(lohn)}` : ''
     const materialHinweis =
       material > 0
-        ? ` (Rechnungsnetto abzüglich ausgewiesener Materialkosten von ${euro(material)}; inkl. Anfahrt und Maschinenkosten, soweit enthalten)`
+        ? ` (Rechnungsnetto abzüglich ausgewiesener Materialkosten von ${formatEuro(material)}; inkl. Anfahrt und Maschinenkosten, soweit enthalten)`
         : ` (inkl. Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten)`
     parts.push(
       `<p style="${pStyle}">
@@ -421,18 +423,18 @@ function summenBlockHtml(
     const bereitsZeilen = schluss.bereits_gezahlt
       .map(
         (z) =>
-          `<tr><td style="padding:3px 4px;">Bereits gezahlt · ${esc(z.label)}</td><td style="padding:3px 4px;text-align:right;">−${euro(z.brutto)}</td></tr>`
+          `<tr><td style="padding:3px 4px;">Bereits gezahlt · ${esc(z.label)}</td><td style="padding:3px 4px;text-align:right;">−${formatEuro(z.brutto)}</td></tr>`
       )
       .join('')
     const summenSpalte = `<div style="width:300px;flex-shrink:0;">
     <table style="width:100%;font-size:10pt;font-weight:400;">
-      <tr><td style="padding:3px 4px;">Gesamtbetrag (netto)</td><td style="padding:3px 4px;text-align:right;">${euro(schluss.netto)}</td></tr>
-      <tr><td style="padding:3px 4px;">Umsatzsteuer ${esc(String(schluss.mwst_prozent))} %</td><td style="padding:3px 4px;text-align:right;">${euro(schluss.mwst_betrag)}</td></tr>
-      <tr><td style="padding:3px 4px;font-weight:600;">Gesamtbetrag (brutto)</td><td style="padding:3px 4px;text-align:right;font-weight:600;">${euro(schluss.brutto)}</td></tr>
+      <tr><td style="padding:3px 4px;">Gesamtbetrag (netto)</td><td style="padding:3px 4px;text-align:right;">${formatEuro(schluss.netto)}</td></tr>
+      <tr><td style="padding:3px 4px;">Umsatzsteuer ${esc(String(schluss.mwst_prozent))} %</td><td style="padding:3px 4px;text-align:right;">${formatEuro(schluss.mwst_betrag)}</td></tr>
+      <tr><td style="padding:3px 4px;font-weight:600;">Gesamtbetrag (brutto)</td><td style="padding:3px 4px;text-align:right;font-weight:600;">${formatEuro(schluss.brutto)}</td></tr>
       ${bereitsZeilen}
     </table>
-    <table style="width:100%;font-size:11pt;font-weight:700;margin-top:6px;border-top:1px solid #111;">
-      <tr><td style="padding:8px 4px 4px;">Restsumme</td><td style="padding:8px 4px 4px;text-align:right;color:${GREEN_SUM};">${euro(schluss.rest_brutto)}</td></tr>
+    <table style="width:100%;font-size:11pt;font-weight:700;margin-top:6px;border-top:1px solid ${C.gray900};">
+      <tr><td style="padding:8px 4px 4px;">Restsumme</td><td style="padding:8px 4px 4px;text-align:right;color:${GREEN_SUM};">${formatEuro(schluss.rest_brutto)}</td></tr>
     </table>
   </div>`
     if (!recht) {
@@ -452,19 +454,19 @@ function summenBlockHtml(
     nachlass > 0
       ? `${
           vorNachlass != null
-            ? `<tr><td style="padding:3px 4px;">Summe Positionen (netto)</td><td style="padding:3px 4px;text-align:right;">${euro(vorNachlass)}</td></tr>`
+            ? `<tr><td style="padding:3px 4px;">Summe Positionen (netto)</td><td style="padding:3px 4px;text-align:right;">${formatEuro(vorNachlass)}</td></tr>`
             : ''
-        }<tr><td style="padding:3px 4px;">${esc(nachlassLabel)}</td><td style="padding:3px 4px;text-align:right;">−${euro(nachlass)}</td></tr>`
+        }<tr><td style="padding:3px 4px;">${esc(nachlassLabel)}</td><td style="padding:3px 4px;text-align:right;">−${formatEuro(nachlass)}</td></tr>`
       : ''
   const summenSpalte = `<div style="width:300px;flex-shrink:0;">
     ${kostenaufstellungPlain(ka, true)}
     <table style="width:100%;font-size:10pt;font-weight:400;">
       ${nachlassZeilen}
-      <tr><td style="padding:3px 4px;">Zwischensumme (netto)</td><td style="padding:3px 4px;text-align:right;">${euro(s.netto)}</td></tr>
-      <tr><td style="padding:3px 4px;">Umsatzsteuer ${esc(String(s.mwst_prozent))} %</td><td style="padding:3px 4px;text-align:right;">${euro(s.mwst_betrag)}</td></tr>
+      <tr><td style="padding:3px 4px;">Zwischensumme (netto)</td><td style="padding:3px 4px;text-align:right;">${formatEuro(s.netto)}</td></tr>
+      <tr><td style="padding:3px 4px;">Umsatzsteuer ${esc(String(s.mwst_prozent))} %</td><td style="padding:3px 4px;text-align:right;">${formatEuro(s.mwst_betrag)}</td></tr>
     </table>
-    <table style="width:100%;font-size:11pt;font-weight:700;margin-top:6px;border-top:1px solid #111;">
-      <tr><td style="padding:8px 4px 4px;">Gesamtbetrag</td><td style="padding:8px 4px 4px;text-align:right;color:${GREEN_SUM};">${euro(s.brutto)}</td></tr>
+    <table style="width:100%;font-size:11pt;font-weight:700;margin-top:6px;border-top:1px solid ${C.gray900};">
+      <tr><td style="padding:8px 4px 4px;">Gesamtbetrag</td><td style="padding:8px 4px 4px;text-align:right;color:${GREEN_SUM};">${formatEuro(s.brutto)}</td></tr>
     </table>
   </div>`
   if (!recht) {
@@ -509,13 +511,13 @@ function mailAnredeAusProps(props: AngebotHtmlInput): AngebotMailAnrede {
 
 
 function angebotUnterschriftFelderInnerHtml(): string {
-  return `<div style="display:flex;gap:28px;align-items:flex-end;width:100%;font-size:10pt;color:#111;">
+  return `<div style="display:flex;gap:28px;align-items:flex-end;width:100%;font-size:10pt;color:${C.gray900};">
       <div style="flex:1;min-width:0;">
-        <div style="border-bottom:1px solid #D1D5DB;height:32px;"></div>
+        <div style="border-bottom:1px solid ${C.gray300};height:32px;"></div>
         <div style="font-size:8pt;color:${TEXT_MUTED};margin-top:5px;font-weight:400;text-align:left;">Ort und Datum</div>
       </div>
       <div style="flex:1;min-width:0;">
-        <div style="border-bottom:1px solid #D1D5DB;height:32px;"></div>
+        <div style="border-bottom:1px solid ${C.gray300};height:32px;"></div>
         <div style="font-size:8pt;color:${TEXT_MUTED};margin-top:5px;font-weight:400;text-align:left;">Unterschrift</div>
       </div>
     </div>`
@@ -528,7 +530,7 @@ function angebotAnnahmeCardHtml(props: AngebotHtmlInput): string {
   if (!showHinweis) return ''
   const anrede = mailAnredeAusProps(props)
   const text = ANGEBOT_ANNAHME_HINWEIS[anrede]
-  const cardStyle = `margin-top:18px;padding:12px 14px;border:1px solid #D1D5DB;border-radius:2px;font-size:10pt;line-height:1.55;color:${TEXT_PRIMARY};font-weight:400;page-break-inside:avoid;`
+  const cardStyle = `margin-top:18px;padding:12px 14px;border:1px solid ${C.gray300};border-radius:2px;font-size:10pt;line-height:1.55;color:${TEXT_PRIMARY};font-weight:400;page-break-inside:avoid;`
   return `<div class="avoid-fuss-overlap angebot-annahme-card" style="${cardStyle}">
     <strong style="display:block;margin-bottom:6px;color:${TEXT_PRIMARY};font-size:11pt;font-weight:700;">Angebot annehmen</strong>
     <span style="font-weight:400;">${esc(text)}</span>
@@ -705,7 +707,7 @@ function briefEmpfaengerHtml(props: AngebotHtmlInput): string {
   const durchfuehrungRechts = ort
     ? `<div style="text-align:right;font-size:10pt;line-height:1.5;min-width:48mm;max-width:72mm;">
         <div style="font-weight:600;color:${PROJEKT_ACCENT};">Durchführung in:</div>
-        <div style="margin-top:4px;color:#111;">${esc(ort).replace(/\n/g, '<br/>')}</div>
+        <div style="margin-top:4px;color:${C.gray900};">${esc(ort).replace(/\n/g, '<br/>')}</div>
       </div>`
     : ''
   return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin:0 0 20px;">
@@ -729,7 +731,7 @@ function bankverbindungHtml(props: AngebotHtmlInput, referenzNr: string): string
   const platzhalterHinweis = bank
     ? ''
     : `<div style="margin-top:6px;font-size:8pt;color:${TEXT_MUTED};font-style:italic;font-weight:400;">Platzhalter — Bankdaten bitte unter Einstellungen pflegen.</div>`
-  return `<div style="margin-top:18px;padding:10px 12px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:2px;font-size:9pt;line-height:1.55;font-weight:400;">
+  return `<div style="margin-top:18px;padding:10px 12px;background:${C.gray50};border:1px solid ${C.gray200};border-radius:2px;font-size:9pt;line-height:1.55;font-weight:400;">
     <div style="font-weight:700;margin-bottom:6px;color:${TEXT_PRIMARY};">Bankverbindung (Überweisung)</div>
     <div style="white-space:pre-line;color:${TEXT_PRIMARY};">${inhalt}</div>
     ${platzhalterHinweis}
@@ -742,14 +744,14 @@ function projektGewerkUebersichtListeHtml(bloecke: AngebotProjektPdfBlock[]): st
   const rows = bloecke
     .map(
       (b) => `<tr>
-        <td style="padding:8px 10px;border-bottom:1px solid #E5E7EB;font-size:10pt;color:#111;">${esc(b.titel)}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid ${C.gray200};font-size:10pt;color:${C.gray900};">${esc(b.titel)}</td>
       </tr>`
     )
     .join('')
   return `<div style="margin-bottom:16px;">
-    <table style="width:100%;border-collapse:collapse;border:1px solid #E5E7EB;">
+    <table style="width:100%;border-collapse:collapse;border:1px solid ${C.gray200};">
       <thead>
-        <tr style="background:#F3F4F6;font-size:9pt;text-transform:uppercase;letter-spacing:0.04em;color:${TEXT_PRIMARY};">
+        <tr style="background:${C.gray100};font-size:9pt;text-transform:uppercase;letter-spacing:0.04em;color:${TEXT_PRIMARY};">
           <th style="padding:8px 10px;text-align:left;font-weight:600;">Gewerk</th>
         </tr>
       </thead>
@@ -759,7 +761,7 @@ function projektGewerkUebersichtListeHtml(bloecke: AngebotProjektPdfBlock[]): st
 }
 
 function summenBlockKompaktHtml(s: AngebotTemplateSummen, gruen = false): string {
-  const accent = gruen ? PROJEKT_ACCENT : '#111'
+  const accent = gruen ? PROJEKT_ACCENT : C.gray900
   const bg = gruen ? PROJEKT_TINT : 'transparent'
   const border = gruen ? `1px solid ${PROJEKT_ACCENT}` : 'none'
   const pad = gruen ? '12px 14px' : '0'
@@ -768,17 +770,17 @@ function summenBlockKompaktHtml(s: AngebotTemplateSummen, gruen = false): string
     nachlass > 0
       ? `${
           s.netto_vor_nachlass != null
-            ? `<tr><td style="padding:3px 6px;">Summe Positionen</td><td style="padding:3px 6px;text-align:right;">${euro(s.netto_vor_nachlass)}</td></tr>`
+            ? `<tr><td style="padding:3px 6px;">Summe Positionen</td><td style="padding:3px 6px;text-align:right;">${formatEuro(s.netto_vor_nachlass)}</td></tr>`
             : ''
-        }<tr><td style="padding:3px 6px;">${esc((s.nachlass_label || 'Nachlass').trim() || 'Nachlass')}</td><td style="padding:3px 6px;text-align:right;">−${euro(nachlass)}</td></tr>`
+        }<tr><td style="padding:3px 6px;">${esc((s.nachlass_label || 'Nachlass').trim() || 'Nachlass')}</td><td style="padding:3px 6px;text-align:right;">−${formatEuro(nachlass)}</td></tr>`
       : ''
   return `<div style="margin-top:12px;display:flex;flex-direction:column;align-items:flex-end;">
     <div style="width:300px;background:${bg};border:${border};border-radius:4px;padding:${pad};">
       <table style="width:100%;font-size:10pt;color:${accent};font-weight:400;">
         ${nachlassRows}
-        <tr><td style="padding:3px 6px;">Gesamtsumme netto</td><td style="padding:3px 6px;text-align:right;font-weight:600;">${euro(s.netto)}</td></tr>
-        <tr><td style="padding:3px 6px;">zzgl. ${esc(String(s.mwst_prozent))} % MwSt.</td><td style="padding:3px 6px;text-align:right;">${euro(s.mwst_betrag)}</td></tr>
-        <tr style="border-top:1px solid ${accent};"><td style="padding:8px 6px 4px;font-weight:700;">Gesamtsumme brutto</td><td style="padding:8px 6px 4px;text-align:right;font-weight:700;">${euro(s.brutto)}</td></tr>
+        <tr><td style="padding:3px 6px;">Gesamtsumme netto</td><td style="padding:3px 6px;text-align:right;font-weight:600;">${formatEuro(s.netto)}</td></tr>
+        <tr><td style="padding:3px 6px;">zzgl. ${esc(String(s.mwst_prozent))} % MwSt.</td><td style="padding:3px 6px;text-align:right;">${formatEuro(s.mwst_betrag)}</td></tr>
+        <tr style="border-top:1px solid ${accent};"><td style="padding:8px 6px 4px;font-weight:700;">Gesamtsumme brutto</td><td style="padding:8px 6px 4px;text-align:right;font-weight:700;">${formatEuro(s.brutto)}</td></tr>
       </table>
     </div>
   </div>`
@@ -796,7 +798,7 @@ function projektFotosHtml(
         .slice(0, 12)
         .map((b) => {
           const cap = b.beschreibung?.trim()
-          return `<figure style="margin:0;border:1px solid #E5E7EB;border-radius:4px;overflow:hidden;background:#fff;">
+          return `<figure style="margin:0;border:1px solid ${C.gray200};border-radius:4px;overflow:hidden;background:${C.white};">
             <img alt="" src="${esc(b.url)}" style="width:100%;height:150px;object-fit:cover;display:block;"/>
             <figcaption style="padding:8px 10px;font-size:9pt;line-height:1.45;color:${TEXT_PRIMARY};background:${PROJEKT_TINT};min-height:36px;">
               ${cap ? richTextToSafePdfHtml(cap) : `<span style="color:${TEXT_MUTED};">—</span>`}
@@ -898,37 +900,42 @@ function parseFusszeileSteuer(props: AngebotHtmlInput): { ustId: string; steuern
   return { ustId, steuernr }
 }
 
-/** Puppeteer footerTemplate — auf jeder PDF-Seite (2 Spalten + Seitenzahl). */
-export function buildAngebotPdfFooterTemplate(props: AngebotHtmlInput): string {
-  const name = firmennameZeile(props)
-  const addrLines = props.firmen_adresse
-    .split('\n')
-    .map((z) => z.trim())
-    .filter(Boolean)
+/** Puppeteer footerTemplate — chrome-Baustein (Seite n/m, Typo 3.1). */
+export function buildAngebotPdfFooterTemplate(
+  props: AngebotHtmlInput,
+  opts?: { seitenZusatz?: string | null; serviceVonBaerenwald?: boolean; variant?: 'bw-kunde' | 'hv-wl' | 'partner-bw' }
+): string {
   const { tel, email, web } = parseFusszeileKontakt(props)
   const { ustId, steuernr } = parseFusszeileSteuer(props)
-  const telDisplay = tel.startsWith('+') ? tel : `+49 ${tel.replace(/^0/, '')}`
-  const leftHtml = [
-    esc(name),
-    ...addrLines.map((l) => esc(l)),
-    `Tel.: ${esc(telDisplay)}`,
-    esc(email),
-  ].join('<br/>')
-  const rightHtml = [
-    esc(web.startsWith('www.') ? web : `www.${web}`),
-    `USt-IdNr.: ${esc(ustId)}`,
-    `Steuernummer: ${esc(steuernr)}`,
-  ].join('<br/>')
-
-  return `<div style="width:100%;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-size:7.5pt;color:${TEXT_MUTED};padding:4px 12mm 2px;border-top:0.5pt solid #E5E7EB;background:#fff;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;width:100%;">
-      <div style="flex:1;text-align:left;line-height:1.45;font-weight:400;">${leftHtml}</div>
-      <div style="flex:0 0 auto;text-align:center;line-height:1.45;font-weight:400;white-space:nowrap;padding:0 8px;">
-        Seite <span class="pageNumber"></span> von <span class="totalPages"></span>
-      </div>
-      <div style="flex:1;text-align:right;line-height:1.45;font-weight:400;">${rightHtml}</div>
-    </div>
-  </div>`
+  const telDisplay = tel
+    ? tel.startsWith('+')
+      ? tel
+      : `+49 ${tel.replace(/^0/, '')}`
+    : null
+  const website = web
+    ? web.startsWith('www.') || /^https?:/i.test(web)
+      ? web
+      : `www.${web}`
+    : null
+  const absender = pdfAbsenderFromReportFirm({
+    firmenname: props.firmenname,
+    firmen_rechtsform: props.firmen_rechtsform,
+    firmen_adresse: props.firmen_adresse,
+    firmen_logo_url: props.firmen_logo_url,
+    firmen_telefon: telDisplay,
+    firmen_email: email || null,
+    firmen_website: website,
+    firmen_steuer_footer: props.firmen_steuer_footer,
+  })
+  // Steuer aus Parser hat Vorrang (Pflichtangaben unverändert)
+  if (ustId) absender.ustId = ustId
+  if (steuernr) absender.steuernummer = steuernr
+  return pdfFussPuppeteerTemplate({
+    variant: opts?.variant ?? 'bw-kunde',
+    absender,
+    seitenZusatz: opts?.seitenZusatz,
+    serviceVonBaerenwald: opts?.serviceVonBaerenwald,
+  })
 }
 
 /** Fußzeile für HTML-Vorschau (Browser, eine Seite am Ende). */
@@ -960,40 +967,20 @@ function angebotPdfShell(
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>${esc(title)}</title>
 <style>
-  * { box-sizing: border-box; }
-  @page { size: A4; margin: 12mm 12mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 12mm; }
-  body {
-    margin: 0;
-    font-family: Arial, Helvetica, sans-serif;
-    color: ${TEXT_PRIMARY};
-    font-size: 11pt;
-    font-weight: 400;
-    padding-bottom: ${bodyPaddingBottom};
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  table { border-collapse: collapse; width: 100%; }
-  .page { padding: 0 4mm; max-width: 210mm; margin: 0 auto; }
-  .page-body {
-    padding-bottom: ${options?.includeBodyFooter ? '0' : '4mm'};
-  }
+${pdfShellCss({ bodyPaddingBottom })}
   .pdf-fuss-end {
     margin-top: 28px;
     padding-top: 10px;
     page-break-inside: avoid;
     break-inside: avoid-page;
   }
-  .projekt-block { break-inside: avoid-page; }
   .angebot-unterschrift-block {
     break-inside: avoid-page;
     page-break-inside: avoid;
   }
-  @media print {
-    .avoid-fuss-overlap {
-      break-inside: avoid-page;
-      page-break-inside: avoid;
-    }
-  }
+  /* Beleg Feinschliff 3.1 — 5 Stufen */
+  .pdf-title { font-size: ${PDF_FS.head}; font-weight: 700; letter-spacing: -0.02em; }
+  .pdf-meta { font-size: ${PDF_FS.meta}; color: ${TEXT_MUTED}; }
 </style>
 </head>
 <body>

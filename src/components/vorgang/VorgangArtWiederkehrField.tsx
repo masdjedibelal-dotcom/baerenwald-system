@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockSelect } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   WIEDERKEHR_TURNUS_LABELS,
@@ -41,55 +43,38 @@ export function VorgangArtWiederkehrField({
         <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>{hint}</div>
       </div>
       <div className="doctype-row">
-        <button
-          type="button"
-          disabled={disabled}
-          className={cn('doctype-radio-opt', !ist && 'on')}
-          onClick={() => onChange({ ist_wiederkehrend: false, wiederkehr_turnus: null })}
-        >
+        <MockBtn className={cn('doctype-radio-opt', !ist && 'on')} type="button" disabled={disabled} onClick={() => onChange({ ist_wiederkehrend: false, wiederkehr_turnus: null })}>
           <span className="dot" aria-hidden />
           <MockIcon ctx="default" n="file-text" size={16} />
           <span className="lbl">Einmalig</span>
           <span className="hint">Klassischer Auftrag mit Abschluss</span>
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          className={cn('doctype-radio-opt', ist && 'on')}
-          onClick={() =>
+        </MockBtn>
+        <MockBtn className={cn('doctype-radio-opt', ist && 'on')} type="button" disabled={disabled} onClick={() =>
             onChange({
               ist_wiederkehrend: true,
               wiederkehr_turnus: value.wiederkehr_turnus ?? 'monatlich',
-            })
-          }
-        >
+            })}>
           <span className="dot" aria-hidden />
           <MockIcon ctx="default" n="refresh" size={16} />
           <span className="lbl">Monatlich / wiederkehrend</span>
           <span className="hint">Bestand — regelmäßige Einsätze</span>
-        </button>
+        </MockBtn>
       </div>
       {ist ? (
         <div style={{ marginTop: 12, maxWidth: 360 }}>
           <label className="field">
             <span className="field-label">Zeitintervall</span>
-            <select
-              className="sel"
-              value={turnus}
-              disabled={disabled}
-              onChange={(e) =>
+            <MockSelect className="sel" value={turnus} disabled={disabled} onChange={(e) =>
                 onChange({
                   ist_wiederkehrend: true,
                   wiederkehr_turnus: e.target.value as WiederkehrTurnus,
-                })
-              }
-            >
+                })}>
               {WIEDERKEHR_TURNUS_VALUES.map((v) => (
                 <option key={v} value={v}>
                   {WIEDERKEHR_TURNUS_LABELS[v]}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </label>
         </div>
       ) : null}

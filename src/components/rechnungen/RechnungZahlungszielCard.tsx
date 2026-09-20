@@ -1,11 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { updateRechnungZahlungsziel } from '@/app/(dashboard)/rechnungen/actions'
+import { MockBtn } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
 import { MockProp } from '@/components/mock-ui/MockProp'
-import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockSegment } from '@/components/mock-ui/MockSegment'
+import { useMemo, useState } from 'react'
+import { updateRechnungZahlungsziel } from '@/app/(dashboard)/rechnungen/actions'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { DateInput } from '@/components/ui/DateInput'
 import { toast } from '@/components/ui/app-toast'
@@ -15,10 +15,13 @@ import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import {
   zahlfristAnzeigeText,
   zahlfristSegFromFaelligAm,
+  ZAHLFRIST_SEG_OPTIONS,
   type ZahlfristSeg,
 } from '@/lib/zahlfrist'
 import type { Rechnung } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
+import { C } from '@/lib/tokens/colors'
+import { TOAST } from '@/lib/copy'
 
 function zahlungszielTageAnzeige(
   erstellt: string | null | undefined,
@@ -101,10 +104,10 @@ export function RechnungZahlungszielCard({
         zahlfristDatum: zahlfrist === 'datum' ? zahlfristDatum : undefined,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Zahlungsziel aktualisiert')
+      toast.success(TOAST.zahlungsziel_aktualisiert)
       setSheetOpen(false)
       onSaved?.()
     })
@@ -136,15 +139,45 @@ export function RechnungZahlungszielCard({
                 ? zahlfristAnzeigeText(zahlfristInit.seg, detail.faellig_am ?? zahlfristInit.datum)
                 : `${zielTage} Tage`}
             </MockProp>
-            <MockProp label="Fällig am">
-              <span
-                style={
-                  ueberfaellig ? { color: 'var(--danger, #c0392b)', fontWeight: 600 } : undefined
-                }
-              >
-                {detail.faellig_am ? formatDatum(detail.faellig_am) : '—'}
-              </span>
-            </MockProp>
+            {bearbeitbar ? (
+              <MockField label="Fällig am">
+                <DateInput
+                  size="sm"
+                  value={detail.faellig_am?.slice(0, 10) || zahlfristDatum}
+                  disabled={pending}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setZahlfrist('datum')
+                    setZahlfristDatum(v)
+                    startTransition(async () => {
+                      const r = await updateRechnungZahlungsziel({
+                        rechnungId: detail.id,
+                        zahlfrist: 'datum',
+                        zahlfristDatum: v,
+                      })
+                      if (!r.ok) {
+                        toast.systemError(r)
+                        return
+                      }
+                      toast.autoSaved({ label: 'Fälligkeit' })
+                      onSaved?.()
+                    })
+                  }}
+                />
+              </MockField>
+            ) : (
+              <MockProp label="Fällig am">
+                <span
+                  style={
+                    ueberfaellig
+                      ? { color: `var(--danger, ${C.redTx3})`, fontWeight: 600 }
+                      : undefined
+                  }
+                >
+                  {detail.faellig_am ? formatDatum(detail.faellig_am) : '—'}
+                </span>
+              </MockProp>
+            )}
             <MockProp label="Status">{zahlungsText}</MockProp>
           </div>
           {bearbeitbar ? (
@@ -152,7 +185,7 @@ export function RechnungZahlungszielCard({
               sm
               kind="ghost"
               icon="pencil"
-              title="Zahlungsziel bearbeiten"
+              title="Zahlungsziel (Tage) bearbeiten"
               onClick={openSheet}
               disabled={pending}
             />
@@ -166,22 +199,28 @@ export function RechnungZahlungszielCard({
         title="Zahlungsziel"
         subtitle={detail.rechnungsnummer?.trim() || undefined}
         context="detail"
-        footer={
-          <>
-            <MockBtn kind="ghost" onClick={() => setSheetOpen(false)} disabled={pending}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn kind="primary" onClick={speichern} disabled={pending}>
-              Speichern
-            </MockBtn>
-          </>
-        }
+        secondary={{
+          label: 'Abbrechen',
+          onClick: () => setSheetOpen(false),
+          disabled: pending,
+          kind: 'ghost',
+        }}
+        primary={{
+          label: 'Speichern',
+          onClick: speichern,
+          disabled: pending,
+        }}
       >
         <div className="form-grid form-grid--sheet">
           <div className="full">
             <MockField label="Zahlungsziel" full>
               <div className="space-y-2">
-                <MockZahlfristSeg value={zahlfrist} onChange={(v) => applyZahlfrist(v)} />
+                <MockSegment
+                  value={zahlfrist}
+                  onChange={(v) => applyZahlfrist(v)}
+                  options={ZAHLFRIST_SEG_OPTIONS}
+                  aria-label="Zahlfrist"
+                />
                 {zahlfrist === 'datum' ? (
                   <DateInput
                     size="sm"

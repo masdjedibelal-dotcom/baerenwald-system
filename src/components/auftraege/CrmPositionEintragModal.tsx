@@ -1,10 +1,15 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
@@ -16,6 +21,7 @@ import { optimizeImageForUpload } from '@/lib/media/optimize-image-for-upload'
 import { splitTagebuchBeschreibung } from '@/lib/auftraege/tagebuch-text'
 import type { AuftragPosition } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 const MAX_FOTOS = 12
 
@@ -122,37 +128,52 @@ export function CrmPositionEintragModal({
     const batch = files.slice(0, room)
 
     setUploading(true)
+    const failedRaw: File[] = []
     try {
       const results = await Promise.all(
         batch.map(async (file) => {
           let uploadFile = file
           try {
-            uploadFile = await optimizeImageForUpload(file)
+            uploadFile = await optimizeImageForUpload(file, { maxEdge: 2000 })
           } catch {
             uploadFile = file
           }
           const fd = new FormData()
           fd.append('file', uploadFile)
           fd.append('filename', uploadFile.name)
-          const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
-            method: 'POST',
-            body: fd,
-          })
-          const json = (await res.json()) as { url?: string; error?: string }
-          if (!res.ok || !json.url) {
+          try {
+            const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
+              method: 'POST',
+              body: fd,
+            })
+            const json = (await res.json()) as { url?: string; error?: string }
+            if (!res.ok || !json.url) {
+              failedRaw.push(file)
+              return {
+                ok: false as const,
+                name: file.name,
+                error: json.error || 'Upload fehlgeschlagen',
+              }
+            }
+            return { ok: true as const, url: json.url }
+          } catch {
+            failedRaw.push(file)
             return {
               ok: false as const,
               name: file.name,
-              error: json.error || 'Upload fehlgeschlagen',
+              error: 'Keine Verbindung',
             }
           }
-          return { ok: true as const, url: json.url }
         })
       )
       const added = results.filter((r): r is { ok: true; url: string } => r.ok).map((r) => r.url)
       const failed = results.filter((r): r is { ok: false; name: string; error: string } => !r.ok)
       for (const f of failed) {
-        toast.error(`${f.name}: ${f.error}`)
+        if (f.error === 'Keine Verbindung') {
+          toast.offlineRetry(() => void uploadFotos(failedRaw))
+        } else {
+          toast.error(`${f.name}: ${f.error}`)
+        }
       }
       if (added.length) {
         setFotoPaths((prev) => [...prev, ...added])
@@ -171,7 +192,7 @@ export function CrmPositionEintragModal({
 
   function speichern() {
     if (!titel.trim() && !beschreibung.trim() && !fotoPaths.length) {
-      toast.error('Titel, Text oder Foto angeben.')
+      toast.error(TOAST.titel_text_oder_foto_angeben)
       return
     }
 
@@ -193,7 +214,7 @@ export function CrmPositionEintragModal({
             ? await updateCrmTagebuchEintrag({ ...payload, eintragId: editEintrag!.id })
             : await createCrmTagebuchEintrag(payload)
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
           toast.success(isEdit ? 'Eintrag aktualisiert' : 'Eintrag gespeichert')
@@ -220,16 +241,21 @@ export function CrmPositionEintragModal({
       title={isEdit ? 'Eintrag bearbeiten' : 'Tagebuch-Eintrag'}
       size="lg"
       dirty={dirty && !busy}
+<<<<<<< Updated upstream
+      secondary={{ label: 'Abbrechen', disabled: busy }}
+      primary={{ label: 'Speichern', busy: pending, onClick: speichern }}
+=======
       footer={
         <div className="sheet-footer-actions ldr-cta">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
+          <MockBtn type="button" kind="secondary" onClick={onClose} disabled={busy}>
             Abbrechen
-          </Button>
-          <Button type="button" variant="primary" loading={pending} onClick={speichern}>
+          </MockBtn>
+          <MockBtn type="button" kind="primary" loading={pending} onClick={speichern}>
             Speichern
-          </Button>
+          </MockBtn>
         </div>
       }
+>>>>>>> Stashed changes
     >
       <div className="space-y-4">
         <div>
@@ -244,25 +270,14 @@ export function CrmPositionEintragModal({
           ) : (
             <>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className={cn(
-                    'btn sm',
-                    selectedIds.length === 0 ? 'primary' : 'secondary'
-                  )}
-                  disabled={busy}
-                  onClick={selectKeineLeistung}
-                >
+                <MockBtn kind="primary" sm className={cn(
+                    selectedIds.length === 0 ? '' : ''
+                  )} type="button" disabled={busy} onClick={selectKeineLeistung}>
                   Keine Leistung
-                </button>
-                <button
-                  type="button"
-                  className="btn secondary sm"
-                  disabled={busy || selectedIds.length === sortedPos.length}
-                  onClick={selectAlleLeistungen}
-                >
+                </MockBtn>
+                <MockBtn kind="secondary" sm type="button" disabled={busy || selectedIds.length === sortedPos.length} onClick={selectAlleLeistungen}>
                   Alle auswählen
-                </button>
+                </MockBtn>
                 <span className="text-xs text-muted">
                   {selectedIds.length === 0
                     ? 'Freier Tageseintrag ohne Leistungsbezug'
@@ -278,13 +293,12 @@ export function CrmPositionEintragModal({
                     <li
                       key={p.id}
                       className={cn(
-                        'rounded-lg border px-3 py-2',
+                        'rounded-card border px-3 py-2',
                         checked ? 'border-accent bg-accent/5' : 'border-border'
                       )}
                     >
                       <label className="flex cursor-pointer items-start gap-2.5">
-                        <input
-                          type="checkbox"
+                        <MockCheckbox
                           className="mt-1"
                           checked={checked}
                           disabled={busy}
@@ -301,8 +315,7 @@ export function CrmPositionEintragModal({
                       </label>
                       {checked && !alreadyDone && !isEdit ? (
                         <label className="mt-1.5 ml-6 flex cursor-pointer items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
+                          <MockCheckbox
                             checked={erledigt}
                             disabled={busy}
                             onChange={() => toggleErledigt(p.id)}
@@ -363,17 +376,11 @@ export function CrmPositionEintragModal({
                   <img
                     src={url}
                     alt={`Foto ${i + 1}`}
-                    className="h-full w-full rounded-md border border-bw-border object-cover"
+                    className="h-full w-full rounded-field border border-bw-border object-cover"
                   />
-                  <button
-                    type="button"
-                    className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
-                    disabled={busy}
-                    onClick={() => removeFoto(url)}
-                    aria-label={`Foto ${i + 1} entfernen`}
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden />
-                  </button>
+                  <MockBtn className="absolute right-1 top-1 rounded-pill bg-black/55 p-1 text-white" type="button" disabled={busy} onClick={() => removeFoto(url)} aria-label={`Foto ${i + 1} löschen`}>
+                    <MockIcon n="x" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                  </MockBtn>
                 </div>
               ))}
             </div>

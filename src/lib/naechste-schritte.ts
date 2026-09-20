@@ -104,10 +104,10 @@ export function buildAuftragNaechsteSchritte(opts: {
   hatAbnahme: boolean
   hatRechnung?: boolean
   positionen?: AuftragPosition[]
-  auftragHandwerkerCount?: number
+  auftragPartnerCount?: number
   angebotHandwerker?: AngebotHandwerkerRow[]
   bautagebuchCount?: number
-  onHandwerkerZuweisen?: () => void
+  onPartnerZuweisen?: () => void
   onBautagebuch?: () => void
   onHwAngebot?: () => void
   onAbschluss?: () => void
@@ -122,11 +122,11 @@ export function buildAuftragNaechsteSchritte(opts: {
     hatAbnahme,
     hatRechnung = false,
     positionen = [],
-    auftragHandwerkerCount = 0,
+    auftragPartnerCount = 0,
     angebotHandwerker = [],
     bautagebuchCount = 0,
     offeneMaengelCount = 0,
-    onHandwerkerZuweisen,
+    onPartnerZuweisen,
     onBautagebuch,
     onHwAngebot,
     onAbschluss,
@@ -137,7 +137,7 @@ export function buildAuftragNaechsteSchritte(opts: {
   if (status === 'storniert') return []
 
   const abgeschlossen = status === 'abgeschlossen'
-  const hwZugewiesen = handwerkerZugewiesen(positionen, auftragHandwerkerCount)
+  const hwZugewiesen = handwerkerZugewiesen(positionen, auftragPartnerCount)
   const hwAngebot = hwAngebotSchritt(angebotHandwerker)
   const bautagebuchDone = bautagebuchCount > 0
 
@@ -162,14 +162,14 @@ export function buildAuftragNaechsteSchritte(opts: {
   const steps: NaechsterSchritt[] = [
     {
       id: 'handwerker',
-      label: 'Handwerker zuweisen',
+      label: 'Partner zuweisen',
       dateLabel: labelAlsNaechstes('handwerker', hwZugewiesen || abgeschlossen, 'Offen'),
       done: hwZugewiesen || abgeschlossen,
-      onClick: hwZugewiesen || abgeschlossen ? undefined : onHandwerkerZuweisen,
+      onClick: hwZugewiesen || abgeschlossen ? undefined : onPartnerZuweisen,
     },
     {
       id: 'hw-angebot',
-      label: 'Handwerker-Angebot Rückmeldung',
+      label: 'Partner-Angebot Rückmeldung',
       dateLabel: labelAlsNaechstes(
         'hw-angebot',
         hwAngebot.done || abgeschlossen || !angebotId,

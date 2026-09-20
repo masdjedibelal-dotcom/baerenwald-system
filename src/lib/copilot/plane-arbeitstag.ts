@@ -111,6 +111,6 @@ export async function planeArbeitstag() {
     },
     wichtige_todos: todoList.slice(0, 8),
     links,
-    tipp: 'Flows: „Angebot aus Anfrage X“ · „Handwerker vorschlagen“ · „Rechnung aus Auftrag“ · list_todos.',
+    tipp: 'Flows: „Angebot aus Anfrage X“ · „Partner vorschlagen“ · „Rechnung aus Auftrag“ · list_todos.',
   }
 }

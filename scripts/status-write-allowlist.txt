@@ -1,0 +1,2 @@
+# Legacy-Allowlist P2-5 — leer = alle Status-Writes nur über src/lib/status/write-*.
+# Neue direkte .update({ status… }) außerhalb write-* → Guard-Fehler.

@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { revalidateAngebotDetail } from '@/lib/crm-revalidate'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { sendAngebotToKunde } from '@/app/(dashboard)/angebote/actions'
@@ -34,7 +34,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: r.message }, { status: 502 })
   }
 
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
+  revalidateAngebotDetail(angebotId)
   return NextResponse.json({ success: true })
 }

@@ -1,11 +1,12 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useState, type ReactNode } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
-/** Bottom Sheet — Draft übernehmen (kein DB-Save). */
+/** Bottom Sheet — Draft speichern (kein DB-Save). */
 export function MobileEditSheet({
   open,
   onClose,
@@ -25,7 +26,6 @@ export function MobileEditSheet({
   dirty?: boolean
   onConfirm?: () => void
 }) {
-  const isDraftTakeover = !onConfirm
   return (
     <EditorSheet
       open={open}
@@ -34,7 +34,7 @@ export function MobileEditSheet({
       context="detail"
       dirty={dirty}
       onConfirm={onConfirm ?? onClose}
-      confirmLabel={isDraftTakeover ? 'Übernehmen' : 'Speichern'}
+      confirmLabel="Speichern"
       className={className}
     >
       {children}
@@ -87,13 +87,9 @@ export function MobileEditableBlock({
       <div className={cn('mobile-editable-overview', overviewClassName)}>
         {overview}
         {!hideEditButton && !disabled ? (
-          <button
-            type="button"
-            className="mt-2 text-[length:var(--fs-text)] font-medium text-bw-primary"
-            onClick={() => setSheetOpen(true)}
-          >
+          <MockBtn className="mt-2 text-[length:var(--fs-text)] font-medium text-bw-primary" type="button" onClick={() => setSheetOpen(true)}>
             {editLabel}
-          </button>
+          </MockBtn>
         ) : null}
       </div>
       <EditorSheet
@@ -102,7 +98,7 @@ export function MobileEditableBlock({
         title={sheetTitle}
         context={sheetContext}
         onConfirm={() => setSheetOpen(false)}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         {children}
       </EditorSheet>

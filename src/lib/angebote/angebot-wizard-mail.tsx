@@ -6,11 +6,12 @@ import {
 } from '@/lib/angebote/angebot-wizard-types'
 import { angebotGewerkNameAnzeige } from '@/lib/dokument-zeilen'
 import { richTextToPlain } from '@/lib/rich-text'
+import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -38,7 +39,7 @@ export function buildAngebotWizardMailHtml(input: {
         return `<tr>
         <td>
           <div style="font-weight:500">${esc(p.leistung)}</div>
-          <div style="color:#6B7280;font-size:${compact ? '11' : '11.5'}px">${esc(richTextToPlain(p.beschreibung) || angebotGewerkNameAnzeige(p.gewerk_name))}</div>
+          <div style="color:${C.gray500};font-size:${compact ? '11' : '11.5'}px">${esc(richTextToPlain(p.beschreibung) || angebotGewerkNameAnzeige(p.gewerk_name))}</div>
         </td>
         <td>${esc(String(p.menge))} ${esc(p.einheit)}</td>
         <td class="amt">${esc(formatEurRange(einzel, einzel))}</td>
@@ -52,7 +53,7 @@ export function buildAngebotWizardMailHtml(input: {
     ? meta.einleitung
     : 'vielen Dank für Ihre Anfrage. Anbei das Angebot mit allen Leistungen und Preisen.'
   const leistBlock = meta.leistungsumfang.trim().length
-    ? `<p style="margin:0 0 12px;font-size:13px;color:#374151"><strong>Leistungsumfang:</strong> ${esc(meta.leistungsumfang)}</p>`
+    ? `<p style="margin:0 0 12px;font-size:13px;color:${C.gray700}"><strong>Leistungsumfang:</strong> ${esc(meta.leistungsumfang)}</p>`
     : ''
 
   const cta = statusLink
@@ -83,7 +84,7 @@ export function buildAngebotWizardMailHtml(input: {
         </tbody>
       </table>
       <p style="white-space:pre-line;margin-top:12px">${esc(meta.schluss)}</p>
-      <p style="color:#6B7280;font-size:${compact ? '11px' : '12px'}">
+      <p style="color:${C.gray500};font-size:${compact ? '11px' : '12px'}">
         <b>Gültig bis:</b> ${esc(meta.gueltig_bis)}<br />
         <b>Zahlungsbedingungen:</b> ${esc(zahlung)}
       </p>

@@ -1,7 +1,11 @@
 'use client'
 
+<<<<<<< Updated upstream
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+=======
 import { Download } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+>>>>>>> Stashed changes
+import { MockBtn } from '@/components/mock-ui'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -20,17 +24,17 @@ export function ExportCsvButton({
   variant = 'secondary',
 }: Props) {
   return (
-    <Button
+    <MockBtn
       type="button"
-      variant={variant}
-      size="sm"
+      kind={variant}
+      sm
       onClick={onClick}
       aria-label="Als CSV exportieren"
       title="Als CSV exportieren"
       className={cn('shrink-0 gap-1.5', iconOnly && 'px-2.5', className)}
     >
-      <Download className="h-4 w-4" aria-hidden />
+      <MockIcon n="download" ctx="default" className="h-4 w-4" aria-hidden />
       {iconOnly ? <span className="sr-only">Export</span> : 'Export'}
-    </Button>
+    </MockBtn>
   )
 }

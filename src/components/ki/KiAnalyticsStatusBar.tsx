@@ -1,6 +1,7 @@
 'use client'
 
-import { RefreshCw, Sparkles } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import type { KiAnalyticsMeta } from '@/lib/ki/analytics-meta'
 
 type Progress = { current: number; total: number; label: string } | null
@@ -28,8 +29,8 @@ export function KiAnalyticsStatusBar({
     <div className="sticky top-0 z-20 -mx-4 border-b border-bw-border bg-white px-4 py-4 md:-mx-6 md:px-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#2E7D52]">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden />
+          <p className="flex items-center gap-1.5 text-fs-caption font-semibold uppercase tracking-wider text-bw-primary">
+            <MockIcon n="sparkles" ctx="default" className="h-3.5 w-3.5" aria-hidden />
             KI Analytics
           </p>
           {meta.leadsGesamt != null ? (
@@ -47,43 +48,46 @@ export function KiAnalyticsStatusBar({
             Zahlen: {meta.zahlenAktualisiertLabel} · KI-Texte: {meta.kiTexteAnzahl}/
             {meta.kiTexteGesamt}
             {kiFehlt > 0 ? (
-              <span className="text-amber-700"> · {kiFehlt} fehlen</span>
+              <span className="text-status-contact-text"> · {kiFehlt} fehlen</span>
             ) : null}
           </p>
           {loading && progress ? (
-            <p className="mt-2 text-xs font-medium text-[#2E7D52]">
+            <p className="mt-2 text-xs font-medium text-bw-primary">
               {progress.current}/{progress.total} — {progress.label}…
             </p>
           ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <MockBtn
             type="button"
+            kind="primary"
+            sm
+            loading={loading}
             onClick={onRefreshKi}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-bw-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
-            <Sparkles className={`h-4 w-4 ${loading ? 'animate-pulse' : ''}`} aria-hidden />
+            <MockIcon n="sparkles" ctx="default" className={`h-4 w-4 ${loading ? 'animate-pulse' : ''}`} aria-hidden />
             KI-Texte
-          </button>
-          <button
+          </MockBtn>
+          <MockBtn
             type="button"
+            kind="secondary"
+            sm
+            loading={loading}
             onClick={onRefreshZahlen}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 py-2 text-sm font-medium text-bw-text hover:bg-bw-bg disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden />
             Zahlen
-          </button>
-          <button
+          </MockBtn>
+          <MockBtn
             type="button"
-            onClick={onRefreshBeides}
+            kind="ghost"
+            sm
             disabled={loading}
-            className="text-xs text-muted underline hover:text-bw-text disabled:opacity-50"
+            onClick={onRefreshBeides}
+            className="text-xs underline"
           >
             Beides
-          </button>
+          </MockBtn>
         </div>
       </div>
     </div>

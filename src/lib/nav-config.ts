@@ -1,17 +1,14 @@
-import type { LucideIcon } from 'lucide-react'
-import { Calendar, Settings, Sparkles, Wrench } from 'lucide-react'
-import { resolveMockIcon } from '@/lib/mock-icons'
 import {
   CREATE_ENTRY_LABELS,
   createAnfrageHref,
   createAngebotHref,
   createRechnungHref,
 } from '@/lib/crm/create-entry'
+import { COPY_ROLE } from '@/lib/copy'
 
 export type NavItemDef = {
   href: string
-  icon: LucideIcon
-  /** Mock-Icon-Name (Dokumentation / spätere n=-Migration). */
+  /** Mock-Icon-Name für MockIcon `n=`. */
   iconName: string
   label: string
   exact?: boolean
@@ -35,7 +32,6 @@ function nav(
   return {
     href,
     iconName,
-    icon: resolveMockIcon(iconName),
     label,
     exact,
     activeAlso,
@@ -44,11 +40,9 @@ function nav(
 
 /**
  * Sidebar Spec §3:
- * Arbeit = Dashboard · Vorgänge · Kunden · Handwerker
+ * Arbeit = Dashboard · Vorgänge · Kunden · Partner
  * Organisation = Kalender · KI Analytics
  * unten abgesetzt: Einstellungen (Sidebar-Footer, nicht in Gruppen)
- *
- * Tabelle `partner` bleibt (Daten), Route/Nav-Einstieg entfernt → Redirect `/handwerker`.
  */
 export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   {
@@ -63,7 +57,7 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
         '/rechnungen',
       ]),
       nav('/kunden', 'users', 'Kunden'),
-      nav('/handwerker', 'tool', 'Handwerker'),
+      nav('/handwerker', 'tool', COPY_ROLE.partner),
     ],
   },
   {
@@ -84,7 +78,6 @@ export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS.slice(1).f
 
 /**
  * Bottom-Nav Spec §3: Dashboard · Vorgänge · + · Kunden · Mehr
- * Kalender / Handwerker / KI Analytics / Einstellungen → Mehr
  */
 export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
   nav('/', 'layout-dashboard', 'Dashboard', true),
@@ -100,14 +93,14 @@ export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
 /** Mobile Mehr-Screen (Kachel-Grid). */
 export const MEHR_TILE_NAV: Array<{
   href: string
-  icon: LucideIcon
+  iconName: string
   label: string
   desc: string
 }> = [
-  { href: '/handwerker', icon: Wrench, label: 'Handwerker', desc: 'Ausführungspartner' },
-  { href: '/kalender', icon: Calendar, label: 'Kalender', desc: 'Termine & Planung' },
-  { href: '/ki-analytics', icon: Sparkles, label: 'KI Analytics', desc: 'Empfehlungen & Funnel' },
-  { href: '/einstellungen', icon: Settings, label: 'Einstellungen', desc: 'Firma & Team' },
+  { href: '/handwerker', iconName: 'tool', label: COPY_ROLE.partner, desc: 'Ausführungspartner' },
+  { href: '/kalender', iconName: 'calendar', label: 'Kalender', desc: 'Termine & Planung' },
+  { href: '/ki-analytics', iconName: 'sparkles', label: 'KI Analytics', desc: 'Empfehlungen & Funnel' },
+  { href: '/einstellungen', iconName: 'settings', label: 'Einstellungen', desc: 'Firma & Team' },
 ]
 
 export type RouteCta = { label: string; href: string }
@@ -133,7 +126,7 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
     title: 'Rechnungen',
     cta: { label: CREATE_ENTRY_LABELS.rechnung, href: createRechnungHref() },
   },
-  '/handwerker': { title: 'Handwerker' },
+  '/handwerker': { title: COPY_ROLE.partner },
   '/kunden': { title: 'Kunden' },
   '/kalender': { title: 'Kalender' },
   '/angebote': {
@@ -150,7 +143,7 @@ export const SECTION_LABELS: Record<string, string> = {
   anfragen: 'Anfragen',
   auftraege: 'Aufträge',
   rechnungen: 'Rechnungen',
-  handwerker: 'Handwerker',
+  handwerker: COPY_ROLE.partner,
   kunden: 'Kunden',
   kalender: 'Kalender',
   angebote: 'Angebote',
@@ -172,6 +165,7 @@ export const SUB_LABELS: Record<string, Record<string, string>> = {
     gewerke: 'Gewerke',
     preisliste: 'Preisliste',
     vorlagen: 'Angebot-Vorlagen',
+    benachrichtigungen: 'Benachrichtigungen',
   },
 }
 

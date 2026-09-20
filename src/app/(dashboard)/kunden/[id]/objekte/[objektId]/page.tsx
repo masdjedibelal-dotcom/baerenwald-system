@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { ObjektAkteDetailClient } from '@/components/objektakte/ObjektAkteDetailClient'

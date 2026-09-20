@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { notifyNewLeadAlert } from '@/lib/copilot/crm-actions'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -80,7 +81,8 @@ export async function POST(req: Request) {
 
   let kundeId: string | null = null
   if (email) {
-    const { data: existing } = await supabaseAdmin.from('kunden').select('id').eq('email', email).maybeSingle()
+    const {data: existing, error} = await supabaseAdmin.from('kunden').select('id').eq('email', email).maybeSingle()
+    if (error) logDbError('app/api/lead/route:kunden', error)
     if (existing?.id) kundeId = existing.id as string
   }
 
@@ -133,15 +135,17 @@ export async function POST(req: Request) {
       })
       .select('id')
       .single()
+    if (kundeErr) logDbError('app/api/lead/route:kunden', kundeErr)
     if (kundeErr || !kundeRow) {
       return NextResponse.json({ ok: false, error: kundeErr?.message ?? 'Kunde' }, { status: 500 })
     }
     kundeId = kundeRow.id as string
   } else if (hatAnfrageAdresse(adresseFelder)) {
-    await supabaseAdmin
+    const { error: __dbErr1 } = await supabaseAdmin
       .from('kunden')
       .update({ ...adresseDb, plz: plzFinal, updated_at: new Date().toISOString() })
       .eq('id', kundeId)
+    if (__dbErr1) logDbError('app/api/lead/route:kunden', __dbErr1)
   }
 
   const { data: leadRow, error: leadErr } = await supabaseAdmin
@@ -193,6 +197,7 @@ export async function POST(req: Request) {
     })
     .select('id')
     .single()
+  if (leadErr) logDbError('app/api/lead/route:leads', leadErr)
 
   if (leadErr || !leadRow) {
     return NextResponse.json({ ok: false, error: leadErr?.message ?? 'Lead' }, { status: 500 })
@@ -207,19 +212,23 @@ export async function POST(req: Request) {
     user_id: null,
   })
 
-  await supabaseAdmin.from('lead_timeline').insert({
+  const { error: __dbErr2 } = await supabaseAdmin.from('lead_timeline').insert({
     lead_id: leadId,
     typ: 'created',
     titel: 'Anfrage erstellt',
     beschreibung: null,
     erstellt_von: null,
   })
+  if (__dbErr2) logDbError('app/api/lead/route:lead_timeline', __dbErr2)
 
   if (kanal === 'website') {
     await sendAnfrageBestaetigung(leadId)
   }
 
-  const alert = await notifyNewLeadAlert(leadId).catch(() => null)
+  const alert = await notifyNewLeadAlert(leadId).catch((err) => {
+    console.error('[api/lead] notifyNewLeadAlert', err)
+    return null
+  })
   if (alert && typeof alert === 'object' && 'ok' in alert && !(alert as { ok?: boolean }).ok) {
     console.warn('[api/lead] notifyNewLeadAlert fehlgeschlagen', alert)
   }
@@ -234,7 +243,10 @@ export async function POST(req: Request) {
         tag: `neue_anfrage:${leadId}`,
       })
     )
-    .catch(() => undefined)
+    .catch((err) => {
+      console.error('[api/lead] sendCrmPushToStaff', err)
+      return undefined
+    })
 
   return NextResponse.json({ ok: true, id: leadId })
 }

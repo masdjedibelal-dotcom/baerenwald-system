@@ -6,6 +6,7 @@ import {
   previewAngebotWizardMailLive,
 } from '@/app/(dashboard)/angebote/actions'
 import { mailIframeSrcDoc } from '@/lib/mail/mail-iframe-srcdoc'
+import { C } from '@/lib/tokens/colors'
 
 /** Echte Kunden-Mail wie beim Versand — live aus Wizard ohne Entwurf, oder aus gespeichertem Angebot. */
 export function AngebotWizardMailPreview({
@@ -167,7 +168,7 @@ export function AngebotWizardMailPreview({
           style={{
             padding: 12,
             borderRadius: 8,
-            border: '0.5px solid var(--border)',
+            border: '0.0.3125remrem solid var(--border)',
             background: 'var(--bg-soft)',
             fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
@@ -181,10 +182,10 @@ export function AngebotWizardMailPreview({
           sandbox=""
           style={{
             width: '100%',
-            height: 'min(520px, 55vh)',
-            border: '0.5px solid var(--border)',
+            height: 'min(32.5rem, 55vh)',
+            border: '0.0.3125remrem solid var(--border)',
             borderRadius: 8,
-            background: '#fff',
+            background: C.white,
           }}
           srcDoc={mailIframeSrcDoc(
             html,

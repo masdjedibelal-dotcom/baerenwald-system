@@ -1,8 +1,12 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { DateInput } from '@/components/ui/DateInput'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
-import { Camera, X } from 'lucide-react'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import type { FormularFeld } from '@/lib/types'
-import { Textarea } from '@/components/ui/Textarea'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { cn } from '@/lib/utils'
 
@@ -49,7 +53,7 @@ export function validateFormularPflicht(
 }
 
 const inputPreviewClass =
-  'w-full min-h-[44px] rounded-lg border border-bw-border bg-bw-canvas px-3 text-bw-text opacity-80'
+  'w-full min-h-[44px] rounded-card border border-bw-border bg-bw-canvas px-3 text-bw-text opacity-80'
 
 export function FormularFelderRenderer({
   felder,
@@ -102,55 +106,28 @@ export function FormularFelderRenderer({
               ro ? (
                 <p className="text-sm text-bw-text">{String(v ?? '—')}</p>
               ) : (
-                <input
-                  className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-lg border border-border px-3'}
-                  value={String(v ?? '')}
-                  readOnly={prev}
-                  disabled={dis && !prev}
-                  onChange={(e) => set(f.id, e.target.value)}
-                />
+                <MockInput className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-card border border-border px-3'} value={String(v ?? '')} readOnly={prev} disabled={dis && !prev} onChange={(e) => set(f.id, e.target.value)} />
               )
             ) : null}
             {f.typ === 'number' ? (
               ro ? (
                 <p className="text-sm text-bw-text">{v != null && v !== '' ? String(v) : '—'}</p>
               ) : (
-                <input
-                  type="number"
-                  className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-lg border border-border px-3'}
-                  value={v === undefined || v === null ? '' : String(v)}
-                  readOnly={prev}
-                  disabled={dis && !prev}
-                  onChange={(e) => set(f.id, e.target.value === '' ? '' : Number(e.target.value))}
-                />
+                <MockInput type="number" className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-card border border-border px-3'} value={v === undefined || v === null ? '' : String(v)} readOnly={prev} disabled={dis && !prev} onChange={(e) => set(f.id, e.target.value === '' ? '' : Number(e.target.value))} />
               )
             ) : null}
             {f.typ === 'date' ? (
               ro ? (
                 <p className="text-sm text-bw-text">{String(v ?? '—')}</p>
               ) : (
-                <input
-                  type="date"
-                  className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-lg border border-border px-3'}
-                  value={String(v ?? '')}
-                  readOnly={prev}
-                  disabled={dis && !prev}
-                  onChange={(e) => set(f.id, e.target.value)}
-                />
+                <DateInput className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-card border border-border px-3'} value={String(v ?? '')} readOnly={prev} disabled={dis && !prev} onChange={(e) => set(f.id, e.target.value)} />
               )
             ) : null}
             {f.typ === 'textarea' ? (
               ro ? (
                 <RichTextContent html={String(v ?? '')} className="text-sm" fallback={<span>—</span>} />
               ) : (
-                <Textarea
-                  className={prev ? inputPreviewClass : undefined}
-                  rows={4}
-                  value={String(v ?? '')}
-                  readOnly={prev}
-                  disabled={dis && !prev}
-                  onChange={(e) => set(f.id, e.target.value)}
-                />
+                <RichTextEditor value={String(v ?? '')} onChange={(__v) => set(f.id, __v)} disabled={dis && !prev} minHeight={120} className={prev ? inputPreviewClass : undefined} />
               )
             ) : null}
             {f.typ === 'checkbox' ? (
@@ -160,12 +137,11 @@ export function FormularFelderRenderer({
                 <label
                   className={cn(
                     'flex items-center gap-2',
-                    prev && 'pointer-events-none rounded-lg border border-bw-border bg-bw-canvas px-3 py-2 opacity-90'
+                    prev && 'pointer-events-none rounded-card border border-bw-border bg-bw-canvas px-3 py-2 opacity-90'
                   )}
                 >
-                  <input
-                    type="checkbox"
-                    className="rounded border-bw-border"
+                  <MockCheckbox
+                    className="rounded-card border-bw-border"
                     checked={Boolean(v)}
                     disabled={dis}
                     readOnly={prev}
@@ -179,19 +155,14 @@ export function FormularFelderRenderer({
               ro ? (
                 <p className="text-sm text-bw-text">{String(v ?? '—')}</p>
               ) : (
-                <select
-                  className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-lg border border-border px-3'}
-                  value={String(v ?? '')}
-                  disabled={dis}
-                  onChange={(e) => set(f.id, e.target.value)}
-                >
+                <MockSelect className={prev ? inputPreviewClass : 'w-full min-h-[44px] rounded-card border border-border px-3'} value={String(v ?? '')} disabled={dis} onChange={(e) => set(f.id, e.target.value)}>
                   <option value="">Bitte wählen</option>
                   {(f.optionen ?? []).map((o) => (
                     <option key={o} value={o}>
                       {o}
                     </option>
                   ))}
-                </select>
+                </MockSelect>
               )
             ) : null}
             {f.typ === 'foto' ? (
@@ -228,19 +199,13 @@ export function FormularFelderRenderer({
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={url} alt="" />
                                 {!dis ? (
-                                  <button
-                                    type="button"
-                                    className="bt-foto-remove"
-                                    aria-label="Foto entfernen"
-                                    onClick={() =>
+                                  <MockBtn className="bt-foto-remove" type="button" aria-label="Foto löschen" onClick={() =>
                                       set(
                                         f.id,
                                         urls.filter((u) => u !== url)
-                                      )
-                                    }
-                                  >
-                                    <X className="h-3 w-3" aria-hidden />
-                                  </button>
+                                      )}>
+                                    <MockIcon n="x" ctx="default" className="h-3 w-3" aria-hidden />
+                                  </MockBtn>
                                 ) : null}
                               </div>
                             ))}
@@ -249,11 +214,11 @@ export function FormularFelderRenderer({
                         <label
                           className={
                             canAdd && !dis
-                              ? 'inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text hover:bg-bw-hover'
-                              : 'inline-flex min-h-[44px] cursor-not-allowed items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text-muted opacity-60'
+                              ? 'inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-card border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text hover:bg-bw-hover'
+                              : 'inline-flex min-h-[44px] cursor-not-allowed items-center gap-2 rounded-card border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text-muted opacity-60'
                           }
                         >
-                          <Camera className="h-4 w-4" aria-hidden />
+                          <MockIcon n="photo" ctx="default" className="h-4 w-4" aria-hidden />
                           {canAdd ? 'Fotos wählen' : 'Maximum erreicht'}
                           <input
                             type="file"
@@ -274,20 +239,16 @@ export function FormularFelderRenderer({
                             }}
                           />
                         </label>
-                        <p className="text-[11px] text-bw-text-muted">
+                        <p className="text-fs-caption text-bw-text-muted">
                           Bis zu {fotoLimit} Fotos · {urls.length}/{fotoLimit}
                         </p>
                       </div>
                     )
                   })()
                 ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text opacity-90"
-                  >
+                  <MockBtn className="inline-flex min-h-[44px] items-center gap-2 rounded-button border border-bw-border bg-bw-canvas px-4 text-sm text-bw-text opacity-90" type="button" disabled>
                     Foto aufnehmen
-                  </button>
+                  </MockBtn>
                 )}
               </div>
             ) : null}
@@ -300,6 +261,6 @@ export function FormularFelderRenderer({
 
 export function FormularFeldTypBadge({ typ }: { typ: FormularFeld['typ'] }) {
   return (
-    <span className={cn('rounded-md bg-canvas px-2 py-0.5 text-xs font-medium text-ink')}>{typBadge(typ)}</span>
+    <span className={cn('rounded-field bg-canvas px-2 py-0.5 text-xs font-medium text-ink')}>{typBadge(typ)}</span>
   )
 }

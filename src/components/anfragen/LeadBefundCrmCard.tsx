@@ -1,9 +1,11 @@
 'use client'
 
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { logDbError } from '@/lib/errors/log-db-error'
+import { formatDatum } from '@/lib/utils'
 import { useEffect, useMemo, useState } from 'react'
 import { befundVorlageLabelDe } from '@/lib/anfragen/befund-vorlage-label'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import { CHECKLISTE } from '@/lib/crm-labels'
 import { createClient } from '@/lib/supabase'
 import { toneToMockBadgeKind } from '@/lib/status/status-tone'
@@ -36,8 +38,8 @@ function statusLabel(s: string | null): string | null {
 
 function ergebnisMeta(s: string | null): { label: string; tone: StatusTone } {
   if (s === 'selbst_erledigt') return { label: 'Selbst erledigt', tone: 'gruen' }
-  if (s === 'fachfirma_angebot') return { label: 'Fachfirma — Angebot', tone: 'blau' }
-  if (s === 'fachfirma_akut') return { label: 'Fachfirma — Akut', tone: 'rot' }
+  if (s === 'fachfirma_angebot') return { label: 'Partner — Angebot', tone: 'blau' }
+  if (s === 'fachfirma_akut') return { label: 'Partner — Akut', tone: 'rot' }
   if (s?.trim()) return { label: s.trim(), tone: 'grau' }
   return { label: 'Prüfung läuft', tone: 'grau' }
 }
@@ -46,10 +48,10 @@ function punktIstAusgefuellt(p: Punkt): boolean {
   return Boolean(statusLabel(p.status) || p.notiz.trim() || p.foto_refs.length > 0)
 }
 
-function formatDatum(iso: string): string {
+function formatBefundDatum(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('de-DE')
+  return formatDatum(d.toISOString())
 }
 
 /** Read-only HM-Checkliste am CRM-Anfrage-Detail. */
@@ -69,11 +71,12 @@ export function LeadBefundCrmCard({
     let cancelled = false
     void (async () => {
       const supabase = createClient()
-      const { data: head } = await supabase
+      const {data: head, error: error1} = await supabase
         .from('lead_befunde')
         .select('id, durchgefuehrt_von, durchgefuehrt_am, ergebnis, vorlage_key')
         .eq('lead_id', leadId)
         .maybeSingle()
+      if (error1) logDbError('components/anfragen/LeadBefundCrmCard:lead_befunde', error1)
 
       if (cancelled) return
       if (!head?.id) {
@@ -82,11 +85,12 @@ export function LeadBefundCrmCard({
         return
       }
 
-      const { data: punkte } = await supabase
+      const {data: punkte, error: error2} = await supabase
         .from('lead_befund_punkte')
         .select('id, titel, status, notiz, foto_refs, sort_order')
         .eq('befund_id', head.id)
         .order('sort_order', { ascending: true })
+      if (error2) logDbError('components/anfragen/LeadBefundCrmCard:lead_befund_punkte', error2)
 
       if (cancelled) return
       setBefund({
@@ -145,7 +149,7 @@ export function LeadBefundCrmCard({
   const vorlageLabel = befundVorlageLabelDe(befund.vorlage_key)
   const metaParts = [
     befund.durchgefuehrt_von.trim() || null,
-    befund.durchgefuehrt_am ? formatDatum(befund.durchgefuehrt_am) : null,
+    befund.durchgefuehrt_am ? formatBefundDatum(befund.durchgefuehrt_am) : null,
     vorlageLabel,
   ].filter(Boolean)
 
@@ -160,7 +164,7 @@ export function LeadBefundCrmCard({
       {metaParts.length > 0 ? (
         <p
           style={{
-            margin: '0 0 12px',
+            margin: '0 0 0.75rem',
             fontSize: 'var(--fs-meta)',
             color: 'var(--text-3)',
           }}

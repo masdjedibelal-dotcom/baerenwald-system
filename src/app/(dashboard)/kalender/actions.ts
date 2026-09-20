@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin } from '@/lib/types'
 
@@ -37,19 +43,21 @@ export async function saveKalenderTermin(input: {
 
   if (input.id) {
     let { error } = await supabase.from('kalender_termine').update(payload).eq('id', input.id)
+    if (error) logDbError('app/kalender/actions:kalender_termine', error)
     if (error && /kunde_id/i.test(error.message)) {
       const { kunde_id: _k, ...withoutKunde } = payload
       ;({ error } = await supabase.from('kalender_termine').update(withoutKunde).eq('id', input.id))
     }
     if (error) return { ok: false, message: error.message }
-    revalidatePath('/kalender')
-    if (input.lead_id) revalidatePath(`/anfragen/${input.lead_id}`)
+    revalidateKalender()
+    if (input.lead_id) revalidateLeadDetail(input.lead_id)
     return { ok: true, id: input.id }
   }
 
   let { data, error } = await supabase.from('kalender_termine').insert(payload)
     .select('id')
     .single()
+  if (error) logDbError('app/kalender/actions:kalender_termine', error)
   if (error && /kunde_id/i.test(error.message)) {
     const { kunde_id: _k, ...withoutKunde } = payload
     ;({ data, error } = await supabase.from('kalender_termine').insert(withoutKunde)
@@ -58,8 +66,8 @@ export async function saveKalenderTermin(input: {
   }
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath('/kalender')
-  if (input.lead_id) revalidatePath(`/anfragen/${input.lead_id}`)
+  revalidateKalender()
+  if (input.lead_id) revalidateLeadDetail(input.lead_id)
   return { ok: true, id: data.id as string }
 }
 
@@ -87,6 +95,7 @@ export async function loadTerminLinkAdresse(input: {
       .select('name, vorname, nachname, strasse, hausnummer, plz, ort, adresse')
       .eq('id', input.kundeId.trim())
       .maybeSingle()
+    if (error) logDbError('app/kalender/actions:kunden', error)
     if (error) return { ok: false, message: error.message }
     if (!data) return { ok: false, message: 'Kunde nicht gefunden' }
     const strasse =
@@ -112,6 +121,7 @@ export async function loadTerminLinkAdresse(input: {
       )
       .eq('id', input.leadId.trim())
       .maybeSingle()
+    if (error) logDbError('app/kalender/actions:leads', error)
     if (error) return { ok: false, message: error.message }
     if (!data) return { ok: false, message: 'Anfrage nicht gefunden' }
     const k = data.kunden as
@@ -143,6 +153,7 @@ export async function loadTerminLinkAdresse(input: {
       )
       .eq('id', input.auftragId.trim())
       .maybeSingle()
+    if (error) logDbError('app/kalender/actions:auftraege', error)
     if (error) return { ok: false, message: error.message }
     if (!data) return { ok: false, message: 'Auftrag nicht gefunden' }
     const k = data.kunden as
@@ -181,12 +192,18 @@ export async function deleteKalenderTermin(
   id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: row } = await supabase.from('kalender_termine').select('lead_id').eq('id', id).maybeSingle()
-  const { error } = await supabase.from('kalender_termine').delete().eq('id', id)
-  if (error) return { ok: false, message: error.message }
+  const { data: row, error } = await supabase.from('kalender_termine').select('lead_id').eq('id', id).maybeSingle()
+  if (error) logDbError('app/kalender/actions:kalender_termine', error)
+  const { error: error2 } = await supabase.from('kalender_termine').delete().eq('id', id)
+  if (error2) logDbError('app/kalender/actions:kalender_termine', error2)
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateKalender()
+=======
   revalidatePath('/kalender')
+>>>>>>> Stashed changes
   const lid = row && typeof (row as { lead_id?: string }).lead_id === 'string' ? (row as { lead_id: string }).lead_id : null
-  if (lid) revalidatePath(`/anfragen/${lid}`)
+  if (lid) revalidateLeadDetail(lid)
   return { ok: true }
 }
 
@@ -196,8 +213,9 @@ export async function setTerminErledigt(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const { error } = await supabase.from('kalender_termine').update({ erledigt }).eq('id', id)
+  if (error) logDbError('app/kalender/actions:kalender_termine', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/kalender')
+  revalidateKalender()
   return { ok: true }
 }
 
@@ -216,7 +234,8 @@ export async function moveKalenderTermin(
       uhrzeit_bis,
     })
     .eq('id', id)
+  if (error) logDbError('app/kalender/actions:kalender_termine', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/kalender')
+  revalidateKalender()
   return { ok: true }
 }

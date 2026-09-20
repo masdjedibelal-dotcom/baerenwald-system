@@ -1,7 +1,6 @@
 'use client'
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-
 export type MockUebersichtStat = {
   icon: string
   label: string

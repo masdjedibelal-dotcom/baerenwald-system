@@ -1,8 +1,15 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateRechnungDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { planRechnungStatusWrite } from '@/lib/status/write-rechnung-status'
 import type { HwRechnungStatus } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
 
 export async function setHwEingangsrechnungStatus(
@@ -26,34 +33,38 @@ export async function setHwEingangsrechnungStatus(
     .select('id, angebot_id, hw_rechnung_pdf_url')
     .eq('id', id)
     .maybeSingle()
+  if (fetchErr) logDbError('app/rechnungen/hw-eingang-actions:angebot_handwerker', fetchErr)
   if (fetchErr || !row) return { ok: false, message: fetchErr?.message ?? 'Eintrag nicht gefunden.' }
   if (!String((row as { hw_rechnung_pdf_url?: string | null }).hw_rechnung_pdf_url ?? '').trim()) {
-    return { ok: false, message: 'Keine Handwerker-Rechnung vorhanden.' }
+    return { ok: false, message: 'Keine Partner-Rechnung vorhanden.' }
   }
 
   const now = new Date().toISOString()
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('angebot_handwerker')
     .update({
       hw_rechnung_status: status,
       hw_rechnung_bezahlt_at: status === 'bezahlt' ? now : null,
     })
     .eq('id', id)
+  if (error2) logDbError('app/rechnungen/hw-eingang-actions:angebot_handwerker', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
 
   const rechnungStatus =
     status === 'bezahlt' ? 'bezahlt' : status === 'abgelehnt' ? 'storniert' : 'gesendet'
-  const { data: recRow } = await supabaseAdmin
+  const { data: recRow, error: error3 } = await supabaseAdmin
     .from('rechnungen')
-    .update({
-      status: rechnungStatus,
-      bezahlt_at: status === 'bezahlt' ? now : null,
-      updated_at: now,
-    })
+    .update(
+      planRechnungStatusWrite(rechnungStatus, {
+        bezahlt_at: status === 'bezahlt' ? now : null,
+        updated_at: now,
+      })
+    )
     .eq('angebot_handwerker_id', id)
     .select('id, handwerker_id, auftrag_id, rechnungsnummer')
     .maybeSingle()
+  if (error3) logDbError('app/rechnungen/hw-eingang-actions:rechnungen', error3)
 
   if (status === 'bezahlt' && recRow?.id) {
     const { syncEingangsrechnungUeberwiesen } = await import(
@@ -69,19 +80,22 @@ export async function setHwEingangsrechnungStatus(
   }
 
   const angebotId = String((row as { angebot_id: string }).angebot_id)
-  revalidatePath('/vorgaenge')
-  revalidatePath('/rechnungen')
-  if (recRow?.id) revalidatePath(`/rechnungen/${recRow.id}`)
-  revalidatePath(`/angebote/${angebotId}`)
+  if (recRow?.id) revalidateRechnungDetail(recRow.id)
+  revalidateAngebotDetail(angebotId)
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error: error4 } = await supabaseAdmin
     .from('auftraege')
     .select('id')
     .eq('angebot_id', angebotId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error4) logDbError('app/rechnungen/hw-eingang-actions:auftraege', error4)
+<<<<<<< Updated upstream
+  if (auf?.id) revalidateAuftragDetail(auf.id)
+=======
   if (auf?.id) revalidatePath(`/auftraege/${auf.id}`)
+>>>>>>> Stashed changes
 
   return { ok: true }
 }

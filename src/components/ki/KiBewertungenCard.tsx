@@ -1,4 +1,5 @@
 import type { BewertungenErgebnis } from '@/lib/ki/types'
+import { MockTable } from '@/components/mock-ui'
 import { KiCardShell } from '@/components/ki/KiCardShell'
 import { KiEmptyCardBody, KiHeroStat, type KiCardProps } from '@/components/ki/ki-card-shared'
 
@@ -16,7 +17,7 @@ export function KiBewertungenCard({ analyse, onGenerateKi, kiLoading }: KiCardPr
 
   const hero = top ? (
     <div className="grid gap-3 sm:grid-cols-3">
-      <KiHeroStat label="Top Handwerker" value={top.handwerker_name} sub={top.gewerk} />
+      <KiHeroStat label="Top Partner" value={top.handwerker_name} sub={top.gewerk} />
       <KiHeroStat label="Gesamt" value={<Stern value={top.gesamt} />} />
       <KiHeroStat label="Bewertungen" value={analyse.sample_size} />
     </div>
@@ -33,10 +34,10 @@ export function KiBewertungenCard({ analyse, onGenerateKi, kiLoading }: KiCardPr
           <span>Kommunikation <strong className="text-bw-text"><Stern value={kat.kommunikation} /></strong></span>
         </p>
       ) : null}
-      <table className="w-full text-left text-sm">
+      <MockTable className="w-full text-left text-sm">
         <thead>
-          <tr className="text-[11px] uppercase text-muted">
-            <th className="pb-2 font-semibold">Handwerker</th>
+          <tr className="text-fs-caption uppercase text-muted">
+            <th className="pb-2 font-semibold">Partner</th>
             <th className="pb-2 font-semibold">Gewerk</th>
             <th className="pb-2 text-right font-semibold">Gesamt</th>
             <th className="pb-2 text-right font-semibold">n</th>
@@ -52,7 +53,7 @@ export function KiBewertungenCard({ analyse, onGenerateKi, kiLoading }: KiCardPr
             </tr>
           ))}
         </tbody>
-      </table>
+      </MockTable>
     </>
   )
 
@@ -67,8 +68,8 @@ export function KiBewertungenCard({ analyse, onGenerateKi, kiLoading }: KiCardPr
       empty={empty}
       emptyBody={
         <KiEmptyCardBody
-          title="Noch keine Handwerker-Bewertungen"
-          hint="Nach Projektabschluss im Auftrag den Handwerker bewerten — dann erscheint hier das Qualitäts-Ranking."
+          title="Noch keine Partner-Bewertungen"
+          hint="Nach Projektabschluss im Auftrag den Partner bewerten — dann erscheint hier das Qualitäts-Ranking."
         />
       }
     />

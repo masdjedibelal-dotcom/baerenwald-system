@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ArrowRight, CheckCircle2, Send } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 
 type Props = {
   angebotId: string
@@ -61,9 +61,9 @@ export function AngebotWizardComplete({ angebotId, kundeName, versendet = false,
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
         ) : null}
-        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+        <MockBtn type="button" kind="ghost" sm onClick={onClose}>
           Schließen
-        </Button>
+        </MockBtn>
       </div>
     </div>
   )

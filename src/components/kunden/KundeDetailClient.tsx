@@ -1,18 +1,35 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import {
+  DetailShell,
+  EntityDetailLayout,
+  type DetailShellGroup,
+} from '@/components/layout/EntityDetailLayout'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { formatMonatKurzJahr } from '@/lib/utils'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { Card } from '@/components/ui/Card'
+<<<<<<< Updated upstream
+=======
 import { Textarea } from '@/components/ui/Textarea'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Modal } from '@/components/ui/Modal'
 import { Select } from '@/components/ui/Select'
 import { Input } from '@/components/ui/Input'
+>>>>>>> Stashed changes
 import { CustomFieldRenderer } from '@/components/ui/CustomFieldRenderer'
 import { TypBadge } from '@/components/kunden/TypBadge'
 import {
@@ -34,7 +51,6 @@ import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
 import type { Kunde, KundenObjekt } from '@/lib/types'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { createAngebotHref, createRechnungHref } from '@/lib/crm/create-entry'
@@ -44,7 +60,6 @@ import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
 import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { saveKundeCustomFieldValue, mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
 import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
@@ -61,10 +76,10 @@ import { parseEmailTokens } from '@/lib/email-recipients'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import type { BewohnerPrivatkundeLink } from '@/app/actions/objektakte-actions'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import Link from 'next/link'
 import { EINHEIT_BEWOHNER_ROLLE_LABELS } from '@/lib/objektakte/labels'
 import type { EinheitBewohnerRolle } from '@/lib/objektakte/types'
+import { TOAST } from '@/lib/copy'
 
 const QUELLE_LABELS: Record<string, string> = {
   website: 'Website',
@@ -171,7 +186,7 @@ export function KundeDetailClient({
 
   function confirmMergeIntoCurrent(other: Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'>) {
     if (other.id === kunde.id) {
-      toast.error('Derselbe Kunde kann nicht zusammengeführt werden.')
+      toast.error(TOAST.derselbe_kunde_kann_nicht_zusammengefuehrt_werde)
       return
     }
     setMergeOther(other)
@@ -183,13 +198,13 @@ export function KundeDetailClient({
     startTransition(async () => {
       const res = await mergeKunden(kunde.id, mergeOther.id)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       toast.success(res.message)
       setMergeOther(null)
       router.push(`/kunden/${kunde.id}`)
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -267,7 +282,7 @@ export function KundeDetailClient({
     if (!raw) return null
     const d = new Date(raw)
     if (Number.isNaN(d.getTime())) return null
-    return `Kunde seit ${d.toLocaleDateString('de-DE', { month: 'short', year: 'numeric' })}`
+    return `Kunde seit ${formatMonatKurzJahr(d)}`
   }, [kunde.created_at])
 
   async function openPortalModal() {
@@ -385,9 +400,9 @@ export function KundeDetailClient({
                 <li
                   key={l.bewohnerId}
                   style={{
-                    border: '0.5px solid var(--border)',
+                    border: '0.0.3125remrem solid var(--border)',
                     borderRadius: 10,
-                    padding: '10px 12px',
+                    padding: '0.6250remrem 0.75rem',
                     background: 'var(--bg-soft)',
                   }}
                 >
@@ -396,7 +411,7 @@ export function KundeDetailClient({
                   </p>
                   <p
                     style={{
-                      margin: '4px 0 0',
+                      margin: 'var(--sp-row) 0 0',
                       fontSize: 'var(--fs-meta)',
                       color: 'var(--text-3)',
                     }}
@@ -444,7 +459,7 @@ export function KundeDetailClient({
         }}
         banner={
           kundenStamm.fehlendeRechnungsfelder.length > 0 ? (
-            <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
+            <p className="mb-3 rounded-card border border-status-contact-bg/60 bg-status-contact-bg px-3 py-2 text-[length:var(--fs-meta)] text-status-contact-text">
               Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
             </p>
           ) : null
@@ -669,9 +684,9 @@ export function KundeDetailClient({
     >
       {zeigtOrganisationTab && tab === 'organisation' ? (
         <div className="space-y-3">
-          <button type="button" className="btn ghost sm" onClick={() => setTab('uebersicht')}>
+          <MockBtn kind="ghost" sm type="button" onClick={() => setTab('uebersicht')}>
             ← Zurück zur Übersicht
-          </button>
+          </MockBtn>
           {tabOrganisation}
         </div>
       ) : (
@@ -682,35 +697,34 @@ export function KundeDetailClient({
         />
       )}
 
-      <Modal
+      <EditorSheet
         open={portalModalOpen}
         onClose={() => setPortalModalOpen(false)}
         title="Kundenportal-Link versenden"
         size="lg"
+<<<<<<< Updated upstream
+        secondary={{ label: 'Abbrechen' }}
+        primary={{
+          label: 'Senden',
+          onClick: () => void sendenPortalLink(),
+          busy: portalSending,
+        }}
+=======
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setPortalModalOpen(false)}>
               Abbrechen
-            </Button>
-            <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
+            </MockBtn>
+            <MockBtn kind="primary" type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
               Senden
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         <div className="space-y-3">
-          <Input
-            label="An"
-            value={portalTo}
-            onChange={(e) => setPortalTo(e.target.value)}
-            placeholder="kunde@beispiel.de; weitere@beispiel.de"
-          />
-          <Input
-            label="CC (optional)"
-            value={portalCc}
-            onChange={(e) => setPortalCc(e.target.value)}
-            placeholder="intern@baerenwald.de; team@baerenwald.de"
-          />
+          <MockField label="An"><MockInput value={portalTo} onChange={(e) => setPortalTo(e.target.value)} placeholder="kunde@beispiel.de; weitere@beispiel.de" /></MockField>
+          <MockField label="CC (optional)"><MockInput value={portalCc} onChange={(e) => setPortalCc(e.target.value)} placeholder="intern@baerenwald.de; team@baerenwald.de" /></MockField>
           <KiAssistFieldLabel
             label="Betreff"
             value={portalBetreff}
@@ -718,7 +732,7 @@ export function KundeDetailClient({
             extraHint="Portal-Einladung Betreff an den Kunden (Sie-Anrede)."
             multiline={false}
           >
-            <Input value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
+            <MockInput value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
           </KiAssistFieldLabel>
           <KiAssistFieldLabel
             label="Text"
@@ -726,29 +740,24 @@ export function KundeDetailClient({
             onApply={setPortalText}
             extraHint="Portal-Einladungstext an den Kunden."
           >
-            <Textarea rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
+            <RichTextEditor value={typeof (portalText) === 'string' ? (portalText) : ''} onChange={(__v) => setPortalText(__v)} minHeight={144} />
           </KiAssistFieldLabel>
           <div>
             <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Mail-Vorschau</p>
             <iframe
               title="Kundenportal Mail Vorschau"
               sandbox="allow-same-origin"
-              className="h-[300px] w-full rounded-lg border border-bw-border bg-white"
+              className="h-[300px] w-full rounded-card border border-bw-border bg-white"
               srcDoc={portalHtml}
             />
           </div>
-          <Input
-            label="Portal-Login"
-            value={portalLink}
-            readOnly
-            className="bg-bw-bg-soft"
-          />
+          <MockField label="Portal-Login"><MockInput value={portalLink} readOnly className="bg-bw-bg-soft" /></MockField>
           <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
             Der Button in der Mail führt immer zu <strong>/portal/login</strong>. Mehrere Adressen in „An“/„CC“
             mit Semikolon trennen.
           </p>
         </div>
-      </Modal>
+      </EditorSheet>
 
       {mailCompose.modal}
 
@@ -759,21 +768,29 @@ export function KundeDetailClient({
         onPick={(other) => confirmMergeIntoCurrent(other)}
       />
 
-      <Modal
+      <ConfirmPopup
         open={Boolean(mergeOther)}
-        onClose={() => setMergeOther(null)}
+        onClose={() => {
+          if (!pending) setMergeOther(null)
+        }}
         title="Kunden zusammenführen"
+<<<<<<< Updated upstream
+        busy={pending}
+        confirmLabel={pending ? 'Wird zusammengeführt…' : 'Zusammenführen'}
+        onConfirm={() => executeMerge()}
+=======
         size="sm"
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" variant="secondary" onClick={() => setMergeOther(null)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setMergeOther(null)}>
               Abbrechen
-            </Button>
-            <Button type="button" loading={pending} onClick={() => executeMerge()}>
+            </MockBtn>
+            <MockBtn kind="primary" type="button" loading={pending} onClick={() => executeMerge()}>
               Zusammenführen
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         {mergeOther ? (
           <p className="text-[length:var(--fs-text)] text-bw-text">
@@ -782,7 +799,7 @@ export function KundeDetailClient({
             <strong>{kundeDisplayName(mergeOther)}</strong> wird entfernt.
           </p>
         ) : null}
-      </Modal>
+      </ConfirmPopup>
 
       {quickActionSheets}
     </EntityDetailLayout>

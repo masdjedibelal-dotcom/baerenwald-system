@@ -1,14 +1,14 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useMemo, useState } from 'react'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import {
   AnfrageDokumenteTab,
   type AkteProtokollDokument,
 } from '@/components/anfragen/AnfrageDokumenteTab'
-import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import {
   loadAbnahmeprotokolleListe,
   type AbnahmeprotokollListeEintrag,

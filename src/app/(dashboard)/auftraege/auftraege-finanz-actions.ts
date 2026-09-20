@@ -1,8 +1,15 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragFinanzen } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { planEinbehaltStatusWrite } from '@/lib/status/write-einbehalt-status'
 import type { EingangsrechnungKategorie } from '@/lib/types'
 
 export async function createEingangsrechnung(input: {
@@ -35,9 +42,10 @@ export async function createEingangsrechnung(input: {
     notizen: input.notizen.trim() || null,
     erstellt_von: uid,
   })
+  if (error) logDbError('app/auftraege/auftraege-finanz-actions:eingangsrechnungen', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${input.auftragId}/finanzen`)
+  revalidateAuftragFinanzen(input.auftragId)
   return { ok: true }
 }
 
@@ -58,9 +66,10 @@ export async function toggleEingangsrechnungBezahlt(
     })
     .eq('id', id)
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/auftraege-finanz-actions:eingangsrechnungen', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}/finanzen`)
+  revalidateAuftragFinanzen(auftragId)
   return { ok: true }
 }
 
@@ -91,10 +100,11 @@ export async function createEinbehalt(input: {
     freigabe_datum: input.freigabe_datum,
     notizen: input.notizen.trim() || null,
   })
+  if (error) logDbError('app/auftraege/auftraege-finanz-actions:einbehalte', error)
 
   if (error) return { ok: false, message: error.message }
 
-  revalidatePath(`/auftraege/${input.auftragId}/finanzen`)
+  revalidateAuftragFinanzen(input.auftragId)
   return { ok: true }
 }
 
@@ -120,16 +130,18 @@ export async function createBuergschaft(input: {
     gueltig_bis: input.gueltig_bis,
     dokument_url: input.dokument_url,
   })
+  if (ins) logDbError('app/auftraege/auftraege-finanz-actions:buergschaften', ins)
   if (ins) return { ok: false, message: ins.message }
 
   const { error: up } = await supabaseAdmin
     .from('einbehalte')
-    .update({ status: 'buergschaft' })
+    .update(planEinbehaltStatusWrite('buergschaft'))
     .eq('id', input.einbehaltId)
     .eq('auftrag_id', input.auftragId)
+  if (up) logDbError('app/auftraege/auftraege-finanz-actions:einbehalte', up)
 
   if (up) return { ok: false, message: up.message }
-  revalidatePath(`/auftraege/${input.auftragId}/finanzen`)
+  revalidateAuftragFinanzen(input.auftragId)
   return { ok: true }
 }
 
@@ -142,15 +154,17 @@ export async function freigebenEinbehalt(
 
   const { error } = await supabaseAdmin
     .from('einbehalte')
-    .update({
-      status: 'freigegeben',
-      freigegeben_at: new Date().toISOString(),
-    })
+    .update(
+      planEinbehaltStatusWrite('freigegeben', {
+        freigegeben_at: new Date().toISOString(),
+      })
+    )
     .eq('id', einbehaltId)
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/auftraege-finanz-actions:einbehalte', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}/finanzen`)
+  revalidateAuftragFinanzen(auftragId)
   return { ok: true }
 }
 

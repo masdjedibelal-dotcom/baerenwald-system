@@ -40,10 +40,10 @@ export function buildInternFormularSubmittedHtml(input: {
 }) {
   const url = absUrl(`/auftraege/${input.auftragId}`)
   const hw = input.handwerkerName
-    ? `<br/><strong>Handwerker:</strong> ${input.handwerkerName}`
+    ? `<br/><strong>Partner:</strong> ${input.handwerkerName}`
     : ''
   return `
-  <p>Ein Handwerker-Formular wurde abgesendet.</p>
+  <p>Ein Partner-Formular wurde abgesendet.</p>
   <p><strong>Template:</strong> ${input.templateName}<br/>
   <strong>Kunde:</strong> ${input.kunde}<br/>
   <strong>Auftrag:</strong> ${input.auftragId}${hw}</p>

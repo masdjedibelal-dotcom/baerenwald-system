@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export function publicBaseUrl(): string {
@@ -12,11 +13,12 @@ export function publicBaseUrl(): string {
 export async function projektOderStatusLink(leadId: string | null | undefined): Promise<string> {
   const base = publicBaseUrl()
   if (!leadId) return base
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('kunden_token')
     .eq('lead_id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/mail/versand-helpers:auftraege', error)
   const t = (auf as { kunden_token?: string | null } | null)?.kunden_token?.trim()
   if (t) return `${base}/projekt/${t}`
   return `${base}/status/${leadId}`

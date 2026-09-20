@@ -1,10 +1,12 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockDetailOverflowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { ActionIcon } from '@/components/ui/ActionIcon'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
+import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useMobileScrollChrome } from '@/hooks/useMobileScrollChrome'
 import {
@@ -98,17 +100,9 @@ function InlineActionButton({
   }
 
   return (
-    <button
-      type="button"
-      className={btnClass}
-      onClick={action.onClick}
-      disabled={action.disabled}
-      title={action.title}
-      aria-label={action.label}
-      aria-disabled={action.disabled || undefined}
-    >
+    <MockBtn className={btnClass} type="button" onClick={action.onClick} disabled={action.disabled} title={action.title} aria-label={action.label} aria-disabled={action.disabled || undefined}>
       {inner}
-    </button>
+    </MockBtn>
   )
 }
 
@@ -124,22 +118,17 @@ function MenuTrigger({
   className?: string
 }) {
   return (
-    <ActionsMenu
+    <MockDetailOverflowMenu
       sheetTitle={sheetTitle}
       items={items}
       trigger={
-        <button
-          type="button"
-          className={cn(
+        <MockBtn className={cn(
             'qa-btn inline-flex items-center justify-center',
             compact && 'detail-top-more detail-mobile-action-bar__more',
             className
-          )}
-          aria-label="Weitere Aktionen"
-          title="Weitere"
-        >
+          )} type="button" aria-label="Weitere Aktionen" title="Weitere">
           <ActionIcon n="dots" size={compact ? 20 : 18} />
-        </button>
+        </MockBtn>
       }
     />
   )

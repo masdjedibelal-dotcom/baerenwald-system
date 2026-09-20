@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { VIZ_STORAGE_BUCKET } from '@/lib/visualize/constants'
 
@@ -31,6 +32,7 @@ export async function loadVizImageBase64ForClaude(
   const pathFromUrl = /^https?:\/\//i.test(v) ? extractStoragePath(v, VIZ_STORAGE_BUCKET) : null
   if (pathFromUrl) {
     const { data, error } = await supabaseAdmin.storage.from(VIZ_STORAGE_BUCKET).download(pathFromUrl)
+    if (error) logDbError('lib/visualize/storage:query', error)
     if (error || !data) throw new Error('Bild konnte nicht aus dem Storage geladen werden.')
     buffer = Buffer.from(await data.arrayBuffer())
     contentType = data.type || contentType
@@ -41,6 +43,7 @@ export async function loadVizImageBase64ForClaude(
     contentType = res.headers.get('content-type') || contentType
   } else {
     const { data, error } = await supabaseAdmin.storage.from(VIZ_STORAGE_BUCKET).download(v)
+    if (error) logDbError('lib/visualize/storage:query', error)
     if (error || !data) throw new Error('Bild konnte nicht aus dem Storage geladen werden.')
     buffer = Buffer.from(await data.arrayBuffer())
     contentType = data.type || contentType
@@ -75,6 +78,7 @@ export async function persistRemoteImageToVisualisierungen(input: {
     contentType,
     upsert: true,
   })
+  if (error) logDbError('lib/visualize/storage:query', error)
   if (error) throw new Error(error.message)
 
   return visualisierungPublicUrl(path)

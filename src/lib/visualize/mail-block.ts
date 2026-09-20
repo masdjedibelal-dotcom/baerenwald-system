@@ -1,9 +1,10 @@
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -20,5 +21,5 @@ export function mailKiVisualisierungBlock(
       ? 'Im Angebot findest du eine <strong>KI-generierte Visualisierung</strong> — so könnte dein Projekt aussehen (PDF).'
       : 'Im Angebot finden Sie eine <strong>KI-generierte Visualisierung</strong> — so könnte Ihr Projekt aussehen (PDF).'
 
-  return `<p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${text}</p>`
+  return `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${text}</p>`
 }

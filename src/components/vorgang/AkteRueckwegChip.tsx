@@ -1,8 +1,9 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useCallback, useMemo } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   akteFromHref,
   akteFromLabel,
@@ -39,15 +40,10 @@ export function AkteRueckwegChip({
 
   return (
     <nav aria-label="Zurück" className={cn('mock-detail-back', className)}>
-      <button
-        type="button"
-        onClick={onClick}
-        className="mock-detail-back__link link border-0 bg-transparent p-0 text-left font-inherit"
-        aria-label={label}
-      >
+      <MockBtn className="mock-detail-back__link link border-0 bg-transparent p-0 text-left font-inherit" type="button" onClick={onClick} aria-label={label}>
         <MockIcon ctx="nav" n="arrow-left" size={15} />
         {label}
-      </button>
+      </MockBtn>
     </nav>
   )
 }

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { FormularFeld } from '@/lib/types'
 
@@ -261,6 +262,7 @@ export async function deactivateObsoleteFormularTemplates(): Promise<number> {
     .in('name', [...OBSOLETE_FORMULAR_TEMPLATE_NAMES])
     .eq('aktiv', true)
     .select('id')
+  if (error) logDbError('lib/standard-templates:formular_templates', error)
   if (error) {
     console.error('deactivateObsoleteFormularTemplates', error.message)
     return 0
@@ -298,6 +300,7 @@ export async function ensureStandardTemplates(): Promise<EnsureStandardTemplates
     .from('formular_templates')
     .select('name')
     .in('name', names)
+  if (selErr) logDbError('lib/standard-templates:formular_templates', selErr)
   if (selErr) return { ok: false, message: selErr.message }
 
   const existing = new Set((existingRows ?? []).map((r) => String(r.name)))
@@ -316,6 +319,7 @@ export async function ensureStandardTemplates(): Promise<EnsureStandardTemplates
         aktiv: true,
       }))
     )
+    if (insErr) logDbError('lib/standard-templates:formular_templates', insErr)
     if (insErr) return { ok: false, message: insErr.message }
   }
 

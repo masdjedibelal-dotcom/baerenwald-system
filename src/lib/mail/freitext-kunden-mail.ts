@@ -2,6 +2,7 @@ import type { MailBranding } from '@/lib/mail-branding'
 import { mailBegruessungZeile, mailTeamGruss, resolveMailAnrede, type MailAnrede } from '@/lib/mail/anrede'
 import { emailLogHtmlMarker } from '@/lib/kommunikation/types'
 import { mailHtmlBase } from '@/lib/mail-templates'
+import { C } from '@/lib/tokens/colors'
 
 /** Plain-Text mit Zeilenumbrüchen → HTML-Absätze. */
 export function plainTextToMailParagraphs(text: string): string {
@@ -13,8 +14,8 @@ export function plainTextToMailParagraphs(text: string): string {
     .map((p) => p.replace(/\n/g, '<br/>'))
     .map(
       (p) =>
-        `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${p}</p>`
-    )
+        `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${p}</p>`
+)
     .join('')
 }
 
@@ -30,13 +31,13 @@ export function buildFreitextKundenMailHtml(input: {
 }): string {
   const anrede = resolveMailAnrede(input.anrede, input.kundeTyp)
   const greeting = input.includeGreeting !== false
-    ? `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${mailBegruessungZeile(
+    ? `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${mailBegruessungZeile(
         anrede,
         input.displayName
       )}</p>`
     : ''
   const body = plainTextToMailParagraphs(input.bodyHtml)
-  const gruss = `<p style="font-size:15px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailTeamGruss(
+  const gruss = `<p style="font-size:15px;color:${C.gray700};margin:16px 0 0;line-height:1.6;">${mailTeamGruss(
     anrede,
     input.branding.firmenname
   )}</p>`

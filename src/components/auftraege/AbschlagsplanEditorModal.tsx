@@ -1,9 +1,11 @@
 'use client'
+import { DateInput } from '@/components/ui/DateInput'
 
-import { useEffect, useMemo, useState } from 'react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBtn, MockCard } from '@/components/mock-ui'
+import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { useEffect, useMemo, useState } from 'react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -94,33 +96,6 @@ function ratesEqual(a: EditorRate[], b: EditorRate[]): boolean {
       r.faellig_am === o.faellig_am
     )
   })
-}
-
-/** Footer im Sheet-Context — Abbrechen = Dirty-Confirm wie X/Swipe. */
-function AbschlagsplanEditorFooter({
-  ok,
-  saving,
-  onSave,
-}: {
-  ok: boolean
-  saving: boolean
-  onSave: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="zahlplan-editor-footer">
-      <MockBtn
-        kind="ghost"
-        onClick={() => (requestClose ? requestClose() : undefined)}
-        disabled={saving}
-      >
-        Abbrechen
-      </MockBtn>
-      <MockBtn kind="primary" icon="check" disabled={!ok || saving} onClick={onSave}>
-        {saving ? 'Speichern…' : 'Plan speichern'}
-      </MockBtn>
-    </div>
-  )
 }
 
 /** Abschlagsplan-Editor: bestehenden Plan bearbeiten (IDs bleiben), % oder €. */
@@ -307,30 +282,22 @@ export function AbschlagsplanEditorModal({
       crumb={`${formatEurBetrag(anzeigeGesamt)} aufteilen >`}
       dirty={dirty}
       size="lg"
-      footer={
-        <AbschlagsplanEditorFooter
-          ok={ok}
-          saving={Boolean(saving)}
-          onSave={() => onSave(ratesToPlan(rates, initial, frozenIds))}
-        />
-      }
+      secondary={{ label: 'Abbrechen', disabled: Boolean(saving), kind: 'ghost' }}
+      primary={{
+        label: 'Plan speichern',
+        icon: 'check',
+        disabled: !ok || Boolean(saving),
+        busy: Boolean(saving),
+        onClick: () => onSave(ratesToPlan(rates, initial, frozenIds)),
+      }}
     >
       <div className="zahlplan-editor-presets">
         {PRESETS.map((p) => (
-          <button
-            key={p.name}
-            type="button"
-            className="zahlplan-preset-chip"
-            disabled={frozen.size > 0}
-            title={
-              frozen.size > 0
+          <MockBtn className="zahlplan-preset-chip" key={p.name} type="button" disabled={frozen.size > 0} title={frozen.size > 0
                 ? 'Vorlagen gesperrt — gestellte/bezahlte Raten'
-                : 'Vorlage übernehmen und danach individuell anpassen'
-            }
-            onClick={() => applyPreset(p.build)}
-          >
+                : 'Vorlage übernehmen und danach individuell anpassen'} onClick={() => applyPreset(p.build)}>
             {p.name}
-          </button>
+          </MockBtn>
         ))}
       </div>
 
@@ -343,20 +310,15 @@ export function AbschlagsplanEditorModal({
             ? `Gebunden an gesendete Rechnung ${frozenNr}`
             : 'Gebunden an gesendete Rechnung'
           return (
-            <article
+            <MockCard
               key={r.id}
-              className={cn('card zahlplan-rate-card', isFrozen && 'is-frozen')}
+              className={cn('zahlplan-rate-card', isFrozen && 'is-frozen')}
+              flush
             >
               <div className="zahlplan-rate-card__head">
                 <label className="zahlplan-rate-card__field zahlplan-rate-card__field--grow">
                   <span className="zahlplan-rate-card__lbl">Bezeichnung</span>
-                  <input
-                    className="txt zahlplan-rate-card__name"
-                    value={r.label}
-                    disabled={isFrozen}
-                    aria-label="Bezeichnung"
-                    onChange={(e) => upd(r.id, { label: e.target.value })}
-                  />
+                  <MockInput className="txt zahlplan-rate-card__name" value={r.label} disabled={isFrozen} aria-label="Bezeichnung" onChange={(e) => upd(r.id, { label: e.target.value })} />
                 </label>
                 {isFrozen ? (
                   <span
@@ -381,7 +343,7 @@ export function AbschlagsplanEditorModal({
                     kind="ghost"
                     icon="trash"
                     onClick={() => remove(r.id)}
-                    title="Entfernen"
+                    title="Löschen"
                   />
                 )}
               </div>
@@ -394,16 +356,11 @@ export function AbschlagsplanEditorModal({
               <div className="zahlplan-rate-card__grid">
                 <label className="zahlplan-rate-card__field zahlplan-rate-card__field--art">
                   <span className="zahlplan-rate-card__lbl">Art</span>
-                  <select
-                    className="sel"
-                    value={r.typ}
-                    disabled={isFrozen}
-                    onChange={(e) => setTyp(r.id, e.target.value as ZahlungsplanAbschlagTyp)}
-                  >
+                  <MockSelect className="sel" value={r.typ} disabled={isFrozen} onChange={(e) => setTyp(r.id, e.target.value as ZahlungsplanAbschlagTyp)}>
                     <option value="prozent">%</option>
                     <option value="betrag">€ netto</option>
                     <option value="rest">Rest</option>
-                  </select>
+                  </MockSelect>
                 </label>
 
                 <label className="zahlplan-rate-card__field zahlplan-rate-card__field--wert">
@@ -437,27 +394,17 @@ export function AbschlagsplanEditorModal({
 
                 <label className="zahlplan-rate-card__field zahlplan-rate-card__field--faellig">
                   <span className="zahlplan-rate-card__lbl">Fällig</span>
-                  <input
-                    className="txt"
-                    type="date"
-                    value={r.faellig_am}
-                    disabled={isFrozen}
-                    onChange={(e) => upd(r.id, { faellig_am: e.target.value })}
-                  />
+                  <DateInput className="txt" value={r.faellig_am} disabled={isFrozen} onChange={(e) => upd(r.id, { faellig_am: e.target.value })} />
                 </label>
               </div>
-            </article>
+            </MockCard>
           )
         })}
 
         <div className="zahlplan-editor-foot">
-          <button
-            type="button"
-            className="pt-add zahlplan-editor-add"
-            onClick={add}
-          >
+          <MockBtn className="pt-add zahlplan-editor-add" type="button" onClick={add}>
             <MockIcon ctx="btn" n="plus" size={13} /> Abschlag hinzufügen
-          </button>
+          </MockBtn>
           <div className="zahlplan-editor-foot__totals">
             <span
               className={cn('zahlplan-editor-summe', ok ? 'is-ok' : 'is-bad')}

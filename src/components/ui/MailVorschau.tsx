@@ -1,10 +1,16 @@
 'use client'
-
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useEffect, useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { Send, Paperclip} from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { cn } from '@/lib/utils'
 
 export interface MailVorschauProps {
@@ -49,89 +55,73 @@ export function MailVorschau({
   }
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
       title="E-Mail Vorschau"
       size="lg"
+<<<<<<< Updated upstream
+      secondary={{ label: 'Abbrechen', onClick: onClose }}
+      primary={{
+        label: loading ? 'Wird gesendet…' : 'Jetzt senden',
+        onClick: () => void handleSend(),
+        busy: loading,
+      }}
+=======
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <MockBtn type="button" kind="secondary" onClick={onClose}>
             Abbrechen
-          </Button>
-          <Button type="button" variant="primary" loading={loading} onClick={() => void handleSend()}>
+          </MockBtn>
+          <MockBtn type="button" kind="primary" loading={loading} onClick={() => void handleSend()}>
             <Send className="mr-2 h-4 w-4" aria-hidden />
             {loading ? 'Wird gesendet…' : 'Jetzt senden'}
-          </Button>
+          </MockBtn>
         </div>
       }
+>>>>>>> Stashed changes
     >
       <div className="space-y-4">
         <div>
           <label className="input-label" htmlFor="mail-v-an">
             An
           </label>
-          <input
-            id="mail-v-an"
-            value={localAn}
-            onChange={(e) => setLocalAn(e.target.value)}
-            className="input"
-            type="email"
-          />
+          <MockInput id="mail-v-an" value={localAn} onChange={(e) => setLocalAn(e.target.value)} type="email" />
         </div>
         <div>
           <label className="input-label" htmlFor="mail-v-sub">
             Betreff
           </label>
-          <input
-            id="mail-v-sub"
-            value={localBetreff}
-            onChange={(e) => setLocalBetreff(e.target.value)}
-            className="input"
-          />
+          <MockInput id="mail-v-sub" value={localBetreff} onChange={(e) => setLocalBetreff(e.target.value)} />
         </div>
         {hatAnhang ? (
-          <div className="flex items-center gap-2 rounded-lg bg-bw-hover px-3 py-2 text-sm text-bw-text-muted">
-            <Paperclip className="h-4 w-4" aria-hidden />
+          <div className="flex items-center gap-2 rounded-card bg-bw-hover px-3 py-2 text-sm text-bw-text-muted">
+            <MockIcon n="file" ctx="default" className="h-4 w-4" aria-hidden />
             <span>{anhangName ?? 'Dokument.pdf'}</span>
           </div>
         ) : null}
         <div className="flex gap-2 border-b border-bw-border pb-2">
-          <button
-            type="button"
-            className={cn(
-              'rounded-md px-3 py-1.5 text-sm font-medium',
+          <MockBtn className={cn(
+              'rounded-button px-3 py-1.5 text-sm font-medium',
               tab === 'vorschau' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-light hover:text-bw-text'
-            )}
-            onClick={() => setTab('vorschau')}
-          >
+            )} type="button" onClick={() => setTab('vorschau')}>
             Vorschau
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'rounded-md px-3 py-1.5 text-sm font-medium',
+          </MockBtn>
+          <MockBtn className={cn(
+              'rounded-button px-3 py-1.5 text-sm font-medium',
               tab === 'quelltext' ? 'bg-bw-green-bg text-bw-primary' : 'text-bw-light hover:text-bw-text'
-            )}
-            onClick={() => setTab('quelltext')}
-          >
+            )} type="button" onClick={() => setTab('quelltext')}>
             Text bearbeiten
-          </button>
+          </MockBtn>
         </div>
         {tab === 'vorschau' ? (
-          <div className="h-64 overflow-hidden rounded-lg border border-bw-border">
+          <div className="h-64 overflow-hidden rounded-card border border-bw-border">
             <iframe title="Mail Vorschau" srcDoc={localHtml} className="h-64 w-full border-0" />
           </div>
         ) : (
-          <Textarea
-            plain
-            value={localHtml}
-            onChange={(e) => setLocalHtml(e.target.value)}
-            className="min-h-[240px] font-mono text-xs"
-            rows={12}
-          />
+          <MockTextarea value={localHtml} onChange={(e) => setLocalHtml(e.target.value)} rows={12} className="resize-y py-2 min-h-[120px] min-h-[240px] font-mono text-xs" />
         )}
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

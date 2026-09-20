@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import type {
@@ -97,10 +98,11 @@ export async function loadAuftragFinanzenClientPayload(auftragId: string): Promi
     )
     .eq('id', auftragId)
     .maybeSingle()
+  if (aErr) logDbError('app/auftraege/load-auftrag-finanzen-client-props:auftraege', aErr)
 
   if (aErr || !auf) return null
 
-  const { data: einRaw } = await supabase
+  const { data: einRaw, error: error2 } = await supabase
     .from('einbehalte')
     .select(
       `
@@ -111,18 +113,21 @@ export async function loadAuftragFinanzenClientPayload(auftragId: string): Promi
     )
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error2) logDbError('app/auftraege/load-auftrag-finanzen-client-props:einbehalte', error2)
 
-  const { data: erRaw } = await supabase
+  const { data: erRaw, error: error3 } = await supabase
     .from('eingangsrechnungen')
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error3) logDbError('app/auftraege/load-auftrag-finanzen-client-props:eingangsrechnungen', error3)
 
-  const { data: rechRows } = await supabase
+  const { data: rechRows, error: error4 } = await supabase
     .from('rechnungen')
     .select('id, brutto, status, created_at')
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error4) logDbError('app/auftraege/load-auftrag-finanzen-client-props:rechnungen', error4)
 
   const row = auf as Record<string, unknown>
   const ang = row.angebote as { gesamt_min?: unknown; gesamt_max?: unknown; positionen?: unknown } | null
@@ -151,12 +156,12 @@ export async function loadAuftragFinanzenClientPayload(auftragId: string): Promi
     eingangsrechnungen.filter((e) => e.kategorie === k).reduce((s, e) => s + e.betrag_brutto, 0)
 
   const breakdown = [
-    { key: 'lohn', label: 'Handwerker-Lohn (Eingang)', betrag: katSum('lohn') },
+    { key: 'lohn', label: 'Partner-Lohn (Eingang)', betrag: katSum('lohn') },
     { key: 'material', label: 'Material', betrag: katSum('material') },
     { key: 'geraete', label: 'Geräte / Miete', betrag: katSum('geraete') },
     { key: 'entsorgung', label: 'Entsorgung', betrag: katSum('entsorgung') },
     { key: 'sonstiges', label: 'Sonstiges', betrag: katSum('sonstiges') },
-    { key: 'hw_einbehalt', label: 'Handwerker-Rechnungen (brutto, Einbehaltbasis)', betrag: summeEinbehaltBrutto },
+    { key: 'hw_einbehalt', label: 'Partner-Rechnungen (brutto, Einbehaltbasis)', betrag: summeEinbehaltBrutto },
   ]
 
   const breakdownGesamt = breakdown.reduce((s, b) => s + b.betrag, 0)

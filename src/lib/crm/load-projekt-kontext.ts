@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
@@ -57,11 +58,12 @@ export async function loadProjektKontext(
 
   // ── Phase 1: fehlende IDs auflösen (nur nötige Schritte) ──
   if (rechnungId && (!leadId || !kundeId || !auftragId || !angebotId)) {
-    const { data: rec } = await supabase
+    const { data: rec, error } = await supabase
       .from('rechnungen')
       .select('id, kunde_id, auftrag_id, angebot_id')
       .eq('id', rechnungId)
       .maybeSingle()
+    if (error) logDbError('lib/crm/load-projekt-kontext:rechnungen', error)
     if (rec) {
       kundeId = kundeId ?? (rec.kunde_id as string | null)
       auftragId = auftragId ?? (rec.auftrag_id as string | null)
@@ -70,11 +72,12 @@ export async function loadProjektKontext(
   }
 
   if (auftragId && (!leadId || !kundeId || !angebotId)) {
-    const { data: auf } = await supabase
+    const { data: auf, error } = await supabase
       .from('auftraege')
       .select('lead_id, kunde_id, angebot_id')
       .eq('id', auftragId)
       .maybeSingle()
+    if (error) logDbError('lib/crm/load-projekt-kontext:auftraege', error)
     if (auf) {
       leadId = leadId ?? (auf.lead_id as string | null)
       kundeId = kundeId ?? (auf.kunde_id as string | null)
@@ -83,11 +86,12 @@ export async function loadProjektKontext(
   }
 
   if (angebotId && (!leadId || !kundeId)) {
-    const { data: ang } = await supabase
+    const { data: ang, error } = await supabase
       .from('angebote')
       .select('lead_id, kunde_id')
       .eq('id', angebotId)
       .maybeSingle()
+    if (error) logDbError('lib/crm/load-projekt-kontext:angebote', error)
     if (ang) {
       leadId = leadId ?? (ang.lead_id as string | null)
       kundeId = kundeId ?? (ang.kunde_id as string | null)
@@ -95,16 +99,18 @@ export async function loadProjektKontext(
   }
 
   if (leadId && !kundeId) {
-    const { data: leadRow } = await supabase
+    const { data: leadRow, error } = await supabase
       .from('leads')
       .select('kunde_id, auftraggeber_kunde_id')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('lib/crm/load-projekt-kontext:leads', error)
     kundeId = leadVertragsKundeId(leadRow ?? {}) ?? null
   }
 
   // ── Phase 2: Entity-Reads parallel ──
   const [kundeRes, leadRes, angeboteRes, auftragRes] = await Promise.all([
+    // logDbError: Ergebnisse direkt nach Promise.all
     kundeId
       ? supabase
           .from('kunden')
@@ -152,6 +158,17 @@ export async function loadProjektKontext(
           : Promise.resolve({ data: null }),
   ])
 
+  for (const [ctx, res] of [
+    ['kunden', kundeRes],
+    ['leads', leadRes],
+    ['angebote', angeboteRes],
+    ['auftraege', auftragRes],
+  ] as const) {
+    if ('error' in res && res.error) {
+      logDbError(`lib/crm/load-projekt-kontext:${ctx}`, res.error)
+    }
+  }
+
   let kunde: ProjektKontext['kunde'] = null
   if (kundeRes.data) {
     const kRow = kundeRes.data
@@ -197,18 +214,20 @@ export async function loadProjektKontext(
   // ── Phase 3: Rechnungen (braucht ggf. aufgelöste auftragId) ──
   let rechnungen: ProjektRechnungKurz[] = []
   if (auftragId) {
-    const { data: recRows } = await supabase
+    const { data: recRows, error } = await supabase
       .from('rechnungen')
       .select(RECHNUNG_KURZ_SELECT)
       .eq('auftrag_id', auftragId)
       .order('rechnungsdatum', { ascending: false })
+    if (error) logDbError('lib/crm/load-projekt-kontext:rechnungen', error)
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]
   } else if (angebotId) {
-    const { data: recRows } = await supabase
+    const { data: recRows, error } = await supabase
       .from('rechnungen')
       .select(RECHNUNG_KURZ_SELECT)
       .eq('angebot_id', angebotId)
       .order('rechnungsdatum', { ascending: false })
+    if (error) logDbError('lib/crm/load-projekt-kontext:rechnungen', error)
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]
   }
 

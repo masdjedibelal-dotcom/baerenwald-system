@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
 import { PARTNER_UPLOAD_BUCKET } from '@/lib/partner/handwerker-einreichung'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -34,6 +35,7 @@ export async function uploadHwAngebotPdfFromCrm(opts: {
   const { error } = await supabaseAdmin.storage
     .from(PARTNER_UPLOAD_BUCKET)
     .upload(path, buf, { contentType: 'application/pdf', upsert: false })
+  if (error) logDbError('lib/partner/upload-hw-angebot-pdf:query', error)
 
   if (error) return { ok: false, message: error.message }
   return { ok: true, path }

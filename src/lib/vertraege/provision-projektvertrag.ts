@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
 import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'
@@ -22,12 +23,14 @@ async function resolveGewerkId(hint?: {
   if (hint?.gewerkId?.trim()) return hint.gewerkId.trim()
   const slug = hint?.gewerkSlug?.trim()
   if (slug) {
-    const { data } = await supabaseAdmin.from('gewerke').select('id').eq('slug', slug).maybeSingle()
+    const { data, error } = await supabaseAdmin.from('gewerke').select('id').eq('slug', slug).maybeSingle()
+    if (error) logDbError('lib/vertraege/provision-projektvertrag:gewerke', error)
     if (data?.id) return String(data.id)
   }
   const name = hint?.gewerkName?.trim()
   if (name) {
-    const { data } = await supabaseAdmin.from('gewerke').select('id').eq('name', name).maybeSingle()
+    const { data, error } = await supabaseAdmin.from('gewerke').select('id').eq('name', name).maybeSingle()
+    if (error) logDbError('lib/vertraege/provision-projektvertrag:gewerke', error)
     if (data?.id) return String(data.id)
   }
   return null
@@ -45,26 +48,28 @@ export async function ensureAuftragHandwerkerZuordnung(
 ): Promise<{ ok: true; created: boolean } | { ok: false; message: string }> {
   const aid = auftragId.trim()
   const hid = handwerkerId.trim()
-  if (!aid || !hid) return { ok: false, message: 'Auftrag oder Handwerker fehlt.' }
+  if (!aid || !hid) return { ok: false, message: 'Auftrag oder Partner fehlt.' }
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('id')
     .eq('auftrag_id', aid)
     .eq('handwerker_id', hid)
     .maybeSingle()
+  if (error) logDbError('lib/vertraege/provision-projektvertrag:auftrag_handwerker', error)
 
   if (existing?.id) return { ok: true, created: false }
 
   let gewerkId = await resolveGewerkId(hint)
   if (!gewerkId) {
-    const { data: pos } = await supabaseAdmin
+    const { data: pos, error } = await supabaseAdmin
       .from('auftrag_positionen')
       .select('gewerk_slug, gewerk_name')
       .eq('auftrag_id', aid)
       .eq('handwerker_id', hid)
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('lib/vertraege/provision-projektvertrag:auftrag_positionen', error)
     if (pos) {
       gewerkId = await resolveGewerkId({
         gewerkSlug: (pos as { gewerk_slug?: string | null }).gewerk_slug,
@@ -74,38 +79,41 @@ export async function ensureAuftragHandwerkerZuordnung(
   }
 
   if (!gewerkId) {
-    return { ok: false, message: 'Gewerk für Handwerker-Zuordnung nicht ermittelbar.' }
+    return { ok: false, message: 'Gewerk für Partner-Zuordnung nicht ermittelbar.' }
   }
 
-  const { error } = await supabaseAdmin.from('auftrag_handwerker').insert({
+  const { error: error2 } = await supabaseAdmin.from('auftrag_handwerker').insert({
     auftrag_id: aid,
     handwerker_id: hid,
     gewerk_id: gewerkId,
     status: 'zugewiesen',
   })
+  if (error2) logDbError('lib/vertraege/provision-projektvertrag:auftrag_handwerker', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
   return { ok: true, created: true }
 }
 
 async function handwerkerIdsAmAuftrag(auftragId: string): Promise<string[]> {
   const ids = new Set<string>()
 
-  const { data: zuordnungen } = await supabaseAdmin
+  const { data: zuordnungen, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('handwerker_id')
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('lib/vertraege/provision-projektvertrag:auftrag_handwerker', error)
 
   for (const z of zuordnungen ?? []) {
     const id = String((z as { handwerker_id: string }).handwerker_id ?? '').trim()
     if (id) ids.add(id)
   }
 
-  const { data: positionen } = await supabaseAdmin
+  const { data: positionen, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select('handwerker_id')
     .eq('auftrag_id', auftragId)
     .not('handwerker_id', 'is', null)
+  if (error2) logDbError('lib/vertraege/provision-projektvertrag:auftrag_positionen', error2)
 
   for (const p of positionen ?? []) {
     const id = String((p as { handwerker_id: string }).handwerker_id ?? '').trim()
@@ -193,7 +201,7 @@ export async function provisionProjektVertragFuerHandwerker(
   auftragId: string,
   handwerkerId: string
 ): Promise<{ ok: true; vertrag_id: string; created: boolean } | { ok: false; message: string }> {
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error } = await supabaseAdmin
     .from('handwerker_vertraege')
     .select('id, pdf_url')
     .eq('auftrag_id', auftragId)
@@ -202,20 +210,22 @@ export async function provisionProjektVertragFuerHandwerker(
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('lib/vertraege/provision-projektvertrag:handwerker_vertraege', error)
 
   if (existing?.pdf_url?.trim()) {
     return { ok: true, vertrag_id: existing.id as string, created: false }
   }
 
-  const { data: zuordnung } = await supabaseAdmin
+  const { data: zuordnung, error: error2 } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('gewerk_id, gewerke(name)')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .maybeSingle()
+  if (error2) logDbError('lib/vertraege/provision-projektvertrag:auftrag_handwerker', error2)
 
   if (!zuordnung) {
-    return { ok: false, message: 'Keine Handwerker-Zuordnung am Auftrag.' }
+    return { ok: false, message: 'Keine Partner-Zuordnung am Auftrag.' }
   }
 
   const gewerk = unwrapJoin(
@@ -224,11 +234,12 @@ export async function provisionProjektVertragFuerHandwerker(
   const gewerkName = gewerk?.name ?? ''
   const gewerkId = (zuordnung as { gewerk_id?: string | null }).gewerk_id ?? null
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error: error3 } = await supabaseAdmin
     .from('auftraege')
     .select('id, titel, kunden(plz, ort, adresse, strasse, hausnummer), auftrag_positionen(*)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error3) logDbError('lib/vertraege/provision-projektvertrag:auftraege', error3)
 
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
 
@@ -277,6 +288,7 @@ export async function provisionProjektVertragFuerHandwerker(
 
   if (vertragId) {
     const { error } = await supabaseAdmin.from('handwerker_vertraege').update(row).eq('id', vertragId)
+    if (error) logDbError('lib/vertraege/provision-projektvertrag:handwerker_vertraege', error)
     if (error) return { ok: false, message: error.message }
   } else {
     const { data: ins, error } = await supabaseAdmin
@@ -284,6 +296,7 @@ export async function provisionProjektVertragFuerHandwerker(
       .insert({ ...row, status: 'entwurf', created_at: now })
       .select('id')
       .single()
+    if (error) logDbError('lib/vertraege/provision-projektvertrag:handwerker_vertraege', error)
     if (error || !ins) return { ok: false, message: error?.message ?? 'Vertrag anlegen fehlgeschlagen' }
     vertragId = ins.id as string
   }

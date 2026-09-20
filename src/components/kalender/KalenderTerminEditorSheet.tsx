@@ -1,17 +1,16 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } from 'react'
-import { Plus } from 'lucide-react'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Combobox } from '@/components/ui/Combobox'
 import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
 import { TimeInput } from '@/components/ui/TimeInput'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   deleteKalenderTermin,
   loadTerminLinkAdresse,
@@ -32,10 +31,13 @@ import {
 } from '@/lib/kalender/termin-kategorien'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { KalenderTermin, Kunde } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, formatWochentagDatumLang } from '@/lib/utils'
 import {
   kalenderTerminEndeVergangen,
 } from '@/lib/kalender/termin-no-show-hint'
+import { C } from '@/lib/tokens/colors'
+import { TOAST } from '@/lib/copy'
+import { deleteWithUndo } from '@/lib/ui/delete-with-undo'
 
 export type MockKat = TerminKatFarbe
 
@@ -85,12 +87,7 @@ function applyAdresseParts(
 function formatDatumLabel(iso: string): string {
   const d = new Date(`${iso.slice(0, 10)}T12:00:00`)
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10)
-  return d.toLocaleDateString('de-DE', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  return formatWochentagDatumLang(d)
 }
 
 function Prop({ label, children }: { label: string; children: ReactNode }) {
@@ -103,7 +100,7 @@ function Prop({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function katDotColor(kat: MockKat): string {
-  if (kat === 'yellow') return '#D9A800'
+  if (kat === 'yellow') return C.accentGold2
   if (kat === 'blue') return 'var(--blue-tx)'
   return 'var(--green)'
 }
@@ -259,7 +256,7 @@ export function KalenderTerminEditorSheet({
   }) {
     const res = await loadTerminLinkAdresse(opts)
     if (!res.ok) {
-      toast.error(res.message)
+      toast.systemError(res)
       return
     }
     applyAdresseParts(setStrasse, setHausnummer, setPlz, {
@@ -323,7 +320,7 @@ export function KalenderTerminEditorSheet({
         erledigt: termin?.erledigt ?? false,
       })
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       toast.success(
@@ -336,15 +333,25 @@ export function KalenderTerminEditorSheet({
 
   function onDelete() {
     if (!termin) return
-    confirmDelete('Termin löschen?', async () => {
-      const res = await deleteKalenderTermin(termin.id)
-      if (!res.ok) {
-        toast.error(res.message)
-        throw new Error(res.message)
-      }
-      toast.success('Termin gelöscht')
-      onClose()
-      onSaved()
+    const id = termin.id
+    onClose()
+    deleteWithUndo({
+      key: `termin:${id}`,
+      removeOptimistic: () => {
+        /* Sheet zu — Liste bleibt bis Commit; Undo bricht Delete ab */
+      },
+      restoreOptimistic: () => {
+        /* nichts — Termin war noch nicht gelöscht */
+      },
+      commit: async () => {
+        const res = await deleteKalenderTermin(id)
+        if (!res.ok) {
+          toast.systemError(res)
+          return
+        }
+        onSaved()
+      },
+      message: TOAST.geloescht,
     })
   }
 
@@ -374,17 +381,12 @@ export function KalenderTerminEditorSheet({
       headerEnd={
         isView ? (
           <div className="cal-termin-detail__header-actions">
-            <button
-              type="button"
-              className="btn ghost sm danger"
-              disabled={pending}
-              onClick={() => void onDelete()}
-            >
+            <MockBtn kind="ghost" sm type="button" disabled={pending} onClick={() => void onDelete()}>
               Löschen
-            </button>
-            <button type="button" className="btn ghost sm" onClick={() => setMode('edit')}>
+            </MockBtn>
+            <MockBtn kind="ghost" sm type="button" onClick={() => setMode('edit')}>
               Bearbeiten
-            </button>
+            </MockBtn>
           </div>
         ) : undefined
       }
@@ -421,7 +423,7 @@ export function KalenderTerminEditorSheet({
               ) : null}
             </div>
             {noShowHinweis ? (
-              <p className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-[length:var(--fs-text)] text-[var(--text-3)]">
+              <p className="mt-3 rounded-card border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-[length:var(--fs-text)] text-[var(--text-3)]">
                 Kunde nicht erschienen? In der Anfrage{' '}
                 <strong className="font-medium text-[var(--text)]">Aktionen → Nicht erreichbar</strong>{' '}
                 setzen.
@@ -432,23 +434,10 @@ export function KalenderTerminEditorSheet({
       ) : (
         <form id={formId} onSubmit={submitForm} className="form-grid">
           <div className="full">
-            <Input
-              label="Titel"
-              value={titel}
-              onChange={(e) => setTitel(e.target.value)}
-              placeholder="z.B. Vor-Ort Termin Koch"
-              required
-              autoFocus
-            />
+            <MockField label="Titel" required><MockInput value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Vor-Ort Termin Koch" required autoFocus /></MockField>
           </div>
           <div className="full">
-            <Select
-              label="Kategorie"
-              value={kategorie}
-              options={kategorieOptions}
-              onChange={(e) => setKategorie(e.target.value as TerminKategorie)}
-              required
-            />
+            <Combobox label="Kategorie" required options={kategorieOptions} value={kategorie == null ? '' : String(kategorie)} placeholder="Auswählen…" onChange={(next) => { setKategorie(next as TerminKategorie); }} />
           </div>
           <div className="full">
             <span className="input-label">
@@ -500,37 +489,14 @@ export function KalenderTerminEditorSheet({
 
           <div className="full form-grid" style={{ margin: 0 }}>
             <div className="full">
-              <Input
-                label="Anschrift"
-                value={strasse}
-                onChange={(e) => setStrasse(e.target.value)}
-                placeholder="Musterstraße"
-                autoComplete="street-address"
-              />
+              <MockField label="Anschrift"><MockInput value={strasse} onChange={(e) => setStrasse(e.target.value)} placeholder="Musterstraße" autoComplete="street-address" /></MockField>
             </div>
-            <Input
-              label="Hausnummer"
-              value={hausnummer}
-              onChange={(e) => setHausnummer(e.target.value)}
-              placeholder="12"
-            />
-            <Input
-              label="PLZ"
-              value={plz}
-              onChange={(e) => setPlz(e.target.value)}
-              placeholder="80331"
-              inputMode="numeric"
-              autoComplete="postal-code"
-            />
+            <MockField label="Hausnummer"><MockInput value={hausnummer} onChange={(e) => setHausnummer(e.target.value)} placeholder="12" /></MockField>
+            <MockField label="PLZ"><MockInput value={plz} onChange={(e) => setPlz(e.target.value)} placeholder="80331" inputMode="numeric" autoComplete="postal-code" /></MockField>
           </div>
 
           <div className="full">
-            <Textarea
-              label="Beschreibung"
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              rows={2}
-            />
+            <MockField label="Beschreibung"><RichTextEditor value={typeof (desc) === 'string' ? (desc) : ''} onChange={(__v) => setDesc(__v)} minHeight={120} aria-label="Beschreibung" /></MockField>
           </div>
         </form>
       )}
@@ -547,15 +513,9 @@ export function KalenderAddButton({
   label?: string
 }) {
   return (
-    <button
-      type="button"
-      className="cal-toolbar__add"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-    >
-      <Plus className="h-5 w-5" aria-hidden />
-    </button>
+    <MockBtn className="cal-toolbar__add" type="button" onClick={onClick} title={label} aria-label={label}>
+      <MockIcon n="plus" ctx="default" className="h-5 w-5" aria-hidden />
+    </MockBtn>
   )
 }
 

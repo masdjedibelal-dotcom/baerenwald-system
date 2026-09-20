@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockSelect } from '@/components/mock-ui/MockForm'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import {
   formatEurBetrag,
@@ -100,34 +102,22 @@ export function NachlassModusFields({
   return (
     <>
       <Field label="Art des Nachlasses">
-        <select
-          className={selectClassName}
-          value={selectVal}
-          onChange={(e) => setArt(e.target.value as 'prozent' | 'betrag' | 'ziel')}
-        >
+        <MockSelect className={selectClassName} value={selectVal} onChange={(e) => setArt(e.target.value as 'prozent' | 'betrag' | 'ziel')}>
           <option value="prozent">Prozent vom Netto</option>
           <option value="betrag">Fester Betrag (netto)</option>
           <option value="ziel">Neuer Gesamtbetrag</option>
-        </select>
+        </MockSelect>
       </Field>
 
       {isZiel ? (
         <Field label="Basis" hint="Rabatt = Summe vorher − neuer Gesamtbetrag">
           <div className="seg" role="group" aria-label="Netto oder Brutto">
-            <button
-              type="button"
-              className={modus === 'ziel_netto' ? 'on' : undefined}
-              onClick={() => setZielBasis('netto')}
-            >
+            <MockBtn className={modus === 'ziel_netto' ? 'on' : undefined} type="button" onClick={() => setZielBasis('netto')}>
               Netto
-            </button>
-            <button
-              type="button"
-              className={modus === 'ziel_brutto' ? 'on' : undefined}
-              onClick={() => setZielBasis('brutto')}
-            >
+            </MockBtn>
+            <MockBtn className={modus === 'ziel_brutto' ? 'on' : undefined} type="button" onClick={() => setZielBasis('brutto')}>
               Brutto
-            </button>
+            </MockBtn>
           </div>
         </Field>
       ) : (

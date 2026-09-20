@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -85,7 +87,7 @@ function ResetPasswordContent() {
     <div className="flex min-h-screen items-center justify-center bg-bw-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-bw-bg p-2">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-sheet bg-bw-bg p-2">
             <BrandLogo variant="green" height={40} priority />
           </div>
           <h1 className="text-xl font-semibold text-bw-text">Neues CRM-Passwort</h1>
@@ -104,37 +106,20 @@ function ResetPasswordContent() {
             <div className="space-y-4">
               <label className="block">
                 <span className="input-label">Neues Passwort</span>
-                <input
-                  type="password"
-                  className="input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
+                <MockInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
               </label>
               <label className="block">
                 <span className="input-label">Passwort wiederholen</span>
-                <input
-                  type="password"
-                  className="input"
-                  value={password2}
-                  onChange={(e) => setPassword2(e.target.value)}
-                  autoComplete="new-password"
-                />
+                <MockInput type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} autoComplete="new-password" />
               </label>
               {error ? (
-                <div className="rounded-lg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
+                <div className="rounded-card bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
                   {error}
                 </div>
               ) : null}
-              <button
-                type="button"
-                className="btn primary w-full"
-                disabled={loading}
-                onClick={() => void handleSave()}
-              >
+              <MockBtn kind="primary" fullWidth type="button" disabled={loading} onClick={() => void handleSave()}>
                 {loading ? 'Speichere…' : 'Passwort speichern'}
-              </button>
+              </MockBtn>
             </div>
           )}
         </Card>

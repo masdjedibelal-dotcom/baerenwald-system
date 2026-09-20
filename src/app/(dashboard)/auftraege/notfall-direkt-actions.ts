@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
@@ -8,6 +14,7 @@ import {
   notifyPartnerUnified,
   partnerVorgangLink,
 } from '@/lib/partner/notify-partner-unified'
+import { writeAuftragStatus } from '@/lib/status/write-auftrag-status'
 
 export type NotfallDirektInput = {
   auftragId?: string | null
@@ -77,6 +84,7 @@ export async function notfallDirektBeauftragen(
       .select('id, lead_id, kunde_id, titel')
       .eq('id', auftragId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/notfall-direkt-actions:auftraege', error)
     if (error || !auf) return { ok: false, message: error?.message ?? 'Auftrag nicht gefunden.' }
     leadId = auf.lead_id ? String(auf.lead_id) : leadId
     kundeId = auf.kunde_id ? String(auf.kunde_id) : null
@@ -87,18 +95,20 @@ export async function notfallDirektBeauftragen(
       .select('id, auftraggeber_kunde_id, kunde_id, melder_einheit, situation')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/notfall-direkt-actions:leads', error)
     if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden.' }
     kundeId = (lead.auftraggeber_kunde_id || lead.kunde_id)
       ? String(lead.auftraggeber_kunde_id || lead.kunde_id)
       : null
 
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: error2 } = await supabaseAdmin
       .from('auftraege')
       .select('id, titel')
       .eq('lead_id', leadId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+    if (error2) logDbError('app/auftraege/notfall-direkt-actions:auftraege', error2)
 
     if (existing?.id) {
       auftragId = String(existing.id)
@@ -118,6 +128,7 @@ export async function notfallDirektBeauftragen(
         })
         .select('id, titel')
         .single()
+      if (aErr) logDbError('app/auftraege/notfall-direkt-actions:auftraege', aErr)
       if (aErr || !neu?.id) {
         // Fallback ohne neue Spalten
         if (/ist_notfall|notfall_verguetung/i.test(aErr?.message ?? '')) {
@@ -132,6 +143,7 @@ export async function notfallDirektBeauftragen(
             })
             .select('id, titel')
             .single()
+          if (aErr2) logDbError('app/auftraege/notfall-direkt-actions:auftraege', aErr2)
           if (aErr2 || !neu2?.id) {
             return { ok: false, message: aErr2?.message ?? 'Auftrag konnte nicht angelegt werden.' }
           }
@@ -150,6 +162,12 @@ export async function notfallDirektBeauftragen(
   }
 
   // Banner-Felder am Auftrag
+<<<<<<< Updated upstream
+  const { error: bannerErr } = await writeAuftragStatus(supabaseAdmin, auftragId, 'in_arbeit', {
+    ist_notfall: true,
+    notfall_verguetung: verguetung,
+  })
+=======
   const { error: bannerErr } = await supabaseAdmin
     .from('auftraege')
     .update({
@@ -159,17 +177,20 @@ export async function notfallDirektBeauftragen(
       updated_at: new Date().toISOString(),
     })
     .eq('id', auftragId)
+>>>>>>> Stashed changes
+  if (bannerErr) logDbError('app/auftraege/notfall-direkt-actions:auftraege', bannerErr)
   if (bannerErr && !/ist_notfall|notfall_verguetung/i.test(bannerErr.message)) {
     return { ok: false, message: bannerErr.message }
   }
 
   let hvStatusVorDirekt: string | null = null
   if (leadId) {
-    const { data: leadVor } = await supabaseAdmin
+    const { data: leadVor, error } = await supabaseAdmin
       .from('leads')
       .select('hv_meldung_status')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/notfall-direkt-actions:leads', error)
     hvStatusVorDirekt =
       (leadVor as { hv_meldung_status?: string } | null)?.hv_meldung_status ?? null
 
@@ -188,31 +209,34 @@ export async function notfallDirektBeauftragen(
       .eq('id', leadId)
   }
 
-  const { data: zuweisung } = await supabaseAdmin
+  const { data: zuweisung, error: error2 } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('id')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', hwId)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/notfall-direkt-actions:auftrag_handwerker', error2)
 
   if (!zuweisung?.id) {
-    await supabaseAdmin.from('auftrag_handwerker').insert({
+    const { error: __dbErr1 } = await supabaseAdmin.from('auftrag_handwerker').insert({
       auftrag_id: auftragId,
       handwerker_id: hwId,
       status: 'angefragt',
     })
+    if (__dbErr1) logDbError('app/auftraege/notfall-direkt-actions:auftrag_handwerker', __dbErr1)
   }
 
   const gewerk = (input.gewerkName?.trim() || 'Allgemein').replace(/\s+/g, ' ')
   const leistungName = `Notfalleinsatz ${gewerk}`
 
-  const { data: maxSort } = await supabaseAdmin
+  const { data: maxSort, error: error3 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select('sort_order')
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error3) logDbError('app/auftraege/notfall-direkt-actions:auftrag_positionen', error3)
 
   const stundensatz = betrag
   // Platzhalter-Menge 1 — tatsächliche Stunden kommen aus dem Bautagebuch / Rechnung.
@@ -257,6 +281,7 @@ export async function notfallDirektBeauftragen(
     .insert(insertPayload)
     .select('id')
     .single()
+  if (posErr) logDbError('app/auftraege/notfall-direkt-actions:auftrag_positionen', posErr)
 
   if (posErr || !inserted?.id) {
     if (/typ|verguetung|geschaetzt_std|stundensatz|anerkennung/i.test(posErr?.message ?? '')) {
@@ -267,6 +292,7 @@ export async function notfallDirektBeauftragen(
         .insert(legacy)
         .select('id')
         .single()
+      if (legacyErr) logDbError('app/auftraege/notfall-direkt-actions:auftrag_positionen', legacyErr)
       if (legacyErr || !legacyIns?.id) {
         return {
           ok: false,
@@ -339,11 +365,12 @@ export async function notfallDirektBeauftragen(
       '@/lib/email/meldung-mail-templates'
     )
     if (!hvHatBereitsMeldungGewaehlt(hvStatusVorDirekt)) {
-      const { data: hv } = await supabaseAdmin
+      const { data: hv, error } = await supabaseAdmin
         .from('kunden')
         .select('id, name, email, org_anzeigename, portal_modus')
         .eq('id', kundeId)
         .maybeSingle()
+      if (error) logDbError('app/auftraege/notfall-direkt-actions:kunden', error)
       const hvEmail = (hv as { email?: string | null } | null)?.email?.trim()
       if (hvEmail && (hv as { portal_modus?: string } | null)?.portal_modus === 'organisation') {
         const { getMailBranding } = await import('@/lib/get-mail-branding')
@@ -399,8 +426,8 @@ export async function notfallDirektBeauftragen(
     }
   }
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  if (leadId) revalidatePath(`/anfragen/${leadId}`)
+  revalidateAuftragDetail(auftragId)
+  if (leadId) revalidateLeadDetail(leadId)
 
   return { ok: true, auftragId, positionId }
 }

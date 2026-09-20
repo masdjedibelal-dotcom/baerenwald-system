@@ -1,14 +1,16 @@
 import type { VersammlungsberichtPayload } from '@/lib/objektakte/load-versammlungsbericht-data'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
-import { formatDatum } from '@/lib/utils'
+import { formatDatum, formatMonatNummerJahr } from '@/lib/utils'
+import { formatEuro } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
 
 /** Identisch zu Angebot/Abnahme — Bericht ist Bärenwald-Service-Dokument */
-export const VERSAMMLUNG_ACCENT = '#1A3D2B'
-export const VERSAMMLUNG_TINT = '#F3F7F4'
-const TEXT = '#111111'
-const TEXT_MUTED = '#6B7280'
-const LINE = '#D1D5DB'
-const ZEBRA = '#F3F7F4'
+export const VERSAMMLUNG_ACCENT = C.greenDark
+export const VERSAMMLUNG_TINT = C.greenTint
+const TEXT = C.gray900
+const TEXT_MUTED = C.gray500
+const LINE = C.gray300
+const ZEBRA = C.greenTint
 
 export type VersammlungsberichtViewModel = {
   primary: string
@@ -61,7 +63,7 @@ export type VersammlungsberichtViewModel = {
     meta: string
     summary: string
     zeilen: Array<{ datum: string; titel: string; kosten: string }>
-    fusszeile: string | null
+fusszeile: string | null
     kostenUeberNeuwert: boolean
   }>
   anlagenBestand: Array<{
@@ -92,20 +94,14 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function fmtEuro(n: number | null | undefined, decimals = 2): string {
+function fmtEuro(n: number | null | undefined, decimals: 0 | 1 | 2 = 2): string {
   if (n == null || !Number.isFinite(n) || n < 0) return '—'
-  if (n === 0) return '0,00 €'
-  return (
-    n.toLocaleString('de-DE', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }) + ' €'
-  )
+  return formatEuro(n, { decimals })
 }
 
 function fmtEuroRounded(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n) || n <= 0) return '—'
-  return `${Math.round(n).toLocaleString('de-DE')} €`
+  return formatEuro(n, { rounded: true, decimals: 0 })
 }
 
 function cell(v: string | null | undefined): string {
@@ -132,7 +128,7 @@ function fmtMonatJahr(iso: string | null | undefined): string | null {
   if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null
   const dt = new Date(d)
   if (Number.isNaN(dt.getTime())) return null
-  return dt.toLocaleDateString('de-DE', { month: '2-digit', year: 'numeric' })
+  return formatMonatNummerJahr(dt)
 }
 
 function istAbgeschlossen(unterstatus: string): boolean {

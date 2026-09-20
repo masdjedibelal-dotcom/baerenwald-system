@@ -1,13 +1,10 @@
 'use client'
+import { MockField, MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
-
 import { useCallback, useEffect, useState } from 'react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import {
@@ -17,26 +14,8 @@ import {
 } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag } from '@/lib/types'
-
-function VersandFooter({
-  pending,
-  onSubmit,
-}: {
-  pending: boolean
-  onSubmit: () => void
-}) {
-  const requestClose = useEditorSheetRequestClose()
-  return (
-    <div className="kunde-create-footer">
-      <button type="button" className="btn ghost" onClick={() => requestClose?.()} disabled={pending}>
-        Abbrechen
-      </button>
-      <MockBtn kind="primary" icon="send" disabled={pending} onClick={onSubmit}>
-        {pending ? '…' : 'Senden'}
-      </MockBtn>
-    </div>
-  )
-}
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 /** Bautagebuch an Kunden — EditorSheet Split-over (Mock Surface B). */
 export function BautagebuchKundeSendModal({
@@ -54,6 +33,7 @@ export function BautagebuchKundeSendModal({
   kundeName: string
   onSent: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useTransition()
   const [anrede, setAnrede] = useState<AngebotMailAnrede>('sie')
   const [projektTitel, setProjektTitel] = useState('')
@@ -72,7 +52,7 @@ export function BautagebuchKundeSendModal({
     setDirty(false)
     void getBautagebuchMailDefaults(auftragId, eintrag.id).then((r) => {
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       setAnrede('sie')
@@ -96,7 +76,7 @@ export function BautagebuchKundeSendModal({
         anrede,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       setPreviewHtml(r.html)
@@ -112,11 +92,11 @@ export function BautagebuchKundeSendModal({
 
   function senden() {
     if (!eintrag || !betreff.trim() || !nachricht.trim()) {
-      toast.error('Bitte Betreff und Nachricht ausfüllen.')
+      applyFieldErrors({ _form: TOAST.bitte_betreff_und_nachricht_ausfuellen })
       return
     }
     if (!mailTo.length) {
-      toast.error('Bitte mindestens eine Empfänger-Adresse in An angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_empfaenger_adresse_in_an_a })
       return
     }
     startTransition(async () => {
@@ -130,10 +110,10 @@ export function BautagebuchKundeSendModal({
         cc: mailCc.length ? mailCc : undefined,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Eintrag veröffentlicht und E-Mail gesendet')
+      toast.success(TOAST.eintrag_veroeffentlicht_und_e_mail_gesendet)
       setDirty(false)
       onSent()
       onClose()
@@ -155,9 +135,10 @@ export function BautagebuchKundeSendModal({
       composeLabel="Senden"
       onConfirm={senden}
       confirmBusy={pending}
-      footer={<VersandFooter pending={pending} onSubmit={senden} />}
+      secondary={{ label: 'Abbrechen', disabled: pending, kind: 'ghost' }}
     >
-      <div className="space-y-4">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              <div className="space-y-4">
         <p className="m-0 text-[length:var(--fs-text)] text-bw-text-muted">
           <strong>{eintrag.titel}</strong> · {kundeName}
         </p>
@@ -186,13 +167,10 @@ export function BautagebuchKundeSendModal({
           extraHint={`Bautagebuch-Mail an ${kundeName}.`}
           multiline={false}
         >
-          <Input
-            value={betreff}
-            onChange={(e) => {
+          <MockInput value={betreff} onChange={(e) => {
               setBetreff(e.target.value)
               setDirty(true)
-            }}
-          />
+            }} />
         </KiAssistFieldLabel>
 
         {previewHtml ? (
@@ -212,15 +190,10 @@ export function BautagebuchKundeSendModal({
           }}
           extraHint={`Bautagebuch-Mailtext. Anrede: ${anrede}.`}
         >
-          <Textarea
-            plain
-            rows={6}
-            value={nachricht}
-            onChange={(e) => {
+          <MockTextarea rows={6} value={nachricht} onChange={(e) => {
               setNachricht(e.target.value)
               setDirty(true)
-            }}
-          />
+            }} className="resize-y py-2 min-h-[120px]" />
         </KiAssistFieldLabel>
       </div>
     </EditorSheet>

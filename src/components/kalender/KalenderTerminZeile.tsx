@@ -51,8 +51,8 @@ export function KalenderTerminZeile({
       onClick={onClick}
       className={cn('rounded-none border-0 border-b border-bw-border shadow-none', className)}
       avatar={
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-bw-hover">
-          <TerminMarker typ={termin.typ} className="h-3 w-3 rounded-full" />
+        <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-bw-hover">
+          <TerminMarker typ={termin.typ} className="h-3 w-3 rounded-pill" />
         </span>
       }
       eyebrow={faelligkeitLabel(termin, showFaelligkeit)}

@@ -1,5 +1,5 @@
 import type { VizBauErklaerung } from "@/lib/visualize/types";
-
+import { C } from '@/lib/tokens/colors'
 export const ZIELBILD_W = 1080;
 export const ZIELBILD_H = 1350;
 
@@ -8,15 +8,15 @@ export type ZielbildRasterImage = {
   height: number;
 };
 
-const CREAM = "#F7F4EF";
-const CREAM_MID = "#EEF3EC";
-const GREEN_DARK = "#0F2818";
-const GREEN_MID = "#1A3D2B";
-const GREEN_ACCENT = "#2E7D52";
-const GREEN_GLOW = "#3D9966";
-const TEXT_BODY = "#1A2420";
-const TEXT_SOFT = "#4A5C54";
-const WHITE = "#FFFFFF";
+const CREAM = C.bgWarm2;
+const CREAM_MID = C.greenTint4;
+const GREEN_DARK = C.greenDeep4;
+const GREEN_MID = C.greenDark;
+const GREEN_ACCENT = C.green;
+const GREEN_GLOW = C.greenAccent;
+const TEXT_BODY = C.textInk;
+const TEXT_SOFT = C.textMuted2;
+const WHITE = C.white;
 
 const FONT_SANS = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 const FONT_SERIF = "Georgia, 'Times New Roman', 'Palatino Linotype', serif";
@@ -89,8 +89,8 @@ function drawCreamGreenBackground(ctx: CanvasRenderingContext2D) {
   const bg = ctx.createLinearGradient(0, 0, 0, ZIELBILD_H);
   bg.addColorStop(0, CREAM);
   bg.addColorStop(0.55, CREAM_MID);
-  bg.addColorStop(0.82, "#DDE8E0");
-  bg.addColorStop(1, "#C8D9CE");
+  bg.addColorStop(0.82, C.greenPale);
+  bg.addColorStop(1, C.greenPale2);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, ZIELBILD_W, ZIELBILD_H);
 
@@ -141,7 +141,7 @@ function drawPhotoFrame(
   ctx.shadowBlur = 24;
   ctx.shadowOffsetY = 8;
   roundRect(ctx, x, y, w, h, radius);
-  ctx.fillStyle = "#E4EAE6";
+  ctx.fillStyle = C.greenPale3;
   ctx.fill();
   ctx.restore();
 
@@ -246,7 +246,7 @@ function drawBrandFooter(
   ctx.font = `600 20px ${FONT_SANS}`;
   ctx.fillText("Bärenwald", 48 + logoSize + 12, fy + 26);
   const bwW = ctx.measureText("Bärenwald").width;
-  ctx.fillStyle = "#C8E6D4";
+  ctx.fillStyle = C.greenMint;
   ctx.fillText("GPT", 48 + logoSize + 12 + bwW + 5, fy + 26);
 
   ctx.fillStyle = "rgba(255,255,255,0.72)";

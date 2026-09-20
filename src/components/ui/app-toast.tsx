@@ -1,9 +1,10 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { CheckCircle, XCircle, Info, X, Loader2 } from 'lucide-react'
 import { actionBusy } from '@/components/ui/action-busy'
+import { systemErrorMessage, isLikelyOfflineError } from '@/lib/copy/errors'
 import { cn } from '@/lib/utils'
 
 type ToastType = 'success' | 'error' | 'info' | 'loading'
@@ -20,7 +21,13 @@ export interface ToastItem {
   action?: ToastAction
 }
 
-type ToastOpts = { id?: string; persist?: boolean; action?: ToastAction }
+type ToastOpts = {
+  id?: string
+  persist?: boolean
+  action?: ToastAction
+  /** Überschreibt Default-Timeout (ms). Action-Toasts: Default 5000. */
+  durationMs?: number
+}
 
 type ToastApi = {
   push: (type: ToastType, message: string, opts?: ToastOpts) => string
@@ -48,17 +55,76 @@ function pushToast(type: ToastType, message: string, opts?: ToastOpts): string {
 }
 
 export const toast = {
-  success: (msg: string, opts?: { id?: string; action?: ToastAction }) => {
+  success: (
+    msg: string,
+    opts?: { id?: string; action?: ToastAction; durationMs?: number }
+  ) => {
     if (opts?.id) releaseLoadingBusy(opts.id)
     return pushToast('success', msg, {
       id: opts?.id,
       action: opts?.action,
       persist: Boolean(opts?.action),
+      durationMs: opts?.durationMs,
     })
   },
-  error: (msg: string, opts?: { id?: string; action?: ToastAction }) => {
+  /**
+   * Lösch-Toast: „Gelöscht“ + „Rückgängig“, Standard 5 s.
+   */
+  deleted: (opts: {
+    message?: string
+    onUndo: () => void
+    durationMs?: number
+    id?: string
+  }) => {
+    if (opts.id) releaseLoadingBusy(opts.id)
+    return pushToast('success', opts.message ?? 'Gelöscht', {
+      id: opts.id,
+      persist: true,
+      durationMs: opts.durationMs ?? 5000,
+      action: { label: 'Rückgängig', onClick: opts.onUndo },
+    })
+  },
+  error: (msg: string, opts?: { id?: string; action?: ToastAction; durationMs?: number }) => {
     if (opts?.id) releaseLoadingBusy(opts.id)
-    return pushToast('error', msg, { id: opts?.id, action: opts?.action })
+    return pushToast('error', msg, {
+      id: opts?.id,
+      action: opts?.action,
+      persist: Boolean(opts?.action),
+      durationMs: opts?.durationMs,
+    })
+  },
+  /**
+   * Schwaches Netz / Speichern fehlgeschlagen — Eingaben bleiben, Retry-Aktion.
+   */
+  offlineRetry: (onRetry?: () => void, opts?: { id?: string }) => {
+    if (opts?.id) releaseLoadingBusy(opts.id)
+    return pushToast('error', 'Keine Verbindung – Erneut versuchen', {
+      id: opts?.id ?? 'offline-retry',
+      persist: Boolean(onRetry),
+      durationMs: onRetry ? 8000 : 5000,
+      action: onRetry
+        ? {
+            label: 'Erneut versuchen',
+            onClick: onRetry,
+          }
+        : undefined,
+    })
+  },
+  /**
+   * System-/Netzwerkfehler: Technik → logDbError, Nutzer → userMessage.
+   * Validierung gehört an Felder — nicht hier.
+   */
+  systemError: (
+    error: unknown,
+    context = 'toast',
+    fallback?: string,
+    opts?: { onRetry?: () => void }
+  ) => {
+    const msg = systemErrorMessage(error, context, fallback)
+    if (isLikelyOfflineError(error) || msg.includes('Keine Verbindung')) {
+      return toast.offlineRetry(opts?.onRetry)
+    }
+    return pushToast('error', msg)
   },
   info: (msg: string, opts?: { id?: string; action?: ToastAction }) => {
     if (opts?.id) releaseLoadingBusy(opts.id)
@@ -91,11 +157,11 @@ export const toast = {
 }
 
 const icons = {
-  success: CheckCircle,
-  error: XCircle,
-  info: Info,
-  loading: Loader2,
-}
+  success: 'circle-check-filled',
+  error: 'circle-x',
+  info: 'info-circle',
+  loading: 'hourglass',
+} as const
 
 export function ToastProvider() {
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -113,14 +179,15 @@ export function ToastProvider() {
     })
     const persist = opts?.persist || type === 'loading' || Boolean(opts?.action)
     if (!persist) {
-      const ms = type === 'error' ? 5000 : 3000
+      const ms = opts?.durationMs ?? (type === 'error' ? 5000 : 3000)
       window.setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id))
       }, ms)
     } else if (opts?.action && type !== 'loading') {
+      const ms = opts?.durationMs ?? 5000
       window.setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id))
-      }, 8000)
+      }, ms)
     }
     return id
   }, [])
@@ -145,12 +212,11 @@ export function ToastProvider() {
     >
       <div className="flex w-[min(100%,28rem)] flex-col items-stretch gap-2">
         {toasts.map((t) => {
-          const Icon = icons[t.type]
           return (
             <div
               key={t.id}
               className={cn(
-                'app-toast pointer-events-auto flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
+                'app-toast pointer-events-auto flex items-center gap-3 rounded-card border px-4 py-3 text-sm font-medium shadow-lg animate-slide-up',
                 t.type === 'success' && 'app-toast--success',
                 t.type === 'error' && 'app-toast--error',
                 (t.type === 'info' || t.type === 'loading') && 'app-toast--info'
@@ -158,7 +224,9 @@ export function ToastProvider() {
               role="status"
               aria-live={t.type === 'loading' ? 'polite' : 'assertive'}
             >
-              <Icon
+              <MockIcon
+                n={icons[t.type]}
+                ctx="default"
                 className={cn('h-5 w-5 shrink-0', t.type === 'loading' && 'animate-spin')}
                 aria-hidden
               />
@@ -166,7 +234,7 @@ export function ToastProvider() {
               {t.action ? (
                 <button
                   type="button"
-                  className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold underline-offset-2 hover:underline"
+                  className="shrink-0 rounded-button px-2 py-1 text-xs font-semibold underline-offset-2 hover:underline"
                   onClick={() => {
                     t.action?.onClick()
                     dismiss(t.id)
@@ -182,7 +250,7 @@ export function ToastProvider() {
                   className="text-current opacity-60 hover:opacity-100"
                   aria-label="Schließen"
                 >
-                  <X className="h-4 w-4" />
+                  <MockIcon n="x" ctx="default" className="h-4 w-4" />
                 </button>
               ) : null}
             </div>

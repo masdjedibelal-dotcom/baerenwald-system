@@ -1,12 +1,17 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
-
+import { Combobox } from '@/components/ui/Combobox'
 import { useMemo, useState } from 'react'
-import { FileText, UserPlus } from 'lucide-react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 import { HandwerkerDetailsModal } from '@/components/auftraege/HandwerkerDetailsModal'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Select } from '@/components/ui/Select'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   updateAuftragHandwerkerStatus,
@@ -26,6 +31,7 @@ import {
 import { cn } from '@/lib/utils'
 import { labelHandwerkerAblehnung } from '@/lib/angebote/ablehnung-labels'
 import type { AngebotHandwerkerRow, AuftragHandwerkerRow, AuftragPosition } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -135,7 +141,7 @@ export function AuftragHandwerkerPanel({
 
   function openGewerkModal(gruppe: GewerkGruppe, replaceZuweisungId?: string) {
     if (!gruppe.gewerkId) {
-      toast.error('Gewerk nicht in Stammdaten')
+      toast.error(TOAST.gewerk_nicht_in_stammdaten)
       return
     }
     const alterHwId = replaceZuweisungId
@@ -173,7 +179,7 @@ export function AuftragHandwerkerPanel({
 
   function openPositionModal(gruppe: GewerkGruppe, position: AuftragPosition) {
     if (!gruppe.gewerkId) {
-      toast.error('Gewerk nicht in Stammdaten.')
+      toast.error(TOAST.gewerk_nicht_in_stammdaten_2)
       return
     }
     const z = gruppe.zuweisung
@@ -207,9 +213,9 @@ export function AuftragHandwerkerPanel({
   function changeGewerkStatus(zuweisungId: string, status: AuftragHandwerkerZuweisungStatus) {
     startTransition(async () => {
       const r = await updateAuftragHandwerkerStatus({ auftragId, zuweisungId, status })
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Status aktualisiert')
+        toast.success(TOAST.statusAktualisiert)
         onChanged()
       }
     })
@@ -218,9 +224,9 @@ export function AuftragHandwerkerPanel({
   function changePositionStatus(positionId: string, status: AuftragHandwerkerZuweisungStatus) {
     startTransition(async () => {
       const r = await updateAuftragPositionHandwerkerStatus({ auftragId, positionId, status })
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Status aktualisiert')
+        toast.success(TOAST.statusAktualisiert)
         onChanged()
       }
     })
@@ -228,13 +234,13 @@ export function AuftragHandwerkerPanel({
 
   if (gruppen.length === 0) {
     return (
-      <div className="mb-6 rounded-lg border border-bw-border bg-bw-card p-4">
+      <div className="mb-6 rounded-card border border-bw-border bg-surface p-4">
         <h3 className="mb-1 flex items-center gap-2 text-[length:var(--fs-text)] font-semibold text-bw-text">
           <ToolIcon className="h-4 w-4 text-bw-primary" aria-hidden />
-          Handwerker
+          Partner
         </h3>
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-          Noch keine Gewerke oder Positionen — zuerst Leistungen anlegen, dann Handwerker zuweisen.
+          Noch keine Gewerke oder Positionen — zuerst Leistungen anlegen, dann Partner zuweisen.
         </p>
       </div>
     )
@@ -242,12 +248,12 @@ export function AuftragHandwerkerPanel({
 
   return (
     <>
-      <div className="mb-6 rounded-lg border border-bw-border bg-bw-card p-4">
+      <div className="mb-6 rounded-card border border-bw-border bg-surface p-4">
         <h3 className="mb-1 flex items-center gap-2 text-[length:var(--fs-text)] font-semibold text-bw-text">
           <ToolIcon className="h-4 w-4 text-bw-primary" aria-hidden />
           {handwerkerRows.some((z) => z.handwerker_id && String(z.status).toLowerCase() !== 'ersetzt')
-            ? 'Handwerker bearbeiten'
-            : 'Handwerker zuweisen'}
+            ? 'Partner bearbeiten'
+            : 'Partner zuweisen'}
         </h3>
         <p className="mb-4 text-[length:var(--fs-meta)] text-bw-text-muted">
           Pro Gewerk oder einzelne Leistung — Nachricht mit Ort, Zeitraum und Leistungen wird automatisch befüllt.
@@ -261,24 +267,23 @@ export function AuftragHandwerkerPanel({
             const abgelehnt = (hwStatus as string).toLowerCase() === 'abgelehnt'
             const ablehnungGrund = z && abgelehnt ? ablehnungGrundAusAngebot(z, angebotHandwerker) : null
             return (
-              <div key={gruppe.gewerkId || gruppe.gewerkName} className="rounded-lg border border-bw-border p-3">
+              <div key={gruppe.gewerkId || gruppe.gewerkName} className="rounded-card border border-bw-border p-3">
                 {abgelehnt && z ? (
-                  <div className="mb-3 rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)]">
+                  <div className="mb-3 rounded-field border border-danger/40 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)]">
                     <p className="font-medium text-danger">
                       Partner {hwName ?? '—'} hat abgelehnt
                       {ablehnungGrund ? `: ${labelHandwerkerAblehnung(ablehnungGrund)}` : ''}
                     </p>
-                    <Button
+                    <MockBtn
                       type="button"
-                      variant="primary"
-                      size="sm"
+                      kind="primary" sm
                       className="mt-2"
                       disabled={pending || !gruppe.gewerkId}
                       onClick={() => openGewerkModal(gruppe, z.id)}
                     >
-                      <UserPlus className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
+                      <MockIcon n="user" ctx="default" className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
                       Anderen Partner zuweisen
-                    </Button>
+                    </MockBtn>
                   </div>
                 ) : null}
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -298,13 +303,13 @@ export function AuftragHandwerkerPanel({
                           ) : null}
                         </>
                       ) : (
-                        'Noch kein Handwerker fürs Gewerk'
+                        'Noch kein Partner fürs Gewerk'
                       )}
                     </p>
                     {z ? (
                       <span
                         className={cn(
-                          'mt-2 inline-block rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                          'mt-2 inline-block rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                           auftragHwStatusBadgeClass(hwStatus)
                         )}
                       >
@@ -312,7 +317,7 @@ export function AuftragHandwerkerPanel({
                       </span>
                     ) : null}
                     {z?.erledigt_gemeldet_am ? (
-                      <span className="mt-2 ml-2 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-emerald-900">
+                      <span className="mt-2 ml-2 inline-block rounded-pill bg-status-order-bg px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-status-order-text">
                         HW erledigt
                       </span>
                     ) : null}
@@ -320,16 +325,18 @@ export function AuftragHandwerkerPanel({
                   <div className="flex flex-wrap items-center gap-2">
                     {z ? (
                       <>
-                        <Button
+                        <MockBtn
                           type="button"
-                          variant="ghost"
-                          size="sm"
+                          kind="ghost" sm
                           disabled={pending}
                           onClick={() => setDetailsOpen({ mode: 'gewerk', zuweisung: z })}
                         >
-                          <FileText className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+                          <MockIcon n="file-text" ctx="default" className="mr-1 inline h-3.5 w-3.5" aria-hidden />
                           Details
-                        </Button>
+                        </MockBtn>
+<<<<<<< Updated upstream
+                        <Combobox id={`status-gw-${z.id}`} name={`status-gw-${z.id}`} disabled={pending} options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} value={(hwStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend' == null ? '' : String((hwStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend')} placeholder="Auswählen…" onChange={(next) => { changeGewerkStatus(z.id, next as AuftragHandwerkerZuweisungStatus); }} className="!min-w-[160px]" />
+=======
                         <Select
                           name={`status-gw-${z.id}`}
                           value={(hwStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend'}
@@ -340,12 +347,12 @@ export function AuftragHandwerkerPanel({
                           className="!min-w-[160px]"
                           disabled={pending}
                         />
+>>>>>>> Stashed changes
                       </>
                     ) : null}
-                    <Button
+                    <MockBtn
                       type="button"
-                      variant="secondary"
-                      size="sm"
+                      kind="secondary" sm
                       disabled={!gruppe.gewerkId || pending}
                       onClick={() =>
                         openGewerkModal(
@@ -354,9 +361,14 @@ export function AuftragHandwerkerPanel({
                         )
                       }
                     >
+<<<<<<< Updated upstream
+                      <MockIcon n="user" ctx="default" className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
+                      {hwName && !abgelehnt ? 'Partner bearbeiten' : hwName ? 'Anderen Partner zuweisen' : 'Gewerk zuweisen'}
+=======
                       <UserPlus className="mr-1.5 inline h-3.5 w-3.5" aria-hidden />
                       {hwName && !abgelehnt ? 'Handwerker bearbeiten' : hwName ? 'Anderen Partner zuweisen' : 'Gewerk zuweisen'}
-                    </Button>
+>>>>>>> Stashed changes
+                    </MockBtn>
                   </div>
                 </div>
 
@@ -367,16 +379,16 @@ export function AuftragHandwerkerPanel({
                       return (
                         <li
                           key={p.id}
-                          className="flex flex-col gap-2 rounded-md bg-bw-hover/50 px-3 py-2 text-[length:var(--fs-text)] md:flex-row md:items-center md:justify-between"
+                          className="flex flex-col gap-2 rounded-field bg-bw-hover/50 px-3 py-2 text-[length:var(--fs-text)] md:flex-row md:items-center md:justify-between"
                         >
                           <div className="min-w-0">
                             <p className="font-medium text-bw-text">{p.leistung_name}</p>
                             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-                              {p.handwerker?.name ?? 'Kein Handwerker'}
+                              {p.handwerker?.name ?? 'Kein Partner'}
                               {' · '}
                               <span
                                 className={cn(
-                                  'inline rounded px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                                  'inline rounded-card px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium',
                                   auftragHwStatusBadgeClass(posStatus)
                                 )}
                               >
@@ -387,16 +399,18 @@ export function AuftragHandwerkerPanel({
                           <div className="flex flex-wrap items-center gap-2">
                             {p.handwerker_id ? (
                               <>
-                                <Button
+                                <MockBtn
                                   type="button"
-                                  variant="ghost"
-                                  size="sm"
+                                  kind="ghost" sm
                                   disabled={pending}
                                   onClick={() => setDetailsOpen({ mode: 'position', position: p })}
                                 >
-                                  <FileText className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+                                  <MockIcon n="file-text" ctx="default" className="mr-1 inline h-3.5 w-3.5" aria-hidden />
                                   Details
-                                </Button>
+                                </MockBtn>
+<<<<<<< Updated upstream
+                                <Combobox id={`status-pos-${p.id}`} name={`status-pos-${p.id}`} disabled={pending} options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
+=======
                                 <Select
                                   name={`status-pos-${p.id}`}
                                   value={(posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend'}
@@ -404,22 +418,23 @@ export function AuftragHandwerkerPanel({
                                     changePositionStatus(p.id, e.target.value as AuftragHandwerkerZuweisungStatus)
                                   }
                                   options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
+>>>>>>> Stashed changes
                                     value: o.value,
-                                    label: o.label }))}
-                                  className="!min-w-[140px]"
-                                  disabled={pending}
-                                />
+                                    label: o.label }))} value={(posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend' == null ? '' : String((posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend')} placeholder="Auswählen…" onChange={(next) => { changePositionStatus(p.id, next as AuftragHandwerkerZuweisungStatus); }} className="!min-w-[140px]" />
                               </>
                             ) : null}
-                            <Button
+                            <MockBtn
                               type="button"
-                              variant="ghost"
-                              size="sm"
+                              kind="ghost" sm
                               disabled={!gruppe.gewerkId || pending}
                               onClick={() => openPositionModal(gruppe, p)}
                             >
+<<<<<<< Updated upstream
+                              {p.handwerker_id ? 'Partner bearbeiten' : 'Zuweisen'}
+=======
                               {p.handwerker_id ? 'Handwerker bearbeiten' : 'Zuweisen'}
-                            </Button>
+>>>>>>> Stashed changes
+                            </MockBtn>
                           </div>
                         </li>
                       )

@@ -1,8 +1,7 @@
 'use client'
 
+import { DetailShell, type DetailShellGroup } from '@/components/layout/EntityDetailLayout'
 import { useState, type ReactNode } from 'react'
-import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-
 export type MockDetailShellGroup = {
   id: string
   label: string

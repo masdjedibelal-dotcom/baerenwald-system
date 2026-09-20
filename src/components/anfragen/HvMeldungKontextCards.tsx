@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { updateLeadMelderUndLeistungsort } from '@/app/(dashboard)/anfragen/actions'
@@ -11,7 +13,6 @@ import {
   type MelderLeistungsortDraft,
 } from '@/components/crm/MelderLeistungsortFields'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { resolveLeadLeistungsort } from '@/lib/anfragen/resolve-lead-leistungsort'
@@ -20,6 +21,7 @@ import { resolvePipelineKontext } from '@/lib/leads/pipeline-kontext'
 import type { Gewerk, KundenObjekt, LeadDetail, OrgFreigabeStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { leadIstAkut } from '@/lib/anfragen/anfrage-akut-schwelle'
+import { TOAST } from '@/lib/copy'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`
@@ -83,8 +85,7 @@ export function HvMeldungKontextCards({
   angebotId?: string | null
   onSaved?: () => void
 }) {
-  if (resolvePipelineKontext(lead) !== 'hv_meldung') return null
-
+  const isHvMeldung = resolvePipelineKontext(lead) === 'hv_meldung'
   const objekt = lead.kunden_objekte
   const leistungsort = resolveLeadLeistungsort(lead)
   const agKundeId = lead.auftraggeber_kunde_id ?? lead.auftraggeber?.id ?? null
@@ -109,12 +110,12 @@ export function HvMeldungKontextCards({
   const [gewerke, setGewerke] = useState<Gewerk[]>([])
 
   useEffect(() => {
-    if (!editOpen) return
+    if (!isHvMeldung || !editOpen) return
     setDraft(draftFromLeadMelder(lead))
-  }, [editOpen, lead])
+  }, [isHvMeldung, editOpen, lead])
 
   useEffect(() => {
-    if (!editOpen || !agKundeId) {
+    if (!isHvMeldung || !editOpen || !agKundeId) {
       setObjekte([])
       return
     }
@@ -125,14 +126,16 @@ export function HvMeldungKontextCards({
     return () => {
       cancelled = true
     }
-  }, [editOpen, agKundeId])
+  }, [isHvMeldung, editOpen, agKundeId])
 
   useEffect(() => {
-    if (!editOpen) return
+    if (!isHvMeldung || !editOpen) return
     void listGewerkeFuerFab()
       .then((r) => setGewerke(r.ok ? (r.gewerke as Gewerk[]) : []))
       .catch(() => setGewerke([]))
-  }, [editOpen])
+  }, [isHvMeldung, editOpen])
+
+  if (!isHvMeldung) return null
 
   async function saveEdit() {
     if (saving) return
@@ -148,10 +151,10 @@ export function HvMeldungKontextCards({
         angebotId: angebotId ?? null,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Melder & Leistungsort gespeichert')
+      toast.success(TOAST.melder_leistungsort_gespeichert)
       setEditOpen(false)
       onSaved?.()
     } finally {
@@ -161,9 +164,9 @@ export function HvMeldungKontextCards({
 
   return (
     <>
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">Melder</div>
+      <MockCard
+        title="Melder"
+        actions={
           <div className="inline-flex flex-wrap items-center gap-1">
             {istAkut || notfallAutopass ? (
               <span className={cn('hvk-badge', 'hvk-badge--yel')}>Direktauftrag</span>
@@ -181,68 +184,67 @@ export function HvMeldungKontextCards({
               onClick={() => setEditOpen(true)}
             />
           </div>
-        </div>
-        <div className="card-b">
-          <div className="detail-soft-block">
-            <div className="props">
-              <PropRow label="Name" value={melderName(lead)} />
-              <PropRow
-                label="Telefon"
-                value={
-                  melderTel ? (
-                    <a className="link" href={telHref(melderTel)}>
-                      {melderTel}
-                    </a>
-                  ) : (
-                    '—'
-                  )
-                }
-              />
-              <PropRow
-                label="E-Mail"
-                value={
-                  melderMail ? (
-                    <a className="link" href={`mailto:${melderMail}`}>
-                      {melderMail}
-                    </a>
-                  ) : (
-                    '—'
-                  )
-                }
-              />
-              <PropRow label="Adresse" value={melderAdresse(lead)} />
-            </div>
+        }
+      >
+        <div className="detail-soft-block">
+          <div className="props">
+            <PropRow label="Name" value={melderName(lead)} />
+            <PropRow
+              label="Telefon"
+              value={
+                melderTel ? (
+                  <a className="link" href={telHref(melderTel)}>
+                    {melderTel}
+                  </a>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <PropRow
+              label="E-Mail"
+              value={
+                melderMail ? (
+                  <a className="link" href={`mailto:${melderMail}`}>
+                    {melderMail}
+                  </a>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <PropRow label="Adresse" value={melderAdresse(lead)} />
           </div>
+        </div>
 
-          <div className="detail-soft-block">
-            <div className="detail-soft-block__h">
-              Leistungsort
-              {objektTitel ? (
-                <>
-                  {' · '}
-                  {objektHref ? (
-                    <Link href={objektHref} className="link">
-                      {objektTitel}
-                    </Link>
-                  ) : (
-                    <span style={{ color: 'var(--text)', fontWeight: 600 }}>{objektTitel}</span>
-                  )}
-                </>
-              ) : null}
-            </div>
-            <div className="props">
-              <PropRow label="Straße" value={leistungsort.strasse || '—'} />
-              <PropRow label="Hausnummer" value={leistungsort.hausnummer || '—'} />
-              <PropRow label="PLZ" value={leistungsort.plz || '—'} />
-              <PropRow label="Ort" value={leistungsort.ort || '—'} />
-              <PropRow
-                label="Anlage / Teil"
-                value={lead.objekt_anlagen?.bezeichnung?.trim() || '—'}
-              />
-            </div>
+        <div className="detail-soft-block">
+          <div className="detail-soft-block__h">
+            Leistungsort
+            {objektTitel ? (
+              <>
+                {' · '}
+                {objektHref ? (
+                  <Link href={objektHref} className="link">
+                    {objektTitel}
+                  </Link>
+                ) : (
+                  <span style={{ color: 'var(--text)', fontWeight: 600 }}>{objektTitel}</span>
+                )}
+              </>
+            ) : null}
+          </div>
+          <div className="props">
+            <PropRow label="Straße" value={leistungsort.strasse || '—'} />
+            <PropRow label="Hausnummer" value={leistungsort.hausnummer || '—'} />
+            <PropRow label="PLZ" value={leistungsort.plz || '—'} />
+            <PropRow label="Ort" value={leistungsort.ort || '—'} />
+            <PropRow
+              label="Anlage / Teil"
+              value={lead.objekt_anlagen?.bezeichnung?.trim() || '—'}
+            />
           </div>
         </div>
-      </div>
+      </MockCard>
 
       <EditorSheet
         open={editOpen}
@@ -250,14 +252,9 @@ export function HvMeldungKontextCards({
         title="Melder & Leistungsort"
         overlayClassName={objektNeuOpen ? 'editor-sheet-overlay--recessed' : undefined}
         headerEnd={
-          <button
-            type="button"
-            className="editor-sheet__confirm-text"
-            disabled={saving}
-            onClick={() => void saveEdit()}
-          >
+          <MockBtn className="editor-sheet__confirm-text" type="button" disabled={saving} onClick={() => void saveEdit()}>
             {saving ? '…' : 'Speichern'}
-          </button>
+          </MockBtn>
         }
       >
         <MelderLeistungsortFields

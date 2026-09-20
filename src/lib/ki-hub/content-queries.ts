@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const KI_CONTENT_BUCKET = 'ki-content'
@@ -22,12 +23,13 @@ export function kiContentPublicUrl(path: string): string {
 }
 
 export async function loadContentForEmpfehlung(empfehlungId: string): Promise<KiContentRow[]> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('ki_content')
     .select('*')
     .eq('empfehlung_id', empfehlungId)
     .order('created_at', { ascending: false })
     .limit(5)
+  if (error) logDbError('lib/ki-hub/content-queries:ki_content', error)
 
   return (data ?? []) as KiContentRow[]
 }
@@ -52,6 +54,7 @@ export async function saveKiContent(row: {
     })
     .select('*')
     .single()
+  if (error) logDbError('lib/ki-hub/content-queries:ki_content', error)
 
   if (error) {
     console.error('saveKiContent', error.message)
@@ -74,6 +77,7 @@ export async function uploadKiContentImage(
     contentType: 'image/webp',
     upsert: false,
   })
+  if (error) logDbError('lib/ki-hub/content-queries:query', error)
   if (error) throw new Error(error.message)
 
   return { path, publicUrl: kiContentPublicUrl(path) }
@@ -83,15 +87,17 @@ export async function updateEmpfehlungBildUrl(
   empfehlungId: string,
   bildUrl: string
 ): Promise<void> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('ki_empfehlungen')
     .select('content')
     .eq('id', empfehlungId)
     .maybeSingle()
+  if (error) logDbError('lib/ki-hub/content-queries:ki_empfehlungen', error)
 
   const content = (data?.content as Record<string, unknown> | null) ?? {}
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('ki_empfehlungen')
     .update({ content: { ...content, bild_url: bildUrl } })
     .eq('id', empfehlungId)
+  if (__dbErr1) logDbError('lib/ki-hub/content-queries:ki_empfehlungen', __dbErr1)
 }

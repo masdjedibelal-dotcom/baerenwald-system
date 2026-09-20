@@ -1,5 +1,7 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import {
   createContext,
   useCallback,
@@ -11,7 +13,6 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, X } from 'lucide-react'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { toast } from '@/components/ui/app-toast'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
@@ -27,6 +28,8 @@ import {
   restoreEditorSheetHistoryAfterDirtyPop,
   updateEditorSheetHistoryPop,
 } from '@/lib/surfaces/editor-sheet-history'
+import { useAutoFormDirty } from '@/lib/surfaces/form-dirty'
+import { CONFIRM, TOAST } from '@/lib/copy'
 import { cn } from '@/lib/utils'
 
 export type EditorSheetContext = 'detail' | 'canvas'
@@ -40,6 +43,19 @@ export function useEditorSheetRequestClose(): (() => void) | null {
   return useContext(EditorSheetApiContext)?.requestClose ?? null
 }
 
+/** Feste Footer-Aktion (primary / secondary / danger). */
+export type EditorSheetAction = {
+  label: string
+  onClick?: () => void
+  href?: string
+  download?: boolean | string
+  disabled?: boolean
+  busy?: boolean
+  icon?: string
+  /** Secondary-Slot: ghost statt secondary (Default secondary). */
+  kind?: 'secondary' | 'ghost'
+}
+
 export type EditorSheetProps = {
   open: boolean
   onClose: () => void
@@ -51,7 +67,7 @@ export type EditorSheetProps = {
   /** detail | canvas — Desktop immer Slide-over (Spec §6: keine Center-Modals) */
   context?: EditorSheetContext
   children: ReactNode
-  /** Dirty → X/Swipe/Backdrop/Back öffnen Confirm (S8) */
+  /** Dirty → X/Swipe/Backdrop/Back öffnen Confirm (S8). Ohne Prop: Auto aus Formularfeldern. Override: true/false. */
   dirty?: boolean
   /** Compose: rechte Action = Text „Senden“ statt ✓ */
   compose?: boolean
@@ -74,13 +90,67 @@ export type EditorSheetProps = {
   bodyClassName?: string
   overlayClassName?: string
   size?: 'md' | 'lg'
-  /** Sticky Footer-CTAs — Aktionen nur hier (oder Auto-Speichern aus onConfirm) */
-  footer?: ReactNode
+  /**
+   * Feste Footer-API — Secondary · Danger · Primary.
+   * Kein freies `footer` ReactNode.
+   */
+  primary?: EditorSheetAction | null
+  secondary?: EditorSheetAction | null
+  danger?: EditorSheetAction | null
   /**
    * Browser-History für Back-to-Close (default true).
    * Aus bei Pickern vor einer Navigation — sonst frisst history.back() die neue URL.
    */
   manageHistory?: boolean
+}
+
+function EditorSheetFooterButton({
+  action,
+  slot,
+  fallbackClick,
+}: {
+  action: EditorSheetAction
+  slot: 'primary' | 'secondary' | 'danger'
+  fallbackClick?: () => void
+}) {
+  const kind =
+    slot === 'primary'
+      ? 'primary'
+      : slot === 'danger'
+        ? 'danger'
+        : (action.kind ?? 'secondary')
+  const disabled = Boolean(action.disabled || action.busy)
+  const label = action.busy ? '…' : action.label
+  const onClick = action.onClick ?? fallbackClick
+
+  if (action.href) {
+    return (
+      <a
+        href={action.href}
+        download={action.download}
+        className={cn('btn', kind, 'inline-flex items-center justify-center gap-1.5')}
+        aria-label={action.label}
+      >
+        {label}
+      </a>
+    )
+  }
+
+  return (
+    <MockBtn
+      kind={kind}
+      type="button"
+      icon={action.icon}
+      disabled={disabled}
+      loading={action.busy}
+      onClick={() => {
+        guardSheetPointerFallthrough()
+        onClick?.()
+      }}
+    >
+      {label}
+    </MockBtn>
+  )
 }
 
 /**
@@ -95,7 +165,7 @@ export function EditorSheet({
   crumb,
   context = 'detail',
   children,
-  dirty = false,
+  dirty: dirtyProp,
   compose = false,
   composeLabel = 'Senden',
   onConfirm,
@@ -109,7 +179,9 @@ export function EditorSheet({
   bodyClassName,
   overlayClassName,
   size = 'md',
-  footer,
+  primary: primaryProp,
+  secondary: secondaryProp,
+  danger: dangerProp,
   manageHistory = true,
 }: EditorSheetProps) {
   const isMobile = useIsMobile()
@@ -143,8 +215,9 @@ export function EditorSheet({
   const titleId = useId()
   const sheetId = `editor-sheet:${titleId}`
   const historyPushed = useRef(false)
-  const dirtyRef = useRef(dirty)
-  dirtyRef.current = dirty
+  const effectiveDirty = useAutoFormDirty(rootRef, open && mounted, dirtyProp)
+  const dirtyRef = useRef(effectiveDirty)
+  dirtyRef.current = effectiveDirty
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   const onDismissAttemptRef = useRef(onDismissAttempt)
@@ -156,25 +229,21 @@ export function EditorSheet({
     confirmPlacementProp ?? (compose ? 'header' : 'footer')
   const confirmLabel =
     confirmLabelProp ?? (compose ? composeLabel : 'Speichern')
+  const hasStructuredFooter = Boolean(primaryProp || secondaryProp || dangerProp)
   const showHeaderConfirm =
     Boolean(onConfirm) && confirmPlacement === 'header' && headerEnd == null
-  const showFooterConfirm =
-    Boolean(onConfirm) && confirmPlacement === 'footer' && footer == null
-  const resolvedFooter =
-    footer ??
-    (showFooterConfirm ? (
-      <button
-        type="button"
-        className="btn primary"
-        disabled={confirmDisabled || confirmBusy}
-        onClick={() => {
-          guardSheetPointerFallthrough()
-          onConfirmRef.current?.()
-        }}
-      >
-        {confirmBusy ? '…' : confirmLabel}
-      </button>
-    ) : null)
+  const resolvedPrimary: EditorSheetAction | null =
+    primaryProp ??
+    (onConfirm && confirmPlacement === 'footer' && !hasStructuredFooter
+      ? {
+          label: confirmLabel,
+          onClick: () => onConfirmRef.current?.(),
+          disabled: confirmDisabled,
+          busy: confirmBusy,
+        }
+      : null)
+  const resolvedSecondary = secondaryProp ?? null
+  const resolvedDanger = dangerProp ?? null
 
   const finishClose = useCallback(() => {
     setDiscardOpen(false)
@@ -198,6 +267,55 @@ export function EditorSheet({
   }, [finishClose])
   const requestCloseRef = useRef(requestClose)
   requestCloseRef.current = requestClose
+
+  const structuredFooterNode =
+    resolvedPrimary || resolvedSecondary || resolvedDanger ? (
+      <div className="sheet-footer-actions">
+        {resolvedSecondary ? (
+          <EditorSheetFooterButton
+            action={resolvedSecondary}
+            slot="secondary"
+            fallbackClick={() => requestCloseRef.current()}
+          />
+        ) : null}
+        {resolvedDanger ? (
+          <EditorSheetFooterButton action={resolvedDanger} slot="danger" />
+        ) : null}
+        {resolvedPrimary ? (
+          <EditorSheetFooterButton action={resolvedPrimary} slot="primary" />
+        ) : null}
+      </div>
+    ) : null
+  const resolvedFooter = structuredFooterNode
+
+  /* Cmd/Ctrl+Enter → Speichern (Primary / onConfirm) */
+  useEffect(() => {
+    if (!open || !mounted) return
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'Enter') return
+      if (discardOpen || pauseFocusTrap) return
+      const primary = resolvedPrimary
+      if (primary && !primary.disabled && !primary.busy) {
+        e.preventDefault()
+        primary.onClick?.()
+        return
+      }
+      if (onConfirmRef.current && !confirmDisabled && !confirmBusy) {
+        e.preventDefault()
+        onConfirmRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [
+    open,
+    mounted,
+    discardOpen,
+    pauseFocusTrap,
+    resolvedPrimary,
+    confirmDisabled,
+    confirmBusy,
+  ])
 
   const handleHistoryPop = useCallback(() => {
     onDismissAttemptRef.current?.()
@@ -314,8 +432,15 @@ export function EditorSheet({
       if (!(t instanceof HTMLElement)) return
       if (!overlay.contains(t)) return
       if (!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && !t.isContentEditable) return
-      requestAnimationFrame(() => {
+      const scrollField = () => {
         t.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        /* Speichern-Button über der Tastatur halten */
+        const footer = overlay.querySelector('.editor-sheet__footer') as HTMLElement | null
+        footer?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+      requestAnimationFrame(() => {
+        scrollField()
+        window.setTimeout(scrollField, 280)
       })
     }
     sync()
@@ -352,25 +477,13 @@ export function EditorSheet({
     headerEnd ??
     (showHeaderConfirm ? (
       compose ? (
-        <button
-          type="button"
-          className="editor-sheet__confirm-text"
-          disabled={confirmDisabled || confirmBusy}
-          onClick={handleConfirm}
-        >
+        <MockBtn className="editor-sheet__confirm-text" type="button" disabled={confirmDisabled || confirmBusy} onClick={handleConfirm}>
           {confirmBusy ? '…' : confirmLabel}
-        </button>
+        </MockBtn>
       ) : (
-        <button
-          type="button"
-          className="editor-sheet__confirm"
-          disabled={confirmDisabled || confirmBusy}
-          onClick={handleConfirm}
-          aria-label={confirmLabel}
-          title={confirmLabel}
-        >
-          <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-        </button>
+        <MockBtn className="editor-sheet__confirm" type="button" disabled={confirmDisabled || confirmBusy} onClick={handleConfirm} aria-label={confirmLabel} title={confirmLabel}>
+          <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
+        </MockBtn>
       )
     ) : null)
 
@@ -400,18 +513,12 @@ export function EditorSheet({
       ) : null}
       {/* Drag nur am Handle — nicht am Header, sonst frisst iOS den X-Klick */}
       <header className="editor-sheet__header">
-        <button
-          type="button"
-          className="editor-sheet__icon-btn"
-          onClick={(e) => {
+        <MockBtn className="editor-sheet__icon-btn" type="button" onClick={(e) => {
             e.stopPropagation()
             requestClose()
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          aria-label="Schließen"
-        >
-          <X className="h-5 w-5" aria-hidden />
-        </button>
+          }} onPointerDown={(e) => e.stopPropagation()} aria-label="Schließen">
+          <MockIcon n="x" ctx="default" className="h-5 w-5" aria-hidden />
+        </MockBtn>
         <div className="editor-sheet__title-block">
           {crumb ? <span className="editor-sheet__crumb">{crumb}</span> : null}
           <h2 id={titleId} className="editor-sheet__title">
@@ -456,16 +563,16 @@ export function EditorSheet({
       <ConfirmPopup
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}
-        title="Nicht gespeichert"
-        confirmLabel="Verwerfen"
-        cancelLabel="Weiter bearbeiten"
+        title={CONFIRM.dirty}
+        confirmLabel={CONFIRM.discard}
+        cancelLabel={CONFIRM.continueEditing}
         danger
         onConfirm={() => {
-          toast.info('Nicht gespeichert')
+          toast.info(TOAST.nicht_gespeichert)
           confirmClose()
         }}
       >
-        Ihre Änderungen werden verworfen.
+        {CONFIRM.dirtyBody}
       </ConfirmPopup>
     </EditorSheetApiContext.Provider>,
     document.body

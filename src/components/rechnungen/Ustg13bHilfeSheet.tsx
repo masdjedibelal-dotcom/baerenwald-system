@@ -1,8 +1,8 @@
 'use client'
 
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 export type Ustg13bHilfeVariant = 'ausgang' | 'eingang'
 
 const AUSGANG = {
@@ -29,7 +29,7 @@ const AUSGANG = {
 const EINGANG = {
   title: '§13b UStG — Partner-Rechnung ohne Umsatzsteuer',
   merksatz:
-    'Entscheidend ist die Leistung des Handwerkers — nicht, ob wir selbst ausführen. Bärenwald ist als Generalunternehmer Bauleister. Erbringt der Partner eine Bauleistung, geht die Steuerschuld auf uns über.',
+    'Entscheidend ist die Leistung des Partners — nicht, ob wir selbst ausführen. Bärenwald ist als Generalunternehmer Bauleister. Erbringt der Partner eine Bauleistung, geht die Steuerschuld auf uns über.',
   wirkung:
     'Bei aktivem Haken muss der Partner seine Rechnung an Bärenwald netto ohne USt stellen, mit Hinweis auf §13b. Wir melden die Steuer selbst an. Weist der Partner trotzdem USt aus, ist die Rechnung falsch → zurückweisen und korrigieren lassen, sonst kein Vorsteuerabzug.',
   aktivTitle:
@@ -68,7 +68,7 @@ function HelpBody({
 }) {
   return (
     <div className="space-y-4 text-[length:var(--fs-text)] leading-relaxed text-bw-text">
-      <p className="m-0 rounded-lg border border-bw-border bg-bw-hover/40 px-3 py-2.5">
+      <p className="m-0 rounded-card border border-bw-border bg-bw-hover/40 px-3 py-2.5">
         <strong className="font-semibold">Merksatz:</strong> {merksatz}
       </p>
       <p className="m-0 text-bw-text-muted">{wirkung}</p>
@@ -88,7 +88,7 @@ function HelpBody({
           ))}
         </ul>
       </div>
-      <p className="m-0 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2.5 text-[length:var(--fs-meta)] text-amber-950">
+      <p className="m-0 rounded-card border border-status-contact-bg/80 bg-status-contact-bg px-3 py-2.5 text-[length:var(--fs-meta)] text-status-contact-text">
         {fuss}
       </p>
     </div>
@@ -130,17 +130,11 @@ export function Ustg13bHilfeTrigger({
   className?: string
 }) {
   return (
-    <button
-      type="button"
-      className={className}
-      aria-label={label}
-      title={label}
-      onClick={(e) => {
+    <MockBtn className={className} type="button" aria-label={label} title={label} onClick={(e) => {
         e.preventDefault()
         e.stopPropagation()
         onOpen()
-      }}
-      style={{
+      }} style={{
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -153,9 +147,8 @@ export function Ustg13bHilfeTrigger({
         cursor: 'pointer',
         borderRadius: 6,
         verticalAlign: 'middle',
-      }}
-    >
+      }}>
       <MockIcon ctx="btn" n="info-circle" size={15} />
-    </button>
+    </MockBtn>
   )
 }

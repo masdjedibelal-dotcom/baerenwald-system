@@ -1,3 +1,4 @@
+import { formatMonatKurzJahr } from '@/lib/utils'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
 import {
   kundeWirtschaftBounds,
@@ -45,7 +46,7 @@ function monthKey(d: Date): string {
 }
 
 function monthLabel(d: Date): string {
-  return d.toLocaleDateString('de-DE', { month: 'short' }).replace(/\.$/, '')
+  return formatMonatKurzJahr(d, { withYear: false })
 }
 
 function inBounds(iso: string | null | undefined, start: Date | null, end: Date): boolean {

@@ -88,7 +88,7 @@ export function buildPulseCards(data: KiHubLoadPayload): KiHubPulseCard[] {
     },
     {
       id: 'handwerker',
-      label: 'Handwerker',
+      label: 'Partner',
       status: 'ok',
       kpis: [
         { label: 'Aktiv', value: String(data.supabase.handwerker_aktiv_count) },

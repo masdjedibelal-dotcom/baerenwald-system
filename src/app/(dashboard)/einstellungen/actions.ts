@@ -1,7 +1,14 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateEinstellungenPath } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
+import { revalidateWizardContext } from '@/lib/wizard-context'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -26,6 +33,7 @@ export async function saveEinstellungen(
   }))
 
   const { error } = await supabase.from('einstellungen').upsert(payload, { onConflict: 'key' })
+  if (error) logDbError('app/einstellungen/actions:einstellungen', error)
   if (error) {
     const raw = error.message
     const fehltTabelle =
@@ -38,9 +46,8 @@ export async function saveEinstellungen(
         : raw,
     }
   }
-  revalidatePath('/einstellungen')
-  revalidatePath('/einstellungen/firma')
-  revalidatePath('/angebote')
-  revalidatePath('/rechnungen')
+  revalidateEinstellungenPath('/einstellungen')
+  revalidateEinstellungenPath('/einstellungen/firma')
+  revalidateWizardContext()
   return { ok: true }
 }

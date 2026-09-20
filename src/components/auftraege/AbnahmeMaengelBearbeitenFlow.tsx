@@ -1,12 +1,17 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockField, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useLocalTransition } from '@/components/ui/action-busy'
-
+import { DateInput } from '@/components/ui/DateInput'
 import { useEffect, useRef, useState } from 'react'
-import { Check, Wrench } from 'lucide-react'
 import { AuftragBaustelleScreen } from '@/components/auftraege/AuftragBaustelleScreen'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -21,6 +26,8 @@ import {
 } from '@/lib/auftraege/abnahme-maengel-helpers'
 import type { AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import { cn, formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 export function AbnahmeMaengelBearbeitenFlow({
   auftragId,
@@ -33,6 +40,7 @@ export function AbnahmeMaengelBearbeitenFlow({
   onClose: () => void
   onDone: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const [loading, setLoading] = useState(true)
   const [punkte, setPunkte] = useState<AbnahmePunkt[]>([])
@@ -46,7 +54,7 @@ export function AbnahmeMaengelBearbeitenFlow({
     void (async () => {
       const saved = await loadAbnahmeprotokollSummary(auftragId)
       if (!saved) {
-        toast.error('Bitte zuerst ein Abnahmeprotokoll erstellen.')
+        applyFieldErrors({ _form: TOAST.bitte_zuerst_ein_abnahmeprotokoll_erstellen })
         onClose()
         return
       }
@@ -94,7 +102,7 @@ export function AbnahmeMaengelBearbeitenFlow({
       const merged = [...(m.foto_nachher_urls ?? []), ...urls].slice(0, 8)
       await patchMangel(punktId, { status: m.status ?? 'offen', foto_nachher_urls: merged })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploading(false)
       setUploadTarget(null)
@@ -118,7 +126,7 @@ export function AbnahmeMaengelBearbeitenFlow({
         ...patch,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       const fresh = await loadAbnahmeprotokollSummary(auftragId)
@@ -127,7 +135,7 @@ export function AbnahmeMaengelBearbeitenFlow({
         setMaengel(fresh.maengel)
         baselineRef.current = structuredClone(fresh.maengel)
       }
-      toast.success('Mangel aktualisiert — PDF neu erstellt')
+      toast.success(TOAST.mangel_aktualisiert_pdf_neu_erstellt)
       if (fresh && countOffeneMaengel(fresh.maengel) === 0) onDone()
     })
   }
@@ -136,19 +144,23 @@ export function AbnahmeMaengelBearbeitenFlow({
 
   const footer = (
     <div className="sheet-footer-actions">
-      <Button type="button" variant="secondary" onClick={onClose}>
+      <MockBtn type="button" kind="secondary" onClick={onClose}>
+<<<<<<< Updated upstream
+        Abbrechen
+=======
         Schließen
-      </Button>
-      <Button type="button" variant="primary" onClick={onDone} disabled={pending}>
+>>>>>>> Stashed changes
+      </MockBtn>
+      <MockBtn type="button" kind="primary" onClick={onDone} disabled={pending}>
         Speichern
-      </Button>
+      </MockBtn>
     </div>
   )
 
   const body = loading ? (
     <p className="py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">Mängel werden geladen…</p>
   ) : maengel.length === 0 ? (
-    <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Mängel im Protokoll — alles abgenommen.</p>
+    <MockEmpty title="Keine Mängel im Protokoll — alles abgenommen." />
   ) : (
     <>
       <input
@@ -167,7 +179,7 @@ export function AbnahmeMaengelBearbeitenFlow({
         {offen > 0 ? (
           <>
             {' '}
-            — <span className="font-medium text-amber-800">{offen} offen</span>
+            — <span className="font-medium text-status-contact-text">{offen} offen</span>
           </>
         ) : (
           <> — alle Mängel erledigt</>
@@ -181,8 +193,8 @@ export function AbnahmeMaengelBearbeitenFlow({
             <div
               key={m.punkt_id}
               className={cn(
-                'rounded-lg border p-3',
-                offenItem ? 'border-amber-200 bg-amber-50/50' : 'border-emerald-200 bg-emerald-50/40'
+                'rounded-card border p-3',
+                offenItem ? 'border-status-contact-bg bg-status-contact-bg/50' : 'border-status-order-bg bg-status-order-bg/40'
               )}
             >
               <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -195,8 +207,8 @@ export function AbnahmeMaengelBearbeitenFlow({
                 </div>
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
-                    offenItem ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'
+                    'rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                    offenItem ? 'bg-status-contact-bg text-status-contact-text' : 'bg-status-order-bg text-status-order-text'
                   )}
                 >
                   {mangelStatusLabel(m.status)}
@@ -212,45 +224,32 @@ export function AbnahmeMaengelBearbeitenFlow({
                 }}
                 extraHint="Mangel-Beschreibung für Abnahme/PDF (kundensichtbar)."
               >
-                <Textarea
-                  long
-                  plain
-                  value={m.beschreibung}
-                  onChange={(e) => {
+                <MockTextarea value={m.beschreibung} onChange={(e) => {
                     const next = maengel.map((x) =>
                       x.punkt_id === m.punkt_id ? { ...x, beschreibung: e.target.value } : x
                     )
                     setMaengel(next)
-                  }}
-                />
+                  }} rows={14} className="resize-y py-2 ta--long" />
               </KiAssistFieldLabel>
-              <Input
-                label="Frist"
-                type="date"
-                className="mt-2"
-                value={m.frist?.slice(0, 10) ?? ''}
-                onChange={(e) => {
+              <MockField label="Frist"><DateInput value={m.frist?.slice(0, 10) ?? ''} onChange={(e) => {
                   const frist = e.target.value || null
                   setMaengel((prev) =>
                     prev.map((x) => (x.punkt_id === m.punkt_id ? { ...x, frist } : x))
                   )
-                }}
-              />
+                }} className=" mt-2" /></MockField>
               {mangelDirty(m) ? (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <Button
+                  <MockBtn
                     type="button"
-                    variant="ghost"
-                    size="sm"
+                    kind="ghost" sm
                     disabled={pending}
                     onClick={() => abbrechenMangel(m.punkt_id)}
                   >
                     Abbrechen
-                  </Button>
-                  <Button
+                  </MockBtn>
+                  <MockBtn
                     type="button"
-                    variant="primary"
-                    size="sm"
+                    kind="primary" sm
                     loading={pending}
                     onClick={() =>
                       void patchMangel(m.punkt_id, {
@@ -261,7 +260,7 @@ export function AbnahmeMaengelBearbeitenFlow({
                     }
                   >
                     Speichern
-                  </Button>
+                  </MockBtn>
                 </div>
               ) : null}
               {(m.verlauf ?? []).length > 0 ? (
@@ -277,20 +276,18 @@ export function AbnahmeMaengelBearbeitenFlow({
               <div className="mt-3 flex flex-wrap gap-2">
                 {offenItem ? (
                   <>
-                    <Button
+                    <MockBtn
                       type="button"
-                      variant="secondary"
-                      size="sm"
+                      kind="secondary" sm
                       loading={pending}
                       onClick={() => void patchMangel(m.punkt_id, { status: 'in_bearbeitung', notiz: 'In Bearbeitung' })}
                     >
-                      <Wrench className="mr-1 h-3.5 w-3.5" aria-hidden />
+                      <MockIcon n="tool" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
                       In Bearbeitung
-                    </Button>
-                    <Button
+                    </MockBtn>
+                    <MockBtn
                       type="button"
-                      variant="secondary"
-                      size="sm"
+                      kind="secondary" sm
                       loading={pending}
                       onClick={() => {
                         setUploadTarget(m.punkt_id)
@@ -299,28 +296,26 @@ export function AbnahmeMaengelBearbeitenFlow({
                       disabled={uploading}
                     >
                       Nachher-Foto
-                    </Button>
-                    <Button
+                    </MockBtn>
+                    <MockBtn
                       type="button"
-                      variant="primary"
-                      size="sm"
+                      kind="primary" sm
                       loading={pending}
                       onClick={() => void patchMangel(m.punkt_id, { status: 'behoben', notiz: 'Nacharbeit erledigt' })}
                     >
                       Als behoben
-                    </Button>
+                    </MockBtn>
                   </>
                 ) : m.status === 'behoben' ? (
-                  <Button
+                  <MockBtn
                     type="button"
-                    variant="primary"
-                    size="sm"
+                    kind="primary" sm
                     loading={pending}
                     onClick={() => void patchMangel(m.punkt_id, { status: 'abgenommen', notiz: 'Vom Kunden abgenommen' })}
                   >
-                    <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
+                    <MockIcon n="check" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
                     Abgenommen
-                  </Button>
+                  </MockBtn>
                 ) : null}
               </div>
             </div>

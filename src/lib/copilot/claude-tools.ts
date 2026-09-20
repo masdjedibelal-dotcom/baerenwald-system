@@ -187,7 +187,7 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   {
     name: 'vorschlage_handwerker_zuordnung',
     description:
-      'Schlägt passende Handwerker je Gewerk für Angebot oder Auftrag vor (aus Positionen). Danach Zuordnung mit User bestätigen und crm_aktion assign_auftrag_handwerker_gewerk.',
+      'Schlägt passende Partner je Gewerk für Angebot oder Auftrag vor (aus Positionen). Danach Zuordnung mit User bestätigen und crm_aktion assign_auftrag_handwerker_gewerk.',
     input_schema: {
       type: 'object',
       properties: {
@@ -214,7 +214,7 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'get_handwerker_offen',
-    description: 'Handwerker-Einreichungen in Prüfung laden',
+    description: 'Partner-Einreichungen in Prüfung laden',
     input_schema: emptySchema,
   },
   {
@@ -312,7 +312,7 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   {
     name: 'save_angebot_wizard',
     description:
-      'Vollständigen Wizard-Entwurf speichern (wie im CRM-Wizard: Positionen, Meta, Projekt, Handwerker). Gibt fehlende_felder zurück wenn unvollständig.',
+      'Vollständigen Wizard-Entwurf speichern (wie im CRM-Wizard: Positionen, Meta, Projekt, Partner). Gibt fehlende_felder zurück wenn unvollständig.',
     input_schema: {
       type: 'object',
       properties: {
@@ -361,7 +361,7 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'list_handwerker_gewerk',
-    description: 'Handwerker für ein Gewerk auflisten (Wizard Schritt 3)',
+    description: 'Partner für ein Gewerk auflisten (Wizard Schritt 3)',
     input_schema: {
       type: 'object',
       properties: {

@@ -1,8 +1,13 @@
 'use client'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
 import { useRouter } from 'next/navigation'
+<<<<<<< Updated upstream
+=======
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import type { VerlaufInspectTarget } from '@/lib/crm/verlauf'
 import { formatDatumZeit } from '@/lib/utils'
 
@@ -28,29 +33,43 @@ export function VerlaufEreignisModal({
   const fotos = (target.fotoUrls ?? []).filter(Boolean)
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
       title={target.title}
       size="md"
+<<<<<<< Updated upstream
+      secondary={{ label: 'Schließen', onClick: onClose }}
+      primary={
+        target.href
+          ? {
+              label: target.hrefLabel ?? 'Öffnen',
+              onClick: () => {
+                onClose()
+                router.push(target.href!)
+              },
+            }
+          : null
+=======
       footer={
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <MockBtn type="button" kind="secondary" onClick={onClose}>
             Schließen
-          </Button>
+          </MockBtn>
           {target.href ? (
-            <Button
+            <MockBtn
               type="button"
-              variant="primary"
+              kind="primary"
               onClick={() => {
                 onClose()
                 router.push(target.href!)
               }}
             >
               {target.hrefLabel ?? 'Öffnen'}
-            </Button>
+            </MockBtn>
           ) : null}
         </div>
+>>>>>>> Stashed changes
       }
     >
       <dl className="grid gap-2 text-sm sm:grid-cols-[120px_1fr]">
@@ -76,7 +95,7 @@ export function VerlaufEreignisModal({
         ) : (
           <>
             <dt className="text-bw-text-muted">Details</dt>
-            <dd className="text-bw-text-muted">Keine weiteren Details hinterlegt.</dd>
+            <dd><MockEmpty title="Keine weiteren Details hinterlegt." /></dd>
           </>
         )}
       </dl>
@@ -88,12 +107,12 @@ export function VerlaufEreignisModal({
               <img
                 src={url}
                 alt=""
-                className="h-20 w-20 rounded-lg border border-bw-border object-cover"
+                className="h-20 w-20 rounded-card border border-bw-border object-cover"
               />
             </a>
           ))}
         </div>
       ) : null}
-    </Modal>
+    </EditorSheet>
   )
 }

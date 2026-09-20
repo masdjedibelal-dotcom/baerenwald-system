@@ -1,6 +1,8 @@
 'use client'
 
-import { Activity, Sparkles } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { KiAngebotAbgleichCard } from '@/components/ki/KiAngebotAbgleichCard'
@@ -103,7 +105,7 @@ export function KiHubLebenszyklusPanel({ analysen }: Props) {
     setError(null)
     try {
       await postRefresh('claude')
-      router.refresh()
+      afterServerActionRefresh()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Fehler')
     } finally {
@@ -120,7 +122,7 @@ export function KiHubLebenszyklusPanel({ analysen }: Props) {
         await postRefresh(key)
       }
       await postRefresh('claude')
-      router.refresh()
+      afterServerActionRefresh()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Fehler')
     } finally {
@@ -129,11 +131,11 @@ export function KiHubLebenszyklusPanel({ analysen }: Props) {
   }, [router])
 
   return (
-    <section id="ki-depth" className="rounded-xl border border-bw-border bg-white shadow-sm">
+    <section id="ki-depth" className="rounded-sheet border border-bw-border bg-white shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-bw-border px-4 py-3">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-bw-text">
-            <Activity className="h-4 w-4 text-[#2E7D52]" aria-hidden />
+            <MockIcon n="activity" ctx="default" className="h-4 w-4 text-bw-primary" aria-hidden />
             Lebenszyklus-Analyse
           </h2>
           <p className="mt-0.5 text-xs text-muted">
@@ -141,45 +143,35 @@ export function KiHubLebenszyklusPanel({ analysen }: Props) {
             {meta.kiTexteGesamt}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void refreshZahlen()}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-bw-border px-2.5 py-1.5 text-xs font-medium text-bw-text hover:bg-bw-bg disabled:opacity-50"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-[#7C5CFC]" aria-hidden />
+        <MockBtn className="inline-flex items-center gap-1.5 rounded-button border border-bw-border px-2.5 py-1.5 text-xs font-medium text-bw-text hover:bg-bw-bg disabled:opacity-50" type="button" onClick={() => void refreshZahlen()} disabled={loading}>
+          <MockIcon n="sparkles" ctx="default" className="h-3.5 w-3.5 text-status-new-text" aria-hidden />
           {loading ? 'Aktualisiert…' : 'Ableitungen aktualisieren'}
-        </button>
+        </MockBtn>
       </div>
 
       <div className="flex gap-2 overflow-x-auto border-b border-bw-border px-4 py-3">
         {KI_PHASEN.map((p, i) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => setPhaseId(p.id)}
-            className={cn(
-              'inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors',
+          <MockBtn className={cn(
+              'inline-flex shrink-0 items-center gap-2 rounded-pill px-3 py-1.5 text-fs-meta font-medium transition-colors',
               phaseId === p.id
-                ? 'bg-[#2E7D52] text-white'
+                ? 'bg-bw-primary text-white'
                 : 'bg-bw-bg text-bw-text hover:bg-bw-surface-2'
-            )}
-          >
+            )} key={p.id} type="button" onClick={() => setPhaseId(p.id)}>
             <span
               className={cn(
-                'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold',
-                phaseId === p.id ? 'bg-white/20' : 'bg-white text-[#2E7D52]'
+                'flex h-5 w-5 items-center justify-center rounded-pill text-fs-caption font-semibold',
+                phaseId === p.id ? 'bg-white/20' : 'bg-white text-bw-primary'
               )}
             >
               {i + 1}
             </span>
             {p.label.replace(/^[①②③④⑤]\s*/, '')}
-          </button>
+          </MockBtn>
         ))}
       </div>
 
       {error ? (
-        <p className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="mx-4 mt-3 rounded-button border border-status-cancel-bg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
           {error}
         </p>
       ) : null}
@@ -190,14 +182,9 @@ export function KiHubLebenszyklusPanel({ analysen }: Props) {
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             Starte die erste Auswertung — danach erscheinen Cluster-Grafiken und KI-Ableitungen.
           </p>
-          <button
-            type="button"
-            onClick={() => void refreshZahlen()}
-            disabled={loading}
-            className="mt-4 rounded-lg bg-[#2E7D52] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-          >
+          <MockBtn className="mt-4 rounded-button bg-bw-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50" type="button" onClick={() => void refreshZahlen()} disabled={loading}>
             Erste Auswertung starten
-          </button>
+          </MockBtn>
         </div>
       ) : (
         <div className="grid gap-0 md:grid-cols-[220px_1fr]">
@@ -208,22 +195,17 @@ export function KiHubLebenszyklusPanel({ analysen }: Props) {
             {phase.bereiche.map((b) => {
               const hasNarrative = Boolean(byBereich.get(b)?.narrative?.trim())
               return (
-                <button
-                  key={b}
-                  type="button"
-                  onClick={() => setBereich(b)}
-                  className={cn(
-                    'flex shrink-0 items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[12px] font-medium transition-colors md:w-full',
+                <MockBtn className={cn(
+                    'flex shrink-0 items-center justify-between gap-2 rounded-card px-3 py-2 text-left text-fs-meta font-medium transition-colors md:w-full',
                     bereich === b
-                      ? 'bg-[#EAF3DE] text-[#2E7D52]'
+                      ? 'bg-bw-green-bg text-bw-primary'
                       : 'text-bw-text hover:bg-bw-bg'
-                  )}
-                >
+                  )} key={b} type="button" onClick={() => setBereich(b)}>
                   <span className="truncate">{KI_BEREICHE[b]}</span>
                   {hasNarrative ? (
-                    <Sparkles className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                    <MockIcon n="sparkles" ctx="default" className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
                   ) : null}
-                </button>
+                </MockBtn>
               )
             })}
           </nav>
@@ -232,8 +214,8 @@ export function KiHubLebenszyklusPanel({ analysen }: Props) {
             {selected ? (
               renderAnalyse(selected, () => void refreshKi(), kiLoading)
             ) : (
-              <div className="rounded-xl border border-dashed border-bw-border bg-bw-bg px-4 py-10 text-center">
-                <p className="text-sm font-medium text-bw-text">Keine Daten für diesen Bereich</p>
+              <div className="rounded-sheet border border-dashed border-bw-border bg-bw-bg px-4 py-10 text-center">
+                <MockEmpty title="Keine Daten für diesen Bereich" />
                 <p className="mt-1 text-sm text-muted">Ableitungen aktualisieren, um neu zu laden.</p>
               </div>
             )}

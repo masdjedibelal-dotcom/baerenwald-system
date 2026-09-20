@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { C } from '@/lib/tokens/colors'
 /* Mock-Listen/Shell-Klassen (.vg-row, .listbar, …) — Tokens liegen in globals.css */
 import '../styles/mock-design-system.css'
 import '../styles/staff-funnel.css'
@@ -28,7 +29,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#1A3D2B',
+  themeColor: C.greenDark,
   /* Pflicht für env(safe-area-inset-*) in Home-Screen-PWA */
   viewportFit: 'cover',
 }

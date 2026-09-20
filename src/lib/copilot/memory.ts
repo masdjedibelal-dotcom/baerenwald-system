@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
   COPILOT_HISTORY_TURNS,
@@ -18,6 +19,7 @@ export async function loadHistory(limit = COPILOT_HISTORY_TURNS): Promise<Copilo
     .select('role, content')
     .order('created_at', { ascending: false })
     .limit(limit)
+  if (error) logDbError('lib/copilot/memory:copilot_messages', error)
 
   if (error) {
     throw new Error(`Supabase copilot_messages (lesen): ${error.message}`)
@@ -39,14 +41,16 @@ export async function saveMessage(role: 'user' | 'assistant', content: string): 
   const { error: insertError } = await supabaseAdmin
     .from('copilot_messages')
     .insert({ role, content: stored })
+  if (insertError) logDbError('lib/copilot/memory:copilot_messages', insertError)
   if (insertError) {
     throw new Error(`Supabase copilot_messages (speichern): ${insertError.message}`)
   }
 
-  const { data } = await supabaseAdmin
+  const { data, error: error2 } = await supabaseAdmin
     .from('copilot_messages')
     .select('id')
     .order('created_at', { ascending: false })
+  if (error2) logDbError('lib/copilot/memory:copilot_messages', error2)
 
   if ((data?.length ?? 0) > 100) {
     const toDelete = data!.slice(100).map((d) => d.id as string)
@@ -56,6 +60,7 @@ export async function saveMessage(role: 'user' | 'assistant', content: string): 
 
 export async function clearCopilotHistory(): Promise<void> {
   const { error } = await supabaseAdmin.from('copilot_messages').delete().not('id', 'is', null)
+  if (error) logDbError('lib/copilot/memory:copilot_messages', error)
   if (error) {
     throw new Error(`Supabase copilot_messages (löschen): ${error.message}`)
   }
@@ -91,11 +96,13 @@ export async function rollbackLastUserMessage(): Promise<boolean> {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('lib/copilot/memory:copilot_messages', error)
   if (error) {
     throw new Error(`Supabase copilot_messages (rollback): ${error.message}`)
   }
   if (!data || data.role !== 'user') return false
   const { error: delError } = await supabaseAdmin.from('copilot_messages').delete().eq('id', data.id)
+  if (delError) logDbError('lib/copilot/memory:copilot_messages', delError)
   if (delError) {
     throw new Error(`Supabase copilot_messages (rollback löschen): ${delError.message}`)
   }

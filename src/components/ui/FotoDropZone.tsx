@@ -1,7 +1,7 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { ReactNode } from 'react'
-import { Camera } from 'lucide-react'
 import { useImageFileDrop } from '@/hooks/useImageFileDrop'
 import { cn } from '@/lib/utils'
 
@@ -57,7 +57,7 @@ export function FotoDropZone({
     >
       {children ?? (
         <>
-          {icon ?? <Camera className="h-5 w-5" aria-hidden />}
+          {icon ?? <MockIcon n="photo" ctx="default" className="h-5 w-5" aria-hidden />}
           <span>{isDragging ? labelDragging : label}</span>
         </>
       )}

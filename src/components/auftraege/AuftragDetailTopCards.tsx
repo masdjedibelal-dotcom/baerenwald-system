@@ -1,14 +1,16 @@
 'use client'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockSelect } from '@/components/mock-ui/MockForm'
+import { MockProp } from '@/components/mock-ui/MockProp'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockProp } from '@/components/mock-ui/MockProp'
 import { updateAuftragBetreuer } from '@/app/(dashboard)/auftraege/actions'
 import { formatAuftragsNr, auftragWertAnzeige } from '@/lib/auftraege/auftrag-liste-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { AuftragDetail } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
+import { TOAST } from '@/lib/copy'
 
 /**
  * Auftragsdaten — Nr · Projektleitung · Auftragswert
@@ -32,10 +34,10 @@ export function AuftragDetailTopCards({
     startTransition(async () => {
       const res = await updateAuftragBetreuer(detail.id, nextId || null)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
-      toast.success('Projektleitung gespeichert')
+      toast.success(TOAST.projektleitung_gespeichert)
       refresh()
     })
   }
@@ -46,13 +48,7 @@ export function AuftragDetailTopCards({
         <MockProp label="Auftrag">{nr}</MockProp>
         <MockProp label="Projektleitung">
           {team.length ? (
-            <select
-              className="sel"
-              value={betreuerId}
-              onChange={(e) => onBetreuerChange(e.target.value)}
-              disabled={pending}
-              aria-label="Projektleitung"
-            >
+            <MockSelect className="sel" value={betreuerId} onChange={(e) => onBetreuerChange(e.target.value)} disabled={pending} aria-label="Projektleitung">
               <option value="">— Keine Zuweisung —</option>
               {team.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -60,7 +56,7 @@ export function AuftragDetailTopCards({
                   {m.telefon ? ` · ${m.telefon}` : ''}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           ) : (
             betreuerName || '—'
           )}

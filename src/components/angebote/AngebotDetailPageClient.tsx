@@ -1,4 +1,16 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import {
+  DetailShell,
+  EntityDetailLayout,
+  type DetailShellGroup,
+} from '@/components/layout/EntityDetailLayout'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Combobox } from '@/components/ui/Combobox'
+import { DateInput } from '@/components/ui/DateInput'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -9,20 +21,19 @@ import {
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
-import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { formatEurBetrag, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
+<<<<<<< Updated upstream
+=======
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
@@ -54,6 +65,7 @@ import { AngebotWizard } from '@/components/angebote/AngebotWizard'
 import {
   KUNDE_ABLEHNUNG_GRUND_LABELS,
   KUNDE_ABLEHNUNG_GRUND_OPTIONS,
+  labelKundeAblehnung,
   type KundeAblehnungGrund,
 } from '@/lib/angebote/ablehnung-labels'
 import {
@@ -85,6 +97,8 @@ import {
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type AngebotDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
 
@@ -165,6 +179,7 @@ export function AngebotDetailPageClient({
   kiVisualisierungen?: import('@/lib/visualize/types').KiVisualisierung[]
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
@@ -287,7 +302,7 @@ export function AngebotDetailPageClient({
     startTransition(async () => {
       const res = await loadAngebotWizardBootstrap(detail.id, detail.lead_id!)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       openWizardMitBootstrap(res.bootstrap)
@@ -296,13 +311,13 @@ export function AngebotDetailPageClient({
 
   function openNeuesAngebotAlsKopie() {
     if (!detail.lead_id) {
-      toast.error('Keine verknüpfte Anfrage.')
+      toast.error(TOAST.keine_verknuepfte_anfrage)
       return
     }
     startTransition(async () => {
       const res = await loadAngebotWizardBootstrapKopie(detail.id, detail.lead_id!)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       openWizardMitBootstrap(res.bootstrap)
@@ -346,7 +361,7 @@ export function AngebotDetailPageClient({
       if (cancelled) return
       setAufPreviewLoading(false)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setAufBetreff((prev) => prev.trim() || res.betreff)
@@ -524,7 +539,7 @@ export function AngebotDetailPageClient({
         )
         return
       }
-      toast.success('Auftrag erstellt — ohne Kundenmail / ohne HV-Freigabe')
+      toast.success(TOAST.auftrag_erstellt_ohne_kundenmail_ohne_hv_freigab)
       router.push(`/auftraege/${res.auftragId}`)
       refresh()
     })
@@ -686,7 +701,7 @@ export function AngebotDetailPageClient({
       />
     ) : (
       <MockCard title="Notizen" icon="messages" className="dshell-framed">
-        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '0.25rem 0' }}>
           Noch keine Notizen — verknüpfe eine Anfrage oder lege später welche an.
         </div>
       </MockCard>
@@ -777,10 +792,15 @@ export function AngebotDetailPageClient({
       }}
     >
       {statusEinfach === 'abgelehnt' ? (
-        <p className="rounded-lg border border-bw-border px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="rounded-card border border-bw-border px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
           Abgelehnt
           {detail.updated_at ? ` am ${formatDatum(detail.updated_at)}` : ''}
-          {detail.ablehnung_grund ? ` — ${detail.ablehnung_grund}` : ''}
+          {detail.ablehnung_grund
+            ? ` — ${labelKundeAblehnung(detail.ablehnung_grund)}`
+            : ''}
+          {detail.ablehnung_notiz?.trim()
+            ? `: ${detail.ablehnung_notiz.trim()}`
+            : ''}
         </p>
       ) : null}
 
@@ -788,18 +808,18 @@ export function AngebotDetailPageClient({
         <div className="detail-info-banners">
           {inhaltGeaendertNachVersand ? (
             <div className="detail-info-banner detail-info-banner--warn flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[length:var(--fs-text)] text-amber-950">
+              <p className="text-[length:var(--fs-text)] text-status-contact-text">
                 Inhalt geändert seit Versand
                 {gesendetAm ? ` am ${formatDatum(gesendetAm)}` : ''} — der Kunde hat die neue
                 Fassung noch nicht per E-Mail.
               </p>
-              <Button
+              <MockBtn kind="primary"
                 type="button"
                 onClick={() => setKundeVersandOpen(true)}
                 disabled={pending}
               >
                 Korrigierte Fassung senden
-              </Button>
+              </MockBtn>
             </div>
           ) : null}
           {direktAuftragUnterSchwelleHinweis ? (
@@ -882,34 +902,24 @@ export function AngebotDetailPageClient({
         />
       ) : null}
 
-      <Modal open={acceptOpen} onClose={() => setAcceptOpen(false)} title="Angebot annehmen" size="lg">
-        <div className="space-y-4">
+      <EditorSheet open={acceptOpen} onClose={() => setAcceptOpen(false)} title="Angebot annehmen" size="lg">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                <div className="space-y-4">
           <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             Angebot als angenommen markieren — auch ohne vorherigen Versand an den Kunden. Optional
             die Auftragsbestätigung per E-Mail senden.
           </p>
-          <Input
-            label="Start-Datum"
-            type="date"
-            required
-            value={aufStart}
-            onChange={(e) => {
+          <MockField label="Start-Datum" required><DateInput required value={aufStart} onChange={(e) => {
               const v = e.target.value
               setAufStart(v)
               setAufEnde(addDaysYmd(v, 14))
-            }}
-          />
-          <Input
-            label="Geschätztes End-Datum"
-            type="date"
-            value={aufEnde}
-            onChange={(e) => setAufEnde(e.target.value)}
-          />
+            }} /></MockField>
+          <MockField label="Geschätztes End-Datum"><DateInput value={aufEnde} onChange={(e) => setAufEnde(e.target.value)} /></MockField>
 
           <div className="border-t border-bw-border pt-4">
             <p className="mb-3 text-[length:var(--fs-text)] font-semibold text-bw-text">Auftragsbestätigung an Kund:in</p>
             {!kunde?.email?.trim() ? (
-              <p className="text-[length:var(--fs-text)] text-amber-700">Keine E-Mail-Adresse — Auftrag wird ohne Mail erstellt.</p>
+              <p className="text-[length:var(--fs-text)] text-status-contact-text">E-Mail-Adresse fehlt — Auftrag wird ohne Mail erstellt.</p>
             ) : (
               <>
                 <KiAssistFieldLabel
@@ -919,11 +929,7 @@ export function AngebotDetailPageClient({
                   extraHint="Auftragsbestätigung — Betreff an den Kunden."
                   multiline={false}
                 >
-                  <Input
-                    value={aufBetreff}
-                    onChange={(e) => setAufBetreff(e.target.value)}
-                    className="mb-3"
-                  />
+                  <MockInput value={aufBetreff} onChange={(e) => setAufBetreff(e.target.value)} className="mb-3" />
                 </KiAssistFieldLabel>
                 <EmailPillsField
                   label="An"
@@ -948,7 +954,7 @@ export function AngebotDetailPageClient({
                   <iframe
                     title="Auftragsbestätigung Vorschau"
                     sandbox="allow-same-origin"
-                    className="h-[320px] w-full rounded-lg border border-bw-border bg-white"
+                    className="h-[320px] w-full rounded-card border border-bw-border bg-white"
                     srcDoc={aufPreviewHtml}
                   />
                 )}
@@ -957,16 +963,16 @@ export function AngebotDetailPageClient({
           </div>
         </div>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => setAcceptOpen(false)}>
+          <MockBtn type="button" kind="secondary" onClick={() => setAcceptOpen(false)}>
             Abbrechen
-          </Button>
-          <Button
+          </MockBtn>
+          <MockBtn
             type="button"
-            variant="secondary"
+            kind="secondary"
             loading={pending}
             onClick={() => {
               if (!aufStart.trim()) {
-                toast.error('Bitte Start-Datum angeben.')
+                applyFieldErrors({ _form: TOAST.bitte_start_datum_angeben })
                 return
               }
               startTransition(async () => {
@@ -976,30 +982,30 @@ export function AngebotDetailPageClient({
                   send_kunden_email: false,
                 })
                 if (!res.ok) {
-                  toast.error(res.message)
+                  toast.systemError(res)
                   return
                 }
                 setAcceptOpen(false)
-                toast.success('Auftrag erstellt')
+                toast.success(TOAST.auftrag_erstellt)
                 router.push(`/auftraege/${res.auftragId}`)
                 refresh()
               })
             }}
           >
             Nur Auftrag erstellen
-          </Button>
-          <Button
+          </MockBtn>
+          <MockBtn
             type="button"
-            variant="primary"
+            kind="primary"
             loading={pending}
             disabled={!kunde?.email?.trim() || !aufTo.length}
             onClick={() => {
               if (!aufStart.trim()) {
-                toast.error('Bitte Start-Datum angeben.')
+                applyFieldErrors({ _form: TOAST.bitte_start_datum_angeben })
                 return
               }
               if (!aufTo.length) {
-                toast.error('Bitte mindestens einen Empfänger angeben.')
+                applyFieldErrors({ _form: TOAST.bitte_mindestens_einen_empfaenger_angeben })
                 return
               }
               startTransition(async () => {
@@ -1012,22 +1018,22 @@ export function AngebotDetailPageClient({
                   cc: aufCc,
                 })
                 if (!res.ok) {
-                  toast.error(res.message)
+                  toast.systemError(res)
                   return
                 }
                 setAcceptOpen(false)
-                toast.success('Auftrag erstellt — Bestätigung gesendet')
+                toast.success(TOAST.auftrag_erstellt_bestaetigung_gesendet)
                 router.push(`/auftraege/${res.auftragId}`)
                 refresh()
               })
             }}
           >
             Erstellen & Bestätigung senden
-          </Button>
+          </MockBtn>
         </div>
-      </Modal>
+      </EditorSheet>
 
-      <Modal
+      <EditorSheet
         open={ablehnenOpen}
         onClose={() => setAblehnenOpen(false)}
         title="Angebot ablehnen"
@@ -1037,47 +1043,29 @@ export function AngebotDetailPageClient({
           <p className="text-[length:var(--fs-text)] text-bw-text-muted">
             Markiert das Angebot als abgelehnt und kann den zugehörigen Lead schließen.
           </p>
-          <Select
-            label="Grund"
-            name="ablehnung_grund"
-            required
-            value={ablehnenGrund}
-            onChange={(e) => setAblehnenGrund(e.target.value as KundeAblehnungGrund | '')}
-            options={[
+          <Combobox label="Grund" id="ablehnung_grund" name="ablehnung_grund" required options={[
               { value: '', label: 'Grund wählen' },
               ...KUNDE_ABLEHNUNG_GRUND_OPTIONS.map((v) => ({
                 value: v,
                 label: KUNDE_ABLEHNUNG_GRUND_LABELS[v],
               })),
-            ]}
-          />
+            ]} value={ablehnenGrund == null ? '' : String(ablehnenGrund)} placeholder="Auswählen…" onChange={(next) => { setAblehnenGrund(next as KundeAblehnungGrund | ''); }} />
           {(ablehnenGrund === 'konkurrenz' || ablehnenGrund === 'zu_teuer') && (
-            <Input
-              label="Konkurrenzpreis (€, optional)"
-              type="number"
-              min={0}
-              step="0.01"
-              value={ablehnenKonkurrenz}
-              onChange={(e) => setAblehnenKonkurrenz(e.target.value)}
-            />
+            <MockField label="Konkurrenzpreis (€, optional)"><MockInput type="number" min={0} step="0.01" value={ablehnenKonkurrenz} onChange={(e) => setAblehnenKonkurrenz(e.target.value)} /></MockField>
           )}
-          <Input
-            label="Notiz (optional)"
-            value={ablehnenNotiz}
-            onChange={(e) => setAblehnenNotiz(e.target.value)}
-          />
+          <MockField label="Notiz (optional)"><MockInput value={ablehnenNotiz} onChange={(e) => setAblehnenNotiz(e.target.value)} /></MockField>
         </div>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => setAblehnenOpen(false)}>
+          <MockBtn type="button" kind="secondary" onClick={() => setAblehnenOpen(false)}>
             Abbrechen
-          </Button>
-          <Button
+          </MockBtn>
+          <MockBtn
             type="button"
-            variant="danger"
+            kind="danger"
             loading={pending}
             onClick={() => {
               if (!ablehnenGrund) {
-                toast.error('Bitte einen Ablehnungsgrund wählen.')
+                applyFieldErrors({ _form: TOAST.bitte_einen_ablehnungsgrund_waehlen })
                 return
               }
               startTransition(async () => {
@@ -1090,15 +1078,15 @@ export function AngebotDetailPageClient({
                   notiz: ablehnenNotiz.trim() || null,
                 })
                 if (!res.ok) {
-                  toast.error(res.message)
+                  toast.systemError(res)
                   return
                 }
                 const leadClose = await schliesseLeadNachAngebotVerlust(detail.id)
                 if (!leadClose.ok) {
-                  toast.success('Angebot abgelehnt')
+                  toast.success(TOAST.angebot_abgelehnt)
                   toast.info(leadClose.message)
                 } else {
-                  toast.success('Angebot abgelehnt — Lead geschlossen')
+                  toast.success(TOAST.angebot_abgelehnt_lead_geschlossen)
                 }
                 setAblehnenOpen(false)
                 refresh()
@@ -1106,9 +1094,9 @@ export function AngebotDetailPageClient({
             }}
           >
             Ablehnen
-          </Button>
+          </MockBtn>
         </div>
-      </Modal>
+      </EditorSheet>
 
       {quickActionSheets}
     </EntityDetailLayout>

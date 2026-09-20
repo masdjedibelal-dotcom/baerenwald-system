@@ -1,8 +1,8 @@
 'use client'
 
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { actionBusy } from '@/components/ui/action-busy'
 import {
   deleteKunde,
@@ -10,6 +10,7 @@ import {
   type KundeDeletePreview,
 } from '@/app/actions/kunden'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 type ConfirmState = {
   kundeId: string
@@ -26,13 +27,13 @@ let globalConfirmKundeDelete:
   | ((kundeId: string, onDone?: () => void | Promise<void>) => void)
   | null = null
 
-/** Globaler Einstieg (Listen/Swipe/Detail-Menü) — MockModal mit Umfang + Namens-Confirm. */
+/** Globaler Einstieg (Listen/Swipe/Detail-Menü) — ConfirmPopup mit Umfang + Namens-Confirm. */
 export function confirmKundeDelete(kundeId: string, onDone?: () => void | Promise<void>) {
   if (globalConfirmKundeDelete) {
     globalConfirmKundeDelete(kundeId, onDone)
     return
   }
-  toast.error('Lösch-Dialog nicht verfügbar.')
+  toast.error(TOAST.loesch_dialog_nicht_verfuegbar)
 }
 
 export function useConfirmKundeDelete() {
@@ -92,15 +93,15 @@ export function ConfirmKundeDeleteProvider({ children }: { children: ReactNode }
     try {
       const r = await deleteKunde(state.kundeId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Kunde gelöscht')
+      toast.success(TOAST.kunde_geloescht)
       const done = state.onDone
       setState(null)
       if (done) await Promise.resolve(done())
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Löschen fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Löschen fehlgeschlagen')
     } finally {
       actionBusy.hide()
       setPending(false)
@@ -116,46 +117,26 @@ export function ConfirmKundeDeleteProvider({ children }: { children: ReactNode }
     <ConfirmKundeDeleteContext.Provider value={{ confirmKundeDelete: confirmKundeDeleteFn }}>
       {children}
       {state ? (
-        <MockModal
+        <ConfirmPopup
           open
-          icon="trash"
           title="Kunde löschen?"
-          sub={
-            preview?.blocked
-              ? 'Löschen blockiert'
-              : 'Dauerhaft entfernen — inkl. Vorgänge und Rechnungen.'
-          }
-          size="sm"
+          danger
+          busy={pending}
+          confirmDisabled={pending || loading || !preview || preview.blocked || !nameOk}
+          confirmLabel={pending ? 'Wird gelöscht…' : 'Kunde löschen'}
           onClose={close}
-          footer={
-            <>
-              <MockBtn kind="ghost" disabled={pending} onClick={close}>
-                Abbrechen
-              </MockBtn>
-              <div style={{ flex: 1 }} />
-              <MockBtn
-                kind="danger"
-                icon={pending ? undefined : 'trash'}
-                disabled={pending || loading || !preview || preview.blocked || !nameOk}
-                title={
-                  preview?.blocked
-                    ? preview.blockReason ?? undefined
-                    : !nameOk && preview
-                      ? 'Bitte Kundennamen zur Bestätigung eintippen'
-                      : undefined
-                }
-                onClick={() => void handleConfirm()}
-              >
-                {pending ? 'Wird gelöscht…' : 'Kunde löschen'}
-              </MockBtn>
-            </>
-          }
+          onConfirm={() => void handleConfirm()}
         >
           <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.55 }}>
+            <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+              {preview?.blocked
+                ? 'Löschen blockiert'
+                : 'Dauerhaft entfernen — inkl. Vorgänge und Rechnungen.'}
+            </p>
             {loading ? (
               <p className="m-0">Umfang wird geladen…</p>
             ) : loadError ? (
-              <p className="m-0" style={{ color: 'var(--danger, #b42318)' }}>
+              <p className="m-0" style={{ color: 'var(--danger)' }}>
                 {loadError}
               </p>
             ) : preview?.blocked ? (
@@ -185,9 +166,9 @@ export function ConfirmKundeDeleteProvider({ children }: { children: ReactNode }
                   <p
                     className="m-0 mb-3"
                     style={{
-                      padding: '8px 10px',
+                      padding: '0.5rem 0.6250remrem',
                       borderRadius: 8,
-                      background: 'var(--warn-soft, #fff7ed)',
+                      background: 'var(--warn-soft)',
                       color: 'var(--text)',
                       fontSize: 'var(--fs-meta)',
                     }}
@@ -199,20 +180,12 @@ export function ConfirmKundeDeleteProvider({ children }: { children: ReactNode }
                   <div className="field-label">
                     Zur Bestätigung „{preview.kundeName}“ eintippen
                   </div>
-                  <input
-                    className="txt"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    placeholder={preview.kundeName}
-                    autoComplete="off"
-                    disabled={pending}
-                    aria-label="Kundenname zur Bestätigung"
-                  />
+                  <MockInput className="txt" value={nameInput} onChange={(e) => setNameInput(e.target.value)} placeholder={preview.kundeName} autoComplete="off" disabled={pending} aria-label="Kundenname zur Bestätigung" />
                 </div>
               </>
             ) : null}
           </div>
-        </MockModal>
+        </ConfirmPopup>
       ) : null}
     </ConfirmKundeDeleteContext.Provider>
   )

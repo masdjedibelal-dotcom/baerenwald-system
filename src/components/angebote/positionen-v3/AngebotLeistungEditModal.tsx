@@ -1,4 +1,6 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -8,6 +10,7 @@ import { toast } from '@/components/ui/app-toast'
 import { updateAngebotPositionSteuerung } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import { positionNettoZeile } from '@/lib/angebot-positionen'
 import type { AngebotPosition } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 export function AngebotLeistungEditModal({
   open,
@@ -62,7 +65,7 @@ export function AngebotLeistungEditModal({
     if (!pos) return
     const trimmed = name.trim()
     if (!trimmed) {
-      toast.error('Bezeichnung fehlt.')
+      toast.error(TOAST.bezeichnung_fehlt)
       return
     }
     const vkNum = vk.trim() ? Number(vk.replace(',', '.')) : null
@@ -79,10 +82,10 @@ export function AngebotLeistungEditModal({
         einheit: einheit.trim() || 'Stk.',
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Gespeichert')
+      toast.success(TOAST.gespeichert)
       onSaved()
       onClose()
     })
@@ -102,53 +105,24 @@ export function AngebotLeistungEditModal({
     >
       <GroupedFieldCard>
         <GroupedFieldRow label="Bezeichnung">
-          <input
-            className="input w-full text-right"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <MockInput className="w-full text-right" value={name} onChange={(e) => setName(e.target.value)} />
         </GroupedFieldRow>
         <GroupedFieldRow label="Menge">
-          <input
-            type="number"
-            className="input w-24 text-right"
-            step="0.01"
-            min="0.01"
-            value={menge}
-            onChange={(e) => setMenge(e.target.value)}
-          />
+          <MockInput type="number" className="w-24 text-right" step="0.01" min="0.01" value={menge} onChange={(e) => setMenge(e.target.value)} />
         </GroupedFieldRow>
         <GroupedFieldRow label="Einheit">
-          <input
-            className="input w-24 text-right"
-            value={einheit}
-            onChange={(e) => setEinheit(e.target.value)}
-          />
+          <MockInput className="w-24 text-right" value={einheit} onChange={(e) => setEinheit(e.target.value)} />
         </GroupedFieldRow>
         <GroupedFieldRow label="Preis">
           <div className="txt-prefix justify-end">
             <span className="prefix">€</span>
-            <input
-              type="number"
-              className="input w-28 text-right"
-              step="0.01"
-              min="0"
-              value={vk}
-              onChange={(e) => setVk(e.target.value)}
-            />
+            <MockInput type="number" className="w-28 text-right" step="0.01" min="0" value={vk} onChange={(e) => setVk(e.target.value)} />
           </div>
         </GroupedFieldRow>
         <GroupedFieldRow label="EK">
           <div className="txt-prefix justify-end">
             <span className="prefix">€</span>
-            <input
-              type="number"
-              className="input w-28 text-right"
-              step="0.01"
-              min="0"
-              value={ek}
-              onChange={(e) => setEk(e.target.value)}
-            />
+            <MockInput type="number" className="w-28 text-right" step="0.01" min="0" value={ek} onChange={(e) => setEk(e.target.value)} />
           </div>
         </GroupedFieldRow>
       </GroupedFieldCard>
@@ -157,21 +131,13 @@ export function AngebotLeistungEditModal({
         <GroupedFieldCard className="mt-3">
           <div className="px-4 py-3">
             <label className="input-label">Beschreibung</label>
-            <textarea
-              className="input mt-1 w-full min-h-[4rem]"
-              value={beschreibung}
-              onChange={(e) => setBeschreibung(e.target.value)}
-            />
+            <MockTextarea className="mt-1 w-full min-h-[4rem]" value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} />
           </div>
         </GroupedFieldCard>
       ) : (
-        <button
-          type="button"
-          className="mt-3 text-[length:var(--fs-text)] font-medium text-bw-primary"
-          onClick={() => setShowBeschreibung(true)}
-        >
+        <MockBtn className="mt-3 text-[length:var(--fs-text)] font-medium text-bw-primary" type="button" onClick={() => setShowBeschreibung(true)}>
           + Beschreibung
-        </button>
+        </MockBtn>
       )}
     </EditorSheet>
   )

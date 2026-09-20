@@ -1,9 +1,13 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase'
 import {
   IDLE_COUNTDOWN_SEC,
@@ -264,26 +268,26 @@ export function SessionGuard() {
         >
           {isIdle ? (
             <>
-              <Button
+              <MockBtn
                 type="button"
-                variant="danger"
+                kind="danger"
                 onClick={() => void forceLogout('idle')}
               >
                 Abmelden
-              </Button>
-              <Button type="button" variant="primary" onClick={staySignedIn}>
+              </MockBtn>
+              <MockBtn type="button" kind="primary" onClick={staySignedIn}>
                 Weiterarbeiten
-              </Button>
+              </MockBtn>
             </>
           ) : (
-            <Button
+            <MockBtn
               type="button"
-              variant="primary"
+              kind="primary"
               className="w-full"
               onClick={() => void forceLogout('session')}
             >
               Zur Anmeldung
-            </Button>
+            </MockBtn>
           )}
         </div>
       </div>

@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
@@ -17,6 +23,8 @@ import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-p
 import { provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
 import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
+import { planAuftragHandwerkerStatusWrite } from '@/lib/status/write-auftrag-handwerker-status'
+import { planAngebotHandwerkerStatusWrite } from '@/lib/status/write-angebot-handwerker-status'
 import type { AuftragPosition } from '@/lib/types'
 
 async function assertAuftrag(auftragId: string) {
@@ -26,6 +34,7 @@ async function assertAuftrag(auftragId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet', supabase: null }
   const { data, error } = await supabase.from('auftraege').select('id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden', supabase: null }
   return { ok: true as const, supabase }
 }
@@ -45,6 +54,7 @@ export async function bulkDeleteAuftragPositionenV3(
     .select('id, leistung_name, handwerker_id, handwerker_status, aenderung_typ, preis_partner')
     .eq('auftrag_id', auftragId)
     .in('id', ids)
+  if (loadErr) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', loadErr)
 
   if (loadErr) return { ok: false, message: loadErr.message }
 
@@ -62,6 +72,7 @@ export async function bulkDeleteAuftragPositionenV3(
         .update(metaLeistungEntfernt())
         .eq('id', id)
         .eq('auftrag_id', auftragId)
+      if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
       markiert++
 
@@ -84,6 +95,7 @@ export async function bulkDeleteAuftragPositionenV3(
         .delete()
         .eq('id', id)
         .eq('auftrag_id', auftragId)
+      if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
       deleted++
     }
@@ -92,7 +104,7 @@ export async function bulkDeleteAuftragPositionenV3(
   await syncAuftragIstBauprojekt(auftragId)
   void syncProjektvertragStilleFuerAuftrag(auftragId)
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true, deleted, markiert }
 }
 
@@ -114,15 +126,20 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   const ids = Array.from(new Set(input.positionIds.map((id) => id.trim()).filter(Boolean)))
   const hwId = input.handwerkerId.trim()
   if (!ids.length || !hwId) {
-    return { ok: false, message: 'Positionen und Handwerker erforderlich.' }
+    return { ok: false, message: 'Positionen und Partner erforderlich.' }
   }
 
-  const { data: hw } = await gate.supabase!
+  const { data: hw, error } = await gate.supabase!
     .from('handwerker')
     .select('id')
     .eq('id', hwId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:handwerker', error)
+<<<<<<< Updated upstream
+  if (!hw) return { ok: false, message: 'Partner nicht gefunden.' }
+=======
   if (!hw) return { ok: false, message: 'Handwerker nicht gefunden.' }
+>>>>>>> Stashed changes
 
   const ekGlobal =
     input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto >= 0
@@ -135,6 +152,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     .select('id, gewerk_slug, gewerk_name, handwerker_id, preis_partner, handwerker_status, aenderung_typ')
     .eq('auftrag_id', input.auftragId)
     .in('id', ids)
+  if (loadErr) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', loadErr)
 
   if (loadErr) return { ok: false, message: loadErr.message }
   if (!rows?.length) return { ok: false, message: 'Positionen nicht gefunden.' }
@@ -176,6 +194,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
       .update(patch)
       .eq('id', posId)
       .eq('auftrag_id', input.auftragId)
+    if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
     if (error) return { ok: false, message: error.message }
     updated++
 
@@ -199,30 +218,33 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
 
   // Auftrag-Zuweisungstabelle mitziehen (Tagebuch anfordern / Partner-UI liest daraus).
   for (const gewerkId of gewerkIdsTouched) {
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error } = await supabaseAdmin
       .from('auftrag_handwerker')
       .select('id')
       .eq('auftrag_id', input.auftragId)
       .eq('gewerk_id', gewerkId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_handwerker', error)
     if (existing?.id) {
-      await supabaseAdmin
+      const { error: __dbErr1 } = await supabaseAdmin
         .from('auftrag_handwerker')
-        .update({ handwerker_id: hwId, status: 'zugewiesen' })
+        .update(planAuftragHandwerkerStatusWrite('zugewiesen', { handwerker_id: hwId }))
         .eq('id', existing.id)
+      if (__dbErr1) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_handwerker', __dbErr1)
     } else {
-      await supabaseAdmin.from('auftrag_handwerker').insert({
+      const { error: __dbErr2 } = await supabaseAdmin.from('auftrag_handwerker').insert({
         auftrag_id: input.auftragId,
         gewerk_id: gewerkId,
         handwerker_id: hwId,
         status: 'zugewiesen',
       })
+      if (__dbErr2) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_handwerker', __dbErr2)
     }
   }
 
   provisionProjektvertragFireAndForget(input.auftragId, hwId)
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, updated }
 }
 
@@ -278,6 +300,7 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
     )
     .eq('auftrag_id', input.auftragId)
     .not('handwerker_id', 'is', null)
+  if (pErr) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', pErr)
 
   if (pErr) return { ok: false, message: pErr.message }
 
@@ -333,6 +356,7 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
         .update(sendPatch)
         .eq('id', p.id)
         .eq('auftrag_id', input.auftragId)
+      if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
       gesendet++
     }
@@ -342,10 +366,11 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
       if (ahRow?.id) {
         const prev = (ahRow.status ?? '').toLowerCase()
         if (!prev || prev === 'zugewiesen' || prev === 'ausstehend') {
-          await supabaseAdmin
+          const { error: __dbErr3 } = await supabaseAdmin
             .from('angebot_handwerker')
-            .update({ status: 'ausstehend', gesendet_at: now })
+            .update(planAngebotHandwerkerStatusWrite('ausstehend', { gesendet_at: now }))
             .eq('id', ahRow.id)
+          if (__dbErr3) logDbError('app/auftraege/leistungen-steuerung-v3-actions:angebot_handwerker', __dbErr3)
         }
       }
     }
@@ -381,7 +406,7 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
     syncProjektvertragStilleFireAndForget(input.auftragId, hwId)
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, gesendet, handwerker: byHw.size }
 }
 
@@ -395,7 +420,7 @@ export async function notifyPartnerPositionGeaendertV3(input: {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
 
-  const { data: pos } = await gate.supabase!
+  const { data: pos, error } = await gate.supabase!
     .from('auftrag_positionen')
     .select(
       'id, leistung_name, handwerker_id, gewerk_slug, gewerk_name, aenderung_typ, preis_alt, preis_partner, handwerker_status'
@@ -403,6 +428,7 @@ export async function notifyPartnerPositionGeaendertV3(input: {
     .eq('id', input.positionId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
 
   if (!pos?.handwerker_id) return { ok: true, skipped: true }
 
@@ -442,6 +468,7 @@ export async function countUnsentZugewieseneLeistungenV3(
     .select('id, handwerker_id, handwerker_status, aenderung_typ')
     .eq('auftrag_id', auftragId)
     .not('handwerker_id', 'is', null)
+  if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
 
   if (error) return { ok: false, message: error.message }
 

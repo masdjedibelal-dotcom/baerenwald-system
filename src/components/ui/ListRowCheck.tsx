@@ -1,12 +1,11 @@
 'use client'
 
-import type { KeyboardEvent, MouseEvent } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import type { MouseEvent } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
- * Zeilen-/Header-Auswahl — echter Button (kein div-onClick).
- * Ersetzt nackte `.vg-check`-divs (AUFTRAG C2).
+ * Zeilen-/Header-Auswahl — MockCheckbox intern (AUFTRAG C2 / P5-17).
  */
 export function ListRowCheck({
   checked,
@@ -21,27 +20,19 @@ export function ListRowCheck({
   title?: string
   className?: string
 }) {
-  function activate(e: MouseEvent | KeyboardEvent) {
-    e.stopPropagation()
-    e.preventDefault()
-    onToggle()
-  }
-
   return (
-    <button
-      type="button"
+    <label
       className={cn('vg-check', className)}
       title={title}
-      aria-label={title ?? (checked ? 'Auswahl aufheben' : 'Auswählen')}
-      aria-pressed={checked}
-      onClick={activate}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') activate(e)
-      }}
+      onClick={(e: MouseEvent) => e.stopPropagation()}
     >
-      <span className={cn('vg-box', checked && 'on', !checked && partial && 'partial')}>
-        {checked || partial ? <MockIcon ctx="default" n="check" size={12} /> : null}
-      </span>
-    </button>
+      <MockCheckbox
+        checked={checked}
+        indeterminate={Boolean(partial) && !checked}
+        aria-label={title ?? (checked ? 'Auswahl aufheben' : 'Auswählen')}
+        onChange={() => onToggle()}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </label>
   )
 }

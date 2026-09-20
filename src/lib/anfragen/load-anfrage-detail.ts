@@ -1,7 +1,11 @@
+<<<<<<< Updated upstream
+import { createClient } from '@/lib/supabase-server'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
 import { enrichLeadDetailUserNames } from '@/lib/anfragen/enrich-lead-user-names'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { resolveLeadKunde } from '@/lib/lead-display-helpers'
 import type {
   KundenObjekt,
@@ -58,6 +62,7 @@ async function loadLeadTimelineOptional(
     .select('*')
     .eq('lead_id', leadId)
     .order('created_at', { ascending: true })
+  if (error) logDbError('lib/anfragen/load-anfrage-detail:lead_timeline', error)
 
   if (error) {
     // Tabelle fehlt lokal / Migration nicht angewendet — Detailseite soll trotzdem öffnen.
@@ -78,6 +83,7 @@ async function loadLeadDokumenteOptional(
     .select('*')
     .eq('lead_id', leadId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('lib/anfragen/load-anfrage-detail:lead_dokumente', error)
 
   if (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -100,31 +106,34 @@ async function loadLeadOrgKontextOptional(
   > = {}
 
   if (lead.auftraggeber_kunde_id) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('kunden')
       .select(
         'id, name, vorname, nachname, email, telefon, plz, ort, strasse, hausnummer, typ, org_anzeigename, org_kennung, ansprechpartner, portal_modus, freigabe_modus, freigabe_schwelle_eur, notfall_direkt'
       )
       .eq('id', lead.auftraggeber_kunde_id)
       .maybeSingle()
+    if (error) logDbError('lib/anfragen/load-anfrage-detail:kunden', error)
     if (data) out.auftraggeber = data as LeadAuftraggeberEmbed
   }
 
   if (lead.kunde_objekt_id) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('kunden_objekte')
       .select('*')
       .eq('id', lead.kunde_objekt_id)
       .maybeSingle()
+    if (error) logDbError('lib/anfragen/load-anfrage-detail:kunden_objekte', error)
     if (data) out.kunden_objekte = data as KundenObjekt
   }
 
   if (lead.objekt_anlage_id) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('objekt_anlagen')
       .select('id, bezeichnung, gewerke(name)')
       .eq('id', lead.objekt_anlage_id)
       .maybeSingle()
+    if (error) logDbError('lib/anfragen/load-anfrage-detail:objekt_anlagen', error)
     if (data) {
       const raw = data as {
         id: string
@@ -140,12 +149,13 @@ async function loadLeadOrgKontextOptional(
     }
   }
 
-  const { data: logRows } = await supabase
+  const { data: logRows, error } = await supabase
     .from('org_freigabe_log')
     .select('*')
     .eq('lead_id', lead.id)
     .order('created_at', { ascending: false })
     .limit(20)
+  if (error) logDbError('lib/anfragen/load-anfrage-detail:org_freigabe_log', error)
 
   if (logRows?.length) out.org_freigabe_log = logRows as OrgFreigabeLogRow[]
 
@@ -163,9 +173,7 @@ export async function loadAnfrageDetail(
   const selects = [SELECT_FULL, SELECT_WITHOUT_ANGEBOTE, SELECT_MINIMAL]
 
   for (const select of selects) {
-    const { data, error } = await withCrmReadFallback(async (db) =>
-      db.from('leads').select(select).eq('id', leadId).maybeSingle()
-    )
+    const { data, error } = await (() => { const db = createClient(); return db.from('leads').select(select).eq('id', leadId).maybeSingle() })()
     if (error) {
       if (process.env.NODE_ENV === 'development') {
         console.warn('[load-anfrage-detail] select fallback:', error.message)

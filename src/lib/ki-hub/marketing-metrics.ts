@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { fetchGscSummary } from '@/lib/ki-hub/sources/google'
 import { fetchPostHogSummary } from '@/lib/ki-hub/sources/posthog'
 import { fetchResendSummary } from '@/lib/ki-hub/sources/resend'
@@ -27,13 +28,14 @@ async function persistMetric(
   status: KiHubQuelleResult<Record<string, unknown>>['status']
 ): Promise<void> {
   const day = todayIso()
-  await supabaseAdmin.from('marketing_metrics').insert({
+  const { error: __dbErr1 } = await supabaseAdmin.from('marketing_metrics').insert({
     quelle,
     metrik,
     wert: { ...wert, sync_status: status },
     zeitraum_start: day,
     zeitraum_end: day,
   })
+  if (__dbErr1) logDbError('lib/ki-hub/marketing-metrics:marketing_metrics', __dbErr1)
 }
 
 export async function syncMarketingMetrics(): Promise<{
@@ -83,13 +85,14 @@ export async function loadLatestMarketingMetrics(): Promise<MarketingMetricRow[]
   const rows: MarketingMetricRow[] = []
 
   for (const quelle of quellen) {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('marketing_metrics')
       .select('*')
       .eq('quelle', quelle)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('lib/ki-hub/marketing-metrics:marketing_metrics', error)
 
     if (data) rows.push(data as MarketingMetricRow)
   }

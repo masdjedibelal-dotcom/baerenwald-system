@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateKundeDetail, revalidateKundeObjekt } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import {
   assignHausmeisterToObjekt,
@@ -20,8 +26,8 @@ import {
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 function revalidateObjekt(kundeId: string, objektId: string) {
-  revalidatePath(`/kunden/${kundeId}`)
-  revalidatePath(`/kunden/${kundeId}/objekte/${objektId}`)
+  revalidateKundeDetail(kundeId)
+  revalidateKundeObjekt(kundeId, objektId)
 }
 
 async function assertObjektGehoertKunde(
@@ -29,12 +35,13 @@ async function assertObjektGehoertKunde(
   objektId: string
 ): Promise<{ ok: true; titel: string } | { ok: false; message: string }> {
   const db = getSupabaseAdmin()
-  const { data } = await db
+  const { data, error } = await db
     .from('kunden_objekte')
     .select('id, titel')
     .eq('id', objektId)
     .eq('kunde_id', kundeId)
     .maybeSingle()
+  if (error) logDbError('app/actions/org-hausmeister:kunden_objekte', error)
   if (!data?.id) return { ok: false, message: 'Objekt nicht gefunden.' }
   return { ok: true, titel: String(data.titel ?? 'Objekt') }
 }
@@ -151,11 +158,12 @@ export async function saveObjektHausmeister(
     if (inv.ok) {
       inviteUrl = inv.url
       const hm = (await listOrgHausmeister(kid)).find((h) => h.id === hmId)
-      const { data: kunde } = await getSupabaseAdmin()
+      const { data: kunde, error } = await getSupabaseAdmin()
         .from('kunden')
         .select('name, org_anzeigename')
         .eq('id', kid)
         .maybeSingle()
+      if (error) logDbError('app/actions/org-hausmeister:kunden', error)
       const hvName =
         String(kunde?.org_anzeigename ?? '').trim() ||
         String(kunde?.name ?? '').trim() ||
@@ -320,11 +328,12 @@ export async function inviteObjektHausmeister(
     return { ok: true, inviteUrl: inv.url, inviteMailto: null }
   }
 
-  const { data: kunde } = await getSupabaseAdmin()
+  const { data: kunde, error } = await getSupabaseAdmin()
     .from('kunden')
     .select('name, org_anzeigename')
     .eq('id', kid)
     .maybeSingle()
+  if (error) logDbError('app/actions/org-hausmeister:kunden', error)
   const hvName =
     String(kunde?.org_anzeigename ?? '').trim() ||
     String(kunde?.name ?? '').trim() ||

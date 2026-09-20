@@ -1,3 +1,4 @@
+import { formatDatum } from '@/lib/utils'
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
 import { firmenSteuerFooterZeilen } from '@/lib/angebote/angebot-rechtshinweise'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
@@ -58,7 +59,7 @@ function buildAbschlussSummen(
 function formatDe(iso: string | null | undefined): string {
   if (!iso?.trim()) return '—'
   try {
-    return new Date(`${iso.trim().slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE')
+    return formatDatum(`${iso.trim().slice(0, 10)}T12:00:00`)
   } catch {
     return iso ?? '—'
   }
@@ -146,7 +147,7 @@ export function buildAbschlussdokuHtmlInput(
     firmen_kontakt: firmKontaktZeile(firm),
     firmen_steuer_footer: steuer.length ? steuer.join('\n') : null,
     dokumentTitel,
-    erstelltAm: new Date().toLocaleDateString('de-DE'),
+    erstelltAm: formatDatum(new Date().toISOString()),
     leistungszeitraum_text: formatLeistungszeitraumText(
       leistungszeitraum?.von ?? null,
       leistungszeitraum?.bis ?? null

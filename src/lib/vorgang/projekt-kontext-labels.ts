@@ -1,3 +1,4 @@
+import { formatEuro } from '@/lib/format/geld-datum'
 /**
  * Einheitliche Kurz-Labels für Projekt-Kontext /
  * EntityProjektUebersichtCard (PhaseCard/ZugehoerigListe entfernt).
@@ -83,10 +84,7 @@ export function abnahmeMetaKurz(opts: {
 
 export function formatEurKurz(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return '—'
-  return (
-    n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
-    ' €'
-  )
+  return formatEuro(n)
 }
 
 /** Angebots-Summen in CRM-Phasen-UI: DB speichert netto, Anzeige wie Kunden-Mail (brutto). */

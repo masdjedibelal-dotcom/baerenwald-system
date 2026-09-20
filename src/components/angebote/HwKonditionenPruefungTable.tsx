@@ -3,6 +3,7 @@
 /**
  * @deprecated Konditionen-Tabelle — nicht mehr im v3 Leistungen-Tab. Für Legacy/Angebot.
  */
+import { MockTable } from '@/components/mock-ui'
 import { cn } from '@/lib/utils'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import type { AngebotHandwerkerRow } from '@/lib/types'
@@ -47,7 +48,7 @@ export function HwKonditionenPruefungTable({
         <span className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Konditionen je Leistung</span>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+            'rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
             hwKonditionenArtBadgeClass(konditionen.art)
           )}
         >
@@ -55,79 +56,80 @@ export function HwKonditionenPruefungTable({
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-md border border-bw-border">
-        <table className="min-w-full text-[length:var(--fs-meta)]">
-          <thead>
-            <tr className="border-b border-bw-border bg-bw-bg-soft/60 text-left text-bw-text-muted">
-              <th className="px-2 py-1.5 font-medium">Leistung</th>
-              <th className="px-2 py-1.5 font-medium text-right">Vorschlag netto</th>
-              <th className="px-2 py-1.5 font-medium text-right">Vergütung netto</th>
-              <th className="px-2 py-1.5 font-medium text-right">Δ</th>
-              <th className="px-2 py-1.5 font-medium text-center">Geändert</th>
-            </tr>
-          </thead>
-          <tbody>
-            {konditionen.positionen.map((p, i) => {
-              const delta = hwKonditionDelta(p.ek_netto, p.hw_netto)
-              return (
-                <tr
-                  key={p.position_id || `${p.leistung}-${i}`}
+      <MockTable
+        wrapClassName="overflow-x-auto rounded-field border border-bw-border"
+        className="min-w-full text-[length:var(--fs-meta)]"
+      >
+        <thead>
+          <tr className="border-b border-bw-border bg-bw-bg-soft/60 text-left text-bw-text-muted">
+            <th className="px-2 py-1.5 font-medium">Leistung</th>
+            <th className="px-2 py-1.5 font-medium text-right">Vorschlag netto</th>
+            <th className="px-2 py-1.5 font-medium text-right">Vergütung netto</th>
+            <th className="px-2 py-1.5 font-medium text-right">Δ</th>
+            <th className="px-2 py-1.5 font-medium text-center">Geändert</th>
+          </tr>
+        </thead>
+        <tbody>
+          {konditionen.positionen.map((p, i) => {
+            const delta = hwKonditionDelta(p.ek_netto, p.hw_netto)
+            return (
+              <tr
+                key={p.position_id || `${p.leistung}-${i}`}
+                className={cn(
+                  'border-b border-bw-border/60',
+                  p.geaendert && 'bg-status-contact-bg/90'
+                )}
+              >
+                <td className="px-2 py-1.5 text-bw-text">
+                  <span className="font-medium">{p.leistung}</span>
+                  {p.beschreibung ? (
+                    <span className="mt-0.5 block text-bw-text-muted">{p.beschreibung}</span>
+                  ) : null}
+                </td>
+                <td className="px-2 py-1.5 text-right tabular-nums">
+                  {p.ek_netto != null && p.ek_netto > 0
+                    ? betragAnzeige(p.ek_netto, null, null)
+                    : 'Preis folgt'}
+                </td>
+                <td className="px-2 py-1.5 text-right tabular-nums">
+                  {betragAnzeige(p.hw_netto, null, null)}
+                </td>
+                <td
                   className={cn(
-                    'border-b border-bw-border/60',
-                    p.geaendert && 'bg-amber-50/90'
+                    'px-2 py-1.5 text-right tabular-nums',
+                    delta != null && delta > 0 && 'text-status-contact-text',
+                    delta != null && delta < 0 && 'text-status-order-text'
                   )}
                 >
-                  <td className="px-2 py-1.5 text-bw-text">
-                    <span className="font-medium">{p.leistung}</span>
-                    {p.beschreibung ? (
-                      <span className="mt-0.5 block text-bw-text-muted">{p.beschreibung}</span>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">
-                    {p.ek_netto != null && p.ek_netto > 0
-                      ? betragAnzeige(p.ek_netto, null, null)
-                      : 'Preis folgt'}
-                  </td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">
-                    {betragAnzeige(p.hw_netto, null, null)}
-                  </td>
-                  <td
-                    className={cn(
-                      'px-2 py-1.5 text-right tabular-nums',
-                      delta != null && delta > 0 && 'text-amber-800',
-                      delta != null && delta < 0 && 'text-emerald-800'
-                    )}
-                  >
-                    {deltaAnzeige(delta)}
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    {p.geaendert ? (
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-950">Ja</span>
-                    ) : (
-                      <span className="text-bw-text-muted">—</span>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="bg-bw-bg-soft/40 font-medium text-bw-text">
-              <td className="px-2 py-1.5">Gesamt</td>
-              <td className="px-2 py-1.5 text-right tabular-nums">
-                {summeEk > 0 ? betragAnzeige(summeEk, null, null) : '—'}
-              </td>
-              <td className="px-2 py-1.5 text-right tabular-nums">
-                {betragAnzeige(summeNetto, null, null)}
-              </td>
-              <td className="px-2 py-1.5 text-right tabular-nums">
-                {summeEk > 0 ? deltaAnzeige(summeHw - summeEk) : '—'}
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+                  {deltaAnzeige(delta)}
+                </td>
+                <td className="px-2 py-1.5 text-center">
+                  {p.geaendert ? (
+                    <span className="rounded-card bg-status-contact-bg px-1.5 py-0.5 text-status-contact-text">Ja</span>
+                  ) : (
+                    <span className="text-bw-text-muted">—</span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+        <tfoot>
+          <tr className="bg-bw-bg-soft/40 font-medium text-bw-text">
+            <td className="px-2 py-1.5">Gesamt</td>
+            <td className="px-2 py-1.5 text-right tabular-nums">
+              {summeEk > 0 ? betragAnzeige(summeEk, null, null) : '—'}
+            </td>
+            <td className="px-2 py-1.5 text-right tabular-nums">
+              {betragAnzeige(summeNetto, null, null)}
+            </td>
+            <td className="px-2 py-1.5 text-right tabular-nums">
+              {summeEk > 0 ? deltaAnzeige(summeHw - summeEk) : '—'}
+            </td>
+            <td />
+          </tr>
+        </tfoot>
+      </MockTable>
 
       <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
         Summe brutto: {betragAnzeige(summeBrutto, null, null)}

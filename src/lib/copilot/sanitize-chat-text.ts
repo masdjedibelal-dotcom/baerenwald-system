@@ -1,3 +1,5 @@
+import { formatEuro } from '@/lib/format/geld-datum'
+
 /** Nutzer-sichtbaren Assistenten-Text von IDs, URLs und Dokumentnummern befreien. */
 
 const UUID_RE =
@@ -11,12 +13,6 @@ const CRM_PATH_RE =
   /\/(?:rechnungen|angebote|auftraege|anfragen|kunden|handwerker|partner|vorgaenge|kalender|katalog)(?:\/[^\s)|\]"'<>]*)?/gi
 
 const QUERY_RE = /\?[a-z0-9_]+=[^\s)&\]"'<>]+(?:&[a-z0-9_]+=[^\s)&\]"'<>]+)*/gi
-
-function formatEurShort(n: unknown): string | null {
-  const v = typeof n === 'number' ? n : Number(n)
-  if (!Number.isFinite(v)) return null
-  return `${v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
-}
 
 export function nestedName(rel: unknown, fallback = '—'): string {
   if (!rel) return fallback
@@ -75,7 +71,8 @@ export function rechnungChipLabel(row: {
   rechnungsnummer?: unknown
 }): string {
   const name = nestedName(row.kunden, 'Kunde')
-  const betrag = formatEurShort(row.brutto)
+  const n = typeof row.brutto === 'number' ? row.brutto : Number(row.brutto)
+  const betrag = Number.isFinite(n) && n > 0 ? formatEuro(n) : null
   return betrag ? `${name} · ${betrag}` : `Rechnung · ${name}`
 }
 
@@ -94,6 +91,7 @@ export function angebotChipLabel(row: {
       name = kn || kontakt || name
     }
   }
-  const betrag = formatEurShort(row.gesamt_fix)
+  const n = typeof row.gesamt_fix === 'number' ? row.gesamt_fix : Number(row.gesamt_fix)
+  const betrag = Number.isFinite(n) && n > 0 ? formatEuro(n) : null
   return betrag ? `${name} · ${betrag}` : `Angebot · ${name}`
 }

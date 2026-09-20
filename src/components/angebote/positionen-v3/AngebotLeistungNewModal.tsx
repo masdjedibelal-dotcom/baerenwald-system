@@ -1,4 +1,6 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
@@ -7,6 +9,8 @@ import { toast } from '@/components/ui/app-toast'
 import { addAngebotPosition } from '@/app/(dashboard)/angebote/angebot-positionen-steuerung-actions'
 import type { AngebotGewerkBlock } from '@/components/angebote/positionen-v3/utils'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -31,6 +35,7 @@ export function AngebotLeistungNewModal({
   gewerke: GewerkOpt[]
   onSaved: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useTransition()
   const [name, setName] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
@@ -69,16 +74,16 @@ export function AngebotLeistungNewModal({
   function save() {
     const trimmed = name.trim()
     if (!trimmed) {
-      toast.error('Bezeichnung ist erforderlich.')
+      toast.error(TOAST.bezeichnung_ist_erforderlich)
       return
     }
     if (!gewerk?.slug) {
-      toast.error('Bitte ein Gewerk wählen.')
+      applyFieldErrors({ _form: TOAST.bitte_ein_gewerk_waehlen })
       return
     }
     const vkNum = vk.trim() ? Number(vk.replace(',', '.')) : null
     if (vkNum == null || !Number.isFinite(vkNum) || vkNum <= 0) {
-      toast.error('VK netto ist erforderlich.')
+      toast.error(TOAST.vk_netto_ist_erforderlich)
       return
     }
     const ekNum = ek.trim() ? Number(ek.replace(',', '.')) : null
@@ -99,10 +104,10 @@ export function AngebotLeistungNewModal({
         kostenverteilung,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Position hinzugefügt.')
+      toast.success(TOAST.position_hinzugefuegt)
       setDirty(false)
       onSaved()
       onClose()
@@ -120,53 +125,37 @@ export function AngebotLeistungNewModal({
       confirmBusy={pending}
       onConfirm={save}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <label className="input-label">Bezeichnung *</label>
-          <input
-            className="input w-full"
-            value={name}
-            onChange={(e) => mark(setName, e.target.value)}
-          />
+          <MockInput className="w-full" value={name} onChange={(e) => mark(setName, e.target.value)} />
         </div>
         <div className="sm:col-span-2">
           <label className="input-label">Gewerk *</label>
           {block ? (
             <p className="text-[length:var(--fs-text)] font-medium text-bw-text">{block.gewerkName}</p>
           ) : (
-            <select
-              className="input w-full"
-              value={gewerkSlug}
-              onChange={(e) => mark(setGewerkSlug, e.target.value)}
-            >
+            <MockSelect className="w-full" value={gewerkSlug} onChange={(e) => mark(setGewerkSlug, e.target.value)}>
               {gewerke.map((g) => (
                 <option key={g.id} value={g.slug}>
                   {g.name}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           )}
         </div>
         <div className="sm:col-span-2">
           <label className="input-label">Beschreibung</label>
-          <textarea
-            className="input w-full min-h-[4rem]"
-            value={beschreibung}
-            onChange={(e) => mark(setBeschreibung, e.target.value)}
-          />
+          <MockTextarea className="w-full min-h-[4rem]" value={beschreibung} onChange={(e) => mark(setBeschreibung, e.target.value)} />
         </div>
         <div className="sm:col-span-2">
           <label className="input-label">Kostenart</label>
           <div className="seg" role="group" aria-label="Kostenart">
             {KOSTENART_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                className={kostenverteilung === opt.value ? 'on' : undefined}
-                onClick={() => mark(setKostenverteilung, opt.value)}
-              >
+              <MockBtn className={kostenverteilung === opt.value ? 'on' : undefined} key={opt.value} type="button" onClick={() => mark(setKostenverteilung, opt.value)}>
                 {opt.label}
-              </button>
+              </MockBtn>
             ))}
           </div>
           <p className="mt-1 text-[length:var(--fs-meta)] text-bw-muted">
@@ -177,48 +166,23 @@ export function AngebotLeistungNewModal({
           <label className="input-label">VK netto *</label>
           <div className="txt-prefix">
             <span className="prefix">€</span>
-            <input
-              type="number"
-              className="input"
-              step="0.01"
-              min="0"
-              value={vk}
-              onChange={(e) => mark(setVk, e.target.value)}
-            />
+            <MockInput type="number" step="0.01" min="0" value={vk} onChange={(e) => mark(setVk, e.target.value)} />
           </div>
         </div>
         <div>
           <label className="input-label">EK netto</label>
           <div className="txt-prefix">
             <span className="prefix">€</span>
-            <input
-              type="number"
-              className="input"
-              step="0.01"
-              min="0"
-              value={ek}
-              onChange={(e) => mark(setEk, e.target.value)}
-            />
+            <MockInput type="number" step="0.01" min="0" value={ek} onChange={(e) => mark(setEk, e.target.value)} />
           </div>
         </div>
         <div>
           <label className="input-label">Menge</label>
-          <input
-            type="number"
-            className="input w-full"
-            step="0.01"
-            min="0.01"
-            value={menge}
-            onChange={(e) => mark(setMenge, e.target.value)}
-          />
+          <MockInput type="number" className="w-full" step="0.01" min="0.01" value={menge} onChange={(e) => mark(setMenge, e.target.value)} />
         </div>
         <div>
           <label className="input-label">Einheit</label>
-          <input
-            className="input w-full"
-            value={einheit}
-            onChange={(e) => mark(setEinheit, e.target.value)}
-          />
+          <MockInput className="w-full" value={einheit} onChange={(e) => mark(setEinheit, e.target.value)} />
         </div>
       </div>
     </EditorSheet>

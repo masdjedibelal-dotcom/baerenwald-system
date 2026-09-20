@@ -1,12 +1,13 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { cn } from '@/lib/utils'
 
 /**
- * Mobile Dokument-Karte analog Leistungen (`lt-card`):
- * Titel + Badge oben, Meta + Chevron unten.
+ * Mobile Dokument-Karte analog Leistungen:
+ * Titel + Badge oben, Meta + Chevron unten — gerendert als MockCard.
  */
 export function DokMobileCard({
   title,
@@ -24,8 +25,9 @@ export function DokMobileCard({
   children?: ReactNode
 }) {
   return (
-    <div
-      className={cn('dok-card', className)}
+    <MockCard
+      className={cn('dok-mobile', className)}
+      flush
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
@@ -40,17 +42,17 @@ export function DokMobileCard({
           : undefined
       }
     >
-      <div className="dok-card__head">
-        <span className="dok-card__title">{title}</span>
-        {badge ? <div className="dok-card__badge">{badge}</div> : null}
+      <div className="dok-mobile__head">
+        <span className="dok-mobile__title">{title}</span>
+        {badge ? <div className="dok-mobile__badge">{badge}</div> : null}
       </div>
       {children}
-      <div className="dok-card__meta">
-        <span className="dok-card__meta-left">{meta || '—'}</span>
-        <span className="dok-card__meta-right">
-          <ChevronRight className="dok-card__chev h-4 w-4" aria-hidden />
+      <div className="dok-mobile__meta">
+        <span className="dok-mobile__meta-left">{meta || '—'}</span>
+        <span className="dok-mobile__meta-right">
+          <MockIcon n="chevron-right" ctx="default" className="dok-mobile__chev h-4 w-4" aria-hidden />
         </span>
       </div>
-    </div>
+    </MockCard>
   )
 }

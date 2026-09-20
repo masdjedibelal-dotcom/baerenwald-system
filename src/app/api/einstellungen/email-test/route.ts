@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/mail-service'
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
     .select('betreff, body_html')
     .eq('id', body.template_id)
     .maybeSingle()
+  if (error) logDbError('app/api/einstellungen/email-test/route:email_templates', error)
 
   if (error || !row) {
     return NextResponse.json({ error: error?.message ?? 'Template nicht gefunden' }, { status: 404 })

@@ -1,17 +1,20 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { PublicProjektPayload } from '@/lib/projekt/load-public-projekt'
 import type { AuftragStatus, LeadStatus } from '@/lib/types'
-import { Check, Circle, Mail, Phone } from 'lucide-react'
 import { BrandLogo } from '@/components/brand/BrandLogo'
 import { TokenLinkInvalid } from '@/components/public/TokenLinkInvalid'
 import { IconText } from '@/components/ui/IconText'
 import { RichTextContent } from '@/components/ui/RichTextContent'
 import { betragAnzeige } from '@/lib/angebot-einfach'
-import { formatDatum, formatDatumZeit } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import { aktuellePhaseIndexFromEntities } from '@/lib/auftraege/projekt-phasen'
+import { formatEuro, formatDatumZeit } from '@/lib/format/geld-datum'
 
 function statusProgress(status: AuftragStatus): number {
   switch (status) {
@@ -66,7 +69,7 @@ export function ProjektStatusClient({
 
   useEffect(() => {
     const id = setInterval(() => {
-      router.refresh()
+      afterServerActionRefresh()
       setLastRefresh(new Date())
     }, 60_000)
     return () => clearInterval(id)
@@ -75,7 +78,7 @@ export function ProjektStatusClient({
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === 'visible') {
-        router.refresh()
+        afterServerActionRefresh()
         setLastRefresh(new Date())
       }
     }
@@ -144,23 +147,23 @@ export function ProjektStatusClient({
   const naechsterFreitext = auftrag.naechster_schritt?.trim()
 
   return (
-    <div className="min-h-screen bg-[#F7F6F3] pb-12 text-ink">
-      <header className="bg-[#1A3D2B] px-4 py-4 text-white md:px-6">
+    <div className="min-h-screen bg-bw-bg-soft pb-12 text-ink">
+      <header className="bg-bw-dark px-4 py-4 text-white md:px-6">
         <div className="mx-auto flex max-w-[600px] items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <BrandLogo variant="white" height={32} />
             <span className="text-sm font-medium opacity-95">Ihr Projekt</span>
           </div>
-          <p className="text-[10px] opacity-80" suppressHydrationWarning>
+          <p className="text-fs-caption opacity-80" suppressHydrationWarning>
             {lastRefresh ? `Aktualisiert vor ${minuten} Min.` : 'Aktualisiert …'}
           </p>
         </div>
       </header>
 
       <main className="mx-auto max-w-[600px] px-4 py-6">
-        <p className="text-xs font-medium uppercase tracking-wide text-[#2E7D52]">Projekt</p>
-        <h1 className="mt-1 text-xl font-semibold leading-snug text-[#1A3D2B]">{gewerkTitle}</h1>
-        <p className="mt-2 text-sm text-[#6B7280]">
+        <p className="text-xs font-medium uppercase tracking-wide text-bw-primary">Projekt</p>
+        <h1 className="mt-1 text-xl font-semibold leading-snug text-bw-dark">{gewerkTitle}</h1>
+        <p className="mt-2 text-sm text-muted">
           {adresseLine}
           {kunde.ort && kunde.plz ? ` · ${ortLine}` : null}
         </p>
@@ -175,37 +178,37 @@ export function ProjektStatusClient({
                 <div key={label} className="flex flex-1 flex-col items-center text-center">
                   <div className="flex w-full items-center">
                     {i > 0 ? (
-                      <div className={`h-0.5 flex-1 ${i <= phaseIdx ? 'bg-[#2E7D52]' : 'bg-[#E5E3DF]'}`} />
+                      <div className={`h-0.5 flex-1 ${i <= phaseIdx ? 'bg-bw-primary' : 'bg-bw-bg-soft'}`} />
                     ) : (
                       <div className="flex-1" />
                     )}
                     <div
-                      className={`mx-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
+                      className={`mx-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-pill border-2 text-xs font-bold ${
                         done
-                          ? 'border-[#2E7D52] bg-[#2E7D52] text-white'
+                          ? 'border-bw-primary bg-bw-primary text-white'
                           : active
-                            ? 'border-[#2E7D52] bg-white text-[#1A3D2B]'
-                            : 'border-[#D1D5DB] bg-white text-[#9CA3AF]'
+                            ? 'border-bw-primary bg-white text-bw-dark'
+                            : 'border-bw-border-strong bg-white text-bw-text-subtle'
                       }`}
                       aria-current={active ? 'step' : undefined}
                     >
                       {done ? (
-                        <Check className="h-4 w-4" aria-hidden />
+                        <MockIcon n="check" ctx="default" className="h-4 w-4" aria-hidden />
                       ) : active ? (
-                        <Circle className="h-2.5 w-2.5 fill-current" aria-hidden />
+                        <MockIcon n="circle" ctx="default" className="h-2.5 w-2.5 fill-current" aria-hidden />
                       ) : (
-                        <Circle className="h-3 w-3" aria-hidden />
+                        <MockIcon n="circle" ctx="default" className="h-3 w-3" aria-hidden />
                       )}
                     </div>
                     {i < PHASEN.length - 1 ? (
-                      <div className={`h-0.5 flex-1 ${i < phaseIdx ? 'bg-[#2E7D52]' : 'bg-[#E5E3DF]'}`} />
+                      <div className={`h-0.5 flex-1 ${i < phaseIdx ? 'bg-bw-primary' : 'bg-bw-bg-soft'}`} />
                     ) : (
                       <div className="flex-1" />
                     )}
                   </div>
                   <p
-                    className={`mt-2 max-w-[72px] text-[10px] font-medium leading-tight md:max-w-none md:text-xs ${
-                      active ? 'text-[#1A3D2B]' : 'text-[#9CA3AF]'
+                    className={`mt-2 max-w-[72px] text-fs-caption font-medium leading-tight md:max-w-none md:text-xs ${
+                      active ? 'text-bw-dark' : 'text-bw-text-subtle'
                     }`}
                   >
                     {label}
@@ -216,11 +219,11 @@ export function ProjektStatusClient({
           </div>
         </section>
 
-        <section className="mt-6 rounded-xl border border-[#E5E3DF] bg-white p-4 shadow-sm">
-          <p className="text-sm font-medium text-[#6B7280]">Fortschritt</p>
-          <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-[#E5E3DF]">
+        <section className="mt-6 rounded-sheet border border-bw-border bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium text-muted">Fortschritt</p>
+          <div className="mt-2 h-3 w-full overflow-hidden rounded-pill bg-bw-bg-soft">
             <div
-              className="h-full rounded-full bg-[#2E7D52] transition-all"
+              className="h-full rounded-pill bg-bw-primary transition-all"
               style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
               role="progressbar"
               aria-valuenow={pct}
@@ -228,20 +231,20 @@ export function ProjektStatusClient({
               aria-valuemax={100}
             />
           </div>
-          <p className="mt-2 text-center text-sm font-semibold text-[#1A3D2B]">{statusLabel(auftrag.status)}</p>
+          <p className="mt-2 text-center text-sm font-semibold text-bw-dark">{statusLabel(auftrag.status)}</p>
         </section>
 
         {naechsterFreitext && auftrag.status !== 'abgeschlossen' && auftrag.status !== 'storniert' ? (
-          <section className="mt-6 rounded-xl border border-[#E5E3DF] bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-[#1A3D2B]">Nächster Schritt</h2>
+          <section className="mt-6 rounded-sheet border border-bw-border bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-bw-dark">Nächster Schritt</h2>
             <p className="mt-2 whitespace-pre-wrap text-sm text-bw-text-mid">{naechsterFreitext}</p>
           </section>
         ) : null}
 
         {auftrag.abnahme_protokoll_url?.trim() ? (
-          <section className="mt-6 rounded-xl border border-[#2E7D52]/30 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-[#1A3D2B]">Dokumente</h2>
-            <p className="mt-1 text-sm text-[#6B7280]">
+          <section className="mt-6 rounded-sheet border border-bw-primary/30 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-bw-dark">Dokumente</h2>
+            <p className="mt-1 text-sm text-muted">
               Abnahmeprotokoll
               {auftrag.abnahme_datum ? ` · ${formatDatum(auftrag.abnahme_datum)}` : ''}
             </p>
@@ -249,7 +252,7 @@ export function ProjektStatusClient({
               href={auftrag.abnahme_protokoll_url.trim()}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 flex min-h-[52px] items-center justify-center rounded-xl bg-[#2E7D52] px-4 text-base font-semibold text-white"
+              className="mt-4 flex min-h-[52px] items-center justify-center rounded-sheet bg-bw-primary px-4 text-base font-semibold text-white"
             >
               Abnahmeprotokoll öffnen (PDF)
             </a>
@@ -261,13 +264,13 @@ export function ProjektStatusClient({
             <h2 className="text-sm font-semibold text-ink">Meilensteine</h2>
             <ul className="mt-2 space-y-2 text-sm">
               {milestones.map((m) => (
-                <li key={m.id} className="flex items-start gap-2 rounded-lg border border-[#E5E3DF] bg-white px-3 py-2">
-                  <span className={m.erledigt ? 'text-[#2E7D52]' : 'text-[#9CA3AF]'}>
-                    {m.erledigt ? <Check className="h-4 w-4" aria-hidden /> : <Circle className="h-3 w-3" aria-hidden />}
+                <li key={m.id} className="flex items-start gap-2 rounded-card border border-bw-border bg-white px-3 py-2">
+                  <span className={m.erledigt ? 'text-bw-primary' : 'text-bw-text-subtle'}>
+                    {m.erledigt ? <MockIcon n="check" ctx="default" className="h-4 w-4" aria-hidden /> : <MockIcon n="circle" ctx="default" className="h-3 w-3" aria-hidden />}
                   </span>
                   <div>
                     <p className="font-medium">{m.titel}</p>
-                    {m.datum ? <p className="text-xs text-[#6B7280]">{formatDatum(m.datum)}</p> : null}
+                    {m.datum ? <p className="text-xs text-muted">{formatDatum(m.datum)}</p> : null}
                   </div>
                 </li>
               ))}
@@ -282,17 +285,17 @@ export function ProjektStatusClient({
               <article
                 key={u.id}
                 id={`update-${u.id}`}
-                className={`scroll-mt-24 rounded-xl border bg-white p-4 shadow-sm ${
-                  highlightUpdateId === u.id ? 'border-[#2E7D52] ring-2 ring-[#2E7D52]/25' : 'border-[#E5E3DF]'
+                className={`scroll-mt-24 rounded-sheet border bg-white p-4 shadow-sm ${
+                  highlightUpdateId === u.id ? 'border-bw-primary ring-2 ring-bw-primary/25' : 'border-bw-border'
                 }`}
               >
-                <p className="text-xs text-[#6B7280]">{formatDatumZeit(u.created_at)}</p>
-                <p className="mt-1 font-medium text-[#1A3D2B]">{u.titel}</p>
-                {u.beschreibung ? <p className="mt-2 whitespace-pre-wrap text-sm text-[#4B5563]">{u.beschreibung}</p> : null}
+                <p className="text-xs text-muted">{formatDatumZeit(u.created_at)}</p>
+                <p className="mt-1 font-medium text-bw-dark">{u.titel}</p>
+                {u.beschreibung ? <p className="mt-2 whitespace-pre-wrap text-sm text-bw-text-mid">{u.beschreibung}</p> : null}
                 {(u.foto_urls ?? []).length > 0 ? (
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {(u.foto_urls ?? []).map((url) => (
-                      <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg bg-[#F3F4F6]">
+                      <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-card bg-bw-bg-soft">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt="" className="h-28 w-full object-cover" />
                       </a>
@@ -302,39 +305,31 @@ export function ProjektStatusClient({
               </article>
             ))}
             {timeline.length > 3 ? (
-              <button
-                type="button"
-                className="w-full rounded-lg border border-[#E5E3DF] bg-white py-2 text-sm font-medium text-[#2E7D52]"
-                onClick={() => setAlleUpdates((v) => !v)}
-              >
+              <MockBtn fullWidth className="rounded-button border border-bw-border bg-white py-2 text-sm font-medium text-bw-primary" type="button" onClick={() => setAlleUpdates((v) => !v)}>
                 {alleUpdates ? 'Weniger anzeigen ▲' : 'Alle Updates anzeigen ▼'}
-              </button>
+              </MockBtn>
             ) : null}
           </section>
         ) : (
-          <p className="mt-8 text-center text-sm text-[#6B7280]">Noch keine Updates. Wir melden uns bald.</p>
+          <p className="mt-8 text-center text-sm text-muted">Noch keine Updates. Wir melden uns bald.</p>
         )}
 
         {angebote && angebote.positionen.length > 0 ? (
-          <section className="mt-8 rounded-xl border border-[#E5E3DF] bg-white shadow-sm">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-[#1A3D2B]"
-              onClick={() => setAngebotOpen((o) => !o)}
-            >
+          <section className="mt-8 rounded-button border border-bw-border bg-white shadow-sm">
+            <MockBtn fullWidth className="flex items-center justify-between px-4 py-3 text-left text-sm font-semibold text-bw-dark" type="button" onClick={() => setAngebotOpen((o) => !o)}>
               <span>Ihr Angebot ansehen</span>
-              <span className="text-[#6B7280]">{angebotOpen ? '▲' : '▼'}</span>
-            </button>
+              <span className="text-muted">{angebotOpen ? '▲' : '▼'}</span>
+            </MockBtn>
             {angebotOpen ? (
-              <div className="border-t border-[#E5E3DF] px-4 pb-4 pt-2">
+              <div className="border-t border-bw-border px-4 pb-4 pt-2">
                 <ul className="space-y-2 text-sm">
                   {angebote.positionen.map((p, i) => (
-                    <li key={i} className="flex justify-between gap-2 border-b border-dashed border-[#E5E3DF] pb-2 last:border-0">
+                    <li key={i} className="flex justify-between gap-2 border-b border-dashed border-bw-border pb-2 last:border-0">
                       <RichTextContent
                         html={(p.beschreibung || p.leistung).trim()}
                         className="min-w-0 text-sm"
                       />
-                      <span className="shrink-0 whitespace-nowrap font-medium text-[#2E7D52]">
+                      <span className="shrink-0 whitespace-nowrap font-medium text-bw-primary">
                         {betragAnzeige(null, p.gesamt_min, p.gesamt_max)}
                       </span>
                     </li>
@@ -350,16 +345,16 @@ export function ProjektStatusClient({
                     )}
                   </p>
                 ) : null}
-                <p className="mt-2 text-xs text-[#6B7280]">Detailliertes Angebot finden Sie in Ihrer E-Mail.</p>
+                <p className="mt-2 text-xs text-muted">Detailliertes Angebot finden Sie in Ihrer E-Mail.</p>
               </div>
             ) : null}
           </section>
         ) : null}
 
         {nachtraegeAkzeptiert.length > 0 ? (
-          <section className="mt-8 rounded-xl border border-amber-300 bg-amber-50 p-4">
-            <h2 className="text-sm font-semibold text-amber-950">Zusatzleistungen</h2>
-            <ul className="mt-2 space-y-2 text-sm text-amber-950">
+          <section className="mt-8 rounded-sheet border border-status-contact-bg bg-status-contact-bg p-4">
+            <h2 className="text-sm font-semibold text-status-contact-text">Zusatzleistungen</h2>
+            <ul className="mt-2 space-y-2 text-sm text-status-contact-text">
               {nachtraegeAkzeptiert.map((n) => (
                 <li key={n.id} className="flex justify-between gap-2">
                   <span className="min-w-0">{n.grund}</span>
@@ -369,43 +364,40 @@ export function ProjektStatusClient({
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-sm font-semibold text-amber-950" suppressHydrationWarning>
+            <p className="mt-3 text-sm font-semibold text-status-contact-text" suppressHydrationWarning>
               Gesamt Nachträge: +
-              {nachtragSumme.toLocaleString('de-DE', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}{' '}
+              {formatEuro(nachtragSumme, { suffix: false })}{' '}
               €
             </p>
           </section>
         ) : null}
 
-        <section className="mt-10 rounded-xl border border-[#E5E3DF] bg-white p-4 shadow-sm">
-          <p className="text-sm font-semibold text-[#1A3D2B]">Fragen zu Ihrem Projekt?</p>
+        <section className="mt-10 rounded-sheet border border-bw-border bg-white p-4 shadow-sm">
+          <p className="text-sm font-semibold text-bw-dark">Fragen zu Ihrem Projekt?</p>
           <a
             href={telHref(tel)}
-            className="mt-4 flex min-h-[52px] items-center justify-center gap-2 rounded-xl bg-[#2E7D52] px-4 text-base font-semibold text-white"
+            className="mt-4 flex min-h-[52px] items-center justify-center gap-2 rounded-sheet bg-bw-primary px-4 text-base font-semibold text-white"
           >
-            <IconText icon={Phone}>{tel}</IconText>
+            <IconText icon="phone">{tel}</IconText>
           </a>
           {kunde.email ? (
-            <a href={`mailto:${encodeURIComponent(kunde.email)}`} className="mt-3 block text-center text-sm text-[#2E7D52] underline">
-              <IconText icon={Mail}>{kunde.email}</IconText>
+            <a href={`mailto:${encodeURIComponent(kunde.email)}`} className="mt-3 block text-center text-sm text-bw-primary underline">
+              <IconText icon="mail">{kunde.email}</IconText>
             </a>
           ) : null}
         </section>
       </main>
 
-      <footer className="mt-10 border-t border-[#E2E8E2] bg-[#F7F6F3] px-4 py-6 text-center text-xs text-[#6B7280]">
+      <footer className="mt-10 border-t border-bw-border bg-bw-bg-soft px-4 py-6 text-center text-xs text-muted">
         Bärenwald Handwerksgruppe München
         <br />
         {siteFooter ? (
           <>
-            <a href={`${siteFooter}/datenschutz`} className="text-[#2E7D52] underline">
+            <a href={`${siteFooter}/datenschutz`} className="text-bw-primary underline">
               Datenschutz
             </a>{' '}
             ·{' '}
-            <a href={`${siteFooter}/impressum`} className="text-[#2E7D52] underline">
+            <a href={`${siteFooter}/impressum`} className="text-bw-primary underline">
               Impressum
             </a>
           </>

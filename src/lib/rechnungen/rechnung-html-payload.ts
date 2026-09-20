@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { formatKundennr } from '@/lib/angebot-utils'
 import { normalizeAngebotPositionen, summenAusPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
 import {
@@ -120,12 +121,13 @@ export async function loadVorherigeAbschlaegeFuerSchluss(
   auftragId: string,
   ausserRechnungId?: string | null
 ): Promise<RechnungAbschlagLink[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('rechnungen')
     .select(
       'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, richtung'
     )
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('lib/rechnungen/rechnung-html-payload:rechnungen', error)
   return ((data ?? []) as Array<RechnungAbschlagLink & { richtung?: string | null }>).filter(
     (r) =>
       r.id !== ausserRechnungId &&
@@ -377,6 +379,7 @@ export async function loadRechnungDetailForPdf(
     .select(selectMitObjekt)
     .eq('id', rechnungId)
     .maybeSingle()
+  if (error) logDbError('lib/rechnungen/rechnung-html-payload:rechnungen', error)
 
   /** Prod ohne Migration kunde_objekt_id: Embed bricht den ganzen Select. */
   if (
@@ -410,11 +413,12 @@ export async function loadRechnungDetailForPdf(
     (data as { kunde_objekt_id?: string | null }).kunde_objekt_id ?? ''
   ).trim()
   if (!objekt && objektId) {
-    const { data: objRow } = await supabase
+    const { data: objRow, error } = await supabase
       .from('kunden_objekte')
       .select('id, kunde_id, titel, strasse, hausnummer, plz, ort')
       .eq('id', objektId)
       .maybeSingle()
+    if (error) logDbError('lib/rechnungen/rechnung-html-payload:kunden_objekte', error)
     objekt = (objRow as KundenObjekt) ?? null
   }
 

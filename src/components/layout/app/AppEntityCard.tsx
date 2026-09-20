@@ -4,7 +4,10 @@ import Link from 'next/link'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-/** Lose Listen-Karte (iOS grouped list style). */
+/**
+ * Lose Listen-Karte (iOS grouped list style) — Kanon-Chrome (Allowlist P5-4).
+ * Kein MockBtn: `.app-entity-card` ist eigene Surface, nicht `.btn`.
+ */
 export function AppEntityCard({
   children,
   className,

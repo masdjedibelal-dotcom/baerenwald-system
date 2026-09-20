@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateHandwerkerDetail, revalidateKalender, revalidateKundeDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import type { CrmTodo, TodoPrioritaet } from '@/lib/types'
 
@@ -42,11 +48,11 @@ function revalidateTodoPaths(row?: {
   auftrag_id?: string | null
   handwerker_id?: string | null
 }) {
-  revalidatePath('/kalender')
-  if (row?.kunde_id) revalidatePath(`/kunden/${row.kunde_id}`)
-  if (row?.lead_id) revalidatePath(`/anfragen/${row.lead_id}`)
-  if (row?.auftrag_id) revalidatePath(`/auftraege/${row.auftrag_id}`)
-  if (row?.handwerker_id) revalidatePath(`/handwerker/${row.handwerker_id}`)
+  revalidateKalender()
+  if (row?.kunde_id) revalidateKundeDetail(row.kunde_id)
+  if (row?.lead_id) revalidateLeadDetail(row.lead_id)
+  if (row?.auftrag_id) revalidateAuftragDetail(row.auftrag_id)
+  if (row?.handwerker_id) revalidateHandwerkerDetail(row.handwerker_id)
 }
 
 export async function listTodos(
@@ -109,6 +115,7 @@ export async function saveTodo(
       patch.erledigt_at = input.erledigt ? new Date().toISOString() : null
     }
     const { error } = await supabase.from('todos').update(patch).eq('id', input.id)
+    if (error) logDbError('app/kalender/todo-actions:todos', error)
     if (error) return { ok: false, message: error.message }
     revalidateTodoPaths(payload)
     return { ok: true, id: input.id }
@@ -123,6 +130,7 @@ export async function saveTodo(
     })
     .select('id')
     .single()
+  if (error) logDbError('app/kalender/todo-actions:todos', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
   revalidateTodoPaths(payload)
@@ -134,13 +142,14 @@ export async function setTodoErledigt(
   erledigt: boolean
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('todos')
     .select('kunde_id, lead_id, auftrag_id, handwerker_id')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/kalender/todo-actions:todos', error)
 
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('todos')
     .update({
       erledigt,
@@ -148,8 +157,9 @@ export async function setTodoErledigt(
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
+  if (error2) logDbError('app/kalender/todo-actions:todos', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
   revalidateTodoPaths(row ?? undefined)
   return { ok: true }
 }
@@ -158,14 +168,16 @@ export async function deleteTodo(
   id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('todos')
     .select('kunde_id, lead_id, auftrag_id, handwerker_id')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/kalender/todo-actions:todos', error)
 
-  const { error } = await supabase.from('todos').delete().eq('id', id)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('todos').delete().eq('id', id)
+  if (error2) logDbError('app/kalender/todo-actions:todos', error2)
+  if (error2) return { ok: false, message: error2.message }
   revalidateTodoPaths(row ?? undefined)
   return { ok: true }
 }

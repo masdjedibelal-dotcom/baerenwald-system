@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -24,7 +25,8 @@ export async function POST(req: Request, { params }: { params: { leadId: string 
     return NextResponse.json({ error: 'leadId fehlt' }, { status: 400 })
   }
 
-  const { data: lead } = await supabase.from('leads').select('id').eq('id', leadId).maybeSingle()
+  const {data: lead, error} = await supabase.from('leads').select('id').eq('id', leadId).maybeSingle()
+  if (error) logDbError('app/api/anfragen/[leadId]/dokument/upload/route:leads', error)
   if (!lead) {
     return NextResponse.json({ error: 'Anfrage nicht gefunden' }, { status: 404 })
   }
@@ -53,6 +55,7 @@ export async function POST(req: Request, { params }: { params: { leadId: string 
   const { error: upErr } = await supabaseAdmin.storage
     .from('lead-dokumente')
     .upload(path, buf, { contentType: type, upsert: false })
+  if (upErr) logDbError('app/api/anfragen/[leadId]/dokument/upload/route:lead-dokumente', upErr)
 
   if (upErr) {
     const raw = upErr.message ?? ''

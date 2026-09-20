@@ -5,11 +5,12 @@ import {
   GSC_OAUTH_STATE_COOKIE,
   saveGscOAuthRefreshToken,
 } from '@/lib/ki-hub/sources/gsc-auth'
+import { C } from '@/lib/tokens/colors'
 
 export const dynamic = 'force-dynamic'
 
 function callbackHtml(title: string, body: string, ok: boolean): string {
-  const color = ok ? '#166534' : '#991b1b'
+  const color = ok ? C.greenDeep : C.redTx
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -17,11 +18,11 @@ function callbackHtml(title: string, body: string, ok: boolean): string {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${title}</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; color: #111; }
-    h1 { font-size: 1.25rem; color: ${color}; }
+    body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; color: ${C.gray900}; }
+h1 { font-size: 1.25rem; color: ${color}; }
     p { line-height: 1.5; font-size: 0.95rem; }
-    a { color: #2563eb; }
-    code { background: #f3f4f6; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem; }
+    a { color: ${C.blue}; }
+    code { background: ${C.gray100}; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.85rem; }
   </style>
 </head>
 <body>

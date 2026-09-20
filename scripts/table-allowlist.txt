@@ -1,0 +1,14 @@
+# P5-18: <table> nur in MockTable bzw. PDF-/Mail-HTML-Allowlist.
+# Ein Pfad-Substring pro Zeile.
+
+src/components/mock-ui/MockTable.tsx
+src/lib/angebote/angebot-wizard-mail.tsx
+src/components/assistent/AssistentMarkdown.tsx
+src/lib/templates/
+src/lib/pdf/
+src/lib/org/
+src/lib/mail-templates.ts
+src/lib/mail/
+src/lib/email/
+src/lib/partner/
+src/lib/auftraege/projekt-phasen.ts

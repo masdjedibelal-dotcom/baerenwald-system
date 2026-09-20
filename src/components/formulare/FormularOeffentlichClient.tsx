@@ -1,10 +1,14 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
-import { Check } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import {
   FormularFelderRenderer,
   validateFormularPflicht,
@@ -117,7 +121,7 @@ export function FormularOeffentlichClient({
   if (done) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <div className="mb-4 text-5xl" aria-hidden><Check className="h-5 w-5 text-[#2E7D52]" aria-hidden /></div>
+        <div className="mb-4 text-5xl" aria-hidden><MockIcon n="check" ctx="default" className="h-5 w-5 text-bw-primary" aria-hidden /></div>
         <h1 className="text-2xl font-semibold text-bw-text">Vielen Dank!</h1>
         <p className="mt-2 text-bw-light">Ihre Angaben wurden übermittelt.</p>
       </div>
@@ -136,16 +140,16 @@ export function FormularOeffentlichClient({
           </span>
           <span>{progressPct}%</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-bw-border">
+        <div className="h-2 overflow-hidden rounded-pill bg-bw-border">
           <div
-            className={cn('h-full rounded-full bg-bw-accent transition-all')}
+            className={cn('h-full rounded-pill bg-bw-accent transition-all')}
             style={{ width: `${progressPct}%` }}
           />
         </div>
       </div>
 
       {err ? (
-        <p className="mt-4 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
+        <p className="mt-4 rounded-card border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
           {err}
         </p>
       ) : null}
@@ -162,12 +166,12 @@ export function FormularOeffentlichClient({
       </Card>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <Button type="button" variant="secondary" fullWidth loading={pending} onClick={zwischenspeichern}>
+        <MockBtn type="button" kind="secondary" fullWidth loading={pending} onClick={zwischenspeichern}>
           Zwischenspeichern
-        </Button>
-        <Button type="button" variant="primary" fullWidth loading={pending} onClick={einreichen}>
+        </MockBtn>
+        <MockBtn type="button" kind="primary" fullWidth loading={pending} onClick={einreichen}>
           Einreichen
-        </Button>
+        </MockBtn>
       </div>
     </div>
   )

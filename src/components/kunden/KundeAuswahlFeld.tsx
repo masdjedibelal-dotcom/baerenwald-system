@@ -1,9 +1,10 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
 import { searchKunden, getKundeKurz } from '@/app/(dashboard)/angebote/actions'
-import { Input } from '@/components/ui/Input'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { Kunde } from '@/lib/types'
 
@@ -105,7 +106,7 @@ export function KundeAuswahlFeld({
     <div className="kunde-auswahl min-w-0 max-w-full space-y-2">
       {hint ? <p className="text-xs text-bw-text-muted">{hint}</p> : null}
       {ausgewaehlt ? (
-        <div className="kunde-auswahl__picked flex min-w-0 max-w-full items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--green-10)] px-3 py-2.5">
+        <div className="kunde-auswahl__picked flex min-w-0 max-w-full items-start gap-2 rounded-card border border-[var(--border)] bg-[var(--green-10)] px-3 py-2.5">
           <div className="min-w-0 flex-1 overflow-hidden text-sm">
             <p className="m-0 break-words font-medium text-bw-text">
               {kundeDisplayName(ausgewaehlt)}
@@ -120,30 +121,17 @@ export function KundeAuswahlFeld({
             ))}
           </div>
           {!disabled ? (
-            <button
-              type="button"
-              className="shrink-0 rounded p-1 text-bw-text-muted hover:bg-bw-hover hover:text-bw-text"
-              aria-label="Kundenverknüpfung entfernen"
-              onClick={entfernen}
-            >
-              <X className="h-4 w-4" aria-hidden />
-            </button>
+            <MockBtn className="shrink-0 rounded-button p-1 text-bw-text-muted hover:bg-bw-hover hover:text-bw-text" type="button" aria-label="Kundenverknüpfung löschen" onClick={entfernen}>
+              <MockIcon n="x" ctx="default" className="h-4 w-4" aria-hidden />
+            </MockBtn>
           ) : null}
         </div>
       ) : (
         <div className="min-w-0 max-w-full space-y-2">
-          <Input
-            label={label || undefined}
-            name="kunde_suche"
-            value={suche}
-            onChange={(e) => setSuche(e.target.value)}
-            placeholder="Name, E-Mail oder Ort (mind. 2 Zeichen)"
-            autoComplete="off"
-            disabled={disabled}
-          />
+          <MockField label={label || undefined}><MockInput name="kunde_suche" value={suche} onChange={(e) => setSuche(e.target.value)} placeholder="Name, E-Mail oder Ort (mind. 2 Zeichen)" autoComplete="off" disabled={disabled} /></MockField>
           {showResults ? (
             <ul
-              className="kunde-auswahl__list m-0 max-h-56 list-none overflow-y-auto overflow-x-hidden rounded-lg border border-[var(--border)] bg-white py-1"
+              className="kunde-auswahl__list m-0 max-h-56 list-none overflow-y-auto overflow-x-hidden rounded-card border border-[var(--border)] bg-white py-1"
               role="listbox"
               aria-label="Kundenvorschläge"
             >
@@ -151,17 +139,13 @@ export function KundeAuswahlFeld({
                 <li className="px-3 py-2.5 text-sm text-bw-text-muted">Suche…</li>
               ) : null}
               {!suchen && treffer.length === 0 ? (
-                <li className="px-3 py-2.5 text-sm text-bw-text-muted">Keine Kunden gefunden</li>
+                <li className="px-3 py-2.5"><MockEmpty title="Keine Kunden gefunden" /></li>
               ) : null}
               {treffer.map((k) => {
                 const meta = kundeMetaLines(k)
                 return (
                   <li key={k.id} role="option" className="min-w-0">
-                    <button
-                      type="button"
-                      className="w-full min-w-0 border-0 bg-transparent px-3 py-2.5 text-left text-sm hover:bg-[var(--bg-soft)]"
-                      onClick={() => waehle(k)}
-                    >
+                    <MockBtn fullWidth className="min-w-0 border-0 bg-transparent px-3 py-2.5 text-left text-sm hover:bg-[var(--bg-soft)]" type="button" onClick={() => waehle(k)}>
                       <span className="block break-words font-medium text-bw-text">
                         {kundeDisplayName(k)}
                       </span>
@@ -179,7 +163,7 @@ export function KundeAuswahlFeld({
                       ) : (
                         <span className="block text-xs text-bw-text-muted">—</span>
                       )}
-                    </button>
+                    </MockBtn>
                   </li>
                 )
               })}

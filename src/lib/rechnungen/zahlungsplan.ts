@@ -3,6 +3,7 @@ import { berechneRechnung, type RechnungBerechnung } from '@/lib/rechnung-berech
 import type { AngebotPosition } from '@/lib/types'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
+import { formatEuro, formatNumber } from '@/lib/format/geld-datum'
 
 function neueZahlungsplanId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -514,7 +515,7 @@ export function validateZahlungsplanGegenGesamt(
   if (gesamtNetto > 0 && verteiltNetto > gesamtNetto + 0.02) {
     return {
       ok: false,
-      message: `Die Abschläge (${formatEur(verteiltNetto)} netto) übersteigen die Auftragssumme (${formatEur(gesamtNetto)} netto).`,
+      message: `Die Abschläge (${formatEuro(verteiltNetto)} netto) übersteigen die Auftragssumme (${formatEuro(gesamtNetto)} netto).`,
     }
   }
 
@@ -534,7 +535,7 @@ export function validateZahlungsplanGegenGesamt(
 }
 
 function round1(n: number): string {
-  return (Math.round(n * 10) / 10).toLocaleString('de-DE')
+  return formatNumber(Math.round(n * 10) / 10, { decimals: 1, minDecimals: 0 })
 }
 
 /**
@@ -975,7 +976,7 @@ export function validateGestellteRechnungenGegenVk(input: {
   if (sum > vkBrutto + 0.5) {
     return {
       ok: false,
-      message: `Die Summe der Rechnungen (${formatEur(sum)} brutto) übersteigt die Auftragssumme (${formatEur(vkBrutto)} brutto). Bitte Beträge prüfen oder eine Rechnung stornieren.`,
+      message: `Die Summe der Rechnungen (${formatEuro(sum)} brutto) übersteigt die Auftragssumme (${formatEuro(vkBrutto)} brutto). Bitte Beträge prüfen oder eine Rechnung stornieren.`,
     }
   }
   return { ok: true }
@@ -1032,7 +1033,7 @@ export function softWarnGestellteRechnungenGegenVk(input: {
     warn: true,
     gestelltBrutto,
     vkBrutto,
-    message: `Bereits gestellte Rechnungen (${formatEur(gestelltBrutto)} brutto) übersteigen die Auftragssumme (${formatEur(vkBrutto)} brutto).`,
+    message: `Bereits gestellte Rechnungen (${formatEuro(gestelltBrutto)} brutto) übersteigen die Auftragssumme (${formatEuro(vkBrutto)} brutto).`,
   }
 }
 
@@ -1159,14 +1160,14 @@ export function buildAbschlagPauschalPosition(input: {
   const leistung = `${artLabel} — ${zeile.titel}`
   const prozentTeil =
     zeile.typ === 'prozent' && !zeile.istSchluss
-      ? `${zeile.wert} % von ${formatEur(gesamtNetto)} netto`
-      : `${formatEur(zeile.netto)} netto`
+      ? `${zeile.wert} % von ${formatEuro(gesamtNetto)} netto`
+      : `${formatEuro(zeile.netto)} netto`
   const beschreibung = zeile.istSchluss
     ? `${projektTitel || auftragsReferenz}${
         bereitsGestelltBrutto > 0
-          ? ` · bereits abgerechnet ${formatEur(bereitsGestelltBrutto)} brutto`
+          ? ` · bereits abgerechnet ${formatEuro(bereitsGestelltBrutto)} brutto`
           : ''
-      } · Rest ${formatEur(zeile.netto)} netto`
+      } · Rest ${formatEuro(zeile.netto)} netto`
     : `${prozentTeil}, ${auftragsReferenz}`
 
   return {
@@ -1201,12 +1202,12 @@ export function abschlagZahlungstextFuerRechnung(
   const zeilenText = kontext.zeilen.map((z) => {
     const label = z.istSchluss ? z.titel : `Abschlag ${z.index} (${z.titel})`
     if (z.typ === 'prozent') {
-      return `${label}: ${z.wert} % (Plan) — ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+      return `${label}: ${z.wert} % (Plan) — ${formatEuro(z.netto)} netto / ${formatEuro(z.brutto)} brutto`
     }
     if (z.typ === 'rest') {
-      return `${label}: Restbetrag (Plan) — ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+      return `${label}: Restbetrag (Plan) — ${formatEuro(z.netto)} netto / ${formatEuro(z.brutto)} brutto`
     }
-    return `${label} (Plan): ${formatEur(z.netto)} netto / ${formatEur(z.brutto)} brutto`
+    return `${label} (Plan): ${formatEuro(z.netto)} netto / ${formatEuro(z.brutto)} brutto`
   })
 
   const planBlock = `Zahlungsplan (Info — Rechnungsbeträge ergeben sich aus den zugeordneten Leistungen):\n${zeilenText.join('\n')}`
@@ -1273,17 +1274,13 @@ export function rechnungBerechnungFuerListe(
   }
 }
 
-function formatEur(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-}
-
 export function zahlungsplanLabelFuerAngebot(plan: Zahlungsplan | null): string {
   if (!plan?.zeilen.length) return ''
   return plan.zeilen
     .map((z) => {
       if (z.typ === 'rest') return `${z.titel}: Restbetrag`
       if (z.typ === 'prozent') return `${z.titel}: ${z.wert} %`
-      return `${z.titel}: ${formatEur(z.wert)} netto`
+      return `${z.titel}: ${formatEuro(z.wert)} netto`
     })
     .join(' · ')
 }

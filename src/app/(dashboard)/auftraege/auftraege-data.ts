@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
@@ -166,6 +167,7 @@ async function fetchAuftragDetailRow(
   select: string
 ): Promise<{ data: Record<string, unknown> | null; error: { message: string; code?: string } | null }> {
   const { data, error } = await supabaseAdmin.from('auftraege').select(select).eq('id', id).maybeSingle()
+  if (error) logDbError('app/auftraege/auftraege-data:auftraege', error)
   return {
     data: (data as Record<string, unknown> | null) ?? null,
     error: error ? { message: error.message, code: error.code } : null,
@@ -290,6 +292,7 @@ export async function loadEmailLogForAuftrag(auftragId: string): Promise<EmailLo
     .select('id, typ, an_email, an_name, betreff, status, fehler_nachricht, created_at')
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/auftraege/auftraege-data:email_log', error)
 
   if (error) {
     console.error('[loadEmailLogForAuftrag]', error.message)
@@ -307,6 +310,7 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
     )
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/auftraege/auftraege-data:rechnungen', error)
 
   if (error) {
     // Fallback ohne neuere Spalten (Migration ggf. ausstehend)
@@ -317,6 +321,7 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
       )
       .eq('auftrag_id', auftragId)
       .order('created_at', { ascending: false })
+    if (err2) logDbError('app/auftraege/auftraege-data:rechnungen', err2)
     if (err2) {
       console.warn('[loadRechnungenForAuftrag]', error.message, err2.message)
       return []
@@ -331,10 +336,11 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
 
 export async function listFormularTemplates(): Promise<FormularTemplate[]> {
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('formular_templates')
     .select('*')
     .eq('aktiv', true)
     .order('name')
+  if (error) logDbError('app/auftraege/auftraege-data:formular_templates', error)
   return (data ?? []) as FormularTemplate[]
 }

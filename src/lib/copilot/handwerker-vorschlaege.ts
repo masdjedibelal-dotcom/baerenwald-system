@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { listHandwerkerFuerGewerkCopilot } from '@/lib/copilot/wizard-copilot'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -21,11 +22,12 @@ export async function vorschlageHandwerkerZuordnung(input: {
   const buckets = new Map<string, GewerkBucket>()
 
   if (auftragId) {
-    const { data: pos } = await supabaseAdmin
+    const { data: pos, error } = await supabaseAdmin
       .from('auftrag_positionen')
       .select('id, leistung_name, gewerk_slug, gewerk_name, handwerker_id')
       .eq('auftrag_id', auftragId)
       .order('sort_order', { ascending: true })
+    if (error) logDbError('lib/copilot/handwerker-vorschlaege:auftrag_positionen', error)
     for (const p of pos ?? []) {
       const slug = String(p.gewerk_slug || 'sonstiges')
       const name = String(p.gewerk_name || slug)
@@ -34,11 +36,12 @@ export async function vorschlageHandwerkerZuordnung(input: {
       buckets.set(slug, b)
     }
   } else if (angebotId) {
-    const { data: ang } = await supabaseAdmin
+    const { data: ang, error } = await supabaseAdmin
       .from('angebote')
       .select('id, positionen')
       .eq('id', angebotId)
       .maybeSingle()
+    if (error) logDbError('lib/copilot/handwerker-vorschlaege:angebote', error)
     const positionen = Array.isArray(ang?.positionen) ? ang!.positionen : []
     for (const raw of positionen) {
       const p = raw as Record<string, unknown>

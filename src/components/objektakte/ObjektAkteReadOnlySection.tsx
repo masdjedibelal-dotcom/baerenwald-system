@@ -1,19 +1,16 @@
 'use client'
 
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import {
   FREMD_VORGANG_KATEGORIE_LABELS,
   OBJEKT_DOKUMENT_KATEGORIE_LABELS,
 } from '@/lib/objektakte/labels'
 import type { ObjektAkteReadOnlyPayload } from '@/lib/objektakte/types'
 import { formatDatum } from '@/lib/utils'
-
-function formatBetrag(n: number): string {
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
-}
+import { formatEuro } from '@/lib/format/geld-datum'
 
 type Props = {
   data: ObjektAkteReadOnlyPayload
@@ -34,7 +31,7 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
 
   return (
     <MockCard title="Objektakte (HV-Portal)" icon="file-text" className={className}>
-      <p className="mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-3)' }}>
+      <p className="mb-3 text-fs-meta leading-relaxed" style={{ color: 'var(--text-3)' }}>
         Notizen, Dokumente und Fremd-Vorgänge aus dem Auftraggeber-Portal — nur Anzeige,
         Bearbeitung im HV-Portal.
       </p>
@@ -50,7 +47,7 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
           {notizen.length > 0 ? (
             <section>
               <h3
-                className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+                className="mb-2 text-fs-caption font-semibold uppercase tracking-wide"
                 style={{ color: 'var(--text-3)' }}
               >
                 Notizen
@@ -95,7 +92,7 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
           {dokumente.length > 0 ? (
             <section>
               <h3
-                className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+                className="mb-2 text-fs-caption font-semibold uppercase tracking-wide"
                 style={{ color: 'var(--text-3)' }}
               >
                 Dokumente
@@ -149,7 +146,7 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
           {fremdVorgaenge.length > 0 ? (
             <section>
               <h3
-                className="mb-2 text-[11px] font-semibold uppercase tracking-wide"
+                className="mb-2 text-fs-caption font-semibold uppercase tracking-wide"
                 style={{ color: 'var(--text-3)' }}
               >
                 Fremd-Vorgänge
@@ -177,7 +174,7 @@ export function ObjektAkteReadOnlySection({ data, variant = 'full', className }:
                     </div>
                     <div className="lc-sub" style={{ color: 'var(--text-2)', fontSize: 12.5 }}>
                       {[
-                        f.betrag != null ? formatBetrag(f.betrag) : null,
+                        f.betrag != null ? formatEuro(f.betrag) : null,
                         FREMD_VORGANG_KATEGORIE_LABELS[f.kategorie] ?? f.kategorie,
                       ]
                         .filter(Boolean)

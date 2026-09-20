@@ -1,5 +1,6 @@
+import { createClient } from '@/lib/supabase-server'
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { isRechnungComplianceSchemaError } from '@/lib/rechnungen/rechnung-speichern'
 import type { Kunde } from '@/lib/types'
 
@@ -13,14 +14,10 @@ export async function loadKundeFuerRechnung(
   _supabase: SupabaseClient,
   kundeId: string
 ): Promise<{ data: Kunde | null; error: { message: string } | null }> {
-  let result = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select(KUNDE_SELECT).eq('id', kundeId).maybeSingle()
-  )
+  let result = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_SELECT).eq('id', kundeId).maybeSingle() })()
 
   if (result.error && isRechnungComplianceSchemaError(result.error.message)) {
-    result = await withCrmReadFallback(async (db) =>
-      db.from('kunden').select(KUNDE_SELECT_LEGACY).eq('id', kundeId).maybeSingle()
-    )
+    result = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_SELECT_LEGACY).eq('id', kundeId).maybeSingle() })()
   }
 
   if (result.error) return { data: null, error: { message: result.error.message } }

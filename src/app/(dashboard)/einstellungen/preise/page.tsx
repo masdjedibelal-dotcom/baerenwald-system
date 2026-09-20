@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase-server'
 import { PreislistenClient } from '@/components/preislisten/PreislistenClient'
@@ -27,12 +28,11 @@ export default async function EinstellungenPreisePage() {
       .order('leistung', { ascending: true }),
     supabase.from('gewerke').select('id, name, slug, aktiv').order('sort_order', { ascending: true }).order('name', { ascending: true }),
   ])
-
   const gw = (gewerke ?? []) as Gewerk[]
 
   if (error) {
     return (
-      <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
+      <div className="rounded-card border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
         <p className="font-medium">Preislisten konnten nicht geladen werden.</p>
         <p className="mt-1 opacity-90">{error.message}</p>
       </div>

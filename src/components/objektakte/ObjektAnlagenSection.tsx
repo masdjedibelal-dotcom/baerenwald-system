@@ -1,15 +1,16 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockFormSection } from '@/components/mock-ui/MockForm'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import Link from 'next/link'
 import { useTransition } from '@/components/ui/action-busy'
 import { useEffect, useState } from 'react'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { MockModal } from '@/components/mock-ui/MockModal'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockFormSection } from '@/components/mock-ui/MockForm'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import {
   createObjektAnlage,
   deleteObjektAnlage,
@@ -37,6 +38,8 @@ import { toast } from '@/components/ui/app-toast'
 import { LIST } from '@/lib/crm-labels'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { formatNumber } from '@/lib/format/geld-datum'
+import { TOAST } from '@/lib/copy'
 
 const LIST_COLS = 'minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(0, 1fr) 72px 88px 44px'
 
@@ -99,7 +102,7 @@ export function ObjektAnlagenSection({
       if (cancelled) return
       setDetailLoading(false)
       if (r.ok) setDetailVorgaenge(r.rows)
-      else toast.error(r.message)
+      else toast.systemError(r)
     })
     return () => {
       cancelled = true
@@ -123,6 +126,14 @@ export function ObjektAnlagenSection({
   }
 
   function speichern() {
+    if (!formState.bezeichnung.trim()) {
+      setErr('Bezeichnung ist Pflicht.')
+      return
+    }
+    if (!formState.gewerkId) {
+      setErr('Gewerk ist Pflicht.')
+      return
+    }
     setErr(null)
     startTransition(async () => {
       const input = anlageInputFromFormState(formState)
@@ -140,7 +151,7 @@ export function ObjektAnlagenSection({
           )
         )
         if (detail?.id === edit.id) setDetail({ ...r.anlage, vorgang_count: edit.vorgang_count })
-        toast.success('Anlage gespeichert')
+        toast.success(TOAST.anlage_gespeichert)
       } else {
         const r = await createObjektAnlage(kundeId, objektId, input)
         if (!r.ok) {
@@ -148,7 +159,7 @@ export function ObjektAnlagenSection({
           return
         }
         setListe((prev) => [...prev, r.anlage])
-        toast.success('Anlage angelegt')
+        toast.success(TOAST.anlage_angelegt)
       }
       setDirty(false)
       setFormOpen(false)
@@ -161,13 +172,13 @@ export function ObjektAnlagenSection({
     startTransition(async () => {
       const r = await deleteObjektAnlage(kundeId, objektId, deleteTarget.id)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       setListe((prev) => prev.filter((a) => a.id !== deleteTarget.id))
       if (detail?.id === deleteTarget.id) setDetail(null)
       setDeleteTarget(null)
-      toast.success('Anlage gelöscht')
+      toast.success(TOAST.anlage_geloescht)
       onChanged()
     })
   }
@@ -186,7 +197,7 @@ export function ObjektAnlagenSection({
               status: 'stillgelegt',
             })
             if (!r.ok) {
-              toast.error(r.message)
+              toast.systemError(r)
               return
             }
             setListe((prev) =>
@@ -194,7 +205,7 @@ export function ObjektAnlagenSection({
                 x.id === a.id ? { ...r.anlage, vorgang_count: x.vorgang_count } : x
               )
             )
-            toast.success('Anlage stillgelegt')
+            toast.success(TOAST.anlage_stillgelegt)
             onChanged()
           })
         },
@@ -225,12 +236,7 @@ export function ObjektAnlagenSection({
           'cursor-pointer'
         )}
       >
-        <button
-          type="button"
-          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
-          style={isMobile ? undefined : { gridTemplateColumns: LIST_COLS }}
-          onClick={() => setDetail(a)}
-        >
+        <MockBtn className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'} type="button" style={isMobile ? undefined : { gridTemplateColumns: LIST_COLS }} onClick={() => setDetail(a)}>
           {isMobile ? (
             <>
               <div className="ap-mobile-card__top">
@@ -241,7 +247,7 @@ export function ObjektAnlagenSection({
                 <span className="meta-tag">{gewerkName}</span>
               </div>
               <div className="ap-mobile-card__meta">
-                {[a.standort?.trim(), count ? `${count} Vorgänge` : 'Keine Vorgänge']
+                {[a.standort?.trim(), count ? `${count} Vorgänge` : '0 Vorgänge']
                   .filter(Boolean)
                   .join(' · ')}
               </div>
@@ -259,7 +265,7 @@ export function ObjektAnlagenSection({
               </span>
             </>
           )}
-        </button>
+        </MockBtn>
         {!isMobile ? (
           <div
             className="row-actions always"
@@ -306,14 +312,9 @@ export function ObjektAnlagenSection({
                 className="list-row"
                 style={{ gridTemplateColumns: LIST_COLS, cursor: 'default' }}
               >
-                <button
-                  type="button"
-                  className="lc-title text-left"
-                  style={{ fontWeight: 600, background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
-                  onClick={() => setDetail(a)}
-                >
+                <MockBtn className="lc-title text-left" type="button" style={{ fontWeight: 600, background: 'none', border: 0, padding: 0, cursor: 'pointer' }} onClick={() => setDetail(a)}>
                   {a.bezeichnung}
-                </button>
+                </MockBtn>
                 <div>
                   <span className="meta-tag">{a.gewerke?.name ?? '—'}</span>
                 </div>
@@ -348,7 +349,7 @@ export function ObjektAnlagenSection({
         context="detail"
         dirty={dirty}
         onConfirm={speichern}
-        confirmDisabled={pending || !formState.bezeichnung.trim() || !formState.gewerkId}
+        confirmDisabled={pending}
         confirmBusy={pending}
       >
         <ObjektAnlageFormFields
@@ -372,8 +373,7 @@ export function ObjektAnlagenSection({
       >
         {detail ? (
           <div className="space-y-4">
-            <div className="card">
-              <div className="card-b space-y-2">
+            <MockCard bodyClassName="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="meta-tag">{detail.gewerke?.name ?? '—'}</span>
                   <MockBadge kind={OBJEKT_ANLAGE_STATUS_BADGE[detail.status]}>
@@ -417,7 +417,7 @@ export function ObjektAnlagenSection({
                 ) : null}
                 {detail.anschaffungswert_eur != null && detail.anschaffungswert_eur > 0 ? (
                   <p style={{ margin: 0, fontSize: 'var(--fs-meta)', color: 'var(--text-2)' }}>
-                    Neuwert: {detail.anschaffungswert_eur.toLocaleString('de-DE')} €
+                    Neuwert: {formatNumber(detail.anschaffungswert_eur)} €
                   </p>
                 ) : null}
                 {detail.wartungsintervall ? (
@@ -469,8 +469,7 @@ export function ObjektAnlagenSection({
                     Bearbeiten
                   </MockBtn>
                 </div>
-              </div>
-            </div>
+            </MockCard>
 
             <MockFormSection title="Verknüpfte Vorgänge">
               {detailLoading ? (
@@ -485,7 +484,7 @@ export function ObjektAnlagenSection({
                 <div className="listcard">
                   <div
                     className="list-row head"
-                    style={{ gridTemplateColumns: 'minmax(0, 1fr) 100px 88px' }}
+                    style={{ gridTemplateColumns: 'minmax(0, 1fr) 6.25rem 5.5rem' }}
                     aria-hidden
                   >
                     <div>Vorgang</div>
@@ -496,7 +495,7 @@ export function ObjektAnlagenSection({
                     <div
                       key={v.id}
                       className="list-row"
-                      style={{ gridTemplateColumns: 'minmax(0, 1fr) 100px 88px' }}
+                      style={{ gridTemplateColumns: 'minmax(0, 1fr) 6.25rem 5.5rem' }}
                     >
                       <Link
                         href={`/anfragen/${v.id}`}
@@ -520,31 +519,24 @@ export function ObjektAnlagenSection({
         ) : null}
       </EditorSheet>
 
-      <MockModal
+      <ConfirmPopup
         open={Boolean(deleteTarget)}
         onClose={() => {
           if (!pending) setDeleteTarget(null)
         }}
-        icon="trash"
         title="Anlage löschen?"
-        sub="Nur möglich ohne verknüpfte Vorgänge."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={pending} onClick={() => setDeleteTarget(null)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn kind="danger" icon="trash" disabled={pending} onClick={() => void runDelete()}>
-              {pending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={pending}
+        confirmLabel={pending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Nur möglich ohne verknüpfte Vorgänge.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           „{deleteTarget?.bezeichnung ?? 'Anlage'}“ wird unwiderruflich gelöscht.
         </div>
-      </MockModal>
+      </ConfirmPopup>
     </>
   )
 }

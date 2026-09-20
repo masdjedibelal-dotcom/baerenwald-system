@@ -5,6 +5,7 @@ import {
   kundeRechnungsempfaengerAusStammdaten,
   type KundeRechnungsempfaenger,
 } from '@/lib/kunde-rechnungsempfaenger'
+import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -13,11 +14,12 @@ import {
   mailSummaryBlock,
 } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -35,14 +37,12 @@ export type AuftragsbestaetigungMailInput = {
 }
 
 export function auftragsbestaetigungMailBetreff(
-  anrede: AngebotMailAnrede,
-  leistungsumfang: string,
-  firmenname: string
+  leistungsumfang: string | null | undefined
 ): string {
-  const titel = leistungsumfang.trim() || 'Ihr Projekt'
-  return anrede === 'du'
-    ? `Dein Auftrag ist bestätigt — ${titel} · ${firmenname}`
-    : `Ihr Auftrag ist bestätigt — ${titel} · ${firmenname}`
+  return buildSubject({
+    objekt: leistungsumfang,
+    ereignis: 'Auftrag bestätigt',
+  })
 }
 
 export function buildAuftragsbestaetigungMail(
@@ -78,7 +78,7 @@ export function buildAuftragsbestaetigungMail(
   const steps = anrede === 'du' ? stepsDu : stepsSie
   const stepsHtml = steps
     .map(
-      (s) => `<li style="margin:0 0 8px;color:#374151;line-height:1.6;">${esc(s)}</li>`
+      (s) => `<li style="margin:0 0 8px;color:${C.gray700};line-height:1.6;">${esc(s)}</li>`
     )
     .join('')
   const stepsTitle = anrede === 'du' ? 'Das passiert als Nächstes' : 'Das passiert als Nächstes'
@@ -87,28 +87,28 @@ export function buildAuftragsbestaetigungMail(
     label: anrede === 'du' ? 'DEIN AUFTRAG' : 'IHR AUFTRAG',
     title: lu,
     priceHtml: brutto
-      ? `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${esc(brutto)} <span style="font-size:12px;font-weight:400;color:#6B7280;">inkl. MwSt.</span></p>`
+      ? `<p style="font-size:16px;font-weight:700;color:${C.green};margin:0;">${esc(brutto)} <span style="font-size:12px;font-weight:400;color:${C.gray500};">inkl. MwSt.</span></p>`
       : '',
-    metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Zeitraum:</strong> ${zeitraum}</p><p style="font-size:13px;color:#374151;margin:4px 0 0;"><strong>Gewerke:</strong> ${gw}</p>`,
+    metaHtml: `<p style="font-size:13px;color:${C.gray700};margin:8px 0 0;"><strong>Zeitraum:</strong> ${zeitraum}</p><p style="font-size:13px;color:${C.gray700};margin:4px 0 0;"><strong>Gewerke:</strong> ${gw}</p>`,
   })
 
   const contact = mailKundenContactLine(anrede, b.telefon)
   const gruss = mailKundenGruss(anrede)
 
-  const betreff = auftragsbestaetigungMailBetreff(anrede, data.leistungsumfang, b.firmenname)
+  const betreff = auftragsbestaetigungMailBetreff(data.leistungsumfang)
   const preheader =
     anrede === 'du'
       ? `Auftrag bestätigt · ${zeitraum}`
       : `Auftrag bestätigt · ${zeitraum}`
 
   const html = mailHtmlBase(
-    `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
+    `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
-      <p style="font-size:14px;font-weight:600;color:#111111;margin:0 0 8px;">${stepsTitle}</p>
+      <p style="font-size:14px;font-weight:600;color:${C.gray900};margin:0 0 8px;">${stepsTitle}</p>
       <ol style="margin:0 0 16px;padding-left:20px;">${stepsHtml}</ol>
-      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
-      <p style="font-size:14px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
+      <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
+      <p style="font-size:14px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,
     undefined,

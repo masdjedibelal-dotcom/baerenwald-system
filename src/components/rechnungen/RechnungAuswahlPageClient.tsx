@@ -1,5 +1,7 @@
 'use client'
 
+
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useTransition } from '@/components/ui/action-busy'
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -58,7 +60,7 @@ export function RechnungAuswahlPageClient({
     startTransition(async () => {
       const res = await loadRechnungWizardBootstrapFromAuftrag(auftragId)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       openWizard(res.bootstrap)
@@ -87,7 +89,7 @@ export function RechnungAuswahlPageClient({
           onClose={closeWizard}
           onDone={() => {
             closeWizard()
-            router.refresh()
+            afterServerActionRefresh()
           }}
         />
       ) : null}

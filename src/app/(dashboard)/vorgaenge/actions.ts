@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateLeadDetail, revalidateVorgaengeListe } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 
@@ -17,30 +23,34 @@ export async function resolveLeadIdForVorgang(
   const supabase = createClient()
 
   if (ref.kind === 'lead') {
-    const { data } = await supabase.from('leads').select('id').eq('id', ref.id).maybeSingle()
+    const { data, error } = await supabase.from('leads').select('id').eq('id', ref.id).maybeSingle()
+    if (error) logDbError('app/vorgaenge/actions:leads', error)
     if (!data?.id) return { ok: false, message: 'Anfrage nicht gefunden.' }
     return { ok: true, leadId: data.id as string }
   }
 
   if (ref.kind === 'angebot') {
-    const { data } = await supabase.from('angebote').select('lead_id').eq('id', ref.id).maybeSingle()
+    const { data, error } = await supabase.from('angebote').select('lead_id').eq('id', ref.id).maybeSingle()
+    if (error) logDbError('app/vorgaenge/actions:angebote', error)
     const leadId = (data as { lead_id?: string | null } | null)?.lead_id?.trim()
     if (!leadId) return { ok: false, message: 'Angebot ohne Anfrage-Verknüpfung.' }
     return { ok: true, leadId }
   }
 
   if (ref.kind === 'auftrag') {
-    const { data } = await supabase.from('auftraege').select('lead_id').eq('id', ref.id).maybeSingle()
+    const { data, error } = await supabase.from('auftraege').select('lead_id').eq('id', ref.id).maybeSingle()
+    if (error) logDbError('app/vorgaenge/actions:auftraege', error)
     const leadId = (data as { lead_id?: string | null } | null)?.lead_id?.trim()
     if (!leadId) return { ok: false, message: 'Auftrag ohne Anfrage-Verknüpfung.' }
     return { ok: true, leadId }
   }
 
-  const { data: rechnung } = await supabase
+  const { data: rechnung, error } = await supabase
     .from('rechnungen')
     .select('auftrag_id, angebote(lead_id), auftraege(lead_id)')
     .eq('id', ref.id)
     .maybeSingle()
+  if (error) logDbError('app/vorgaenge/actions:rechnungen', error)
 
   if (!rechnung) return { ok: false, message: 'Rechnung nicht gefunden.' }
 
@@ -78,12 +88,8 @@ export async function deleteVorgang(
   const r = await softDeleteLeadForPortal({ leadId: id })
   if (!r.ok) return r
 
-  revalidatePath('/vorgaenge')
-  revalidatePath('/anfragen')
-  revalidatePath('/angebote')
-  revalidatePath('/auftraege')
-  revalidatePath('/rechnungen')
-  revalidatePath(`/anfragen/${id}`)
+  revalidateVorgaengeListe()
+  revalidateLeadDetail(id)
   return { ok: true }
 }
 

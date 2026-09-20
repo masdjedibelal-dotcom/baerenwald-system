@@ -1,6 +1,7 @@
 'use client'
 
-import { ChevronDown } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useState } from 'react'
 import { KiAnalyticsClient } from '@/components/ki/KiAnalyticsClient'
 import type { KiClusterAnalyseRow } from '@/lib/ki/types'
@@ -18,21 +19,15 @@ export function KiHubDepthPanel({ analysen, open: openProp, onOpenChange }: Prop
 
   return (
     <section id="ki-depth" className="border-t border-bw-border pt-6">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-2 text-left hover:bg-bw-bg"
-      >
+      <MockBtn fullWidth className="flex items-center justify-between gap-2 rounded-button px-1 py-2 text-left hover:bg-bw-bg" type="button" onClick={() => setOpen(!open)}>
         <div>
           <h2 className="text-sm font-semibold text-bw-text">Alle Analysen & Rohdaten</h2>
           <p className="text-xs text-muted">
-            Cluster-Auswertungen, Funnel, Margen, Handwerker — wie bisheriges KI Analytics
+            Cluster-Auswertungen, Funnel, Margen, Partner — wie bisheriges KI Analytics
           </p>
         </div>
-        <ChevronDown
-          className={`h-5 w-5 shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
+        <MockIcon n="chevron-down" ctx="default" className={`h-5 w-5 shrink-0 text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </MockBtn>
       {open ? (
         <div className="mt-4">
           <KiAnalyticsClient analysen={analysen} />

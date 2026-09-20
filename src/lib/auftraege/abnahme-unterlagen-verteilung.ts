@@ -3,6 +3,7 @@
  * Kanonische Quelle bleibt auftrag_abnahmeprotokolle (V3).
  * Keine E-Mail — nur Unterlagen + Portal-Glocke/Push.
  */
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 async function insertUnterlageOnce(input: {
@@ -11,7 +12,7 @@ async function insertUnterlageOnce(input: {
   dateiUrl: string
   typ: string
 }): Promise<void> {
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error } = await supabaseAdmin
     .from('kunden_dokumente')
     .select('id')
     .eq('kunde_id', input.kundeId)
@@ -19,9 +20,10 @@ async function insertUnterlageOnce(input: {
     .eq('typ', input.typ)
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('lib/auftraege/abnahme-unterlagen-verteilung:kunden_dokumente', error)
   if (existing?.id) return
 
-  await supabaseAdmin.from('kunden_dokumente').insert({
+  const { error: __dbErr1 } = await supabaseAdmin.from('kunden_dokumente').insert({
     kunde_id: input.kundeId,
     name: input.name,
     typ: input.typ,
@@ -29,6 +31,7 @@ async function insertUnterlageOnce(input: {
     groesse_bytes: null,
     erstellt_von: null,
   })
+  if (__dbErr1) logDbError('lib/auftraege/abnahme-unterlagen-verteilung:kunden_dokumente', __dbErr1)
 }
 
 export async function verteileAbnahmeAnUnterlagen(input: {
@@ -40,7 +43,7 @@ export async function verteileAbnahmeAnUnterlagen(input: {
   const pdfUrl = input.pdfUrl?.trim()
   if (!auftragId || !pdfUrl) return
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select(
       `
@@ -58,6 +61,7 @@ export async function verteileAbnahmeAnUnterlagen(input: {
     )
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('lib/auftraege/abnahme-unterlagen-verteilung:auftraege', error)
 
   if (!auf) return
 
@@ -90,13 +94,14 @@ export async function verteileAbnahmeAnUnterlagen(input: {
       typ: 'abnahmeprotokoll',
     })
 
-    await supabaseAdmin.from('hv_notifications').insert({
+    const { error: __dbErr2 } = await supabaseAdmin.from('hv_notifications').insert({
       kunde_id: hvId,
       typ: 'abnahme',
       titel: 'Abnahmedokument verfügbar',
       body: `Das Abnahmeprotokoll zu „${String(auf.titel ?? 'Auftrag').trim() || 'Auftrag'}“ liegt in den Unterlagen.`,
       link: `/portal?section=vorgaenge&id=${encodeURIComponent(String(auf.lead_id ?? ''))}`,
     })
+    if (__dbErr2) logDbError('lib/auftraege/abnahme-unterlagen-verteilung:hv_notifications', __dbErr2)
     const { schedulePortalWebPushForOrgKunde } = await import(
       '@/lib/portal/send-portal-web-push'
     )

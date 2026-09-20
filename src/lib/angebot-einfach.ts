@@ -2,6 +2,7 @@ import type { Angebot, AngebotPosition, AngebotStatus } from '@/lib/types'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { kundeDisplayName, type KundeListenNamePick } from '@/lib/kunde-stammdaten'
 import { BEREICH_LABELS } from '@/lib/utils'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type AngebotStatusEinfach =
   | 'entwurf'
@@ -118,7 +119,7 @@ export function gueltigBisTone(gueltigBis: string | null | undefined): GueltigBi
 
 export function gueltigBisClass(tone: GueltigBisTone): string {
   if (tone === 'danger') return 'text-bw-danger font-medium'
-  if (tone === 'warn') return 'text-amber-700 font-medium'
+  if (tone === 'warn') return 'text-status-contact-text font-medium'
   return 'text-bw-text'
 }
 
@@ -167,7 +168,7 @@ export function betragAnzeige(
 ): string {
   const total = resolveAngebotGesamtbetrag(gesamt_fix, gesamt_min, gesamt_max)
   if (total == null) return '—'
-  return `${total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  return `${formatEuro(total)}`
 }
 
 /** CRM-Listen/Karten: Beträge einheitlich brutto (Netto-DB-Feld × MwSt). */
@@ -186,7 +187,7 @@ export function betragAnzeigeBrutto(
   const total = resolveAngebotGesamtbetrag(gesamt_fix, gesamt_min, gesamt_max)
   if (total == null) return '—'
   const brutto = nettoZuBrutto(total, mwstSatz)
-  return `${brutto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  return `${formatEuro(brutto)}`
 }
 
 export function angebotSummenBrutto(positionen: AngebotPosition[], mwstSatz = 19) {

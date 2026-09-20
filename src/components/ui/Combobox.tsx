@@ -1,5 +1,6 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   useEffect,
   useId,
@@ -8,7 +9,6 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
 export type ComboboxOption = {

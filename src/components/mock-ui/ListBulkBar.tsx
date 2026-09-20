@@ -1,7 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { cn } from '@/lib/utils'
 
 export type ListBulkBarProps = {

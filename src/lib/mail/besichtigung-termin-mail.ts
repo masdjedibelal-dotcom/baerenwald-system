@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailBesichtigungTermin } from '@/lib/mail-templates'
@@ -82,6 +83,7 @@ export async function buildBesichtigungTerminMail(
     )
     .eq('id', input.leadId)
     .maybeSingle()
+  if (error) logDbError('lib/mail/besichtigung-termin-mail:leads', error)
 
   if (error) return { ok: false, message: error.message }
   if (!lead) return { ok: false, message: 'Lead nicht gefunden oder keine Berechtigung.' }

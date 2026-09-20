@@ -1,7 +1,8 @@
 'use client'
 
-import { useId, useState, type ReactNode } from 'react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { useId, useState, type ReactNode } from 'react'
 import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { cn } from '@/lib/utils'
@@ -80,16 +81,9 @@ export function KiAssistFieldLabel({
           {label}
           {required ? <span className="req"> *</span> : null}
         </span>
-        <button
-          type="button"
-          className="ki-assist-icon-btn"
-          title={`KI: ${labelText} umschreiben`}
-          aria-label={`KI: ${labelText} umschreiben`}
-          disabled={disabled || !assistent}
-          onClick={openFieldChat}
-        >
+        <MockBtn className="ki-assist-icon-btn" type="button" title={`KI: ${labelText} umschreiben`} aria-label={`KI: ${labelText} umschreiben`} disabled={disabled || !assistent} onClick={openFieldChat}>
           <MockIcon ctx="btn" n="sparkles" size={16} />
-        </button>
+        </MockBtn>
       </div>
       {children}
     </div>

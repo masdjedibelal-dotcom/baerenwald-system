@@ -1,4 +1,5 @@
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { createClient } from '@/lib/supabase-server'
+import { logDbError } from '@/lib/errors/log-db-error'
 import {
   buildAuftragPipelineKontextMap,
   buildRechnungenByAuftragId,
@@ -26,9 +27,7 @@ export async function loadAuftraegeListe(): Promise<{
   pipelineKontextByAuftragId: Record<string, AuftragPipelineKontext>
   error: string | null
 }> {
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db.from('auftraege').select(AUFTRAEGE_LISTE_SELECT).order('created_at', { ascending: false }).limit(100)
-  )
+  const { data, error } = await (() => { const db = createClient(); return db.from('auftraege').select(AUFTRAEGE_LISTE_SELECT).order('created_at', { ascending: false }).limit(100) })()
 
   if (error) {
     return { auftraege: [], pipelineKontextByAuftragId: {}, error: error.message }
@@ -40,14 +39,12 @@ export async function loadAuftraegeListe(): Promise<{
   let rechnungenByAuftragId: Record<string, import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[]> =
     {}
   if (auftragIds.length) {
-    const { data: recRows, error: recErr } = await withCrmReadFallback(async (db) =>
-      db
+    const { data: recRows, error: recErr } = await (() => { const db = createClient(); return db
         .from('rechnungen')
         .select(
           'id, auftrag_id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto'
         )
-        .in('auftrag_id', auftragIds)
-    )
+        .in('auftrag_id', auftragIds) })()
     if (!recErr && recRows) {
       rechnungenByAuftragId = buildRechnungenByAuftragId(recRows)
     }

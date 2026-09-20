@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache'
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { sendAuftragHandwerkerZuweisungMail } from '@/lib/auftraege/send-auftrag-handwerker-zuweisung-mail'
@@ -72,7 +72,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     await insertAuftragTimelineEvent({
       auftrag_id: auftragId,
       typ: 'mail_handwerker',
-      titel: 'Zuweisung an Handwerker gesendet',
+      titel: 'Zuweisung an Partner gesendet',
       beschreibung: sent.betreff ?? 'Partner-Mail',
       handwerker_id: handwerkerId,
       erstellt_von: user.id,
@@ -80,7 +80,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     })
   }
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
   return NextResponse.json({ portalLink: sent.portalLink, gesendet: sent.gesendet })
 }

@@ -2,6 +2,11 @@
  * Schlussrechnung teurer als Auftragssumme → Auftrag + verknüpftes Angebot
  * still anheben (nur hoch, nie runter; keine Positionen löschen).
  */
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import 'server-only'
 
 import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
@@ -17,7 +22,6 @@ import {
   type RechnungAbschlagLink,
 } from '@/lib/rechnungen/zahlungsplan'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
-import { revalidatePath } from 'next/cache'
 function normKey(s: string): string {
   return s.trim().toLowerCase()
 }
@@ -60,11 +64,12 @@ async function loadAuftragVkNetto(auftragId: string): Promise<{
   angebotId: string | null
   auftragPos: AuftragPosition[]
 }> {
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('angebot_id, auftrag_positionen(*)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:auftraege', error)
 
   const auftragPos = ((auf as { auftrag_positionen?: AuftragPosition[] } | null)?.auftrag_positionen ??
     []) as AuftragPosition[]
@@ -77,11 +82,12 @@ async function loadAuftragVkNetto(auftragId: string): Promise<{
   }
 
   if (angebotId) {
-    const { data: ang } = await supabaseAdmin
+    const { data: ang, error } = await supabaseAdmin
       .from('angebote')
       .select('positionen')
       .eq('id', angebotId)
       .maybeSingle()
+    if (error) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', error)
     const pos = normalizeAngebotPositionen(ang?.positionen)
     return { vkNetto: auftragSummenAusPositionen(pos).netto, angebotId, auftragPos }
   }
@@ -118,7 +124,7 @@ async function appendOrUpdateAuftragPositionen(
 
     if (match?.id) {
       used.add(match.id)
-      await supabaseAdmin
+      const { error: __dbErr1 } = await supabaseAdmin
         .from('auftrag_positionen')
         .update({
           menge: row.menge,
@@ -130,10 +136,11 @@ async function appendOrUpdateAuftragPositionen(
           aenderung_typ: null,
         })
         .eq('id', match.id)
+      if (__dbErr1) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:auftrag_positionen', __dbErr1)
       continue
     }
 
-    const { data: inserted } = await supabaseAdmin
+    const { data: inserted, error } = await supabaseAdmin
       .from('auftrag_positionen')
       .insert({
         ...row,
@@ -142,6 +149,7 @@ async function appendOrUpdateAuftragPositionen(
       })
       .select('id')
       .maybeSingle()
+    if (error) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:auftrag_positionen', error)
     sortCursor += 10
     if (inserted?.id) {
       pool.push({
@@ -160,11 +168,12 @@ async function mergeAngebotPositionen(
   angebotId: string,
   fromWizard: AngebotPosition[]
 ): Promise<void> {
-  const { data: ang } = await supabaseAdmin
+  const { data: ang, error } = await supabaseAdmin
     .from('angebote')
     .select('positionen')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', error)
   if (!ang) return
 
   const existing = normalizeAngebotPositionen(ang.positionen)
@@ -192,7 +201,7 @@ async function mergeAngebotPositionen(
 
   const next = Array.from(byKey.values())
   const summen = summenAusPositionen(next, 19)
-  await supabaseAdmin
+  const { error: __dbErr2 } = await supabaseAdmin
     .from('angebote')
     .update({
       positionen: next,
@@ -202,19 +211,21 @@ async function mergeAngebotPositionen(
       gesamt_fix: summen.nettoMin,
     })
     .eq('id', angebotId)
+  if (__dbErr2) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', __dbErr2)
 }
 
 /** Angebots-Summenfelder an aktuelle Positionen anbinden (Listenanzeige). */
 async function syncAngebotGesamtFelder(angebotId: string): Promise<void> {
-  const { data: ang } = await supabaseAdmin
+  const { data: ang, error } = await supabaseAdmin
     .from('angebote')
     .select('positionen')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', error)
   if (!ang) return
   const pos = normalizeAngebotPositionen(ang.positionen)
   const summen = summenAusPositionen(pos, 19)
-  await supabaseAdmin
+  const { error: __dbErr3 } = await supabaseAdmin
     .from('angebote')
     .update({
       gesamt_min: summen.nettoMin,
@@ -222,6 +233,7 @@ async function syncAngebotGesamtFelder(angebotId: string): Promise<void> {
       gesamt_fix: summen.nettoMin,
     })
     .eq('id', angebotId)
+  if (__dbErr3) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', __dbErr3)
 }
 
 /**
@@ -282,9 +294,7 @@ export async function raiseAuftragVkFuerSchlussrechnung(input: {
       'Schlussrechnung lag über der bisherigen Auftragssumme — Auftrag und Angebot wurden automatisch angehoben.',
   })
 
-  revalidatePath('/vorgaenge')
-  revalidatePath('/auftraege')
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
 
   return { ok: true, vkNetto, adjusted: true }
 }

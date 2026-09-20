@@ -1,13 +1,14 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import type { ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
 /**
  * Bereich mit Stift-Icon → Bearbeitungsmodus.
  * Im Edit-Modus: Felder hervorgehoben + Abbrechen / Speichern.
+ * Rahmen über MockCard.
  */
 export function InlineEditSection({
   title,
@@ -37,36 +38,31 @@ export function InlineEditSection({
   editLabel?: string
   hideEditTrigger?: boolean
 }) {
-  return (
-    <div className={cn('card', editing && 'inline-edit-section--active', className)}>
-      <div className="card-h">
-        <div className="card-title title">
-          {icon ? <MockIcon ctx="emphasis" n={icon} size={16} /> : null}
-          {title}
-        </div>
-        {!disabled ? (
-          editing ? (
-            <div className="inline-edit-actions">
-              <MockBtn sm kind="ghost" onClick={onCancel} disabled={saving}>
-                Abbrechen
-              </MockBtn>
-              <MockBtn sm kind="primary" icon="check" onClick={onSave} disabled={saving}>
-                {saving ? 'Speichern…' : 'Speichern'}
-              </MockBtn>
-            </div>
-          ) : hideEditTrigger ? null : (
-            <MockBtn
-              sm
-              kind="ghost"
-              icon="pencil"
-              title={editLabel}
-              onClick={onStartEdit}
-            />
-          )
-        ) : null}
+  const actions = !disabled ? (
+    editing ? (
+      <div className="inline-edit-actions">
+        <MockBtn sm kind="ghost" onClick={onCancel} disabled={saving}>
+          Abbrechen
+        </MockBtn>
+        <MockBtn sm kind="primary" icon="check" onClick={onSave} disabled={saving}>
+          {saving ? 'Speichern…' : 'Speichern'}
+        </MockBtn>
       </div>
-      <div className={cn('card-b', editing && 'inline-edit-body')}>{children}</div>
-    </div>
+    ) : hideEditTrigger ? null : (
+      <MockBtn sm kind="ghost" icon="pencil" title={editLabel} onClick={onStartEdit} />
+    )
+  ) : null
+
+  return (
+    <MockCard
+      title={title}
+      icon={icon}
+      actions={actions}
+      className={cn(editing && 'inline-edit-section--active', className)}
+      bodyClassName={editing ? 'inline-edit-body' : undefined}
+    >
+      {children}
+    </MockCard>
   )
 }
 

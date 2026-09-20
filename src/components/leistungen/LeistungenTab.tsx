@@ -1,12 +1,17 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
-import { Check, ChevronRight, Info } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+import { useMemo, useState, type ReactNode } from 'react'
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
+import { COPY_ROLE } from '@/lib/copy'
 import { LeistungDrawer } from '@/components/leistungen/LeistungDrawer'
 import { LeistungHandwerkerUpdatesAccordion } from '@/components/leistungen/LeistungHandwerkerUpdatesAccordion'
 import { LeistungenMaengelCard } from '@/components/leistungen/LeistungenMaengelCard'
@@ -34,7 +39,7 @@ const COL_LABELS: Record<ColId, string> = {
   preis: 'Preis',
   status: 'Fortschritt',
   gewerk: 'Gewerk',
-  handwerker: 'Handwerker',
+  handwerker: COPY_ROLE.partner,
   ek: 'EK',
 }
 
@@ -215,7 +220,7 @@ export function LeistungenTab({
             aria-checked={selected}
           >
             <span className={cn('lt-box', selected && 'on')}>
-              {selected ? <Check className="h-2.5 w-2.5" aria-hidden /> : null}
+              {selected ? <MockIcon n="check" ctx="default" className="h-2.5 w-2.5" aria-hidden /> : null}
             </span>
           </div>
         ) : null}
@@ -241,12 +246,12 @@ export function LeistungenTab({
                     />
                   ) : null}
                   <span>
-                    {hwName || 'Handwerker'}
+                    {hwName || COPY_ROLE.partner}
                     {anfrage ? ` · ${anfrage}` : ''}
                   </span>
                 </span>
               ) : phase === 'auftrag' ? (
-                <span className="lt-card__dim">Kein Handwerker</span>
+                <span className="lt-card__dim">Kein Partner</span>
               ) : (
                 <span className="lt-card__dim">{row.mengeLabel}</span>
               )}
@@ -256,7 +261,7 @@ export function LeistungenTab({
             </div>
             <span className="lt-card__meta-right">
               <span className="lt-card__price">{row.preisLabel}</span>
-              <ChevronRight className="lt-card__chev h-4 w-4" aria-hidden />
+              <MockIcon n="chevron-right" ctx="default" className="lt-card__chev h-4 w-4" aria-hidden />
             </span>
           </div>
           {(row.handwerkerUpdates?.length ?? 0) > 0 ? (
@@ -301,7 +306,7 @@ export function LeistungenTab({
             aria-checked={selected}
           >
             <span className={cn('lt-box', selected && 'on')}>
-              {selected ? <Check className="h-2.5 w-2.5" aria-hidden /> : null}
+              {selected ? <MockIcon n="check" ctx="default" className="h-2.5 w-2.5" aria-hidden /> : null}
             </span>
           </div>
         ) : null}
@@ -401,9 +406,9 @@ export function LeistungenTab({
           hint={emptyHint ?? hint ?? undefined}
           action={
             onOpenDokument ? (
-              <Button type="button" variant="secondary" onClick={onOpenDokument}>
+              <MockBtn type="button" kind="secondary" onClick={onOpenDokument}>
                 {dokLabel}
-              </Button>
+              </MockBtn>
             ) : undefined
           }
         />
@@ -418,12 +423,12 @@ export function LeistungenTab({
 
       {hint ? (
         <div className="lt-hint">
-          <Info className="h-4 w-4" aria-hidden />
+          <MockIcon n="info-circle" ctx="default" className="h-4 w-4" aria-hidden />
           <span>{hint}</span>
           {onOpenDokument ? (
-            <Button type="button" variant="ghost" className="!px-2 !py-1 text-[length:var(--fs-meta)]" onClick={onOpenDokument}>
+            <MockBtn type="button" kind="ghost" className="!px-2 !py-1 text-[length:var(--fs-meta)]" onClick={onOpenDokument}>
               {dokLabel}
-            </Button>
+            </MockBtn>
           ) : null}
         </div>
       ) : null}
@@ -432,18 +437,18 @@ export function LeistungenTab({
         <div className="lt-bulk" role="toolbar" aria-label="Sammelaktionen">
           <span className="lt-bulk-n">{selectedCount} ausgewählt</span>
           {bulkActions!.map((a) => (
-            <Button
+            <MockBtn
               key={a.id}
               type="button"
-              variant="secondary"
+              kind="secondary"
               onClick={() => a.onClick(Array.from(selectedIds), clearSelection)}
             >
               {a.label}
-            </Button>
+            </MockBtn>
           ))}
-          <Button type="button" variant="ghost" onClick={clearSelection}>
+          <MockBtn type="button" kind="ghost" onClick={clearSelection}>
             Aufheben
-          </Button>
+          </MockBtn>
         </div>
       ) : null}
 
@@ -459,7 +464,7 @@ export function LeistungenTab({
             >
               <span className={cn('lt-box', selectedCount === rows.length && rows.length > 0 && 'on')}>
                 {selectedCount === rows.length && rows.length > 0 ? (
-                  <Check className="h-2.5 w-2.5" aria-hidden />
+                  <MockIcon n="check" ctx="default" className="h-2.5 w-2.5" aria-hidden />
                 ) : null}
               </span>
             </div>
@@ -486,7 +491,7 @@ export function LeistungenTab({
               <div className="lt-chk" onClick={toggleAll} role="columnheader">
                 <span className={cn('lt-box', selectedCount === rows.length && rows.length > 0 && 'on')}>
                   {selectedCount === rows.length && rows.length > 0 ? (
-                    <Check className="h-2.5 w-2.5" aria-hidden />
+                    <MockIcon n="check" ctx="default" className="h-2.5 w-2.5" aria-hidden />
                   ) : null}
                 </span>
               </div>

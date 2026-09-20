@@ -1,3 +1,4 @@
+import { formatDatum } from '@/lib/utils'
 import { istFachbetriebGewerk } from '@/lib/gewerke-ausfuehrung'
 import type { ComplianceDokumentTyp, Gewerk } from '@/lib/types'
 
@@ -176,7 +177,7 @@ export function complianceAblaufHinweis(
   if (status === 'warnung' && gueltigBis) {
     try {
       const d = new Date(gueltigBis)
-      return `Läuft ab am ${d.toLocaleDateString('de-DE')} — bitte rechtzeitig neu hochladen`
+      return `Läuft ab am ${formatDatum(d.toISOString())} — bitte rechtzeitig neu hochladen`
     } catch {
       return 'Läuft bald ab — bitte neu hochladen'
     }

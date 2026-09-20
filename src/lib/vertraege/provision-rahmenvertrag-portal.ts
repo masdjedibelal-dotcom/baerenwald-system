@@ -1,10 +1,11 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { finalizeRahmenVertrag } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { syncRahmenvertragComplianceDoc } from '@/lib/vertraege/sync-vertrag-compliance'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 
 async function loadRahmenRow(handwerkerId: string): Promise<HandwerkerVertragRow | null> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('handwerker_vertraege')
     .select('*')
     .eq('handwerker_id', handwerkerId)
@@ -13,6 +14,7 @@ async function loadRahmenRow(handwerkerId: string): Promise<HandwerkerVertragRow
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('lib/vertraege/provision-rahmenvertrag-portal:handwerker_vertraege', error)
   return (data as HandwerkerVertragRow | null) ?? null
 }
 
@@ -28,14 +30,19 @@ export async function acceptRahmenvertragFromPortal(input: {
   | { ok: false; message: string }
 > {
   const handwerkerId = input.handwerkerId.trim()
-  if (!handwerkerId) return { ok: false, message: 'Handwerker fehlt.' }
+  if (!handwerkerId) return { ok: false, message: 'Partner fehlt.' }
 
-  const { data: hw } = await supabaseAdmin
+  const { data: hw, error } = await supabaseAdmin
     .from('handwerker')
     .select('id')
     .eq('id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('lib/vertraege/provision-rahmenvertrag-portal:handwerker', error)
+<<<<<<< Updated upstream
+  if (!hw?.id) return { ok: false, message: 'Partner nicht gefunden.' }
+=======
   if (!hw?.id) return { ok: false, message: 'Handwerker nicht gefunden.' }
+>>>>>>> Stashed changes
 
   let row = await loadRahmenRow(handwerkerId)
   const now = new Date().toISOString()
@@ -87,12 +94,13 @@ export async function acceptRahmenvertragFromPortal(input: {
     patch.signiert_am = now
   }
 
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('handwerker_vertraege')
     .update(patch)
     .eq('id', row.id)
+  if (error2) logDbError('lib/vertraege/provision-rahmenvertrag-portal:handwerker_vertraege', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
 
   const refreshed = await loadRahmenRow(handwerkerId)
   return {

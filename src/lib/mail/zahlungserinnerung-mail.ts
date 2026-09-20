@@ -1,5 +1,6 @@
 import { addDaysYmd } from '@/lib/angebot-einfach'
 import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
+import { buildSubject } from '@/lib/mail/build-subject'
 
 export type ZahlungserinnerungStufe = 1 | 2
 
@@ -23,8 +24,16 @@ export function zahlungserinnerungZahlbarBis(
   return effektivesFaelligAmYmd(verlaengert) ?? verlaengert
 }
 
-export function zahlungserinnerungBetreff(stufe: ZahlungserinnerungStufe, nummer: string): string {
-  return stufe === 1 ? `Zahlungserinnerung ${nummer}` : `2. Zahlungserinnerung ${nummer}`
+export function zahlungserinnerungBetreff(
+  stufe: ZahlungserinnerungStufe,
+  nummer: string,
+  projektTitel?: string | null
+): string {
+  return buildSubject({
+    objekt: projektTitel,
+    ereignis: stufe === 1 ? 'Zahlungserinnerung' : '2. Zahlungserinnerung',
+    nummer,
+  })
 }
 
 export type ZahlungserinnerungMailInput = {
@@ -38,6 +47,8 @@ export type ZahlungserinnerungMailInput = {
   iban: string
   anrede?: import('@/lib/mail/anrede').MailAnrede
   kundeTyp?: string | null
+  /** Objekt/Projekt für F5-Betreff */
+  projektTitel?: string | null
   /** Offener Betrag dieser Rechnung (Standard = brutto) */
   offenerBetrag?: number
   /** Bereits bezahlte Abschläge desselben Auftrags */

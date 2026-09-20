@@ -1,8 +1,9 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface AccordionProps {
@@ -24,11 +25,7 @@ export function Accordion({
 
   return (
     <div className={cn('accordion', className)}>
-      <button
-        type="button"
-        className="accordion-header w-full text-left"
-        onClick={() => setOpen(!open)}
-      >
+      <MockBtn fullWidth className="accordion-header text-left" type="button" onClick={() => setOpen(!open)}>
         <span className="accordion-title">{title}</span>
         <div className="flex items-center gap-2">
           {action ? (
@@ -40,9 +37,9 @@ export function Accordion({
               {action}
             </div>
           ) : null}
-          <ChevronDown className={cn('accordion-icon h-4 w-4', open && 'open')} aria-hidden />
+          <MockIcon n="chevron-down" ctx="default" className={cn('accordion-icon h-4 w-4', open && 'open')} aria-hidden />
         </div>
-      </button>
+      </MockBtn>
       {open ? <div className="accordion-body animate-fade-in">{children}</div> : null}
     </div>
   )

@@ -1,4 +1,13 @@
-"use client";
+'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useRef, useState } from 'react';
@@ -7,7 +16,6 @@ import {
   insertLeadDokument,
 } from "@/app/(dashboard)/anfragen/dokumente-actions";
 import { toast } from "@/components/ui/app-toast";
-import { confirmDelete } from "@/components/ui/confirm-delete";
 import {
   rechnungIstAlsAkteUnterlage,
 } from "@/lib/auftraege/auftrag-dokumente-helpers";
@@ -15,15 +23,11 @@ import { rechnungDokumentBezeichnung } from "@/lib/rechnungen/zahlungsplan";
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import type { LeadDokumentRow } from "@/lib/types";
 import type { EntityMenuItem } from "@/lib/entity-menu";
-import { MockDokumenteCard } from "@/components/mock-ui/MockDetailCards";
-import { MockEntityRowMenu } from "@/components/mock-ui/MockEntityRowMenu";
-import { MockIcon } from "@/components/mock-ui/MockIcon";
-import { MockBtn } from "@/components/mock-ui/MockPrimitives";
 import { DokMobileCard } from "@/components/ui/DokMobileCard";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { cn } from "@/lib/utils";
-import { MockEmpty } from "@/components/mock-ui/MockEmpty";
+import { cn, formatDatum } from "@/lib/utils";
 import { DOC } from "@/lib/crm-labels";
+import { TOAST } from '@/lib/copy'
 
 type AngebotKurz = {
   id: string;
@@ -72,18 +76,6 @@ function formatBytes(n: number | null | undefined): string | null {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatDatum(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return "—";
-  }
 }
 
 function openDokumentDatei(url: string) {
@@ -249,7 +241,7 @@ export function AnfrageDokumenteTab({
       );
       startTransition(() => onReload());
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload fehlgeschlagen");
+      toast.systemError(e, 'ui', "Upload fehlgeschlagen");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -258,15 +250,15 @@ export function AnfrageDokumenteTab({
 
   function removeDoc(row: DocRow) {
     if (row.quelle !== "upload" || !row.dokumentId) return;
-    confirmDelete(
+    openDeleteConfirm(
       "Dokument löschen?",
       async () => {
         const r = await deleteLeadDokument(row.dokumentId!, leadId);
         if (!r.ok) {
-          toast.error(r.message);
+          toast.systemError(r);
           throw new Error(r.message);
         }
-        toast.success("Dokument gelöscht");
+        toast.success(TOAST.dokumentGeloescht);
         if (editId === row.id) setEditId(null);
         onReload();
       },
@@ -353,7 +345,7 @@ export function AnfrageDokumenteTab({
             <MockEmpty icon="files" title={DOC.emptyTitle} hint={DOC.emptyHint} />
           ) : null
         ) : isMobile ? (
-          <div className="dok-cards">
+          <div className="dok-mobiles">
             {docs.map((d) => {
               const sizeLabel = formatBytes(d.groesse_bytes);
               const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(" · ");
@@ -364,7 +356,7 @@ export function AnfrageDokumenteTab({
                   meta={meta}
                   onClick={() => openDokumentDatei(d.href)}
                   badge={
-                    <span className={cn("dok-card__tag", d.freigabe && "is-kunde")}>
+                    <span className={cn("dok-mobile__tag", d.freigabe && "is-kunde")}>
                       {d.freigabe ? "Kunde" : "intern"}
                     </span>
                   }
@@ -406,13 +398,7 @@ export function AnfrageDokumenteTab({
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
                     >
-                      <input
-                        className="txt"
-                        value={d.name}
-                        onChange={(e) => upd(d.id, { name: e.target.value })}
-                        style={{ height: 30 }}
-                        autoFocus
-                      />
+                      <MockInput className="txt" value={d.name} onChange={(e) => upd(d.id, { name: e.target.value })} style={{ height: 30 }} autoFocus />
                     </div>
                   ) : (
                     <div className="dok-list__main min-w-0">
@@ -429,8 +415,7 @@ export function AnfrageDokumenteTab({
                     style={{ cursor: "pointer" }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <input
-                      type="checkbox"
+                    <MockCheckbox
                       checked={d.freigabe}
                       onChange={(e) => upd(d.id, { freigabe: e.target.checked })}
                     />

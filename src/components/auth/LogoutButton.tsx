@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { confirmAction } from '@/components/ui/confirm-action'
 
 export function LogoutButton({ className }: { className?: string }) {
@@ -34,16 +34,15 @@ export function LogoutButton({ className }: { className?: string }) {
   }
 
   return (
-    <Button
+    <MockBtn
       type="button"
-      variant="ghost"
-      size="md"
+      kind="ghost"
       loading={loading}
       onClick={handleLogout}
       className={className}
     >
       <LogOut className="h-5 w-5" aria-hidden />
       Abmelden
-    </Button>
+    </MockBtn>
   )
 }

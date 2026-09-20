@@ -3,6 +3,7 @@
  * Gleiche Tabellen wie Portal (`org_hausmeister` / `hausmeister_objekte`).
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import 'server-only'
 
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
@@ -33,6 +34,7 @@ export async function listOrgHausmeister(orgKundeId: string): Promise<OrgHausmei
     .select('id, org_kunde_id, name, email, portal_zugang, portal_kunde_id')
     .eq('org_kunde_id', orgKundeId)
     .order('name', { ascending: true })
+  if (error) logDbError('lib/org/org-hausmeister:org_hausmeister', error)
   if (error) {
     console.warn('[org-hausmeister] list:', error.message)
     return []
@@ -54,6 +56,7 @@ export async function loadHausmeisterForObjekt(
     )
     .eq('kunde_objekt_id', oid)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-hausmeister:hausmeister_objekte', error)
 
   if (error) {
     return loadLegacyKontaktAsHm(oid)
@@ -75,7 +78,7 @@ export async function loadHausmeisterForObjekt(
 
 async function loadLegacyKontaktAsHm(oid: string): Promise<HausmeisterAmObjekt | null> {
   const db = getSupabaseAdmin()
-  const { data } = await db
+  const { data, error } = await db
     .from('objekt_kontakte')
     .select('id, name, email, telefon, kunde_id')
     .eq('kunde_objekt_id', oid)
@@ -84,6 +87,7 @@ async function loadLegacyKontaktAsHm(oid: string): Promise<HausmeisterAmObjekt |
     .order('sort_order', { ascending: true })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-hausmeister:objekt_kontakte', error)
   if (!data?.id) return null
   return {
     id: String(data.id),
@@ -126,6 +130,7 @@ export async function upsertOrgHausmeister(input: {
       .eq('org_kunde_id', input.orgKundeId)
       .select('id, org_kunde_id, name, email, portal_zugang, portal_kunde_id')
       .single()
+    if (error) logDbError('lib/org/org-hausmeister:org_hausmeister', error)
     if (error || !data) {
       return { ok: false, error: error?.message ?? 'Speichern fehlgeschlagen.' }
     }
@@ -142,6 +147,7 @@ export async function upsertOrgHausmeister(input: {
     })
     .select('id, org_kunde_id, name, email, portal_zugang, portal_kunde_id')
     .single()
+  if (error) logDbError('lib/org/org-hausmeister:org_hausmeister', error)
   if (error || !data) {
     return { ok: false, error: error?.message ?? 'Anlegen fehlgeschlagen.' }
   }
@@ -154,27 +160,30 @@ export async function assignHausmeisterToObjekt(input: {
   orgHausmeisterId: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const db = getSupabaseAdmin()
-  const { data: hm } = await db
+  const { data: hm, error } = await db
     .from('org_hausmeister')
     .select('id')
     .eq('id', input.orgHausmeisterId)
     .eq('org_kunde_id', input.orgKundeId)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-hausmeister:org_hausmeister', error)
   if (!hm?.id) return { ok: false, error: 'Hausmeister nicht gefunden.' }
 
   const { error: delErr } = await db
     .from('hausmeister_objekte')
     .delete()
     .eq('kunde_objekt_id', input.objektId)
+  if (delErr) logDbError('lib/org/org-hausmeister:hausmeister_objekte', delErr)
   if (delErr && !/does not exist|relation/i.test(delErr.message)) {
     return { ok: false, error: delErr.message }
   }
 
-  const { error } = await db.from('hausmeister_objekte').insert({
+  const { error: error3 } = await db.from('hausmeister_objekte').insert({
     org_hausmeister_id: input.orgHausmeisterId,
     kunde_objekt_id: input.objektId,
   })
-  if (error) return { ok: false, error: error.message }
+  if (error3) logDbError('lib/org/org-hausmeister:hausmeister_objekte', error3)
+  if (error3) return { ok: false, error: error3.message }
   return { ok: true }
 }
 
@@ -185,6 +194,7 @@ export async function unassignHausmeisterFromObjekt(
   if (!oid) return { ok: false, error: 'Objekt fehlt.' }
   const db = getSupabaseAdmin()
   const { error } = await db.from('hausmeister_objekte').delete().eq('kunde_objekt_id', oid)
+  if (error) logDbError('lib/org/org-hausmeister:hausmeister_objekte', error)
   if (error && !/does not exist|relation/i.test(error.message)) {
     return { ok: false, error: error.message }
   }
@@ -198,12 +208,13 @@ export async function createHausmeisterEinladung(input: {
   createdBy?: string | null
 }): Promise<{ ok: true; url: string; token: string } | { ok: false; error: string }> {
   const db = getSupabaseAdmin()
-  const { data: hm } = await db
+  const { data: hm, error } = await db
     .from('org_hausmeister')
     .select('id, email, portal_zugang, name')
     .eq('id', input.orgHausmeisterId)
     .eq('org_kunde_id', input.orgKundeId)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-hausmeister:org_hausmeister', error)
   if (!hm?.id) return { ok: false, error: 'Hausmeister nicht gefunden.' }
   if (!hm.portal_zugang || !String(hm.email ?? '').trim()) {
     return { ok: false, error: 'Kein Portal-Zugang / keine E-Mail.' }
@@ -211,7 +222,7 @@ export async function createHausmeisterEinladung(input: {
 
   const token = createPortalEinladungToken()
   const expires_at = portalEinladungExpiresAt().toISOString()
-  const { data, error } = await db
+  const { data, error: error2 } = await db
     .from('portal_einladungen')
     .insert({
       token,
@@ -224,14 +235,15 @@ export async function createHausmeisterEinladung(input: {
     })
     .select('token')
     .single()
+  if (error2) logDbError('lib/org/org-hausmeister:portal_einladungen', error2)
 
-  if (error) {
-    const missing = /org_hausmeister_id|does not exist|relation/i.test(error.message)
+  if (error2) {
+    const missing = /org_hausmeister_id|does not exist|relation/i.test(error2.message)
     return {
       ok: false,
       error: missing
         ? 'Hausmeister-Einladungen noch nicht freigeschaltet (Migration).'
-        : error.message,
+        : error2.message,
     }
   }
   const t = String(data?.token ?? token)

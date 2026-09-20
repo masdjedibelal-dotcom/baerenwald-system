@@ -1,13 +1,14 @@
 'use server'
 
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { createClient } from '@/lib/supabase-server'
 import type { Kunde } from '@/lib/types'
 
 /** N4: Kunden für Combobox (>15 → Tipp-Filter) — bis 200 Einträge. */
 export async function listKundenFuerCombobox(q?: string) {
   const term = (q ?? '').trim()
-  const { data } = await withCrmReadFallback(async (db) => {
-    let query = db
+  const { data } = await (async () => {
+  const db = createClient()
+  let query = db
       .from('kunden')
       .select(
         'id, name, vorname, nachname, typ, email, telefon, plz, ort, strasse, hausnummer, adresse, notizen, created_at'
@@ -22,6 +23,6 @@ export async function listKundenFuerCombobox(q?: string) {
       )
     }
     return query
-  })
+})()
   return { kunden: (data ?? []) as Kunde[] }
 }

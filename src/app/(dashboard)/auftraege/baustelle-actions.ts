@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -25,6 +31,7 @@ async function gate(auftragId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet' }
   const { data, error } = await supabase.from('auftraege').select('id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/baustelle-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden' }
   return { ok: true as const, userId: user.id }
 }
@@ -80,13 +87,14 @@ function mapDokument(row: Record<string, unknown>): AuftragBaustellenDokument {
 
 export async function loadAuftragBaustelleTeam(auftragId: string): Promise<AuftragBaustelleTeam> {
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('auftraege')
     .select(
       'bauleiter_name, bauleiter_telefon, bauleiter_email, bau_mannschaft, bau_nachunternehmer_name, bau_nachunternehmer_firma'
     )
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/baustelle-actions:auftraege', error)
   const row = data as Record<string, unknown> | null
   return {
     bauleiter_name: (row?.bauleiter_name as string | null) ?? null,
@@ -116,8 +124,9 @@ export async function saveAuftragBaustelleTeam(
       bau_nachunternehmer_firma: team.bau_nachunternehmer_firma?.trim() || null,
     })
     .eq('id', auftragId)
+  if (error) logDbError('app/auftraege/baustelle-actions:auftraege', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -128,6 +137,7 @@ export async function listAuftragRegiearbeiten(auftragId: string): Promise<Auftr
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('datum', { ascending: false })
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_regiearbeiten', error)
   if (error) return []
   return (data ?? []).map((r) => mapRegie(r as Record<string, unknown>))
 }
@@ -157,8 +167,9 @@ export async function createAuftragRegiearbeit(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_regiearbeiten', error)
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath(`/auftraege/${input.auftrag_id}`)
+  revalidateAuftragDetail(input.auftrag_id)
   return { ok: true, id: data.id as string }
 }
 
@@ -183,8 +194,9 @@ export async function updateAuftragRegiearbeit(
     })
     .eq('id', id)
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_regiearbeiten', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -196,8 +208,9 @@ export async function deleteAuftragRegiearbeit(
   if (!g.ok) return g
   const supabase = createClient()
   const { error } = await supabase.from('auftrag_regiearbeiten').delete().eq('id', id).eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_regiearbeiten', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -208,19 +221,21 @@ export async function listAuftragWochenberichte(auftragId: string): Promise<Auft
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('von_datum', { ascending: false })
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
   if (error) return []
   return (data ?? []).map((r) => mapWoche(r as Record<string, unknown>))
 }
 
 async function naechsteWochenNummer(auftragId: string): Promise<number> {
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('auftrag_wochenberichte')
     .select('wochen_nummer')
     .eq('auftrag_id', auftragId)
     .order('wochen_nummer', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
   return ((data as { wochen_nummer?: number } | null)?.wochen_nummer ?? 0) + 1
 }
 
@@ -250,8 +265,9 @@ export async function createAuftragWochenbericht(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
   if (error || !data) return { ok: false, message: error?.message ?? 'Anlegen fehlgeschlagen' }
-  revalidatePath(`/auftraege/${input.auftrag_id}`)
+  revalidateAuftragDetail(input.auftrag_id)
   return { ok: true, id: data.id as string }
 }
 
@@ -272,8 +288,9 @@ export async function updateAuftragWochenbericht(
     })
     .eq('id', id)
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -285,8 +302,9 @@ export async function deleteAuftragWochenbericht(
   if (!g.ok) return g
   const supabase = createClient()
   const { error } = await supabase.from('auftrag_wochenberichte').delete().eq('id', id).eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -297,6 +315,7 @@ export async function listAuftragBaustellenDokumente(auftragId: string): Promise
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_baustellen_dokumente', error)
   if (error) return []
   return (data ?? []).map((r) => mapDokument(r as Record<string, unknown>))
 }
@@ -330,6 +349,7 @@ export async function createBaustellenDokumentEintrag(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_baustellen_dokumente', error)
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
 
   await insertAuftragTimelineEvent({
@@ -341,7 +361,7 @@ export async function createBaustellenDokumentEintrag(input: {
     erstellt_von: g.userId,
   })
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, id: data.id as string }
 }
 
@@ -357,8 +377,9 @@ export async function deleteBaustellenDokument(
     .delete()
     .eq('id', id)
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_baustellen_dokumente', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -395,6 +416,7 @@ export async function loadWochenberichtPdfDaten(
     .eq('id', wochenberichtId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
   if (error || !wRow) return { ok: false, message: 'Wochenbericht nicht gefunden' }
   const woche = mapWoche(wRow as Record<string, unknown>)
 
@@ -416,7 +438,6 @@ export async function loadWochenberichtPdfDaten(
     loadAuftragBaustelleTeam(auftragId),
     supabase.from('auftraege').select('titel, kunden(*)').eq('id', auftragId).maybeSingle(),
   ])
-
   const kundenRaw = (auf as { kunden?: Kunde | Kunde[] | null; titel?: string | null } | null)?.kunden
   const kunde = Array.isArray(kundenRaw) ? kundenRaw[0] ?? null : kundenRaw ?? null
   const titel = (auf as { titel?: string | null } | null)?.titel?.trim() || kunde?.name?.trim() || 'Bauprojekt'
@@ -490,7 +511,6 @@ export async function loadRegieSammelPdfDaten(
       .limit(1)
       .maybeSingle(),
   ])
-
   const kundenRaw = (auf as { kunden?: Kunde | Kunde[] | null; titel?: string | null } | null)?.kunden
   const kunde = Array.isArray(kundenRaw) ? kundenRaw[0] ?? null : kundenRaw ?? null
   const titel = (auf as { titel?: string | null } | null)?.titel?.trim() || kunde?.name?.trim() || 'Bauprojekt'
@@ -524,6 +544,7 @@ async function persistGeneriertesPdf(
   const { error: upErr } = await supabaseAdmin.storage
     .from('protokolle')
     .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
+  if (upErr) logDbError('app/auftraege/baustelle-actions:protokolle', upErr)
   if (upErr) throw new Error(upErr.message)
   const { data: pub } = supabaseAdmin.storage.from('protokolle').getPublicUrl(path)
   await createBaustellenDokumentEintrag({
@@ -561,11 +582,12 @@ export async function generateUndSpeichereWochenberichtPdf(
         referenz_id: wochenberichtId,
       }
     )
-    await supabaseAdmin
+    const { error: __dbErr1 } = await supabaseAdmin
       .from('auftrag_wochenberichte')
       .update({ pdf_url: pdfUrl, updated_at: new Date().toISOString() })
       .eq('id', wochenberichtId)
-    revalidatePath(`/auftraege/${auftragId}`)
+    if (__dbErr1) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', __dbErr1)
+    revalidateAuftragDetail(auftragId)
     return { ok: true, pdfUrl }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : 'PDF fehlgeschlagen' }
@@ -593,7 +615,7 @@ export async function generateUndSpeichereRegieSammelPdf(
       buffer,
       { kalenderwoche, jahr }
     )
-    revalidatePath(`/auftraege/${auftragId}`)
+    revalidateAuftragDetail(auftragId)
     return { ok: true, pdfUrl }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : 'PDF fehlgeschlagen' }

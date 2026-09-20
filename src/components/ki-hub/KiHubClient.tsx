@@ -1,6 +1,7 @@
 'use client'
 
-import { RefreshCw, Sparkles } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useState } from 'react'
 import { KiHubEmpfehlungenPanel } from '@/components/ki-hub/KiHubEmpfehlungenPanel'
 import { KiHubLebenszyklusPanel } from '@/components/ki-hub/KiHubLebenszyklusPanel'
@@ -11,6 +12,7 @@ import type {
   KiHubLoadPayload,
 } from '@/lib/ki-hub/types'
 import { cn } from '@/lib/utils'
+import { formatDatumZeit } from '@/lib/format/geld-datum'
 
 type HubResponse = {
   ok: boolean
@@ -28,12 +30,7 @@ type Props = {
 function formatZeit(iso: string | null | undefined): string {
   if (!iso) return '—'
   try {
-    return new Date(iso).toLocaleString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return formatDatumZeit(String(iso))
   } catch {
     return '—'
   }
@@ -191,7 +188,7 @@ export function KiHubClient({ initialAnalysen }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-lg font-semibold text-bw-text">
-            <Sparkles className="h-5 w-5 text-[#7C5CFC]" aria-hidden />
+            <MockIcon n="sparkles" ctx="default" className="h-5 w-5 text-status-new-text" aria-hidden />
             KI Analytics
           </h1>
           <p className="mt-1 text-sm text-bw-text">
@@ -201,12 +198,12 @@ export function KiHubClient({ initialAnalysen }: Props) {
             {dots.map((d) => (
               <span
                 key={d.label}
-                className="inline-flex items-center gap-1.5 text-[11px] text-muted"
+                className="inline-flex items-center gap-1.5 text-fs-caption text-muted"
               >
                 <span
                   className={cn(
-                    'h-2 w-2 rounded-full',
-                    d.ok ? 'bg-emerald-500' : 'bg-amber-400'
+                    'h-2 w-2 rounded-pill',
+                    d.ok ? 'bg-bw-success' : 'bg-status-contact-bg'
                   )}
                   aria-hidden
                 />
@@ -215,27 +212,24 @@ export function KiHubClient({ initialAnalysen }: Props) {
             ))}
           </div>
           {analyzing ? (
-            <p className="mt-2 flex items-center gap-2 text-xs font-medium text-[#7C5CFC]">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-[#7C5CFC]" />
+            <p className="mt-2 flex items-center gap-2 text-xs font-medium text-status-new-text">
+              <span className="h-2 w-2 animate-pulse rounded-pill bg-status-new-bg" />
               Claude analysiert…
             </p>
           ) : null}
         </div>
-        <button
+        <MockBtn
           type="button"
+          kind="primary"
+          loading={loading || analyzing}
           onClick={() => void handleRefresh()}
-          disabled={loading || analyzing}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#2E7D52] px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
-          <RefreshCw
-            className={`h-4 w-4 ${loading || analyzing ? 'animate-spin' : ''}`}
-          />
           Aktualisieren
-        </button>
+        </MockBtn>
       </div>
 
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="rounded-button border border-status-cancel-bg bg-status-cancel-bg px-3 py-2 text-sm text-status-cancel-text">
           {error}
         </p>
       ) : null}

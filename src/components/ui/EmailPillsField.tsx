@@ -1,7 +1,9 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { useRef, useState, type KeyboardEvent } from 'react'
-import { X } from 'lucide-react'
 import { mergeEmailList } from '@/lib/email-recipients'
 import { cn } from '@/lib/utils'
 
@@ -48,13 +50,13 @@ export function EmailPillsField({
     <div className="email-pills-field w-full">
       <span className="input-label">
         {label}
-        {required ? <span className="text-red-600"> *</span> : null}
+        {required ? <span className="text-danger"> *</span> : null}
       </span>
       <div
         role="group"
         aria-label={label}
         className={cn(
-          'email-pills-box flex min-h-[42px] w-full flex-wrap items-center gap-1.5 rounded-lg border border-bw-border bg-white px-2 py-1.5',
+          'email-pills-box flex min-h-[42px] w-full flex-wrap items-center gap-1.5 rounded-card border border-bw-border bg-white px-2 py-1.5',
           'focus-within:border-bw-primary focus-within:ring-2 focus-within:ring-bw-primary/20',
           disabled && 'pointer-events-none opacity-60'
         )}
@@ -63,39 +65,22 @@ export function EmailPillsField({
         {emails.map((em, i) => (
           <span
             key={`${em}-${i}`}
-            className="email-pill inline-flex max-w-full items-center gap-1 rounded-full border border-bw-border bg-bw-bg-soft pl-2.5 pr-1 py-0.5 text-[13px] text-bw-text"
+            className="email-pill inline-flex max-w-full items-center gap-1 rounded-pill border border-bw-border bg-bw-bg-soft pl-2.5 pr-1 py-0.5 text-fs-text text-bw-text"
           >
             <span className="truncate max-w-[min(100%,14rem)]" title={em}>
               {em}
             </span>
-            <button
-              type="button"
-              className="email-pill-remove flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-bw-text-muted hover:bg-bw-hover hover:text-bw-text"
-              aria-label={`${em} entfernen`}
-              disabled={disabled}
-              onClick={(e) => {
+            <MockBtn className="email-pill-remove flex h-5 w-5 shrink-0 items-center justify-center rounded-pill text-bw-text-muted hover:bg-bw-hover hover:text-bw-text" type="button" aria-label={`${em} löschen`} disabled={disabled} onClick={(e) => {
                 e.stopPropagation()
                 removeAt(i)
-              }}
-            >
-              <X className="h-3 w-3" aria-hidden />
-            </button>
+              }}>
+              <MockIcon n="x" ctx="default" className="h-3 w-3" aria-hidden />
+            </MockBtn>
           </span>
         ))}
-        <input
-          ref={inputRef}
-          type="email"
-          autoComplete="off"
-          className="min-w-0 flex-1 border-0 bg-transparent py-1 text-[13px] text-bw-text outline-none placeholder:text-[12px] placeholder:font-normal placeholder:text-bw-text-muted"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          onBlur={commitInput}
-          placeholder={emails.length === 0 ? placeholder : ''}
-          disabled={disabled}
-        />
+        <MockInput ref={inputRef} type="email" autoComplete="off" className="min-w-0 flex-1 border-0 bg-transparent py-1 text-fs-text text-bw-text outline-none placeholder:text-fs-meta placeholder:font-normal placeholder:text-bw-text-muted" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} onBlur={commitInput} placeholder={emails.length === 0 ? placeholder : ''} disabled={disabled} />
       </div>
-      {hint ? <p className="mt-1 text-[11px] leading-snug text-bw-text-muted">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-fs-caption leading-snug text-bw-text-muted">{hint}</p> : null}
     </div>
   )
 }

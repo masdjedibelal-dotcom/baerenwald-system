@@ -1,5 +1,7 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { writeHwFormularStatusByToken } from '@/lib/status/write-hw-formular-status'
 
 export async function PATCH(
   req: Request,
@@ -12,14 +14,11 @@ export async function PATCH(
     return NextResponse.json({ error: 'Ungültige Anfrage' }, { status: 400 })
   }
 
-  const { error } = await supabaseAdmin
-    .from('hw_formular_einreichungen')
-    .update({
-      felder_werte: body.felder_werte ?? {},
-      ...(Array.isArray(body.foto_urls) ? { foto_urls: body.foto_urls } : {}),
-      status: 'ausgefuellt',
-    })
-    .eq('token', params.token)
+  const { error } = await writeHwFormularStatusByToken(supabaseAdmin, params.token, 'ausgefuellt', {
+    felder_werte: body.felder_werte ?? {},
+    ...(Array.isArray(body.foto_urls) ? { foto_urls: body.foto_urls } : {}),
+  })
+  if (error) logDbError('app/api/formular/[token]/route:hw_formular_einreichungen', error)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

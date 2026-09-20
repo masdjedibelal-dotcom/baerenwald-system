@@ -23,7 +23,6 @@ function inferCtx(rel, tag, fileContent) {
   if (rel.includes('NeuErstellen')) return 'emphasis'
   if (rel.includes('MockDetailCrumb')) return 'nav'
   if (rel.includes('DashboardShell')) return 'btn'
-  if (rel.includes('MockNeuPopover')) return 'default'
   if (rel.includes('AuftragDokumenteTab')) {
     if (tag.includes('btn') || tag.includes('upload') || tag.includes('cloud-upload')) return 'btn'
     return 'row'

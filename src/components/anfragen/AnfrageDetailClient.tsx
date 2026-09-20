@@ -1,4 +1,12 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import {
+  DetailShell,
+  EntityDetailLayout,
+  type DetailShellGroup,
+} from '@/components/layout/EntityDetailLayout'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -6,13 +14,9 @@ import { primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
@@ -64,7 +68,7 @@ import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftrage
 import { AnfrageHandwerkerAnfragenSheet } from '@/components/anfragen/AnfrageHandwerkerAnfragenSheet'
 import { AnfragePartnerEinholungCards } from '@/components/anfragen/AnfragePartnerEinholungCards'
 import {
-  listAnfragePartnerEinholungen,
+  listAnfrageHandwerkerEinholungen,
   type AnfragePartnerEinholungRow,
 } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
 import { leadIstAkut, leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
@@ -110,6 +114,7 @@ import type {
 import { formatDatum, kanalLabel } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
+import { TOAST } from '@/lib/copy'
 
 type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
 
@@ -312,7 +317,7 @@ export function AnfrageDetailClient({
   }, [initial])
 
   const loadEinholungen = useCallback(() => {
-    void listAnfragePartnerEinholungen(lead.id).then((res) => {
+    void listAnfrageHandwerkerEinholungen(lead.id).then((res) => {
       if (res.ok) setEinholungRows(res.rows)
     })
   }, [lead.id])
@@ -417,7 +422,7 @@ export function AnfrageDetailClient({
     if (liveGewerke.length > 0 && liveHandwerker.length > 0 && liveFirm) return true
     const res = await loadAnfrageWizardBootstrap()
     if (!res.ok) {
-      toast.error(res.message)
+      toast.systemError(res)
       return false
     }
     setLiveGewerke(res.gewerke)
@@ -494,7 +499,7 @@ export function AnfrageDetailClient({
       if (aufId) {
         const res = await loadRechnungWizardBootstrapFromAuftrag(aufId, { vollOhnePlan: true })
         if (!res.ok) {
-          toast.error(res.message)
+          toast.systemError(res)
           return
         }
         setRechnungWizardBootstrap(res.bootstrap)
@@ -508,16 +513,16 @@ export function AnfrageDetailClient({
         lead.kunde_id?.trim() ||
         ''
       if (!kundeId) {
-        toast.error('Kein Kunde verknüpft — Rechnung nicht möglich.')
+        toast.error(TOAST.kein_kunde_verknuepft_rechnung_nicht_moeglich)
         return
       }
       const k = await loadRechnungWizardKunde(kundeId)
       if (!k.ok) {
-        toast.error(k.message)
+        toast.systemError(k)
         return
       }
       if (!liveFirm) {
-        toast.error('Firmeneinstellungen fehlen.')
+        toast.error(TOAST.firmeneinstellungen_fehlen)
         return
       }
       setRechnungWizardBootstrap({
@@ -548,7 +553,7 @@ export function AnfrageDetailClient({
       const res = await loadAngebotWizardBootstrapKopie(kopieId, lid)
       if (cancelled) return
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         router.replace(`/anfragen/${lid}`, { scroll: false })
         return
       }
@@ -728,10 +733,10 @@ export function AnfrageDetailClient({
           void (async () => {
             const res = await updateLeadStatus(lead.id, 'kontaktiert')
             if (!res.ok) {
-              toast.error(res.message)
+              toast.systemError(res)
               return
             }
-            toast.success('Als kontaktiert markiert')
+            toast.success(TOAST.als_kontaktiert_markiert)
             refresh()
           })()
         },
@@ -746,10 +751,10 @@ export function AnfrageDetailClient({
           void (async () => {
             const res = await updateLeadStatus(lead.id, 'neu')
             if (!res.ok) {
-              toast.error(res.message)
+              toast.systemError(res)
               return
             }
-            toast.success('Status auf Neu gesetzt')
+            toast.success(TOAST.status_auf_neu_gesetzt)
             refresh()
           })()
         },
@@ -989,7 +994,7 @@ export function AnfrageDetailClient({
           <>
             <PipelineKontextBadge lead={lead} />
             {istAkut ? (
-              <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
+              <span className="rounded-card px-1.5 py-0.5 text-fs-caption font-bold bg-status-contact-bg text-status-contact-text">
                 Direktauftrag
               </span>
             ) : null}
@@ -1000,7 +1005,7 @@ export function AnfrageDetailClient({
           <>
             <PipelineKontextBadge lead={lead} />
             {istAkut ? (
-              <span className="rounded px-1.5 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-950">
+              <span className="rounded-card px-1.5 py-0.5 text-fs-caption font-bold bg-status-contact-bg text-status-contact-text">
                 Direktauftrag
               </span>
             ) : null}
@@ -1033,17 +1038,13 @@ export function AnfrageDetailClient({
         onDismissed={() => refresh()}
       />
       {noShowTerminHinweis ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-border bg-muted/30 px-3 py-2.5">
           <p className="text-[length:var(--fs-text)] text-muted">
             Kunde nicht erschienen? „Nicht erreichbar“ als Kontaktversuch speichern.
           </p>
-          <button
-            type="button"
-            className="btn ghost sm shrink-0"
-            onClick={() => setStatusModalKind('nicht_erreichbar')}
-          >
+          <MockBtn kind="ghost" sm className="shrink-0" type="button" onClick={() => setStatusModalKind('nicht_erreichbar')}>
             Nicht erreichbar
-          </button>
+          </MockBtn>
         </div>
       ) : null}
       <DetailShell
@@ -1153,7 +1154,7 @@ export function AnfrageDetailClient({
           refresh()
         }}
         onSuggestVerloren={() => {
-          toast.success('Drei Kontaktversuche — Vorschlag: als verloren markieren', {
+          toast.success(TOAST.drei_kontaktversuche_vorschlag_als_verloren_mark, {
             action: {
               label: 'Als verloren',
               onClick: () => setStatusModalKind('verloren'),

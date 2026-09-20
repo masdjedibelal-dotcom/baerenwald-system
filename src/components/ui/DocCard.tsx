@@ -1,11 +1,5 @@
-import {
-  FileText,
-  Receipt,
-  ClipboardList,
-  File,
-  Eye,
-  Download,
-} from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { cn } from '@/lib/utils'
 
 export type DocType = 'offer' | 'invoice' | 'protocol' | 'other'
@@ -20,22 +14,22 @@ interface DocCardProps {
 
 const DOC_CONFIG = {
   offer: {
-    icon: FileText,
+    icon: 'file-text',
     bg: 'doc-icon-offer',
-    color: 'text-orange-500',
+    color: 'text-warning',
   },
   invoice: {
-    icon: Receipt,
+    icon: 'receipt',
     bg: 'doc-icon-invoice',
-    color: 'text-green-500',
+    color: 'text-bw-success',
   },
   protocol: {
-    icon: ClipboardList,
+    icon: 'clipboard-list',
     bg: 'doc-icon-protocol',
-    color: 'text-blue-500',
+    color: 'text-status-new-text',
   },
   other: {
-    icon: File,
+    icon: 'file',
     bg: 'doc-icon-other',
     color: 'text-bw-text-muted',
   },
@@ -43,12 +37,11 @@ const DOC_CONFIG = {
 
 export function DocCard({ type, title, subtitle, onView, onDownload }: DocCardProps) {
   const config = DOC_CONFIG[type]
-  const Icon = config.icon
 
   return (
-    <div className="doc-card">
+    <div className="doc-row">
       <div className={cn('doc-icon', config.bg)}>
-        <Icon className={cn('h-5 w-5', config.color)} aria-hidden />
+        <MockIcon n={config.icon} ctx="default" size={20} className={config.color} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-bw-text">{title}</div>
@@ -56,24 +49,14 @@ export function DocCard({ type, title, subtitle, onView, onDownload }: DocCardPr
       </div>
       <div className="flex shrink-0 gap-1">
         {onView ? (
-          <button
-            type="button"
-            onClick={onView}
-            className="rounded-md p-2 text-bw-link transition-colors hover:bg-bw-hover"
-            aria-label="Ansehen"
-          >
-            <Eye className="h-4 w-4" />
-          </button>
+          <MockBtn className="rounded-button p-2 text-bw-link transition-colors hover:bg-bw-hover" type="button" onClick={onView} aria-label="Ansehen">
+            <MockIcon n="eye" ctx="default" className="h-4 w-4" />
+          </MockBtn>
         ) : null}
         {onDownload ? (
-          <button
-            type="button"
-            onClick={onDownload}
-            className="rounded-md p-2 text-bw-mid transition-colors hover:bg-bw-hover"
-            aria-label="Herunterladen"
-          >
-            <Download className="h-4 w-4" />
-          </button>
+          <MockBtn className="rounded-button p-2 text-bw-mid transition-colors hover:bg-bw-hover" type="button" onClick={onDownload} aria-label="Herunterladen">
+            <MockIcon n="download" ctx="default" className="h-4 w-4" />
+          </MockBtn>
         ) : null}
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
   logMailCatch,
   newMailCatcherId,
 } from '@/lib/mail/mail-catcher'
+import { htmlToPlainText } from '@/lib/mail/html-to-plain-text'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -59,6 +60,8 @@ export interface SendMailOptions {
   bcc?: string | string[]
   betreff: string
   html: string
+  /** Optionaler Plain-Text; sonst automatisch aus HTML. */
+  text?: string
   /** Optional: Resend „from“ (Domain muss bei Resend verifiziert sein). */
   from?: string
   pdfBuffer?: Buffer | Uint8Array
@@ -157,6 +160,7 @@ export async function sendMail(
 ): Promise<{ success: boolean; error?: string; resendId?: string | null; emailLogId?: string | null }> {
   // Logos als HTTPS (baerenwaldmuenchen.de) — kein CID-Anhang (Apple-Mail-Büroklammer).
   const html = rewriteMailLogoUrlsToHosted(opts.html)
+  const text = (opts.text?.trim() || htmlToPlainText(html)).trim() || undefined
   const inlineLogos: MailInlineLogoAttachment[] = []
 
   if (opts.pdfBuffer && opts.pdfBuffer.byteLength === 0) {
@@ -259,6 +263,7 @@ export async function sendMail(
       ...(bcc ? { bcc } : {}),
       subject: opts.betreff,
       html,
+      ...(text ? { text } : {}),
       attachments,
     })
 

@@ -3,17 +3,23 @@
  */
 
 import {
-  ANGEBOT_PDF_BOTTOM_MARGIN_MM,
   buildAngebotPdfFooterTemplate,
   type AngebotHtmlInput,
 } from '@/lib/templates/angebot-template'
 import type { BautagesberichtFoto } from '@/lib/auftraege/bautagesbericht-types'
+import {
+  pdfAbsenderFromReportFirm,
+  pdfKopfHtml,
+  pdfReportShell,
+  pdfTitelzeileHtml,
+} from '@/lib/pdf/chrome'
+import { C } from '@/lib/tokens/colors'
 
-const ACCENT = '#1A3D2B'
-const TINT = '#F3F7F4'
-const TEXT = '#111111'
-const MUTED = '#6B7280'
-const BORDER = '#D1D5DB'
+const ACCENT = C.greenDark
+const TINT = C.greenTint
+const TEXT = C.gray900
+const MUTED = C.gray500
+const BORDER = C.gray300
 
 export type BautagesberichtHtmlInput = {
   firmen_logo_url?: string | null
@@ -48,46 +54,6 @@ function esc(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-function firmennameZeile(p: BautagesberichtHtmlInput): string {
-  const rf = p.firmen_rechtsform?.trim()
-  return rf ? `${p.firmenname.trim()} ${rf}` : p.firmenname.trim()
-}
-
-function logoKopf(p: BautagesberichtHtmlInput): string {
-  const src = p.firmen_logo_url?.trim()
-  if (!src || /^file:/i.test(src)) return ''
-  if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
-  const safeSrc = src.replace(/"/g, '&quot;')
-  return `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid ${ACCENT};">
-    <img src="${safeSrc}" alt="${esc(firmennameZeile(p))}" style="height:72px;width:auto;max-width:300px;object-fit:contain;display:block;" />
-  </div>`
-}
-
-function briefAbsender(p: BautagesberichtHtmlInput): string {
-  const kontakt = p.firmen_kontakt
-    .split(' · ')
-    .map((z) => z.trim())
-    .filter(Boolean)
-    .map((z) => esc(z))
-  const steuer = (p.firmen_steuer_footer ?? '')
-    .split('\n')
-    .map((z) => z.trim())
-    .filter(Boolean)
-    .map((z) => esc(z))
-  const zeilen = [
-    `<strong>${esc(firmennameZeile(p))}</strong>`,
-    ...esc(p.firmen_adresse)
-      .replace(/\n/g, '<br/>')
-      .split('<br/>')
-      .filter(Boolean),
-    ...kontakt,
-    ...steuer,
-  ]
-  return `<div style="font-size:8pt;line-height:1.45;color:${TEXT};font-weight:400;text-align:right;">
-    ${zeilen.join('<br/>')}
-  </div>`
 }
 
 function sectionHeading(title: string): string {
@@ -128,7 +94,7 @@ function personalGrid(namen: string[]): string {
   }
   const cells = namen.map(
     (name, i) =>
-      `<div style="font-size:9pt;line-height:1.45;padding:6px 8px;border:1px solid ${BORDER};border-radius:4px;background:#fff;">
+      `<div style="font-size:9pt;line-height:1.45;padding:6px 8px;border:1px solid ${BORDER};border-radius:4px;background:${C.white};">
         <span style="color:${MUTED};margin-right:6px;">${i + 1}.</span>${esc(name)}
       </div>`
   )
@@ -143,7 +109,7 @@ function fotosHtml(fotos: BautagesberichtFoto[]): string {
       .slice(0, BAUTAGESBERICHT_MAX_FOTOS)
       .map((b, i) => {
         const cap = b.caption?.trim()
-        return `<figure style="margin:0;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:#fff;page-break-inside:avoid;">
+        return `<figure style="margin:0;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:${C.white};page-break-inside:avoid;">
           <img alt="" src="${esc(b.url)}" style="width:100%;height:140px;object-fit:cover;display:block;"/>
           <figcaption style="padding:8px 10px;font-size:8.5pt;line-height:1.45;color:${TEXT};background:${TINT};">
             ${cap ? esc(cap) : `Bild ${i + 1}`}
@@ -158,22 +124,6 @@ function textBlock(text: string): string {
   const t = text.trim()
   if (!t) return `<p style="margin:0;font-size:9.5pt;color:${MUTED};">—</p>`
   return `<p style="margin:0;font-size:9.5pt;line-height:1.6;color:${TEXT};white-space:pre-wrap;">${esc(t)}</p>`
-}
-
-function briefkopf(p: BautagesberichtHtmlInput): string {
-  const tagLabel = String(p.tagNummer).padStart(2, '0')
-  return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:18px;">
-    <div style="flex:1;min-width:0;">
-      <div style="font-size:9pt;color:${MUTED};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Digitaler Generalunternehmer</div>
-      <h1 style="font-size:17pt;font-weight:700;margin:0;color:${ACCENT};line-height:1.25;">Bautagesbericht</h1>
-      <p style="margin:8px 0 0;font-size:11pt;color:${TEXT};line-height:1.45;font-weight:600;">TAG ${tagLabel} · ${esc(p.datumLabel)}</p>
-      <p style="margin:6px 0 0;font-size:10pt;color:${TEXT};line-height:1.45;">${esc(p.projektTitel)}</p>
-      <p style="margin:4px 0 0;font-size:9.5pt;color:${MUTED};">${esc(p.projektAdresse)}</p>
-    </div>
-    <div style="flex:0 0 auto;text-align:right;">
-      ${briefAbsender(p)}
-    </div>
-  </div>`
 }
 
 function footerInputFromBericht(p: BautagesberichtHtmlInput): AngebotHtmlInput {
@@ -198,37 +148,23 @@ function footerInputFromBericht(p: BautagesberichtHtmlInput): AngebotHtmlInput {
   }
 }
 
-function pdfShell(body: string, title: string): string {
-  return `<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8"/>
-<title>${esc(title)}</title>
-<style>
-  * { box-sizing: border-box; }
-  @page { size: A4; margin: 12mm 12mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 12mm; }
-  body {
-    margin: 0;
-    font-family: Arial, Helvetica, sans-serif;
-    color: ${TEXT};
-    font-size: 11pt;
-    font-weight: 400;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-</style>
-</head>
-<body>${body}</body>
-</html>`
-}
-
 export function buildBautagesberichtHtml(p: BautagesberichtHtmlInput): string {
-  const title = `Bautagesbericht Tag ${String(p.tagNummer).padStart(2, '0')} — ${p.projektTitel}`
+  const tagLabel = String(p.tagNummer).padStart(2, '0')
+  const title = `Bautagesbericht Tag ${tagLabel} — ${p.projektTitel}`
   const body = `
-    ${logoKopf(p)}
-    ${briefkopf(p)}
+    ${pdfKopfHtml({
+      variant: 'bw-kunde',
+      absender: pdfAbsenderFromReportFirm(p),
+    })}
+    ${pdfTitelzeileHtml({
+      dokumentTyp: 'Bautagesbericht',
+      objektOderAdresse: p.projektTitel,
+      datum: `TAG ${tagLabel} · ${p.datumLabel}`,
+      accent: ACCENT,
+    })}
+    <p style="margin:0 0 4px;font-size:9.5pt;color:${MUTED};">${esc(p.projektAdresse)}</p>
     ${metaBlock(p)}
-    ${sectionHeading(`Ausgeführte Leistungen – Tag ${String(p.tagNummer).padStart(2, '0')}`)}
+    ${sectionHeading(`Ausgeführte Leistungen – Tag ${tagLabel}`)}
     ${bulletList(p.leistungen)}
     ${sectionHeading('Behinderungen und Besonderheiten')}
     ${textBlock(p.behinderungen)}
@@ -239,7 +175,7 @@ export function buildBautagesberichtHtml(p: BautagesberichtHtmlInput): string {
     ${sectionHeading('Zusammenfassung')}
     ${textBlock(p.zusammenfassung)}
     <div style="page-break-before:always;"></div>
-    ${sectionHeading(`Personalnachweis – Tag ${String(p.tagNummer).padStart(2, '0')}`)}
+    ${sectionHeading(`Personalnachweis – Tag ${tagLabel}`)}
     ${personalGrid(p.personalNamen)}
     ${
       p.fotos.length
@@ -247,14 +183,12 @@ export function buildBautagesberichtHtml(p: BautagesberichtHtmlInput): string {
         : ''
     }
   `
-  return pdfShell(body, title)
+  return pdfReportShell({ title, bodyHtml: body })
 }
 
 export function buildBautagesberichtPdfFooterTemplate(p: BautagesberichtHtmlInput): string {
   const tagLabel = String(p.tagNummer).padStart(2, '0')
-  const footerBase = buildAngebotPdfFooterTemplate(footerInputFromBericht(p))
-  return footerBase.replace(
-    '</span>',
-    ` · Bautagesbericht Tag ${tagLabel} ${esc(p.datumLabel)}</span>`
-  )
+  return buildAngebotPdfFooterTemplate(footerInputFromBericht(p), {
+    seitenZusatz: `Bautagesbericht Tag ${tagLabel} ${p.datumLabel}`,
+  })
 }

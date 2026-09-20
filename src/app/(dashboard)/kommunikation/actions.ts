@@ -1,7 +1,11 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateAuftragFinanzen, revalidateEinstellungenPath, revalidateKundeDetail, revalidateLeadDetail, revalidateRechnungDetail } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
-import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
@@ -102,14 +106,14 @@ export type KommunikationFilter = {
 }
 
 function revalidateKommunikationPaths(f: KommunikationFilter) {
-  if (f.kundeId) revalidatePath(`/kunden/${f.kundeId}`)
-  if (f.leadId) revalidatePath(`/anfragen/${f.leadId}`)
-  if (f.angebotId) revalidatePath(`/angebote/${f.angebotId}`)
+  if (f.kundeId) revalidateKundeDetail(f.kundeId)
+  if (f.leadId) revalidateLeadDetail(f.leadId)
+  if (f.angebotId) revalidateAngebotDetail(f.angebotId)
   if (f.auftragId) {
-    revalidatePath(`/auftraege/${f.auftragId}`)
-    revalidatePath(`/auftraege/${f.auftragId}/finanzen`)
+    revalidateAuftragDetail(f.auftragId)
+    revalidateAuftragFinanzen(f.auftragId)
   }
-  if (f.rechnungId) revalidatePath(`/rechnungen/${f.rechnungId}`)
+  if (f.rechnungId) revalidateRechnungDetail(f.rechnungId)
 }
 
 export async function loadKommunikationListe(
@@ -117,11 +121,12 @@ export async function loadKommunikationListe(
 ): Promise<KommunikationListeZeile[]> {
   if (filter.rechnungId) {
     const rechnungId = filter.rechnungId
-    const { data: rec } = await supabaseAdmin
+    const { data: rec, error } = await supabaseAdmin
       .from('rechnungen')
       .select('auftrag_id, kunde_id')
       .eq('id', rechnungId)
       .maybeSingle()
+    if (error) logDbError('app/kommunikation/actions:rechnungen', error)
     const parts = [
       emailLogEqFilter('rechnung_id', rechnungId),
       emailLogEqFilter('auftrag_id', rec?.auftrag_id as string | null),
@@ -131,11 +136,12 @@ export async function loadKommunikationListe(
   }
   if (filter.angebotId) {
     const angebotId = filter.angebotId
-    const { data: ang } = await supabaseAdmin
+    const { data: ang, error } = await supabaseAdmin
       .from('angebote')
       .select('lead_id, kunde_id')
       .eq('id', angebotId)
       .maybeSingle()
+    if (error) logDbError('app/kommunikation/actions:angebote', error)
     const parts = [
       emailLogEqFilter('angebot_id', angebotId),
       emailLogEqFilter('lead_id', ang?.lead_id as string | null),
@@ -145,7 +151,7 @@ export async function loadKommunikationListe(
   }
   if (filter.auftragId) {
     const auftragId = filter.auftragId
-    const [{ data: auf }, { data: rechnungen }] = await Promise.all([
+    const [{ data: auf, error: aufErr }, { data: rechnungen, error: recErr }] = await Promise.all([
       supabaseAdmin
         .from('auftraege')
         .select('kunde_id, lead_id, angebot_id')
@@ -153,15 +159,18 @@ export async function loadKommunikationListe(
         .maybeSingle(),
       supabaseAdmin.from('rechnungen').select('id').eq('auftrag_id', auftragId),
     ])
+    if (aufErr) logDbError('app/kommunikation/actions:auftraege', aufErr)
+    if (recErr) logDbError('app/kommunikation/actions:rechnungen', recErr)
     const leadId = (auf?.lead_id as string | null) ?? null
     const angebotIds = new Set<string>()
     const angebotId = (auf?.angebot_id as string | null)?.trim()
     if (angebotId) angebotIds.add(angebotId)
     if (leadId) {
-      const { data: angeboteLead } = await supabaseAdmin
+      const { data: angeboteLead, error } = await supabaseAdmin
         .from('angebote')
         .select('id')
         .eq('lead_id', leadId)
+      if (error) logDbError('app/kommunikation/actions:angebote', error)
       for (const row of angeboteLead ?? []) {
         const id = (row as { id?: string }).id?.trim()
         if (id) angebotIds.add(id)
@@ -179,16 +188,24 @@ export async function loadKommunikationListe(
   }
   if (filter.leadId) {
     const leadId = filter.leadId
-    const [{ data: leadRow }, { data: angebote }, { data: auftraege }] = await Promise.all([
+    const [
+      { data: leadRow, error: leadErr },
+      { data: angebote, error: angErr },
+      { data: auftraege, error: aufErr },
+    ] = await Promise.all([
       supabaseAdmin.from('leads').select('kunde_id').eq('id', leadId).maybeSingle(),
       supabaseAdmin.from('angebote').select('id').eq('lead_id', leadId),
       supabaseAdmin.from('auftraege').select('id').eq('lead_id', leadId),
     ])
+    if (leadErr) logDbError('app/kommunikation/actions:leads', leadErr)
+    if (angErr) logDbError('app/kommunikation/actions:angebote', angErr)
+    if (aufErr) logDbError('app/kommunikation/actions:auftraege', aufErr)
     const angebotIds = (angebote ?? []).map((a) => a.id as string).filter(Boolean)
     const auftragIds = (auftraege ?? []).map((a) => a.id as string).filter(Boolean)
-    const { data: rechnungen } = auftragIds.length
+    const { data: rechnungen, error: recErr } = auftragIds.length
       ? await supabaseAdmin.from('rechnungen').select('id').in('auftrag_id', auftragIds)
-      : { data: [] as { id: string }[] }
+      : { data: [] as { id: string }[], error: null }
+    if (recErr) logDbError('app/kommunikation/actions:rechnungen', recErr)
     const rechnungIds = (rechnungen ?? []).map((r) => r.id as string).filter(Boolean)
     const parts = [
       emailLogEqFilter('lead_id', leadId),
@@ -201,13 +218,21 @@ export async function loadKommunikationListe(
   }
   if (filter.kundeId) {
     const kundeId = filter.kundeId
-    const [{ data: leads }, { data: angebote }, { data: auftraege }, { data: rechnungen }] =
-      await Promise.all([
+    const [
+      { data: leads, error: leadsErr },
+      { data: angebote, error: angErr },
+      { data: auftraege, error: aufErr },
+      { data: rechnungen, error: recErr },
+    ] = await Promise.all([
         supabaseAdmin.from('leads').select('id').eq('kunde_id', kundeId),
         supabaseAdmin.from('angebote').select('id').eq('kunde_id', kundeId),
         supabaseAdmin.from('auftraege').select('id').eq('kunde_id', kundeId),
         supabaseAdmin.from('rechnungen').select('id').eq('kunde_id', kundeId),
       ])
+    if (leadsErr) logDbError('app/kommunikation/actions:leads', leadsErr)
+    if (angErr) logDbError('app/kommunikation/actions:angebote', angErr)
+    if (aufErr) logDbError('app/kommunikation/actions:auftraege', aufErr)
+    if (recErr) logDbError('app/kommunikation/actions:rechnungen', recErr)
     const parts = [
       emailLogEqFilter('kunde_id', kundeId),
       emailLogInFilter('lead_id', (leads ?? []).map((r) => r.id as string)),
@@ -229,6 +254,7 @@ export async function loadKommunikationMailVorlagen(
     .in('kontext_typ', [kontextTyp, 'alle'])
     .order('sort_order')
     .order('name')
+  if (error) logDbError('app/kommunikation/actions:kommunikation_mail_vorlagen', error)
 
   if (error) {
     console.warn('[loadKommunikationMailVorlagen]', error.message)
@@ -258,8 +284,9 @@ export async function saveKommunikationMailVorlage(input: {
       .from('kommunikation_mail_vorlagen')
       .update(row)
       .eq('id', input.id)
+    if (error) logDbError('app/kommunikation/actions:kommunikation_mail_vorlagen', error)
     if (error) return { ok: false, message: error.message }
-    revalidatePath('/einstellungen/kommunikation')
+    revalidateEinstellungenPath('/einstellungen/kommunikation')
     return { ok: true, id: input.id }
   }
 
@@ -268,8 +295,9 @@ export async function saveKommunikationMailVorlage(input: {
     .insert(row)
     .select('id')
     .single()
+  if (error) logDbError('app/kommunikation/actions:kommunikation_mail_vorlagen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/kommunikation')
+  revalidateEinstellungenPath('/einstellungen/kommunikation')
   return { ok: true, id: data.id as string }
 }
 
@@ -277,8 +305,9 @@ export async function deleteKommunikationMailVorlage(
   id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { error } = await supabaseAdmin.from('kommunikation_mail_vorlagen').delete().eq('id', id)
+  if (error) logDbError('app/kommunikation/actions:kommunikation_mail_vorlagen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/kommunikation')
+  revalidateEinstellungenPath('/einstellungen/kommunikation')
   return { ok: true }
 }
 
@@ -423,6 +452,7 @@ export async function mailComposeContextFromLead(
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/kommunikation/actions:leads', error)
   if (error || !data) return { ok: false, message: 'Anfrage nicht gefunden' }
 
   type KundeEmbed = {
@@ -478,6 +508,7 @@ export async function mailComposeContextFromAngebot(
     .select('id, lead_id, kunde_id, kunden(id, name, email, typ)')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/kommunikation/actions:angebote', error)
   if (error || !data) return { ok: false, message: 'Angebot nicht gefunden' }
 
   const kundenRaw = data.kunden as
@@ -511,6 +542,7 @@ export async function mailComposeContextFromAuftrag(
     .select('id, lead_id, kunde_id, kunden(id, name, email, typ)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/kommunikation/actions:auftraege', error)
   if (error || !data) return { ok: false, message: 'Auftrag nicht gefunden' }
 
   const kundenRaw = data.kunden as
@@ -544,6 +576,7 @@ export async function mailComposeContextFromRechnung(
     .select('id, kunde_id, auftrag_id, kunden(id, name, email, typ), auftraege(lead_id)')
     .eq('id', rechnungId)
     .maybeSingle()
+  if (error) logDbError('app/kommunikation/actions:rechnungen', error)
   if (error || !data) return { ok: false, message: 'Rechnung nicht gefunden' }
 
   const kundenRaw = data.kunden as
@@ -581,6 +614,7 @@ export async function mailComposeContextFromKunde(
     .select('id, name, email, typ')
     .eq('id', kundeId)
     .maybeSingle()
+  if (error) logDbError('app/kommunikation/actions:kunden', error)
   if (error || !data) return { ok: false, message: 'Kunde nicht gefunden' }
 
   return {

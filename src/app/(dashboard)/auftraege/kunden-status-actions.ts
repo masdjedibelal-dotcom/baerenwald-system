@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailUpdateHinweis } from '@/lib/mail-templates'
@@ -19,6 +25,7 @@ async function assertAuftragZugriff(auftragId: string): Promise<{ ok: true } | {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet' }
   const { data, error } = await supabase.from('auftraege').select('id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/kunden-status-actions:auftraege', error)
   if (error || !data) return { ok: false, message: 'Auftrag nicht gefunden' }
   return { ok: true }
 }
@@ -31,7 +38,7 @@ export async function ensureKundenTokenAction(
   const { ensureKundenTokenForAuftrag } = await serverRuntime()
   const token = await ensureKundenTokenForAuftrag(auftragId)
   if (!token) return { ok: false, message: 'Token konnte nicht erzeugt werden' }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true, token, url: projektUrlFromToken(token) }
 }
 
@@ -56,15 +63,17 @@ export async function setTimelineKundenfreigabe(input: {
     })
     .eq('id', input.timelineId)
     .eq('auftrag_id', input.auftragId)
+  if (error) logDbError('app/auftraege/kunden-status-actions:auftrag_timeline', error)
 
   if (error) return { ok: false, message: error.message }
 
   if (input.fuerKunde && input.kundeBenachrichtigen) {
-    const { data: auf } = await supabaseAdmin
+    const { data: auf, error } = await supabaseAdmin
       .from('auftraege')
       .select('kunden_token, kunde_id, kunden(name, email, typ)')
       .eq('id', input.auftragId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/kunden-status-actions:auftraege', error)
     const kunden = auf?.kunden as { name?: string; email?: string | null; typ?: string | null } | null
     const email = kunden?.email?.trim()
     const token = (auf?.kunden_token as string | null) ?? (await ensureKundenTokenForAuftrag(input.auftragId))
@@ -91,7 +100,7 @@ export async function setTimelineKundenfreigabe(input: {
     }
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -104,11 +113,12 @@ export async function sendKundenProjektLinkEmail(auftragId: string): Promise<{ o
   const token = await ensureKundenTokenForAuftrag(auftragId)
   if (!token) return { ok: false, message: 'Kein Kunden-Link' }
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('kunde_id, kunden(name, email, typ)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/kunden-status-actions:auftraege', error)
   const kunden = auf?.kunden as { name?: string; email?: string | null; typ?: string | null } | null
   const email = kunden?.email?.trim()
   if (!email) return { ok: false, message: 'Keine Kunden-E-Mail' }
@@ -133,6 +143,6 @@ export async function sendKundenProjektLinkEmail(auftragId: string): Promise<{ o
     auftragId,
   })
   if (!sent.success) return { ok: false, message: sent.error ?? 'Versand fehlgeschlagen' }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }

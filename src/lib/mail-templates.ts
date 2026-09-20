@@ -1,5 +1,6 @@
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
+import { buildPartnerSubject, buildSubject } from '@/lib/mail/build-subject'
 import {
   buildPortalLoginLink,
   portalMailButtonLabel,
@@ -25,11 +26,13 @@ import {
 import { BEREICH_LABELS } from '@/lib/utils'
 import { filterAdressRueckfragen, type VorOrtRueckfrage } from '@/lib/anfrage-adresse'
 import { anfrageBetreffNachAnlass } from '@/lib/email/meldung-mail-templates'
+import { formatEuro, formatNumber, formatEuroSpanne } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -43,7 +46,7 @@ export function mailLogoMitMarkenname(
 ): string {
   const logo =
     variant === 'onLight' ? (b.logoUrlOnLight?.trim() ?? '') : (b.logoUrl?.trim() ?? '')
-  const textColor = variant === 'onLight' ? '#1A3D2B' : '#FFFFFF'
+  const textColor = variant === 'onLight' ? C.greenDark : C.white
   const logoImg =
     logo && /^https?:\/\//i.test(logo)
       ? `<img src="${esc(logo)}" width="36" height="36" alt="${esc(MAIL_MARKENNAME)}" style="display:block;width:36px;height:36px;border:0;"/>`
@@ -67,8 +70,8 @@ export function mailSummaryBlock(opts: {
   metaHtml?: string
 }): string {
   return `<div style="margin:0 0 24px;">
-    <p style="font-size:11px;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">${opts.label}</p>
-    <p style="font-size:17px;font-weight:700;color:#111111;margin:0 0 6px;line-height:1.35;">${opts.title}</p>
+    <p style="font-size:11px;font-weight:600;color:${C.gray500};text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">${opts.label}</p>
+    <p style="font-size:17px;font-weight:700;color:${C.gray900};margin:0 0 6px;line-height:1.35;">${opts.title}</p>
     ${opts.priceHtml ?? ''}
     ${opts.metaHtml ?? ''}
   </div>`
@@ -97,9 +100,9 @@ export function mailMeinBaerenwaldPsFooter(opts: {
   const anrede = opts.anrede
   const text = portalMailPsIntro(audience, anrede)
   const buttonLabel = portalMailButtonLabel(audience)
-  return `<div style="margin:28px 0 0;padding:16px 0 0;border-top:1px solid #E5E7EB;">
-    <p style="font-size:15px;font-weight:700;color:#6B7280;margin:0 0 8px;letter-spacing:0.02em;">P.S.</p>
-    <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 12px;">${text}</p>
+  return `<div style="margin:28px 0 0;padding:16px 0 0;border-top:1px solid ${C.gray200};">
+    <p style="font-size:15px;font-weight:700;color:${C.gray500};margin:0 0 8px;letter-spacing:0.02em;">P.S.</p>
+    <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 12px;">${text}</p>
     ${mailSecondaryButtonHtml(buttonLabel, portal, { margin: '0' })}
   </div>`
 }
@@ -118,7 +121,7 @@ export function mailHtmlBase(
   const telHref = tel.replace(/\s/g, '')
   const logoBlock = mailLogoMitMarkenname(b, 'onLight')
   const disclaimerHtml = footerDisclaimer?.trim()
-    ? `<p style="font-size:11px;color:#D1D5DB;margin:4px 0 0;line-height:1.5;">${esc(footerDisclaimer.trim())}</p>`
+    ? `<p style="font-size:11px;color:${C.gray300};margin:4px 0 0;line-height:1.5;">${esc(footerDisclaimer.trim())}</p>`
     : ''
   const portalLink =
     options?.portalLink?.trim() ||
@@ -139,26 +142,26 @@ export function mailHtmlBase(
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 </head>
-<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background:${C.white};font-family:Arial,Helvetica,sans-serif;">
 ${pre ? `<div style="display:none;max-height:0;overflow:hidden;">${pre}</div>` : ''}
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;">
-<tr><td align="center" style="padding:32px 16px;background:#ffffff;">
-<table width="580" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;max-width:580px;width:100%;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${C.white};">
+<tr><td align="center" style="padding:32px 16px;background:${C.white};">
+<table width="580" cellpadding="0" cellspacing="0" role="presentation" style="background:${C.white};max-width:580px;width:100%;">
 <tr>
-  <td style="padding:0 0 24px;border-bottom:1px solid #E5E7EB;background:#ffffff;">
+  <td style="padding:0 0 24px;border-bottom:1px solid ${C.gray200};background:${C.white};">
     ${logoBlock}
   </td>
 </tr>
 <tr>
-  <td style="padding:32px 0 24px;background:#ffffff;font-size:15px;color:#374151;line-height:1.6;font-family:Arial,Helvetica,sans-serif;">
+  <td style="padding:32px 0 24px;background:${C.white};font-size:15px;color:${C.gray700};line-height:1.6;font-family:Arial,Helvetica,sans-serif;">
     ${content}
     ${psHtml}
   </td>
 </tr>
 <tr>
-  <td style="padding:20px 0 0;border-top:1px solid #E5E7EB;background:#ffffff;">
-    <p style="font-size:12px;color:#9CA3AF;margin:0;line-height:1.6;">
-      ${esc(b.firmenname)} · ${websiteKurz} · <a href="tel:${telHref}" style="color:#9CA3AF;text-decoration:none;">${tel}</a>
+  <td style="padding:20px 0 0;border-top:1px solid ${C.gray200};background:${C.white};">
+    <p style="font-size:12px;color:${C.gray400};margin:0;line-height:1.6;">
+      ${esc(b.firmenname)} · ${websiteKurz} · <a href="tel:${telHref}" style="color:${C.gray400};text-decoration:none;">${tel}</a>
     </p>
     ${disclaimerHtml}
   </td>
@@ -168,6 +171,9 @@ ${pre ? `<div style="display:none;max-height:0;overflow:hidden;">${pre}</div>` :
 </table>
 </body></html>`
 }
+
+/** Alias für Freigabe-Wording „buildStandardMailHtml“ (Portal-Äquivalent). */
+export const buildStandardMailHtml = mailHtmlBase
 
 /** Standard-Fuß: P.S. mit einem Portal-Button (nach Gruß & Inhalt). */
 export function mailKundenStandardOptions(
@@ -192,8 +198,8 @@ export function mailKundenContactLine(anrede: 'du' | 'sie', telefon: string): st
   const tel = esc(telefon)
   const telHref = tel.replace(/\s/g, '')
   return anrede === 'du'
-    ? `Bei Fragen erreichst du uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-    : `Bei Fragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
+    ? `Bei Fragen erreichst du uns unter <a href="tel:${telHref}" style="color:${C.green};text-decoration:none;">${tel}</a>.`
+    : `Bei Fragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:${C.green};text-decoration:none;">${tel}</a>.`
 }
 
 export function mailKundenGruss(anrede: 'du' | 'sie'): string {
@@ -211,24 +217,24 @@ function btnSecondary(text: string, url: string): string {
 }
 
 function greenBox(html: string): string {
-  return `<div style="background:#EAF3DE;border-radius:8px;padding:16px 20px;margin:16px 0;">${html}</div>`
+  return `<div style="background:${C.greenSoft};border-radius:8px;padding:16px 20px;margin:16px 0;">${html}</div>`
 }
 
 function greenHintBox(html: string): string {
-  return `<div style="background:#EAF3DE;border:1px solid #C5DDB0;border-radius:8px;padding:16px 20px;margin:16px 0;">${html}</div>`
+  return `<div style="background:${C.greenSoft};border:1px solid ${C.greenSoftBorder};border-radius:8px;padding:16px 20px;margin:16px 0;">${html}</div>`
 }
 
 function whiteBorderBox(html: string): string {
-  return `<div style="background:#ffffff;border:1px solid #E5E7EB;border-radius:8px;padding:16px 20px;margin:12px 0;">${html}</div>`
+  return `<div style="background:${C.white};border:1px solid ${C.gray200};border-radius:8px;padding:16px 20px;margin:12px 0;">${html}</div>`
 }
 
 function detailRow(label: string, value: string): string {
-  return `<tr><td style="color:#6B7280;padding:5px 0;width:36%;vertical-align:top;font-size:15px;">${esc(label)}:</td><td style="font-weight:600;color:#1F2937;font-size:15px;padding:5px 0;">${value}</td></tr>`
+  return `<tr><td style="color:${C.gray500};padding:5px 0;width:36%;vertical-align:top;font-size:15px;">${esc(label)}:</td><td style="font-weight:600;color:${C.gray800};font-size:15px;padding:5px 0;">${value}</td></tr>`
 }
 
 function mailTerminDetailsInline(datumFmt: string, zeitText: string, ort: string): string {
   const zeit = esc(zeitText.trim() || '—')
-  return `<p style="margin:0 0 18px;font-size:15px;color:#374151;line-height:1.7;">
+  return `<p style="margin:0 0 18px;font-size:15px;color:${C.gray700};line-height:1.7;">
     <strong>Datum:</strong> ${esc(datumFmt)}<br/>
     <strong>Uhrzeit:</strong> ${zeit}<br/>
     <strong>Ort:</strong> ${esc(ort.trim() || '—')}
@@ -238,7 +244,7 @@ function mailTerminDetailsInline(datumFmt: string, zeitText: string, ort: string
 function mailObjektbetreuerTelLink(telefon: string): string {
   const t = telefon.trim()
   if (!t) return ''
-  return `<a href="tel:${esc(t.replace(/\s/g, ''))}" style="color:#2E7D52;font-weight:600;">${esc(t)}</a>`
+  return `<a href="tel:${esc(t.replace(/\s/g, ''))}" style="color:${C.green};font-weight:600;">${esc(t)}</a>`
 }
 
 function mailKollegeVorOrtBlock(
@@ -253,7 +259,7 @@ function mailKollegeVorOrtBlock(
     `Vor Ort ist <strong>${name}</strong>${telTeil} für dich da — in der Regel meldet er sich <strong>30–60 Minuten vorher</strong> telefonisch. Kurzfristige Änderungen bitte direkt bei <strong>${name}</strong>.`,
     `Vor Ort ist <strong>${name}</strong>${telTeil} für Sie da — in der Regel meldet er sich <strong>30–60 Minuten vorher</strong> telefonisch. Kurzfristige Änderungen bitte direkt bei <strong>${name}</strong>.`
   )
-  return `<p style="margin:16px 0 0;font-size:15px;color:#374151;line-height:1.6;">${text}</p>`
+  return `<p style="margin:16px 0 0;font-size:15px;color:${C.gray700};line-height:1.6;">${text}</p>`
 }
 
 function mailVorOrtRueckfragenBlock(anrede: MailAnrede, items: VorOrtRueckfrage[]): string {
@@ -267,12 +273,12 @@ function mailVorOrtRueckfragenBlock(anrede: MailAnrede, items: VorOrtRueckfrage[
   const lis = adressItems
     .map((item) => {
       const label = anrede === 'du' ? item.du : item.sie
-      return `<li style="margin:0 0 4px;font-size:15px;color:#1A3D2B;line-height:1.45;">${esc(label)}</li>`
+      return `<li style="margin:0 0 4px;font-size:15px;color:${C.greenDark};line-height:1.45;">${esc(label)}</li>`
     })
     .join('')
   return `${greenHintBox(`
-    <p style="margin:0 0 8px;font-size:15px;color:#1A3D2B;line-height:1.5;">${intro}</p>
-    <ul style="margin:0;padding-left:18px;color:#1A3D2B;">${lis}</ul>
+    <p style="margin:0 0 8px;font-size:15px;color:${C.greenDark};line-height:1.5;">${intro}</p>
+    <ul style="margin:0;padding-left:18px;color:${C.greenDark};">${lis}</ul>
   `)}`
 }
 
@@ -302,7 +308,7 @@ export function mailBesichtigungTermin(
   const zeitAnzeige = data.zeitText.trim() || '—'
   const notizBlock =
     data.notiz.trim().length > 0
-      ? `<p style="margin:12px 0 0;font-size:15px;color:#374151;line-height:1.55;"><strong>Hinweis:</strong> ${esc(data.notiz).replace(/\n/g, '<br/>')}</p>`
+      ? `<p style="margin:12px 0 0;font-size:15px;color:${C.gray700};line-height:1.55;"><strong>Hinweis:</strong> ${esc(data.notiz).replace(/\n/g, '<br/>')}</p>`
       : ''
   const bestaetigung = mailText(
     anrede,
@@ -311,10 +317,13 @@ export function mailBesichtigungTermin(
   )
   const introBlock =
     data.introHtml?.trim() ||
-    `<p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 6px;">${begruessung}</p>
-      <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 14px;">${bestaetigung}</p>`
+    `<p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 6px;">${begruessung}</p>
+      <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 14px;">${bestaetigung}</p>`
   return {
-    betreff: `Terminbestätigung: ${data.terminTitel} am ${data.datumFmt} — ${b.firmenname}`,
+    betreff: buildSubject({
+      objekt: data.adresse.trim() || data.terminTitel,
+      ereignis: 'Terminbestätigung',
+    }),
     html: mailHtmlBase(
       `
       ${introBlock}
@@ -322,7 +331,7 @@ export function mailBesichtigungTermin(
       ${mailVorOrtRueckfragenBlock(anrede, data.fehlendeRueckfragen ?? [])}
       ${data.kollege?.name?.trim() ? mailKollegeVorOrtBlock(anrede, data.kollege) : ''}
       ${notizBlock}
-      <p style="font-size:15px;color:#374151;margin:20px 0 0;">${mailTeamGruss(anrede, b.firmenname)}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:20px 0 0;">${mailTeamGruss(anrede, b.firmenname)}</p>
     `,
       `Termin am ${data.datumFmt}, ${ort}`,
       b,
@@ -345,11 +354,7 @@ function formatPreisSpanne(min: number | null | undefined, max: number | null | 
   const a = min != null && Number.isFinite(min) ? min : null
   const b = max != null && Number.isFinite(max) ? max : null
   if (a == null && b == null) return null
-  const f = (n: number) =>
-    n.toLocaleString('de-DE', { maximumFractionDigits: 0, minimumFractionDigits: 0 })
-  if (a != null && b != null && a !== b) return `${f(a)} – ${f(b)} €`
-  const x = a ?? b ?? 0
-  return `${f(x)} €`
+  return formatEuroSpanne(a, b, { decimals: 0 })
 }
 
 function anfrageProjektTitel(
@@ -389,7 +394,7 @@ export function mailAnfrageBestaetigung(
   const ref = esc(data.anfrageRef.trim() || '—')
   const preis = formatPreisSpanne(data.preis_min, data.preis_max)
   const preisHtml = preis
-    ? `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${esc(preis)}</p>`
+    ? `<p style="font-size:16px;font-weight:700;color:${C.green};margin:0;">${esc(preis)}</p>`
     : ''
   const disclaimer =
     data.quelle === 'website'
@@ -414,24 +419,23 @@ export function mailAnfrageBestaetigung(
   const abschluss = mailText(anrede, 'Bis bald.', 'Mit freundlichen Grüßen')
 
   const content = `
-      <h1 style="font-size:22px;font-weight:700;color:#111111;margin:0 0 20px;">${h1}</h1>
-      <p style="font-size:15px;color:#374151;margin:0 0 8px;line-height:1.6;">${begruessung}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 24px;line-height:1.6;">${einleitung}</p>
+      <h1 style="font-size:22px;font-weight:700;color:${C.gray900};margin:0 0 20px;">${h1}</h1>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 8px;line-height:1.6;">${begruessung}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 24px;line-height:1.6;">${einleitung}</p>
       ${mailSummaryBlock({
         label: summaryLabel,
         title: projektTitel,
         priceHtml: preisHtml,
       })}
-      <p style="font-size:15px;color:#374151;margin:0 0 4px;line-height:1.6;">${abschluss}</p>
-      <p style="font-size:15px;color:#374151;margin:16px 0 0;">${mailTeamGruss(anrede, b.firmenname)}</p>`
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 4px;line-height:1.6;">${abschluss}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:16px 0 0;">${mailTeamGruss(anrede, b.firmenname)}</p>`
 
   const betreff = data.anlass
     ? anfrageBetreffNachAnlass(data.anlass, data.objektTitel ?? projektTitel.replace(/<[^>]+>/g, ''))
-    : mailText(
-        anrede,
-        `Danke für deine Anfrage — ${b.firmenname}`,
-        `Vielen Dank für Ihre Anfrage — ${b.firmenname}`
-      )
+    : buildSubject({
+        objekt: data.objektTitel ?? projektTitel.replace(/<[^>]+>/g, ''),
+        ereignis: 'Anfrage erhalten',
+      })
 
   return {
     betreff,
@@ -468,8 +472,8 @@ export function mailAngebot(
   const begruessung = esc(mailBegruessungZeile(anrede, data.name))
   const istRange = data.gesamt_min !== data.gesamt_max
   const betragText = istRange
-    ? `${data.gesamt_min.toLocaleString('de-DE')} – ${data.gesamt_max.toLocaleString('de-DE')} €`
-    : `${data.gesamt_min.toLocaleString('de-DE')} €`
+    ? `${formatEuroSpanne(data.gesamt_min, data.gesamt_max)}`
+    : `${formatEuro(data.gesamt_min, { decimals: 0 })}`
   const steuer = Math.round(data.lohn_gesamt * 0.2)
   const body1 = mailText(
     anrede,
@@ -478,10 +482,10 @@ export function mailAngebot(
   )
   const hint35a =
     !data.reverseCharge && data.lohn_gesamt > 0
-      ? `<p style="font-size:15px;color:#6B7280;margin:0 0 16px;line-height:1.6;">${mailText(
+      ? `<p style="font-size:15px;color:${C.gray500};margin:0 0 16px;line-height:1.6;">${mailText(
           anrede,
-          `Hinweis: Als Privatperson kannst du den Lohnkostenanteil von <strong>${data.lohn_gesamt.toLocaleString('de-DE')} €</strong> nach § 35a EStG steuerlich absetzen (20 % = ${steuer.toLocaleString('de-DE')} €).`,
-          `Hinweis: Als Privatperson können Sie den Lohnkostenanteil von <strong>${data.lohn_gesamt.toLocaleString('de-DE')} €</strong> nach § 35a EStG steuerlich absetzen (20 % = ${steuer.toLocaleString('de-DE')} €).`
+          `Hinweis: Als Privatperson kannst du den Lohnkostenanteil von <strong>${formatEuro(data.lohn_gesamt, { decimals: 0 })}</strong> nach § 35a EStG steuerlich absetzen (20 % = ${formatEuro(steuer, { decimals: 0 })}).`,
+          `Hinweis: Als Privatperson können Sie den Lohnkostenanteil von <strong>${formatEuro(data.lohn_gesamt, { decimals: 0 })}</strong> nach § 35a EStG steuerlich absetzen (20 % = ${formatEuro(steuer, { decimals: 0 })}).`
         )}</p>`
       : ''
   const titel =
@@ -492,29 +496,28 @@ export function mailAngebot(
   const summaryHtml = mailSummaryBlock({
     label: mailText(anrede, 'DEIN ANGEBOT', 'IHR ANGEBOT'),
     title: esc(titel),
-    priceHtml: `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${esc(betragText)} <span style="font-size:12px;font-weight:400;color:#6B7280;">${mwstHint}</span></p>`,
-    metaHtml: `<p style="font-size:15px;color:#374151;margin:8px 0 0;"><strong>Gültig bis:</strong> ${esc(data.gueltig_bis)}</p>`,
+    priceHtml: `<p style="font-size:16px;font-weight:700;color:${C.green};margin:0;">${esc(betragText)} <span style="font-size:12px;font-weight:400;color:${C.gray500};">${mwstHint}</span></p>`,
+    metaHtml: `<p style="font-size:15px;color:${C.gray700};margin:8px 0 0;"><strong>Gültig bis:</strong> ${esc(data.gueltig_bis)}</p>`,
   })
   const disclaimer = mailText(
     anrede,
     'Du erhältst diese Mail, weil du ein Angebot von uns erhalten hast.',
     'Sie erhalten diese Mail, weil Sie ein Angebot von uns erhalten haben.'
   )
-  const betreff = mailText(
-    anrede,
-    'Dein Angebot von Bärenwald München',
-    'Ihr Angebot von Bärenwald München'
-  )
+  const betreff = buildSubject({
+    objekt: titel,
+    ereignis: 'Angebot bereit',
+  })
   return {
     betreff,
     html: mailHtmlBase(
-      `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begruessung}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${body1}</p>
+      `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begruessung}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${body1}</p>
       ${summaryHtml}
       ${hint35a}
       ${data.visualisierung_vorschau_url ? mailKiVisualisierungBlock(anredeKey, data.visualisierung_vorschau_url) : ''}
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
-      <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
       mailText(anrede, `Dein Angebot: ${betragText}`, `Ihr Angebot: ${betragText}`),
       b,
       disclaimer,
@@ -546,7 +549,7 @@ export function mailAngebotPdfUebersicht(
   const teaserRaw = data.projektbeschreibung_teaser?.trim() ?? ''
   const teaser =
     data.dokument_typ === 'projekt' && teaserRaw
-      ? `<p style="color:#374151;font-size:15px;line-height:1.6;margin-top:8px;">${esc(teaserRaw.length > 280 ? `${teaserRaw.slice(0, 277)}…` : teaserRaw)}</p>`
+      ? `<p style="color:${C.gray700};font-size:15px;line-height:1.6;margin-top:8px;">${esc(teaserRaw.length > 280 ? `${teaserRaw.slice(0, 277)}…` : teaserRaw)}</p>`
       : ''
   const kicker = mailText(anrede, 'Dein persönliches Angebot', 'Ihr persönliches Angebot')
   const intro = mailText(
@@ -559,47 +562,47 @@ export function mailAngebotPdfUebersicht(
     'Bei Fragen sind wir gerne für dich da.',
     'Bei Fragen stehen wir Ihnen gerne zur Verfügung.'
   )
-  const betreff = mailText(
-    anrede,
-    `Dein Angebot von ${b.firmenname} — ${data.angebotsnr}`,
-    `Ihr Angebot von ${b.firmenname} — ${data.angebotsnr}`
-  )
+  const betreff = buildSubject({
+    objekt: data.leistungsumfang,
+    ereignis: 'Angebot bereit',
+    nummer: data.angebotsnr,
+  })
   return {
     betreff,
     html: `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;background:white;">
-  <div style="background:#1A3D2B;padding:24px;text-align:center;">
+  <div style="background:${C.greenDark};padding:24px;text-align:center;">
     <h1 style="color:white;font-size:20px;margin:0;">${esc(b.firmenname)}</h1>
-    <p style="color:#A8C5A0;margin:4px 0 0;font-size:15px;">${esc(kicker)}</p>
+    <p style="color:${C.greenSoftBorder2};margin:4px 0 0;font-size:15px;">${esc(kicker)}</p>
   </div>
   <div style="padding:32px 24px;">
-    <p style="font-size:15px;color:#1A3D2B;">${begruessung}</p>
+    <p style="font-size:15px;color:${C.greenDark};">${begruessung}</p>
     <br/>
-    <p style="color:#374151;line-height:1.7;">
+    <p style="color:${C.gray700};line-height:1.7;">
       ${intro}
     </p>
     <br/>
-    <div style="background:#F9FAFB;border-radius:8px;padding:16px;margin:16px 0;">
-      <p style="font-weight:bold;color:#1A3D2B;margin-bottom:8px;">Angebotsübersicht</p>
-      <p style="color:#374151;font-size:15px;">Angebotsnr.: <strong>${esc(data.angebotsnr)}</strong></p>
-      <p style="color:#374151;font-size:15px;">Leistung: ${esc(data.leistungsumfang || '—')}</p>
+    <div style="background:${C.gray50};border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="font-weight:bold;color:${C.greenDark};margin-bottom:8px;">Angebotsübersicht</p>
+      <p style="color:${C.gray700};font-size:15px;">Angebotsnr.: <strong>${esc(data.angebotsnr)}</strong></p>
+      <p style="color:${C.gray700};font-size:15px;">Leistung: ${esc(data.leistungsumfang || '—')}</p>
       ${teaser}
-      <p style="color:#1A3D2B;font-weight:bold;font-size:15px;margin-top:8px;">
+      <p style="color:${C.greenDark};font-weight:bold;font-size:15px;margin-top:8px;">
         Gesamtbetrag: ${esc(data.gesamtBruttoFmt)} inkl. MwSt.
       </p>
-      <p style="color:#6B7280;font-size:12px;margin-top:8px;">Gültig bis: ${esc(data.gueltig_bis)}</p>
+      <p style="color:${C.gray500};font-size:12px;margin-top:8px;">Gültig bis: ${esc(data.gueltig_bis)}</p>
     </div>
-    <p style="color:#374151;line-height:1.7;">${fragen}</p>
+    <p style="color:${C.gray700};line-height:1.7;">${fragen}</p>
     <br/>
     <div style="text-align:center;margin:24px 0;">
       ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
     </div>
-    <p style="color:#374151;line-height:1.7;">
+    <p style="color:${C.gray700};line-height:1.7;">
       ${mailTeamGruss(anrede, b.firmenname)}
     </p>
     ${mailMeinBaerenwaldPsFooter({ anrede })}
   </div>
-  <div style="background:#F3F4F6;padding:16px 24px;font-size:11px;color:#6B7280;text-align:center;">
+  <div style="background:${C.gray100};padding:16px 24px;font-size:11px;color:${C.gray500};text-align:center;">
     ${esc(b.firmenname)} · ${adr}<br/>
     Tel.: ${tel}
   </div>
@@ -660,32 +663,31 @@ export function mailAngebotAnnahmeBestaetigung(
     .map(
       (z) => `
       <tr>
-        <td style="padding:8px 0;border-bottom:1px solid #E5E7EB;color:#1F2937;">${esc(z.gewerk)}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #E5E7EB;color:#374151;">${esc(z.leistung)}</td>
-        <td style="padding:8px 0;border-bottom:1px solid #E5E7EB;color:#1A3D2B;text-align:right;font-weight:600;">${esc(z.preis)}</td>
+        <td style="padding:8px 0;border-bottom:1px solid ${C.gray200};color:${C.gray800};">${esc(z.gewerk)}</td>
+        <td style="padding:8px 0;border-bottom:1px solid ${C.gray200};color:${C.gray700};">${esc(z.leistung)}</td>
+        <td style="padding:8px 0;border-bottom:1px solid ${C.gray200};color:${C.greenDark};text-align:right;font-weight:600;">${esc(z.preis)}</td>
       </tr>`
     )
     .join('')
 
   const begruessung = esc(mailBegruessungZeile(data.anrede, data.name))
-  const betreff = mailText(
-    data.anrede,
-    'Bestätigung deines Auftrags — Bärenwald München',
-    'Bestätigung Ihres Auftrags — Bärenwald München'
-  )
+  const betreff = buildSubject({
+    objekt: data.zeilen[0]?.leistung || data.zeilen[0]?.gewerk,
+    ereignis: 'Auftrag bestätigt',
+  })
   return {
     betreff,
     html: mailHtmlBase(
       `
       <p>${begruessung}</p>
       <p>${intro}</p>
-      <p style="margin:14px 0 6px;color:#111827;"><strong>Umsetzungszeitraum:</strong> ${esc(data.zeitraum)}</p>
+      <p style="margin:14px 0 6px;color:${C.gray900b};"><strong>Umsetzungszeitraum:</strong> ${esc(data.zeitraum)}</p>
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;margin:8px 0 16px;">
         <thead>
           <tr>
-            <th style="text-align:left;padding:8px 0;border-bottom:1px solid #D1D5DB;color:#6B7280;font-size:12px;">Gewerk</th>
-            <th style="text-align:left;padding:8px 0;border-bottom:1px solid #D1D5DB;color:#6B7280;font-size:12px;">Leistung</th>
-            <th style="text-align:right;padding:8px 0;border-bottom:1px solid #D1D5DB;color:#6B7280;font-size:12px;">Preis</th>
+            <th style="text-align:left;padding:8px 0;border-bottom:1px solid ${C.gray300};color:${C.gray500};font-size:12px;">Gewerk</th>
+            <th style="text-align:left;padding:8px 0;border-bottom:1px solid ${C.gray300};color:${C.gray500};font-size:12px;">Leistung</th>
+            <th style="text-align:right;padding:8px 0;border-bottom:1px solid ${C.gray300};color:${C.gray500};font-size:12px;">Preis</th>
           </tr>
         </thead>
         <tbody>${zeilenHtml}</tbody>
@@ -716,11 +718,9 @@ export function mailUpdateHinweis(
     'es gibt ein neues Update zu deinem Projekt.',
     'es gibt ein neues Update zu Ihrem Projekt.'
   )
-  const betreff = mailText(
-    anrede,
-    'Neues Update zu deinem Projekt',
-    'Neues Update zu Ihrem Projekt'
-  )
+  const betreff = buildSubject({
+    ereignis: 'Projekt-Update',
+  })
   return {
     betreff,
     html: mailHtmlBase(
@@ -768,18 +768,18 @@ export function mailProjektStatusUpdate(data: MailProjektUpdateInput, b: MailBra
   const summaryHtml = mailSummaryBlock({
     label: mailText(anrede, 'PROJEKT-UPDATE', 'PROJEKT-UPDATE'),
     title: titel,
-    metaHtml: `<p style="font-size:15px;color:#374151;margin:8px 0 0;"><strong>Projekt:</strong> ${projekt}</p>
-      <p style="font-size:15px;color:#374151;margin:4px 0 0;"><strong>Stand:</strong> ${status}</p>`,
+    metaHtml: `<p style="font-size:15px;color:${C.gray700};margin:8px 0 0;"><strong>Projekt:</strong> ${projekt}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:4px 0 0;"><strong>Stand:</strong> ${status}</p>`,
   })
 
   const detailHtml =
     !data.minimalBody && data.updateText.trim()
-      ? `<p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${text}</p>`
+      ? `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${text}</p>`
       : ''
 
   const fotoHinweis =
     fotoCount > 0
-      ? `<p style="font-size:15px;color:#6B7280;margin:0 0 16px;line-height:1.5;">${mailText(
+      ? `<p style="font-size:15px;color:${C.gray500};margin:0 0 16px;line-height:1.5;">${mailText(
           anrede,
           `${fotoCount} Foto${fotoCount === 1 ? '' : 's'} im Update — Details und Bilder in MeinBärenwald.`,
           `${fotoCount} Foto${fotoCount === 1 ? '' : 's'} im Update — Details und Bilder in MeinBärenwald.`
@@ -787,7 +787,7 @@ export function mailProjektStatusUpdate(data: MailProjektUpdateInput, b: MailBra
       : ''
 
   const naechster = data.naechsterSchritt?.trim()
-    ? `<p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;"><strong>Nächster Schritt:</strong> ${esc(data.naechsterSchritt.trim())}</p>`
+    ? `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;"><strong>Nächster Schritt:</strong> ${esc(data.naechsterSchritt.trim())}</p>`
     : ''
 
   const disclaimer = mailText(
@@ -797,16 +797,19 @@ export function mailProjektStatusUpdate(data: MailProjektUpdateInput, b: MailBra
   )
 
   return {
-    betreff: `Projekt-Update — ${data.updateTitel} · ${data.projektTitel.trim() || 'Ihr Projekt'} · ${b.firmenname}`,
+    betreff: buildSubject({
+      objekt: data.projektTitel,
+      ereignis: data.updateTitel.trim() || 'Projekt-Update',
+    }),
     html: mailHtmlBase(
-      `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begruessung}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
+      `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begruessung}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
       ${detailHtml}
       ${fotoHinweis}
       ${naechster}
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
-      <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
       data.updateTitel,
       b,
       disclaimer,
@@ -832,21 +835,19 @@ export function mailNachtrag(
   const begruessung = esc(mailBegruessungZeile(anrede, data.name))
   const betrag =
     data.gesamt_min === data.gesamt_max
-      ? `${data.gesamt_min.toLocaleString('de-DE')} €`
-      : `${data.gesamt_min.toLocaleString('de-DE')} – ${data.gesamt_max.toLocaleString('de-DE')} €`
+      ? `${formatEuro(data.gesamt_min, { decimals: 0 })}`
+      : `${formatEuroSpanne(data.gesamt_min, data.gesamt_max)}`
   const tel = esc(b.telefon)
   const rows = data.positionen
     .map((p) => {
       const txt = esc(String(p.beschreibung || p.leistung || '').trim())
       const g = Number(p.gesamt_fix ?? p.gesamt_min ?? 0)
-      return `<tr style="border-bottom:1px solid #E2E8E2;"><td style="padding:8px 0;">${txt}</td><td style="padding:8px 0;text-align:right;">${g.toLocaleString('de-DE')} €</td></tr>`
+      return `<tr style="border-bottom:1px solid ${C.greenWash};"><td style="padding:8px 0;">${txt}</td><td style="padding:8px 0;text-align:right;">${formatEuro(g, { decimals: 0 })}</td></tr>`
     })
     .join('')
-  const betreff = mailText(
-    anrede,
-    'Nachtrag zu deinem Auftrag — Bärenwald München',
-    'Nachtrag zu Ihrem Auftrag — Bärenwald München'
-  )
+  const betreff = buildSubject({
+    ereignis: 'Nachtrag',
+  })
   const h2 = mailText(anrede, 'Nachtrag zu deinem Auftrag', 'Nachtrag zu Ihrem Auftrag')
   const body = mailText(
     anrede,
@@ -857,17 +858,17 @@ export function mailNachtrag(
     betreff,
     html: mailHtmlBase(
       `
-      <h2 style="color:#C4922A;margin:0 0 16px;">${h2}</h2>
+      <h2 style="color:${C.accent};margin:0 0 16px;">${h2}</h2>
       <p>${begruessung}</p>
       <p>${body}</p>
-      <div style="background:#FEF3E3;border-radius:8px;padding:14px 16px;margin:16px 0;"><p style="margin:0;font-weight:600;">Grund: ${esc(data.grund)}</p></div>
+      <div style="background:${C.accentBg3};border-radius:8px;padding:14px 16px;margin:16px 0;"><p style="margin:0;font-weight:600;">Grund: ${esc(data.grund)}</p></div>
       <table width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;margin:16px 0;">${rows}</table>
       ${greenBox(`
-        <p style="margin:0;font-size:12px;color:#2E7D52;">Mehrkosten gesamt</p>
-        <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#1A3D2B;">+ ${esc(betrag)}</p>
+        <p style="margin:0;font-size:12px;color:${C.green};">Mehrkosten gesamt</p>
+        <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:${C.greenDark};">+ ${esc(betrag)}</p>
       `)}
       ${btn(mailText(anrede, 'Nachtrag bestätigen →', 'Nachtrag bestätigen →'), data.bestaetigungsLink)}
-      <p style="font-size:15px;color:#6B7280;">${mailText(anrede, 'Bei Fragen:', 'Bei Fragen:')} <a href="tel:${tel.replace(/\s/g, '')}" style="color:#2E7D52;">${tel}</a></p>
+      <p style="font-size:15px;color:${C.gray500};">${mailText(anrede, 'Bei Fragen:', 'Bei Fragen:')} <a href="tel:${tel.replace(/\s/g, '')}" style="color:${C.green};">${tel}</a></p>
     `,
       `Nachtrag: +${betrag}`,
       b,
@@ -903,28 +904,27 @@ export function mailAbnahme(
     'Das Abnahmeprotokoll mit der vollständigen Dokumentation finden Sie im Anhang.'
   )
   const danke = mailText(anrede, 'Vielen Dank für dein Vertrauen!', 'Vielen Dank für Ihr Vertrauen!')
-  const betreff = mailText(
-    anrede,
-    'Dein Projekt ist abgeschlossen — Bärenwald München',
-    'Ihr Projekt ist abgeschlossen — Bärenwald München'
-  )
+  const betreff = buildSubject({
+    objekt: data.gewerke.join(', '),
+    ereignis: 'Projekt abgeschlossen',
+  })
   return {
     betreff,
     html: mailHtmlBase(
       `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">${h2}</h2>
+      <h2 style="color:${C.green};margin:0 0 16px;">${h2}</h2>
       <p>${begruessung}</p>
       <p>${body1}</p>
       ${greenBox(`
         <table width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;">
-        <tr><td style="color:#2E7D52;padding:4px 0;width:40%;">Abnahmedatum:</td><td style="font-weight:600;color:#1A3D2B;padding:4px 0;">${esc(data.abnahmeDatum)}</td></tr>
-        <tr><td style="color:#2E7D52;padding:4px 0;">Gewerke:</td><td style="font-weight:600;color:#1A3D2B;padding:4px 0;">${gw}</td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;width:40%;">Abnahmedatum:</td><td style="font-weight:600;color:${C.greenDark};padding:4px 0;">${esc(data.abnahmeDatum)}</td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;">Gewerke:</td><td style="font-weight:600;color:${C.greenDark};padding:4px 0;">${gw}</td></tr>
         </table>
       `)}
       <p>${proto}</p>
-      <p style="font-size:15px;color:#6B7280;"><strong>Gewährleistung:</strong> Die gesetzliche Gewährleistung beträgt 5 Jahre ab Abnahme.</p>
+      <p style="font-size:15px;color:${C.gray500};"><strong>Gewährleistung:</strong> Die gesetzliche Gewährleistung beträgt 5 Jahre ab Abnahme.</p>
       <p>${danke}</p>
-      <p><a href="tel:${tel.replace(/\s/g, '')}" style="color:#2E7D52;">${tel}</a></p>
+      <p><a href="tel:${tel.replace(/\s/g, '')}" style="color:${C.green};">${tel}</a></p>
     `,
       h2,
       b,
@@ -960,12 +960,8 @@ export function buildZahlungserinnerungMail(
   const faellig = esc(data.faelligAm)
   const zahlbarBis = esc(data.zahlbarBis)
   const offenerBetrag = data.offenerBetrag ?? data.brutto
-  const offenFmt = offenerBetrag.toLocaleString('de-DE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  const geldFmt = (n: number) =>
-    n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const offenFmt = formatEuro(offenerBetrag, { suffix: false })
+  const geldFmt = (n: number) => formatEuro(n, { suffix: false })
 
   const stufeTitel = data.stufe === 1 ? 'Zahlungserinnerung' : '2. Zahlungserinnerung'
 
@@ -974,9 +970,9 @@ export function buildZahlungserinnerungMail(
 
   const bereitsGezahltHtml = hatAbschlagHinweis
     ? `
-      <div style="background:#F3F4F6;border-radius:8px;padding:14px 16px;margin:0 0 16px;font-size:15px;border-left:4px solid #2E7D52;">
-        <p style="margin:0 0 8px;font-weight:700;color:#1A3D2B;">Bereits gezahlt (Abschlagsrechnungen)</p>
-        <ul style="margin:0 0 10px;padding-left:20px;color:#374151;">
+      <div style="background:${C.gray100};border-radius:8px;padding:14px 16px;margin:0 0 16px;font-size:15px;border-left:4px solid ${C.green};">
+        <p style="margin:0 0 8px;font-weight:700;color:${C.greenDark};">Bereits gezahlt (Abschlagsrechnungen)</p>
+        <ul style="margin:0 0 10px;padding-left:20px;color:${C.gray700};">
           ${bereitsGezahlt
             .map(
               (z) =>
@@ -984,7 +980,7 @@ export function buildZahlungserinnerungMail(
             )
             .join('')}
         </ul>
-        <p style="margin:0;color:#374151;">Summe bereits gezahlt: <strong>${esc(geldFmt(data.bereitsGezahltBrutto ?? bereitsGezahlt.reduce((s, z) => s + z.brutto, 0)))} €</strong></p>
+        <p style="margin:0;color:${C.gray700};">Summe bereits gezahlt: <strong>${esc(geldFmt(data.bereitsGezahltBrutto ?? bereitsGezahlt.reduce((s, z) => s + z.brutto, 0)))} €</strong></p>
       </div>`
     : ''
 
@@ -1024,28 +1020,28 @@ export function buildZahlungserinnerungMail(
 
   const bereits = mailText(
     anrede,
-    `Falls du bereits überwiesen hast, melde dich bitte unter <a href="tel:${telHref}" style="color:#2E7D52;">${tel}</a>.`,
-    `Falls Sie bereits überwiesen haben, melden Sie sich bitte unter <a href="tel:${telHref}" style="color:#2E7D52;">${tel}</a>.`
+    `Falls du bereits überwiesen hast, melde dich bitte unter <a href="tel:${telHref}" style="color:${C.green};">${tel}</a>.`,
+    `Falls Sie bereits überwiesen haben, melden Sie sich bitte unter <a href="tel:${telHref}" style="color:${C.green};">${tel}</a>.`
   )
 
   return {
-    betreff: zahlungserinnerungBetreff(data.stufe, data.nummer),
+    betreff: zahlungserinnerungBetreff(data.stufe, data.nummer, data.projektTitel),
     html: mailHtmlBase(
       `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">${stufeTitel}</h2>
+      <h2 style="color:${C.green};margin:0 0 16px;">${stufeTitel}</h2>
       ${bereitsGezahltHtml}
       <p>${begruessung}</p>
       <p>${einleitung}</p>
       <p>${bitte}</p>
-      <div style="background:#EAF3DE;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:15px;">
+      <div style="background:${C.greenSoft};border-radius:8px;padding:14px 16px;margin:16px 0;font-size:15px;">
         <table width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="color:#2E7D52;padding:4px 0;width:50%;">Offener Betrag:</td><td style="font-weight:700;font-size:16px;color:#1A3D2B;">${offenFmt} €</td></tr>
-        <tr><td style="color:#2E7D52;padding:4px 0;">Zahlbar bis:</td><td style="font-weight:600;color:#1A3D2B;"><strong>${zahlbarBis}</strong></td></tr>
-        <tr><td style="color:#2E7D52;padding:4px 0;">IBAN:</td><td style="color:#1A3D2B;">${esc(iban)}</td></tr>
-        <tr><td style="color:#2E7D52;padding:4px 0;">Verwendungszweck:</td><td style="color:#1A3D2B;">${nr}</td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;width:50%;">Offener Betrag:</td><td style="font-weight:700;font-size:16px;color:${C.greenDark};">${offenFmt} €</td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;">Zahlbar bis:</td><td style="font-weight:600;color:${C.greenDark};"><strong>${zahlbarBis}</strong></td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;">IBAN:</td><td style="color:${C.greenDark};">${esc(iban)}</td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;">Verwendungszweck:</td><td style="color:${C.greenDark};">${nr}</td></tr>
         </table>
       </div>
-      <p style="font-size:15px;color:#6B7280;">${bereits}</p>
+      <p style="font-size:15px;color:${C.gray500};">${bereits}</p>
     `,
       `${stufeTitel}: ${offenFmt} € offen`,
       b,
@@ -1106,7 +1102,7 @@ export function mailHandwerkerLeistungZuweisung(
       const beschreibung = l.beschreibung?.trim() ? esc(l.beschreibung.trim()) : '—'
       const posLabel =
         data.leistungen.length > 1
-          ? `<p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#2E7D52;text-transform:uppercase;">Position ${i + 1} von ${data.leistungen.length}</p>`
+          ? `<p style="margin:0 0 8px;font-size:12px;font-weight:700;color:${C.green};text-transform:uppercase;">Position ${i + 1} von ${data.leistungen.length}</p>`
           : ''
       return whiteBorderBox(`
         ${posLabel}
@@ -1121,13 +1117,19 @@ export function mailHandwerkerLeistungZuweisung(
     })
     .join('')
   const subjectLeistung =
-    data.leistungen.length === 1 ? data.leistungen[0]!.leistung_name : `${data.leistungen.length} Leistungen`
+    data.leistungen.length === 1 ? data.leistungen[0]!.leistung_name : `${data.leistungen.length} Positionen`
+  const subjectGewerk =
+    data.leistungen.length === 1 ? data.leistungen[0]!.gewerk_name : subjectLeistung
 
   return {
-    betreff: `Leistungsanfrage: ${subjectLeistung} — Bärenwald Partner`,
+    betreff: buildPartnerSubject({
+      gewerk: subjectGewerk,
+      ort: data.plz.trim() || null,
+      ereignis: 'Leistungsanfrage',
+    }),
     html: mailHtmlBase(
       `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">Neue Leistungsanfrage</h2>
+      <h2 style="color:${C.green};margin:0 0 16px;">Neue Leistungsanfrage</h2>
       <p style="margin:0 0 16px;">Guten Tag ${name},</p>
       ${data.leistungen.length > 1 ? `<p style="margin:0 0 16px;line-height:1.6;">Folgende <strong>${data.leistungen.length} Positionen</strong> warten auf Ihre Rückmeldung:</p>` : ''}
       ${cards}
@@ -1159,10 +1161,13 @@ export function mailHandwerkerErgaenzungBereit(
     : null
 
   return {
-    betreff: `Ergänzungsvereinbarung bereit — bitte bestätigen · Bärenwald Partner`,
+    betreff: buildPartnerSubject({
+      gewerk: data.gewerkName,
+      ereignis: 'Ergänzungsvereinbarung bereit',
+    }),
     html: mailHtmlBase(
       `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">Ergänzungsvereinbarung liegt bereit</h2>
+      <h2 style="color:${C.green};margin:0 0 16px;">Ergänzungsvereinbarung liegt bereit</h2>
       <p style="margin:0 0 16px;">Guten Tag ${name},</p>
       <p style="margin:0 0 16px;line-height:1.6;">
         Für Ihren laufenden Auftrag liegt eine <strong>Ergänzungsvereinbarung</strong> zum
@@ -1176,14 +1181,14 @@ export function mailHandwerkerErgaenzungBereit(
         ${bezug ? detailRow('Bezug Vertrag vom', bezug) : ''}
         </table>
       `)}
-      <p style="margin:16px 0 8px;font-size:15px;font-weight:600;color:#1A3D2B;">Nächste Schritte im Portal:</p>
-      <ol style="font-size:15px;line-height:1.75;padding-left:20px;margin:0 0 20px;color:#374151;">
+      <p style="margin:16px 0 8px;font-size:15px;font-weight:600;color:${C.greenDark};">Nächste Schritte im Portal:</p>
+      <ol style="font-size:15px;line-height:1.75;padding-left:20px;margin:0 0 20px;color:${C.gray700};">
         <li>Ergänzungsvereinbarung lesen und prüfen</li>
         <li>Verbindlich bestätigen</li>
       </ol>
       ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
-      <p style="font-size:15px;color:#6B7280;margin:16px 0 0;">Link:<br/>
-        <a href="${esc(data.portalLink)}" style="color:#2E7D52;word-break:break-all;">${esc(data.portalLink)}</a>
+      <p style="font-size:15px;color:${C.gray500};margin:16px 0 0;">Link:<br/>
+        <a href="${esc(data.portalLink)}" style="color:${C.green};word-break:break-all;">${esc(data.portalLink)}</a>
       </p>
     `,
       `Ergänzungsvereinbarung bereit — ${data.gewerkName || 'Auftrag'}`,
@@ -1210,10 +1215,13 @@ export function mailHandwerkerProjektvertragBereit(
   const nr = esc(data.vertragsNr.trim() || '—')
 
   return {
-    betreff: `Projektvertrag bereit — bitte bestätigen · Bärenwald Partner`,
+    betreff: buildPartnerSubject({
+      gewerk: data.gewerkName,
+      ereignis: 'Projektvertrag bereit',
+    }),
     html: mailHtmlBase(
       `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">Projektvertrag liegt bereit</h2>
+      <h2 style="color:${C.green};margin:0 0 16px;">Projektvertrag liegt bereit</h2>
       <p style="margin:0 0 16px;">Guten Tag ${name},</p>
       <p style="margin:0 0 16px;line-height:1.6;">
         Ihr Angebot wurde übernommen. Der <strong>Projekt-Nachunternehmervertrag</strong> steht im Partner-Portal bereit —
@@ -1226,18 +1234,18 @@ export function mailHandwerkerProjektvertragBereit(
         ${detailRow('Vertrags-Nr.', nr)}
         </table>
       `)}
-      <p style="margin:16px 0 8px;font-size:15px;font-weight:600;color:#1A3D2B;">Nächste Schritte im Portal:</p>
-      <ol style="font-size:15px;line-height:1.75;padding-left:20px;margin:0 0 20px;color:#374151;">
+      <p style="margin:16px 0 8px;font-size:15px;font-weight:600;color:${C.greenDark};">Nächste Schritte im Portal:</p>
+      <ol style="font-size:15px;line-height:1.75;padding-left:20px;margin:0 0 20px;color:${C.gray700};">
         <li>Projektvertrag lesen und prüfen</li>
         <li>Pflicht-Unterlagen laut Checkliste hochladen (falls noch offen)</li>
         <li>Vertrag verbindlich bestätigen</li>
       </ol>
-      <p style="font-size:15px;color:#6B7280;margin:0 0 16px;line-height:1.6;">
+      <p style="font-size:15px;color:${C.gray500};margin:0 0 16px;line-height:1.6;">
         Erst nach Ihrer Bestätigung wird der Auftrag für Sie freigeschaltet.
       </p>
       ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
-      <p style="font-size:15px;color:#6B7280;margin:16px 0 0;">Link:<br/>
-        <a href="${esc(data.portalLink)}" style="color:#2E7D52;word-break:break-all;">${esc(data.portalLink)}</a>
+      <p style="font-size:15px;color:${C.gray500};margin:16px 0 0;">Link:<br/>
+        <a href="${esc(data.portalLink)}" style="color:${C.green};word-break:break-all;">${esc(data.portalLink)}</a>
       </p>
     `,
       `Projektvertrag bereit — ${data.gewerkName || 'Auftrag'}`,
@@ -1272,15 +1280,15 @@ export function mailHandwerkerAnfrage(
       const leistung = String(p.leistung ?? '').trim()
       const beschrBlock =
         beschr && beschr !== leistung
-          ? `<p style="margin:8px 0 0;font-size:15px;color:#4B5563;line-height:1.5;">${esc(beschr).replace(/\n/g, '<br/>')}</p>`
+          ? `<p style="margin:8px 0 0;font-size:15px;color:${C.gray600};line-height:1.5;">${esc(beschr).replace(/\n/g, '<br/>')}</p>`
           : ''
       const menge = p.menge && p.einheit ? `${p.menge} ${p.einheit}` : ''
       const mengeRow = menge
-        ? `<tr><td style="color:#6B7280;padding:4px 0;vertical-align:top;">Menge:</td><td style="font-weight:600;color:#1A3D2B;">${esc(menge)}</td></tr>`
+        ? `<tr><td style="color:${C.gray500};padding:4px 0;vertical-align:top;">Menge:</td><td style="font-weight:600;color:${C.greenDark};">${esc(menge)}</td></tr>`
         : ''
       return whiteBorderBox(`
-        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#2E7D52;text-transform:uppercase;">Position ${i + 1}${posCount > 1 ? ` von ${posCount}` : ''}</p>
-        <p style="margin:0;font-size:15px;font-weight:600;color:#1A3D2B;">${titel}</p>
+        <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:${C.green};text-transform:uppercase;">Position ${i + 1}${posCount > 1 ? ` von ${posCount}` : ''}</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:${C.greenDark};">${titel}</p>
         ${beschrBlock}
         ${mengeRow ? `<table width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;margin-top:8px;">${mengeRow}</table>` : ''}
       `)
@@ -1292,23 +1300,27 @@ export function mailHandwerkerAnfrage(
   const betreffSuffix =
     posCount > 1 ? `${data.gewerk} (${posCount} Positionen)` : data.gewerk
   return {
-    betreff: `Neue Anfrage: ${betreffSuffix} — Bärenwald München`,
+    betreff: buildPartnerSubject({
+      gewerk: betreffSuffix,
+      ort: data.plz.trim() || null,
+      ereignis: 'Neue Anfrage',
+    }),
     html: mailHtmlBase(
       `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">Neue Anfrage für Sie</h2>
+      <h2 style="color:${C.green};margin:0 0 16px;">Neue Anfrage für Sie</h2>
       <p>Guten Tag ${name},</p>
       <p>wir haben eine neue Anfrage im Bereich <strong>${gw}</strong>${posCount > 1 ? ` mit <strong>${posCount} Positionen</strong>` : ''}.</p>
       ${greenBox(`
         <table width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;">
-        <tr><td style="color:#2E7D52;padding:4px 0;width:40%;">Gewerk:</td><td style="font-weight:600;color:#1A3D2B;">${gw}</td></tr>
-        <tr><td style="color:#2E7D52;padding:4px 0;">Einsatzort:</td><td style="font-weight:600;color:#1A3D2B;">${plz} München</td></tr>
-        <tr><td style="color:#2E7D52;padding:4px 0;">Zeitraum:</td><td style="font-weight:600;color:#1A3D2B;">${esc(zt)}</td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;width:40%;">Gewerk:</td><td style="font-weight:600;color:${C.greenDark};">${gw}</td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;">Einsatzort:</td><td style="font-weight:600;color:${C.greenDark};">${plz} München</td></tr>
+        <tr><td style="color:${C.green};padding:4px 0;">Zeitraum:</td><td style="font-weight:600;color:${C.greenDark};">${esc(zt)}</td></tr>
         </table>
       `)}
       ${posCount > 0 ? `<div style="margin:16px 0;">${posCards}</div>` : ''}
       ${notizBlock}
       ${btn('Anfrage ansehen & antworten →', data.link)}
-      <p style="font-size:15px;color:#6B7280;">Link:<br/><a href="${esc(data.link)}" style="color:#2E7D52;word-break:break-all;">${esc(data.link)}</a></p>
+      <p style="font-size:15px;color:${C.gray500};">Link:<br/><a href="${esc(data.link)}" style="color:${C.green};word-break:break-all;">${esc(data.link)}</a></p>
     `,
       `Neue Anfrage: ${data.gewerk}`,
       b,
@@ -1333,15 +1345,18 @@ export function mailHandwerkerBautagebuchAnfrage(
     ? `<p style="font-size:15px;line-height:1.6;margin:16px 0;"><strong>Hinweis von Bärenwald:</strong><br/>${esc(data.notiz.trim()).replace(/\n/g, '<br/>')}</p>`
     : ''
   return {
-    betreff: `Tagebucheintrag angefordert: ${data.auftragTitel} — Bärenwald Partner`,
+    betreff: buildPartnerSubject({
+      gewerkOrt: data.auftragTitel.trim() || null,
+      ereignis: 'Tagebucheintrag angefordert',
+    }),
     html: mailHtmlBase(
       `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">Tagebucheintrag angefordert</h2>
+      <h2 style="color:${C.green};margin:0 0 16px;">Tagebucheintrag angefordert</h2>
       <p style="margin:0 0 16px;">Guten Tag ${name},</p>
       <p style="margin:0 0 16px;">Bärenwald bittet dich um einen <strong>Bautagebuch-Eintrag</strong> zum Auftrag <strong>${titel}</strong>.</p>
       ${notizBlock}
       ${btnSecondary('Zum Auftrag im Partner-Portal →', data.portalLink)}
-      <p style="font-size:15px;color:#6B7280;margin:16px 0 0;">Die Aufgabe findest du unter Planer → Aufgaben oder direkt beim Auftrag im Bautagebuch.</p>
+      <p style="font-size:15px;color:${C.gray500};margin:16px 0 0;">Die Aufgabe findest du unter Planer → Aufgaben oder direkt beim Auftrag im Bautagebuch.</p>
     `,
       `Tagebucheintrag: ${data.auftragTitel}`,
       b,
@@ -1357,9 +1372,11 @@ export function mailAbschlussdokumentation(
 ): { betreff: string; htmlBody: string } {
   const projekt = data.anrede === 'du' ? 'dein Projekt' : 'Ihr Projekt'
   return {
-    betreff: 'Abschlussdokumentation — Bärenwald München',
+    betreff: buildSubject({
+      ereignis: 'Projekt abgeschlossen',
+    }),
     htmlBody: `<p>anbei erhalten Sie die Abschlussdokumentation zu ${projekt}.</p>
-      <p style="font-size:15px;color:#6B7280;">Das PDF enthält eine Zusammenfassung aller durchgeführten Arbeiten, Dokumentation und Fotos.</p>
+      <p style="font-size:15px;color:${C.gray500};">Das PDF enthält eine Zusammenfassung aller durchgeführten Arbeiten, Dokumentation und Fotos.</p>
       <p>Vielen Dank für Ihr Vertrauen!</p>`,
   }
 }
@@ -1372,23 +1389,26 @@ export function mailHandwerkerFormular(
   const tel = esc(b.telefon)
   const adr = data.adresse?.trim() ? ` · ${esc(data.adresse.trim())}` : ''
   return {
-    betreff: `Formular: ${data.tabName} — ${data.auftragName}`,
+    betreff: buildPartnerSubject({
+      gewerkOrt: data.auftragName.trim() || null,
+      ereignis: `Formular: ${data.tabName}`,
+    }),
     html: mailHtmlBase(
       `
-      <h2 style="color:#2E7D52;margin:0 0 16px;">Formular zum Ausfüllen</h2>
+      <h2 style="color:${C.green};margin:0 0 16px;">Formular zum Ausfüllen</h2>
       <p>Guten Tag ${name},</p>
       <p>bitte füllen Sie das folgende Formular aus:</p>
       ${greenBox(`
-        <p style="margin:0;font-size:15px;font-weight:600;color:#1A3D2B;">${esc(data.tabName)}</p>
-        <p style="margin:4px 0 0;font-size:15px;color:#2E7D52;">${esc(data.auftragName)}${adr}</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:${C.greenDark};">${esc(data.tabName)}</p>
+        <p style="margin:4px 0 0;font-size:15px;color:${C.green};">${esc(data.auftragName)}${adr}</p>
       `)}
       ${btn('Formular öffnen →', data.link)}
-      <p style="font-size:15px;color:#6B7280;">Bei Fragen: <a href="tel:${tel.replace(/\s/g, '')}" style="color:#2E7D52;">${tel}</a></p>
+      <p style="font-size:15px;color:${C.gray500};">Bei Fragen: <a href="tel:${tel.replace(/\s/g, '')}" style="color:${C.green};">${tel}</a></p>
     `,
       `Formular: ${data.tabName}`,
       b,
       undefined,
       { skipMeinBaerenwaldPs: true }
-    ),
+    )
   }
 }

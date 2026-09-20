@@ -1,9 +1,10 @@
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
+import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -27,12 +28,12 @@ export function buildInternHandwerkerAntwortMail(input: {
     ? `<p><strong>Weitere Notiz:</strong> ${esc(input.notiz.trim())}</p>`
     : ''
   const hinweis = !input.angenommen
-    ? `<p style="margin-top:16px;padding:12px 14px;background:#FFF8E1;border-radius:8px;border:1px solid #F9A825;">
-        <strong>Handlungsbedarf:</strong> Anderen Handwerker für <strong>${esc(input.gewerkName)}</strong> auswählen und erneut anfragen.
+    ? `<p style="margin-top:16px;padding:12px 14px;background:${C.accentBg4};border-radius:8px;border:1px solid ${C.amber2};">
+        <strong>Handlungsbedarf:</strong> Anderen Partner für <strong>${esc(input.gewerkName)}</strong> auswählen und erneut anfragen.
       </p>`
     : ''
   return `
-  <p>Handwerker <strong>${esc(input.handwerkerName)}</strong> hat die Anfrage für <strong>${esc(input.gewerkName)}</strong> <strong>${status}</strong>.</p>
+  <p>Partner <strong>${esc(input.handwerkerName)}</strong> hat die Anfrage für <strong>${esc(input.gewerkName)}</strong> <strong>${status}</strong>.</p>
   ${grund}
   ${notiz}
   ${hinweis}

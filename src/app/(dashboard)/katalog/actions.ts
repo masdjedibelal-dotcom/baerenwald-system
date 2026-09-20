@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { KatalogPosition, KatalogVariante } from '@/lib/katalog/katalog-types'
@@ -84,6 +85,7 @@ export async function updateKatalogVariantePreis(
     .from('katalog_varianten')
     .update({ preis: Math.max(0, Math.round(preis * 100) / 100) })
     .eq('id', varianteId)
+  if (error) logDbError('app/katalog/actions:katalog_varianten', error)
   if (error) return { ok: false, message: error.message }
   return { ok: true }
 }
@@ -97,6 +99,7 @@ export async function setKatalogVarianteAktiv(
     .from('katalog_varianten')
     .update({ aktiv })
     .eq('id', varianteId)
+  if (error) logDbError('app/katalog/actions:katalog_varianten', error)
   if (error) return { ok: false, message: error.message }
   return { ok: true }
 }
@@ -110,6 +113,7 @@ export async function setKatalogPositionAktiv(
     .from('katalog_positionen')
     .update({ aktiv })
     .eq('id', positionId)
+  if (error) logDbError('app/katalog/actions:katalog_positionen', error)
   if (error) return { ok: false, message: error.message }
   return { ok: true }
 }
@@ -144,6 +148,7 @@ export async function recordKatalogLernsignale(
       quelle: r.quelle ?? 'frei',
     }))
   )
+  if (error) logDbError('app/katalog/actions:katalog_lernsignale', error)
   if (error && !/katalog_lernsignale|does not exist/i.test(error.message)) {
     console.warn('[recordKatalogLernsignale]', error.message)
   }

@@ -1,8 +1,8 @@
 'use client'
 
-import Link from 'next/link'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import Link from 'next/link'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
   korrekturKetteMemberRoleLabel,
@@ -49,8 +49,8 @@ export function RechnungKorrekturKetteCard({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
-                padding: '8px 0',
-                borderBottom: '0.5px solid var(--border)',
+                padding: '0.5rem 0',
+                borderBottom: '0.0.3125remrem solid var(--border)',
               }}
             >
               <span
@@ -130,7 +130,7 @@ export function RechnungKorrekturKetteCard({
       {kette.pending ? (
         <p
           style={{
-            margin: '10px 0 0',
+            margin: '0.6250remrem 0 0',
             fontSize: 'var(--fs-meta)',
             color: 'var(--text-3)',
           }}

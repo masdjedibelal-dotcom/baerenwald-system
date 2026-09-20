@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragList, revalidateEinstellungenPath, revalidateHandwerkerList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { toSlug } from '@/lib/utils'
 
@@ -29,6 +35,7 @@ export async function loadComplianceTypen(): Promise<ComplianceTypRow[]> {
     .from('compliance_dokument_typen')
     .select('*')
     .order('sort_order', { ascending: true })
+  if (error) logDbError('app/einstellungen/compliance/actions:compliance_dokument_typen', error)
   if (error) {
     console.warn('loadComplianceTypen', error.message)
     return []
@@ -66,10 +73,11 @@ export async function updateComplianceTyp(
     row.beschreibung = row.beschreibung.trim() || null
   }
   const { error } = await supabase.from('compliance_dokument_typen').update(row).eq('id', id)
+  if (error) logDbError('app/einstellungen/compliance/actions:compliance_dokument_typen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/compliance')
-  revalidatePath('/handwerker')
-  revalidatePath('/auftraege')
+  revalidateEinstellungenPath('/einstellungen/compliance')
+  revalidateHandwerkerList()
+  revalidateAuftragList()
   return { ok: true }
 }
 
@@ -93,9 +101,10 @@ export async function createComplianceTyp(input: {
   let slug = base
   for (let i = 0; i < 50; i++) {
     slug = i === 0 ? base : `${base}_${i}`
-    const { data: ex } = await supabase.from('compliance_dokument_typen').select('id').eq('slug', slug).maybeSingle()
+    const { data: ex, error } = await supabase.from('compliance_dokument_typen').select('id').eq('slug', slug).maybeSingle()
+    if (error) logDbError('app/einstellungen/compliance/actions:compliance_dokument_typen', error)
     if (ex) continue
-    const { error } = await supabase.from('compliance_dokument_typen').insert({
+    const { error: error2 } = await supabase.from('compliance_dokument_typen').insert({
       slug,
       bezeichnung: name,
       beschreibung: input.beschreibung?.trim() || null,
@@ -110,8 +119,13 @@ export async function createComplianceTyp(input: {
       compliance_ebene: input.compliance_ebene ?? 'leistung',
       nur_bei_bauleistung: input.nur_bei_bauleistung ?? false,
     })
-    if (error) return { ok: false, message: error.message }
+    if (error2) logDbError('app/einstellungen/compliance/actions:compliance_dokument_typen', error2)
+    if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+    revalidateEinstellungenPath('/einstellungen/compliance')
+=======
     revalidatePath('/einstellungen/compliance')
+>>>>>>> Stashed changes
     return { ok: true }
   }
   return { ok: false, message: 'Kein freier Slug' }

@@ -1,4 +1,5 @@
 import type { AuftragStatus, LeadStatus } from '@/lib/types'
+import { C } from '@/lib/tokens/colors'
 
 export const PROJEKT_PHASEN = ['Anfrage', 'Angebot', 'Auftrag', 'Abnahme', 'Fertig'] as const
 
@@ -71,12 +72,12 @@ export function mailPhasenStepsHtml(phaseIdx: number): string {
   const cells = PROJEKT_PHASEN.map((label, i) => {
     const done = i < phaseIdx
     const active = i === phaseIdx
-    const color = done || active ? '#2E7D52' : '#D1D5DB'
-    const textColor = active ? '#1A3D2B' : done ? '#2E7D52' : '#9CA3AF'
+    const color = done || active ? C.green : C.gray300
+    const textColor = active ? C.greenDark : done ? C.green : C.gray400
     const weight = active ? '700' : '500'
     const dot = done ? '✓' : active ? '●' : '○'
     return `<td align="center" style="padding:4px 2px;font-size:10px;color:${textColor};font-weight:${weight};">
-      <span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;border:2px solid ${color};color:${color};font-size:11px;">${dot}</span>
+<span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;border:2px solid ${color};color:${color};font-size:11px;">${dot}</span>
       <br/>${label}
     </td>`
   }).join('')

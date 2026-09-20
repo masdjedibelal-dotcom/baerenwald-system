@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailHandwerkerAnfrage } from '@/lib/mail-templates'
@@ -7,6 +8,7 @@ import type { AngebotDetail } from '@/lib/types'
 import { buildPartnerAnfragePortalUrl, buildPartnerLoginLink } from '@/lib/portal-utils'
 import { orgFreigabePartnerBlockMessage } from '@/lib/org/org-portal-helpers'
 import { notifyPartnerHandwerkerAnfrage } from '@/lib/partner/notify-partner-anfrage'
+import { writeAngebotHandwerkerStatus } from '@/lib/status/write-angebot-handwerker-status'
 
 type ZuRow = {
   id: string
@@ -72,7 +74,7 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
   const posAll = normalizeAngebotPositionen(detail.positionen)
   const posFiltered = posAll.filter((p) => p.gewerk_id === row.gewerk_id)
   const ohneLv = Boolean((zuRaw as { ohne_lv?: boolean | null }).ohne_lv)
-  const hwName = row.handwerker?.name ?? 'Handwerkerin'
+  const hwName = row.handwerker?.name ?? 'Partnerin'
   const hwEmail = row.handwerker?.email?.trim() || ''
   const gewerkName = row.gewerke?.name ?? 'Gewerk'
   const kunde = detail.kunden
@@ -120,7 +122,7 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
   if (sendEmail) {
     const toList = options?.to?.map((v) => v.trim()).filter(Boolean) ?? defaultTo
     if (!toList.length) {
-      return { ok: false, message: 'Handwerker hat keine E-Mail-Adresse.', link }
+      return { ok: false, message: 'Partner hat keine E-Mail-Adresse.', link }
     }
 
     const notify = await notifyPartnerHandwerkerAnfrage(row.id)
@@ -156,6 +158,11 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
   }
 
   const now = new Date().toISOString()
+<<<<<<< Updated upstream
+  const { error: upHw } = await writeAngebotHandwerkerStatus(supabaseAdmin, row.id, 'angefragt', {
+    gesendet_at: now,
+  })
+=======
   const { error: upHw } = await supabaseAdmin
     .from('angebot_handwerker')
     .update({
@@ -163,6 +170,8 @@ export async function sendHandwerkerAnfrageFuerZuweisung(
       gesendet_at: now,
     })
     .eq('id', row.id)
+>>>>>>> Stashed changes
+  if (upHw) logDbError('lib/angebote/send-handwerker-anfrage:angebot_handwerker', upHw)
 
   if (upHw) {
     return { ok: false, message: upHw.message, link }

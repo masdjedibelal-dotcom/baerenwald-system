@@ -1,20 +1,29 @@
 'use client'
+import { EMPTY } from '@/lib/crm-labels'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { logDbError } from '@/lib/errors/log-db-error'
+import { openDeleteConfirm, ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { useLocalTransition } from '@/components/ui/action-busy'
+import { Combobox } from '@/components/ui/Combobox'
+import { DateInput } from '@/components/ui/DateInput'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+<<<<<<< Updated upstream
+=======
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   ablehnenPartnerDokument,
   deletePartnerDokument,
   freigebenPartnerDokument,
-  replacePartnerDokumentForTyp,
+  replaceHandwerkerDokumentForTyp,
   signPartnerDokumentUrl,
   updatePartnerDokument,
 } from '@/app/(dashboard)/handwerker/actions'
@@ -32,6 +41,8 @@ import {
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 const BUCKET = 'partner-dokumente'
 const MAX_FILE_BYTES = 5 * 1024 * 1024
@@ -100,6 +111,7 @@ export function PartnerDokumentEditorSheet({
   existing: PartnerDokument | null
   onSaved?: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -234,7 +246,6 @@ export function PartnerDokumentEditorSheet({
     }
   }, [open, existing?.datei_url, existing?.id])
 
-  const canSave = Boolean(effectiveTyp && (isEdit || file))
   const sheetTitle = isReview
     ? titel.trim() || effectiveTyp?.bezeichnung || 'Unterlage'
     : isEdit
@@ -252,7 +263,7 @@ export function PartnerDokumentEditorSheet({
       return
     }
     if (next.size > MAX_FILE_BYTES) {
-      toast.error('Datei zu groß — maximal 5 MB.')
+      toast.error(TOAST.datei_zu_gross_maximal_5_mb)
       if (fileRef.current) fileRef.current.value = ''
       setFile(null)
       return
@@ -275,15 +286,15 @@ export function PartnerDokumentEditorSheet({
   function removeDoc() {
     if (!existing || !effectiveTyp) return
     const label = existing.bezeichnung || effectiveTyp.bezeichnung
-    confirmDelete(
+    openDeleteConfirm(
       `„${label}“ löschen?`,
       async () => {
         const r = await deletePartnerDokument(existing.id, handwerkerId)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Endgültig gelöscht')
+        toast.success(TOAST.endgueltig_geloescht)
         setDirty(false)
         onSaved?.()
         onClose()
@@ -297,10 +308,10 @@ export function PartnerDokumentEditorSheet({
     startTransition(async () => {
       const r = await freigebenPartnerDokument(existing.id, handwerkerId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Dokument angenommen')
+      toast.success(TOAST.dokument_angenommen)
       setDirty(false)
       onSaved?.()
       onClose()
@@ -311,16 +322,16 @@ export function PartnerDokumentEditorSheet({
     if (!existing) return
     const grund = ablehnGrund.trim()
     if (!grund) {
-      toast.error('Bitte einen Ablehnungsgrund angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_einen_ablehnungsgrund_angeben })
       return
     }
     startTransition(async () => {
       const r = await ablehnenPartnerDokument(existing.id, handwerkerId, grund)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Abgelehnt — neu hochladen')
+      toast.success(TOAST.abgelehnt_neu_hochladen)
       setAblehnenOpen(false)
       setAblehnGrund('')
       onSaved?.()
@@ -329,9 +340,12 @@ export function PartnerDokumentEditorSheet({
   }
 
   function speichern() {
-    if (!effectiveTyp) return
+    if (!effectiveTyp) {
+      applyFieldErrors({ _form: 'Bitte Dokumenttyp wählen.' })
+      return
+    }
     if (!isEdit && !file) {
-      toast.error('Bitte Dokument oder Foto auswählen (max. 5 MB).')
+      applyFieldErrors({ _form: TOAST.bitte_dokument_oder_foto_auswaehlen_max_5_mb })
       return
     }
 
@@ -348,9 +362,10 @@ export function PartnerDokumentEditorSheet({
             upsert: false,
             contentType: file.type || undefined,
           })
+          if (upErr) logDbError('components/handwerker/PartnerDokumentEditorSheet:query', upErr)
           if (upErr) throw new Error(upErr.message)
 
-          const ins = await replacePartnerDokumentForTyp({
+          const ins = await replaceHandwerkerDokumentForTyp({
             handwerker_id: handwerkerId,
             auftrag_id: null,
             typ: effectiveTyp.slug,
@@ -372,16 +387,16 @@ export function PartnerDokumentEditorSheet({
             notizen: null,
           })
           if (!r.ok) throw new Error(r.message)
-          toast.success('Unterlage gespeichert')
+          toast.success(TOAST.unterlage_gespeichert)
         } else {
-          toast.error('Bitte Dokument oder Foto auswählen.')
+          applyFieldErrors({ _form: TOAST.bitte_dokument_oder_foto_auswaehlen })
           return
         }
         setDirty(false)
         onSaved?.()
         onClose()
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen')
+        toast.systemError(e, 'ui', 'Speichern fehlgeschlagen')
       }
     })
   }
@@ -397,23 +412,25 @@ export function PartnerDokumentEditorSheet({
     isPdfPath(existing?.datei_url) || isPdfPath(previewUrl) || file?.type === 'application/pdf'
   const showUrl = localPreviewUrl || previewUrl
 
+<<<<<<< Updated upstream
+=======
   const reviewFooter = isReview ? (
     nurEndgueltigLoeschen ? (
-      <Button
+      <MockBtn
         type="button"
-        variant="danger"
+        kind="danger"
         className="w-full"
         disabled={pending}
         loading={pending}
         onClick={removeDoc}
       >
         Endgültig löschen
-      </Button>
+      </MockBtn>
     ) : (
       <div className="flex w-full gap-2">
-        <Button
+        <MockBtn
           type="button"
-          variant="secondary"
+          kind="secondary"
           className="flex-1"
           disabled={pending}
           onClick={() => {
@@ -422,21 +439,22 @@ export function PartnerDokumentEditorSheet({
           }}
         >
           Ablehnen
-        </Button>
-        <Button
+        </MockBtn>
+        <MockBtn
           type="button"
-          variant="primary"
+          kind="primary"
           className="flex-1"
           disabled={pending}
           loading={pending}
           onClick={freigeben}
         >
           Annehmen
-        </Button>
+        </MockBtn>
       </div>
     )
   ) : undefined
 
+>>>>>>> Stashed changes
   return (
     <>
       <EditorSheet
@@ -447,20 +465,46 @@ export function PartnerDokumentEditorSheet({
         dirty={dirty && !isReview}
         size="md"
         onConfirm={isReview ? undefined : speichern}
-        confirmDisabled={!canSave || pending}
+        confirmDisabled={pending}
         confirmBusy={pending}
-        footer={reviewFooter}
+        secondary={
+          isReview && !nurEndgueltigLoeschen
+            ? {
+                label: 'Ablehnen',
+                disabled: pending,
+                onClick: () => {
+                  setAblehnGrund(existing?.ablehnung_grund?.trim() || '')
+                  setAblehnenOpen(true)
+                },
+              }
+            : null
+        }
+        primary={
+          isReview && !nurEndgueltigLoeschen
+            ? {
+                label: 'Annehmen',
+                onClick: freigeben,
+                disabled: pending,
+                busy: pending,
+              }
+            : null
+        }
+        danger={
+          isReview && nurEndgueltigLoeschen
+            ? {
+                label: 'Endgültig löschen',
+                onClick: removeDoc,
+                disabled: pending,
+                busy: pending,
+              }
+            : null
+        }
         headerEnd={
           isReview && !nurEndgueltigLoeschen ? (
-            <button
-              type="button"
-              className="editor-sheet__confirm-text"
-              disabled={pending}
-              onClick={removeDoc}
-              title="Löschen"
-            >
-              Löschen
-            </button>
+            <MockBtn className="editor-sheet__confirm-text" type="button" disabled={pending} onClick={removeDoc} title="Löschen">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                      Löschen
+            </MockBtn>
           ) : undefined
         }
       >
@@ -477,12 +521,12 @@ export function PartnerDokumentEditorSheet({
                 ) : null}
               </div>
               {istGeloescht ? (
-                <p className="m-0 rounded-lg border border-status-cancel-border bg-status-cancel-bg/40 px-3 py-2 text-left text-[length:var(--fs-text)] text-status-cancel-text">
+                <p className="m-0 rounded-card border border-status-cancel-border bg-status-cancel-bg/40 px-3 py-2 text-left text-[length:var(--fs-text)] text-status-cancel-text">
                   Vom Partner gelöscht — Datei bleibt sichtbar, bis du endgültig löschst.
                 </p>
               ) : null}
               {existing?.ablehnung_grund?.trim() ? (
-                <p className="m-0 rounded-lg border border-status-cancel-border bg-status-cancel-bg/40 px-3 py-2 text-left text-[length:var(--fs-text)] text-status-cancel-text">
+                <p className="m-0 rounded-card border border-status-cancel-border bg-status-cancel-bg/40 px-3 py-2 text-left text-[length:var(--fs-text)] text-status-cancel-text">
                   Ablehnung: {existing.ablehnung_grund.trim()}
                 </p>
               ) : null}
@@ -492,12 +536,7 @@ export function PartnerDokumentEditorSheet({
                   Vorschau wird geladen…
                 </p>
               ) : showUrl && previewIsImage ? (
-                <button
-                  type="button"
-                  className="block w-full overflow-hidden rounded-xl border border-bw-border bg-bw-bg p-0 text-left"
-                  onClick={() => setLightboxOpen(true)}
-                  aria-label="Dokument vergrößern"
-                >
+                <MockBtn fullWidth className="block overflow-hidden rounded-button border border-bw-border bg-bw-bg p-0 text-left" type="button" onClick={() => setLightboxOpen(true)} aria-label="Dokument vergrößern">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={showUrl}
@@ -507,9 +546,9 @@ export function PartnerDokumentEditorSheet({
                   <span className="block px-3 py-2 text-center text-[length:var(--fs-meta)] text-bw-text-muted">
                     Tippen zum Vergrößern
                   </span>
-                </button>
+                </MockBtn>
               ) : showUrl && previewIsPdf ? (
-                <div className="overflow-hidden rounded-xl border border-bw-border">
+                <div className="overflow-hidden rounded-sheet border border-bw-border">
                   <iframe title="Dokument" src={showUrl} className="h-[42vh] w-full bg-white" />
                   <a
                     href={showUrl}
@@ -532,18 +571,17 @@ export function PartnerDokumentEditorSheet({
               ) : (
                 <div className="space-y-2">
                   <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
-                    {previewError || 'Keine Vorschau verfügbar.'}
+                    {previewError || EMPTY.vorschauVerfuegbar}
                   </p>
                   {existing?.datei_url ? (
-                    <Button
+                    <MockBtn
                       type="button"
-                      variant="secondary"
-                      size="sm"
+                      kind="secondary" sm
                       disabled={pending}
                       onClick={() => {
                         void signPartnerDokumentUrl(existing.datei_url).then((r) => {
                           if (!r.ok) {
-                            toast.error(r.message)
+                            toast.systemError(r)
                             return
                           }
                           window.open(r.url, '_blank', 'noopener,noreferrer')
@@ -551,7 +589,7 @@ export function PartnerDokumentEditorSheet({
                       }}
                     >
                       In neuem Tab öffnen
-                    </Button>
+                    </MockBtn>
                   ) : null}
                 </div>
               )}
@@ -580,40 +618,30 @@ export function PartnerDokumentEditorSheet({
                 ) : null}
               </div>
 
-              <Input
-                label="Gültig bis"
-                type="date"
-                value={gueltigBis}
-                disabled={pending}
-                onChange={(e) => {
+              <MockField label="Gültig bis"><DateInput value={gueltigBis} disabled={pending} onChange={(e) => {
                   setGueltigBis(e.target.value)
                   markDirty()
-                }}
-              />
+                }} /></MockField>
 
               {allowTypPick ? (
-                <Select
-                  label="Art des Dokuments"
-                  value={selectedSlug}
-                  options={pickOptions}
-                  disabled={pending}
-                  onChange={(e) => {
-                    setSelectedSlug(e.target.value)
-                    markDirty()
-                  }}
-                />
+                <MockField label="Art des Dokuments">
+                  <MockSelect value={selectedSlug} disabled={pending} onChange={(e) => {
+                      setSelectedSlug(e.target.value)
+                      markDirty()
+                    }}>
+                    {pickOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </MockSelect>
+                </MockField>
               ) : null}
 
-              <Input
-                label="Titel"
-                value={titel}
-                disabled={pending}
-                placeholder={effectiveTyp?.bezeichnung || 'Optional'}
-                onChange={(e) => {
+              <MockField label="Titel"><MockInput value={titel} disabled={pending} placeholder={effectiveTyp?.bezeichnung || 'Optional'} onChange={(e) => {
                   setTitel(e.target.value)
                   markDirty()
-                }}
-              />
+                }} /></MockField>
             </>
           )}
         </div>
@@ -629,17 +657,9 @@ export function PartnerDokumentEditorSheet({
         onConfirm={ablehnenSenden}
       >
         <p className="m-0 mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
-          Der Handwerker sieht den Grund im Portal und kann eine neue Datei hochladen.
+          Der Partner sieht den Grund im Portal und kann eine neue Datei hochladen.
         </p>
-        <Textarea
-          label="Begründung"
-          rows={3}
-          plain
-          value={ablehnGrund}
-          disabled={pending}
-          placeholder="z. B. abgelaufen, unleserlich, falsches Dokument…"
-          onChange={(e) => setAblehnGrund(e.target.value)}
-        />
+        <MockField label="Begründung"><MockTextarea rows={3} value={ablehnGrund} disabled={pending} placeholder="z. B. abgelaufen, unleserlich, falsches Dokument…" onChange={(e) => setAblehnGrund(e.target.value)} className="resize-y py-2 min-h-[120px]" /></MockField>
       </ConfirmPopup>
 
       {lightboxOpen && showUrl && previewIsImage ? (

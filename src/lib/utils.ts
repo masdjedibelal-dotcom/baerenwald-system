@@ -1,4 +1,22 @@
 import type { AngebotStatus, AuftragStatus, LeadKanal, LeadStatus } from '@/lib/types'
+import {
+  formatPreis,
+  formatEuro,
+  formatEuroSpanne,
+  formatNumber,
+  formatDatum,
+  formatDatumZeit,
+} from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
+
+export {
+  formatPreis,
+  formatEuro,
+  formatEuroSpanne,
+  formatNumber,
+  formatDatum,
+  formatDatumZeit,
+}
 
 export function toSlug(text: string): string {
   return text
@@ -38,60 +56,6 @@ export function normalizeUrlList(raw: unknown): string[] {
   }
   if (typeof raw === 'string' && raw.trim()) return [raw.trim()]
   return []
-}
-
-const eur0: Intl.NumberFormatOptions = {
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-}
-
-/** Anzeige Gesamt- / Positionspreis: Fix hat Priorität, sonst eine Zahl (kein „X–Y €“). */
-export function formatPreis(fix?: number | null, min?: number | null, max?: number | null): string {
-  if (fix != null && fix > 0) {
-    return `${fix.toLocaleString('de', eur0)} €`
-  }
-  if (min != null && min > 0 && (max == null || max === min)) {
-    return `${min.toLocaleString('de', eur0)} €`
-  }
-  if (min != null && max != null && max > min) {
-    return `${max.toLocaleString('de', eur0)} €`
-  }
-  if (min != null && min > 0) {
-    return `${min.toLocaleString('de', eur0)} €`
-  }
-  if (max != null && max > 0) {
-    return `${max.toLocaleString('de', eur0)} €`
-  }
-  return '—'
-}
-
-export function formatDatum(datum: string): string {
-  const raw = (datum ?? '').trim()
-  if (!raw) return '—'
-  // YYYY-MM-DD → lokal mittags parsen (kein UTC-Tagesversatz)
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw)
-  const d = ymd
-    ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0)
-    : new Date(raw)
-  if (Number.isNaN(d.getTime())) return '—'
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  return `${dd}.${mm}.${yyyy}`
-}
-
-export function formatDatumZeit(datum: string): string {
-  const d = new Date(datum)
-  if (Number.isNaN(d.getTime())) return '—'
-  // Feste Zone — sonst Hydration-Mismatch SSR (UTC) vs. Browser (lokal)
-  return d.toLocaleString('de-DE', {
-    timeZone: 'Europe/Berlin',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 export const STATUS_LABELS: Record<LeadStatus, string> = {
@@ -182,17 +146,17 @@ export const FORMULAR_PHASE_LABELS: Record<string, string> = {
 export const ANGEBOT_STATUS_LABELS: Record<AngebotStatus, string> = {
   entwurf: 'Entwurf',
   gesendet_handwerker: 'An Partner gesendet',
-  handwerker_akzeptiert: 'Partner akzeptiert',
+  handwerker_akzeptiert: 'Angenommen',
   gesendet_kunde: 'Gesendet',
   kunde_akzeptiert: 'Angenommen',
   abgelehnt: 'Abgelehnt',
 }
 
 export const KALENDER_TYP_BG: Record<string, string> = {
-  besichtigung: '#DBEAFE',
-  beginn: '#DCFCE7',
-  abnahme: '#FFEDD5',
-  sonstiges: '#F3F4F6',
+  besichtigung: C.blueBg3,
+  beginn: C.successBg,
+  abnahme: C.amberBg3,
+  sonstiges: C.gray100,
 }
 
 export const BEREICH_LABELS: Record<string, string> = {
@@ -317,13 +281,13 @@ export const BEREICHE_LABELS = BEREICH_LABELS
 /** Budget in Anfragen-Listen (keine Min–Max-Range als „X–Y“). */
 export function formatBudget(budget?: number | null, min?: number | null, max?: number | null): string {
   if (budget != null && budget > 0) {
-    return `ca. ${budget.toLocaleString('de')} €`
+    return `ca. ${formatEuro(budget, { decimals: 0 })}`
   }
   if (min != null && max != null && max > 0) {
-    return `ca. ${Math.round((min + max) / 2).toLocaleString('de')} €`
+    return `ca. ${formatEuro((min + max) / 2, { rounded: true, decimals: 0 })}`
   }
   if (min != null && min > 0) {
-    return `ab ${min.toLocaleString('de')} €`
+    return `ab ${formatEuro(min, { decimals: 0 })}`
   }
   return '—'
 }
@@ -356,20 +320,19 @@ export function formatWebsiteLeadPreis(
   const min = preis_min != null && Number.isFinite(Number(preis_min)) && Number(preis_min) > 0 ? Number(preis_min) : null
   const max = preis_max != null && Number.isFinite(Number(preis_max)) && Number(preis_max) > 0 ? Number(preis_max) : null
   const budget = budget_ca != null && Number.isFinite(Number(budget_ca)) && Number(budget_ca) > 0 ? Number(budget_ca) : null
-
   let basis = ''
   if (min != null && max != null) {
     if (max > min) {
-      basis = `${min.toLocaleString('de', eur0)} – ${max.toLocaleString('de', eur0)} €`
+      basis = formatEuroSpanne(min, max, { decimals: 0 })
     } else {
-      basis = `${min.toLocaleString('de', eur0)} €`
+      basis = formatEuro(min, { decimals: 0 })
     }
   } else if (min != null) {
-    basis = `ab ${min.toLocaleString('de', eur0)} €`
+    basis = `ab ${formatEuro(min, { decimals: 0 })}`
   } else if (max != null) {
-    basis = `bis ${max.toLocaleString('de', eur0)} €`
+    basis = `bis ${formatEuro(max, { decimals: 0 })}`
   } else if (budget != null) {
-    basis = `ca. ${budget.toLocaleString('de', eur0)} €`
+    basis = `ca. ${formatEuro(budget, { decimals: 0 })}`
   }
 
   if (komplex) {
@@ -423,10 +386,131 @@ export function anfragePreisDetailLabel(_kanal: LeadKanal, funnel?: unknown): st
   return isCrmStaffFunnel(funnel) ? 'Preiseinschätzung' : 'Preisrahmen'
 }
 
+const WOCHENTAGE_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const
+const WOCHENTAGE = [
+  'Sonntag',
+  'Montag',
+  'Dienstag',
+  'Mittwoch',
+  'Donnerstag',
+  'Freitag',
+  'Samstag',
+] as const
+const MONATE = [
+  'Januar',
+  'Februar',
+  'März',
+  'April',
+  'Mai',
+  'Juni',
+  'Juli',
+  'August',
+  'September',
+  'Oktober',
+  'November',
+  'Dezember',
+] as const
+const MONATE_KURZ = [
+  'Jan',
+  'Feb',
+  'Mär',
+  'Apr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Dez',
+] as const
+
+function parseDisplayDate(raw: string | Date): Date | null {
+  if (raw instanceof Date) {
+    return Number.isNaN(raw.getTime()) ? null : raw
+  }
+  const s = (raw ?? '').trim()
+  if (!s) return null
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
+  const d = ymd
+    ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0)
+    : new Date(s)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/** Wochentag kurz (Mo … So) — feste DE-Namen, kein Locale-API. */
+export function formatWochentagKurz(datum: string | Date): string {
+  const d = parseDisplayDate(datum)
+  if (!d) return '—'
+  return WOCHENTAGE_KURZ[d.getDay()] ?? '—'
+}
+
+/** „März 2026“ / „März“. */
+export function formatMonatJahr(datum: string | Date, opts?: { withYear?: boolean }): string {
+  const d = parseDisplayDate(datum)
+  if (!d) return '—'
+  const monat = MONATE[d.getMonth()] ?? '—'
+  return opts?.withYear === false ? monat : `${monat} ${d.getFullYear()}`
+}
+
+/** „Mär 2026“ / „Mär“. */
+export function formatMonatKurzJahr(datum: string | Date, opts?: { withYear?: boolean }): string {
+  const d = parseDisplayDate(datum)
+  if (!d) return '—'
+  const monat = MONATE_KURZ[d.getMonth()] ?? '—'
+  return opts?.withYear === false ? monat : `${monat} ${d.getFullYear()}`
+}
+
+/** „MM.YYYY“. */
+export function formatMonatNummerJahr(datum: string | Date): string {
+  const d = parseDisplayDate(datum)
+  if (!d) return '—'
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${mm}.${d.getFullYear()}`
+}
+
+/** „19. März“ / „19. März 2026“. */
+export function formatTagMonatLang(datum: string | Date, opts?: { withYear?: boolean }): string {
+  const d = parseDisplayDate(datum)
+  if (!d) return '—'
+  const monat = MONATE[d.getMonth()] ?? '—'
+  const base = `${d.getDate()}. ${monat}`
+  return opts?.withYear === false ? base : `${base} ${d.getFullYear()}`
+}
+
+/** „Montag, 19. März 2026“ / ohne Jahr. */
+export function formatWochentagDatumLang(
+  datum: string | Date,
+  opts?: { withYear?: boolean }
+): string {
+  const d = parseDisplayDate(datum)
+  if (!d) return '—'
+  const wt = WOCHENTAGE[d.getDay()] ?? '—'
+  const tag = formatTagMonatLang(d, { withYear: opts?.withYear !== false })
+  return `${wt}, ${tag}`
+}
+
+/** „19. Mär“. */
+export function formatTagMonatKurz(datum: string | Date): string {
+  const d = parseDisplayDate(datum)
+  if (!d) return '—'
+  const monat = MONATE_KURZ[d.getMonth()] ?? '—'
+  return `${d.getDate()}. ${monat}`
+}
+
+/** „DD.MM“. */
+export function formatTagMonatNummer(datum: string | Date): string {
+  const d = parseDisplayDate(datum)
+  if (!d) return '—'
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}.${mm}`
+}
+
 /** Relative Zeit für Karten („vor 2h“, „Gestern“ …) */
 export function formatRelativeDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  if (Number.isNaN(date.getTime())) return '—'
+  const date = parseDisplayDate(dateStr)
+  if (!date) return '—'
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const mins = Math.floor(diff / 60000)
@@ -437,27 +521,22 @@ export function formatRelativeDate(dateStr: string): string {
   if (mins < 60) return `vor ${mins} Min`
   if (hours < 24) return `vor ${hours}h`
   if (days === 1) return 'Gestern'
-  if (days < 7) {
-    return date.toLocaleDateString('de-DE', { weekday: 'short' })
-  }
-  return date.toLocaleDateString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-  })
+  if (days < 7) return formatWochentagKurz(date)
+  return formatTagMonatNummer(date)
 }
 
 /** Tabellen-Datum: Heute / Gestern / Wochentag / DD.MM. */
 export function formatLeadListDatum(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
+  const d = parseDisplayDate(iso)
+  if (!d) return '—'
   const now = new Date()
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startD = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const diffDays = Math.round((startToday.getTime() - startD.getTime()) / 86400000)
   if (diffDays === 0) return 'Heute'
   if (diffDays === 1) return 'Gestern'
-  if (diffDays < 7) return d.toLocaleDateString('de-DE', { weekday: 'short' })
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+  if (diffDays < 7) return formatWochentagKurz(d)
+  return formatTagMonatNummer(d)
 }
 
 /** Mock-Timeline-Zeit: „Heute · 09:12“ / „Gestern · 16:40“. */

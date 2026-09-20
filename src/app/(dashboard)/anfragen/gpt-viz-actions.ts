@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { fetchGptZielbildFromWebsite } from '@/lib/gpt-viz/fetch-zielbild'
 import {
   gptHeroBildUrl,
@@ -27,6 +33,7 @@ export async function ensureGptZielbildForLead(
     .select('funnel_daten')
     .eq('id', leadId)
     .maybeSingle()
+  if (loadErr) logDbError('app/anfragen/gpt-viz-actions:leads', loadErr)
 
   if (loadErr || !row) return { ok: false, message: 'Anfrage nicht gefunden.' }
 
@@ -55,12 +62,12 @@ export async function ensureGptZielbildForLead(
       updated_at: new Date().toISOString(),
     })
     .eq('id', leadId)
+  if (updateErr) logDbError('app/anfragen/gpt-viz-actions:leads', updateErr)
 
   if (updateErr) {
     return { ok: true, zielbild_url: fetched.zielbild_url, from_cache: false }
   }
 
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
   return { ok: true, zielbild_url: fetched.zielbild_url, from_cache: false }
 }

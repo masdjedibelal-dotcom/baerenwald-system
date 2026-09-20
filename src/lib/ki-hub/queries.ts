@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { KiEmpfehlungRow, KiHubEmpfehlungenGrouped } from '@/lib/ki-hub/types'
@@ -51,6 +52,7 @@ export async function loadNeuesteEmpfehlungen(limit = 40): Promise<KiEmpfehlungR
     .order('analyse_lauf', { ascending: false })
     .order('prioritaet', { ascending: true })
     .limit(limit)
+  if (error) logDbError('lib/ki-hub/queries:ki_empfehlungen', error)
 
   if (error) {
     console.error('loadNeuesteEmpfehlungen', error.message)
@@ -65,6 +67,7 @@ export async function loadEmpfehlungenFuerLauf(analyseLauf: string): Promise<KiE
     .select('*')
     .eq('analyse_lauf', analyseLauf)
     .order('prioritaet', { ascending: true })
+  if (error) logDbError('lib/ki-hub/queries:ki_empfehlungen', error)
 
   if (error) return []
   return (data ?? []) as KiEmpfehlungRow[]
@@ -86,11 +89,12 @@ export async function markEmpfehlungUmgesetzt(
     .eq('id', empfehlungId)
     .select('id, titel, bereich, content')
     .maybeSingle()
+  if (error) logDbError('lib/ki-hub/queries:ki_empfehlungen', error)
 
   if (error) return { ok: false, message: error.message }
   if (!row) return { ok: false, message: 'Empfehlung nicht gefunden' }
 
-  await supabaseAdmin.from('system_events').insert({
+  const { error: __dbErr1 } = await supabaseAdmin.from('system_events').insert({
     quelle: 'ki_hub',
     event_typ: 'empfehlung_umgesetzt',
     severity: 'info',
@@ -101,6 +105,7 @@ export async function markEmpfehlungUmgesetzt(
       content_typ: (row.content as { typ?: string } | null)?.typ ?? null,
     },
   })
+  if (__dbErr1) logDbError('lib/ki-hub/queries:system_events', __dbErr1)
 
   return { ok: true }
 }
@@ -111,13 +116,14 @@ export async function loadUmgesetzteEmpfehlungen7d(): Promise<
   const seit = new Date()
   seit.setDate(seit.getDate() - 7)
 
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('ki_empfehlungen')
     .select('titel, bereich, umgesetzt_at')
     .eq('umgesetzt', true)
     .gte('umgesetzt_at', seit.toISOString())
     .order('umgesetzt_at', { ascending: false })
     .limit(20)
+  if (error) logDbError('lib/ki-hub/queries:ki_empfehlungen', error)
 
   return (data ?? []) as Pick<KiEmpfehlungRow, 'titel' | 'bereich' | 'umgesetzt_at'>[]
 }

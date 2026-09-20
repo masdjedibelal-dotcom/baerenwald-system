@@ -1,9 +1,7 @@
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { ZahlungsplanZeileBerechnet } from '@/lib/rechnungen/zahlungsplan'
-
-function formatEur(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+import { buildSubject } from '@/lib/mail/build-subject'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type AbschlagTextKontext = {
   anrede: AngebotMailAnrede
@@ -19,11 +17,11 @@ export type AbschlagTextKontext = {
 export function defaultAbschlagPdfEinleitung(ctx: AbschlagTextKontext): string {
   const { anrede, zeile, projektTitel, auftragsReferenz, gesamtNetto, bereitsGestelltBrutto } = ctx
   const projekt = projektTitel.trim() || auftragsReferenz
-  const betrag = formatEur(zeile.netto)
-  const gesamt = formatEur(gesamtNetto)
+  const betrag = formatEuro(zeile.netto, { suffix: false })
+  const gesamt = formatEuro(gesamtNetto, { suffix: false })
 
   if (zeile.istSchluss) {
-    const bereits = bereitsGestelltBrutto > 0 ? formatEur(bereitsGestelltBrutto) : null
+    const bereits = bereitsGestelltBrutto > 0 ? formatEuro(bereitsGestelltBrutto, { suffix: false }) : null
     if (anrede === 'du') {
       return bereits
         ? `Hiermit stellen wir dir die Schlussrechnung für „${projekt}“ (${auftragsReferenz}) in Rechnung. Bereits abgerechnet: ${bereits} brutto. Restbetrag dieser Rechnung: ${betrag} netto.`
@@ -53,19 +51,22 @@ export function defaultAbschlagMailEinleitung(ctx: AbschlagTextKontext): string 
 
 export function defaultAbschlagMailBetreff(
   ctx: AbschlagTextKontext,
-  firmenname: string,
   rechnungsnummerPlaceholder = 'Rechnung'
 ): string {
-  const nr = rechnungsnummerPlaceholder.trim() || 'Rechnung'
+  const nr = rechnungsnummerPlaceholder.trim() || undefined
   const titel = ctx.zeile.titel.trim()
   if (ctx.zeile.istSchluss) {
-    return ctx.anrede === 'du'
-      ? `Schlussrechnung — ${titel} · ${nr} · ${firmenname}`
-      : `Schlussrechnung — ${titel} · ${nr} · ${firmenname}`
+    return buildSubject({
+      objekt: ctx.projektTitel || titel,
+      ereignis: 'Schlussrechnung',
+      nummer: nr,
+    })
   }
-  return ctx.anrede === 'du'
-    ? `Abschlag ${ctx.zeile.index} (${titel}) · ${nr} · ${firmenname}`
-    : `Abschlag ${ctx.zeile.index} (${titel}) · ${nr} · ${firmenname}`
+  return buildSubject({
+    objekt: ctx.projektTitel || titel,
+    ereignis: `Abschlag ${ctx.zeile.index}`,
+    nummer: nr,
+  })
 }
 
 export function abschlagTextKontextFromWizard(input: {

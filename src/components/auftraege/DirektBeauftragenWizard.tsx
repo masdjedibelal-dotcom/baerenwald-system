@@ -15,6 +15,7 @@ import {
 } from '@/lib/posboard/pos-board-line'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Gewerk, LeadDetail, Preisliste } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 function vorhabenTitel(lead: LeadDetail): string {
   const sit = lead.situation?.trim()
@@ -130,7 +131,7 @@ function resolveInitialLines(
 
 /**
  * Abgespeckter DocumentCanvas wie Angebot/Rechnung — nur PosBoard (Leistungen).
- * Speichern (✓ oben rechts) → Auftrag anlegen → Aufrufer öffnet Auftrag/Leistungen.
+ * Footer: Auftrag anlegen (Primary) · Prüfliste bei fehlenden Positionen.
  */
 export function DirektBeauftragenWizard({
   lead,
@@ -150,9 +151,14 @@ export function DirektBeauftragenWizard({
   onDone: (auftragId: string) => void
 }) {
   const [pending, startTransition] = useLocalTransition()
-  const [lines, setLines] = useState<PosBoardLine[]>(() =>
+  const [lines, setLinesState] = useState<PosBoardLine[]>(() =>
     resolveInitialLines(lead, preislisten, initialLines)
   )
+  const [draftDirty, setDraftDirty] = useState(false)
+  const setLines = (next: PosBoardLine[]) => {
+    setDraftDirty(true)
+    setLinesState(next)
+  }
   const istAkut = leadIstAkut(lead)
   const titel = useMemo(() => vorhabenTitel(lead), [lead])
   const gewerkNamen = useMemo(
@@ -163,10 +169,11 @@ export function DirektBeauftragenWizard({
     [gewerke]
   )
 
+  const hatLeistung = lines.some((l) => l.name.trim())
+
   function speichern() {
-    const ok = lines.some((l) => l.name.trim())
-    if (!ok) {
-      toast.error('Mindestens eine Leistung mit Bezeichnung erforderlich.')
+    if (!hatLeistung) {
+      toast.error(TOAST.mindestens_eine_leistung_mit_bezeichnung_erforde)
       return
     }
     startTransition(async () => {
@@ -176,10 +183,10 @@ export function DirektBeauftragenWizard({
         titel,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Direktauftrag angelegt')
+      toast.success(TOAST.direktauftrag_angelegt)
       onDone(r.auftragId)
     })
   }
@@ -191,13 +198,24 @@ export function DirektBeauftragenWizard({
       title="Direkt beauftragen"
       subtitle={istAkut ? `${titel} · Akut` : titel}
       onClose={onClose}
-      onSave={() => speichern()}
-      saveBusy={pending}
+      draftDirty={draftDirty}
       busy={pending}
       busyLabel="Auftrag wird angelegt…"
       className="wizard-flow direkt-beauftragen-canvas"
+      sections={[
+        { id: 'positionen', label: 'Positionen', complete: hatLeistung },
+      ]}
+      primaryAction={{
+        label: 'Auftrag anlegen',
+        onClick: speichern,
+        busy: pending,
+        getGaps: () =>
+          hatLeistung
+            ? []
+            : [{ id: 'positionen', label: 'mindestens 1 Position' }],
+      }}
       document={
-        <div className="dc-doc flex flex-col gap-4">
+        <div className="dc-doc flex flex-col gap-4" data-doc-section="positionen">
           <PosBoard
             title={titel || 'Leistungen'}
             positionen={lines}

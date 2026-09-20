@@ -104,7 +104,7 @@ function buildVerhandlungBadge(input: {
 
   if (!pos.handwerker_id) {
     return {
-      label: 'Kein Handwerker',
+      label: 'Kein Partner',
       badgeClass: 'pos-v2-badge-muted',
       deltaText: null,
     }

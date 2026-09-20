@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
@@ -18,6 +19,7 @@ import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail'
+import { buildInternSubject } from '@/lib/mail/build-subject'
 import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
 import { cronMahnungFuerRechnung, tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import {
@@ -37,6 +39,7 @@ import {
   defaultPartnerPortalInviteText,
   type PortalMailAudience,
 } from '@/lib/portal-utils'
+import { C } from '@/lib/tokens/colors'
 
 /** Website-Lead: Bestätigungsmail; mit `force` auch für manuell erfasste Anfragen (Checkbox). */
 export async function sendAnfrageBestaetigung(
@@ -50,6 +53,7 @@ export async function sendAnfrageBestaetigung(
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:leads', error)
 
   if (error || !lead) {
     return { ok: false, message: error?.message ?? 'Lead nicht gefunden' }
@@ -176,11 +180,12 @@ export async function sendBesichtigungTerminBestaetigung(input: {
     html = html || built.html
     kundeId = built.kundeId
   } else {
-    const { data: lead } = await supabaseAdmin
+    const { data: lead, error } = await supabaseAdmin
       .from('leads')
       .select('kunde_id')
       .eq('id', input.leadId)
       .maybeSingle()
+    if (error) logDbError('app/actions/mails:leads', error)
     kundeId = (lead as { kunde_id?: string | null } | null)?.kunde_id ?? null
   }
 
@@ -263,6 +268,7 @@ export async function sendZahlungserinnerungen(): Promise<{
     .eq('status', 'gesendet')
     .is('bezahlt_at', null)
     .not('faellig_am', 'is', null)
+  if (error) logDbError('app/actions/mails:rechnungen', error)
 
   if (error) {
     console.error('[sendZahlungserinnerungen]', error.message)
@@ -343,7 +349,8 @@ export async function sendZahlungserinnerungen(): Promise<{
           const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
           if (stufe === 1) patch.erinnerung_7_sent_at = new Date().toISOString()
           if (stufe === 2) patch.erinnerung_21_sent_at = new Date().toISOString()
-          await supabaseAdmin.from('rechnungen').update(patch).eq('id', r.id)
+          const { error: __dbErr1 } = await supabaseAdmin.from('rechnungen').update(patch).eq('id', r.id)
+          if (__dbErr1) logDbError('app/actions/mails:rechnungen', __dbErr1)
           ergebnis.push({ id: r.id, aktion: stufe === 1 ? 'erinnerung_1' : 'erinnerung_2' })
         }
         continue
@@ -356,17 +363,21 @@ export async function sendZahlungserinnerungen(): Promise<{
         await sendMail({
           typ: 'intern_hinweis',
           an: intern,
-          betreff: '[Intern] Bärenwald CRM — überfällige Rechnung',
+          betreff: buildInternSubject({
+            objekt: r.rechnungsnummer,
+            ereignis: 'Überfällige Rechnung',
+          }),
           html: `<pre style="font-family:system-ui,sans-serif;font-size:13px;white-space:pre-wrap;">${msg
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')}</pre>`,
         })
       }
-      await supabaseAdmin
+      const { error: __dbErr2 } = await supabaseAdmin
         .from('rechnungen')
         .update({ intern_warnung_30_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('id', r.id)
+      if (__dbErr2) logDbError('app/actions/mails:rechnungen', __dbErr2)
       ergebnis.push({ id: r.id, aktion: 'intern_30' })
     } catch (e) {
       console.error('[sendZahlungserinnerungen] Rechnung', r.id, e)
@@ -387,6 +398,7 @@ export async function buildKundenUpdateVorschau(auftragId: string): Promise<{
     .select('kunden_token, kunden(name, email, typ)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:auftraege', error)
   if (error || !auf) return null
   let token = (auf as { kunden_token?: string | null }).kunden_token?.trim()
   if (!token) {
@@ -411,11 +423,12 @@ export async function sendKundenUpdateMailFromAuftrag(input: {
   betreff: string
   html: string
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, kunde_id')
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:auftraege', error)
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
   const r = await sendMail({
     typ: 'update_hinweis',
@@ -451,7 +464,7 @@ function kundenPortalMailHtml(input: {
   const body = escapeHtml(input.text)
     .split(/\n\n+/)
     .map((p) => p.replace(/\n/g, '<br/>'))
-    .map((p) => `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${p}</p>`)
+    .map((p) => `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${p}</p>`)
     .join('')
   const disclaimer =
     input.portalAudience === 'organisation'
@@ -462,9 +475,9 @@ function kundenPortalMailHtml(input: {
         ? 'Du erhältst diese E-Mail mit Einladung zu MeinBärenwald.'
         : 'Sie erhalten diese E-Mail mit Einladung zu MeinBärenwald.'
   const content = `
-    <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${greeting}</p>
+    <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${greeting}</p>
     ${body}
-    <p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.6;">
+    <p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.6;">
       ${
         input.anrede === 'du'
           ? 'Bei Fragen erreichst du uns jederzeit per Antwort auf diese E-Mail.'
@@ -507,6 +520,7 @@ export async function getKundenPortalMailDraft(
     .select('id, name, email, typ, portal_modus, org_anzeigename')
     .eq('id', kundeId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:kunden', error)
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
   const to = String((kunde as { email?: string | null }).email ?? '').trim()
   if (!to) return { ok: false, message: 'Kunde hat keine E-Mail-Adresse.' }
@@ -555,6 +569,7 @@ export async function sendKundenPortalLinkMail(input: {
     .select('id, name, typ, portal_modus')
     .eq('id', input.kundeId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:kunden', error)
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
 
   const portalLink = buildPortalLoginLink()
@@ -599,6 +614,7 @@ export async function previewKundenPortalMail(input: {
     .select('id, name, typ, portal_modus')
     .eq('id', input.kundeId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:kunden', error)
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
 
   const portalLink = buildPortalLoginLink()
@@ -632,14 +648,14 @@ function partnerPortalMailHtml(input: {
   const body = escapeHtml(input.text)
     .split(/\n\n+/)
     .map((p) => p.replace(/\n/g, '<br/>'))
-    .map((p) => `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${p}</p>`)
+    .map((p) => `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${p}</p>`)
     .join('')
   const portal = buildPartnerPortalButton(input.portalLink)
   const content = `
-    <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${greeting}</p>
+    <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${greeting}</p>
     ${body}
     ${portal}
-    <p style="font-size:13px;color:#6B7280;margin:12px 0 0;line-height:1.6;">
+    <p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.6;">
       Bei Fragen erreichen Sie uns jederzeit per Antwort auf diese E-Mail.
     </p>
   `
@@ -671,9 +687,14 @@ export async function getPartnerPortalMailDraft(
     .select('id, name, email')
     .eq('id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:handwerker', error)
+<<<<<<< Updated upstream
+  if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
+=======
   if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
+>>>>>>> Stashed changes
   const to = String((hw as { email?: string | null }).email ?? '').trim()
-  if (!to) return { ok: false, message: 'Handwerker hat keine E-Mail-Adresse.' }
+  if (!to) return { ok: false, message: 'Partner hat keine E-Mail-Adresse.' }
 
   const portalLink = buildPartnerDashboardLink()
   const name = String((hw as { name?: string | null }).name ?? 'Partner').trim()
@@ -705,7 +726,12 @@ export async function sendPartnerPortalLinkMail(input: {
     .select('id, name')
     .eq('id', input.handwerkerId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:handwerker', error)
+<<<<<<< Updated upstream
+  if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
+=======
   if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
+>>>>>>> Stashed changes
 
   const portalLink = buildPartnerDashboardLink()
   const branding = await getMailBranding(supabaseAdmin)
@@ -738,7 +764,12 @@ export async function previewPartnerPortalMail(input: {
     .select('id, name')
     .eq('id', input.handwerkerId)
     .maybeSingle()
+  if (error) logDbError('app/actions/mails:handwerker', error)
+<<<<<<< Updated upstream
+  if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
+=======
   if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
+>>>>>>> Stashed changes
 
   const portalLink = buildPartnerDashboardLink()
   const branding = await getMailBranding(supabaseAdmin)

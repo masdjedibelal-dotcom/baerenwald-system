@@ -1,7 +1,7 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import { hrefWithAkteFrom, type AkteFromRef } from '@/lib/vorgang/akte-from'
 import { cn } from '@/lib/utils'
@@ -40,7 +40,7 @@ export function PhaseStrip({
       {slots.map((slot, i) => (
         <span key={slot.kind} className="phase-strip__item">
           {i > 0 ? (
-            <ChevronRight className="phase-strip__chev" aria-hidden />
+            <MockIcon n="chevron-right" ctx="default" className="phase-strip__chev" aria-hidden />
           ) : null}
           {slot.active ? (
             <span className="phase-strip__active" aria-current="page">

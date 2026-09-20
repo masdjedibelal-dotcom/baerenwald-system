@@ -1,7 +1,11 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateRechnungList } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
@@ -60,17 +64,19 @@ export async function createRechnungEntwurfFromPositionLebenszyklus(
     .select('id, kunde_id, angebot_id, titel, lead_id, start_datum, end_datum')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:auftraege', error)
   if (error || !auf?.kunde_id) {
     return { ok: false, message: error?.message ?? 'Auftrag/Kunde fehlt.' }
   }
 
-  const { data: positionen } = await supabaseAdmin
+  const { data: positionen, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
       'id, leistung_name, beschreibung, menge, einheit, preis_vk, preis_partner, lohn_vk, typ, verguetung, stundensatz, leistung_status'
     )
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: true })
+  if (error2) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:auftrag_positionen', error2)
 
   const eintraege = await listAuftragPositionEintraege(auftragId)
   const zeitByPos = new Map<string, number>()
@@ -149,8 +155,8 @@ export async function createRechnungEntwurfFromPositionLebenszyklus(
     payload: { rechnung_id: r.id, positionen: rechnungPos.length },
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/rechnungen')
+  revalidateAuftragDetail(auftragId)
+  revalidateRechnungList()
   return { ok: true, rechnungId: r.id }
 }
 
@@ -166,19 +172,21 @@ export async function createPartnerGutschriftEntwurfFromLebenszyklus(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet.' }
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, kunde_id, angebot_id, titel, start_datum, end_datum')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:auftraege', error)
   if (!auf?.kunde_id) return { ok: false, message: 'Auftrag/Kunde fehlt.' }
 
-  const { data: positionen } = await supabaseAdmin
+  const { data: positionen, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
       'id, leistung_name, beschreibung, menge, einheit, preis_partner, stundensatz, verguetung, typ'
     )
     .eq('auftrag_id', auftragId)
+  if (error2) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:auftrag_positionen', error2)
 
   const eintraege = await listAuftragPositionEintraege(auftragId)
   const zeitByPos = new Map<string, number>()
@@ -229,7 +237,8 @@ export async function createPartnerGutschriftEntwurfFromLebenszyklus(
   })
   if (!r.ok) return r
 
-  await supabaseAdmin.from('rechnungen').update({ beleg_typ: 'gutschrift' }).eq('id', r.id)
+  const { error: __dbErr1 } = await supabaseAdmin.from('rechnungen').update({ beleg_typ: 'gutschrift' }).eq('id', r.id)
+  if (__dbErr1) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:rechnungen', __dbErr1)
 
   await writeAuditEvent({
     entityType: 'auftrag',
@@ -241,7 +250,7 @@ export async function createPartnerGutschriftEntwurfFromLebenszyklus(
     payload: { rechnung_id: r.id },
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true, rechnungId: r.id }
 }
 
@@ -260,14 +269,15 @@ export async function pruefeSchwelleWeitereArbeitUndNachtrag(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet.' }
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, lead_id, kunde_id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:auftraege', error)
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden.' }
 
-  const { data: regiePos } = await supabaseAdmin
+  const { data: regiePos, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
       'id, leistung_name, beschreibung, preis_partner, stundensatz, verguetung, anerkennung_status, menge, einheit'
@@ -275,6 +285,7 @@ export async function pruefeSchwelleWeitereArbeitUndNachtrag(
     .eq('auftrag_id', auftragId)
     .eq('typ', 'regie')
     .eq('anerkennung_status', 'anerkannt')
+  if (error2) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:auftrag_positionen', error2)
 
   const eintraege = await listAuftragPositionEintraege(auftragId)
   let betrag = 0
@@ -325,24 +336,27 @@ export async function pruefeSchwelleWeitereArbeitUndNachtrag(
   } | null = null
 
   if (auf.kunde_id) {
-    const { data: k } = await supabaseAdmin
+    const { data: k, error } = await supabaseAdmin
       .from('kunden')
       .select(
         'id, name, email, org_anzeigename, portal_modus, freigabe_modus, freigabe_schwelle_eur, notfall_direkt'
       )
       .eq('id', auf.kunde_id)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:kunden', error)
     org = k as typeof org
   }
   if (auf.lead_id) {
-    const { data: l } = await supabaseAdmin.from('leads').select('*').eq('id', auf.lead_id).maybeSingle()
+    const { data: l, error } = await supabaseAdmin.from('leads').select('*').eq('id', auf.lead_id).maybeSingle()
+    if (error) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:leads', error)
     lead = l as Lead | null
     if (lead?.kunde_objekt_id) {
-      const { data: o } = await supabaseAdmin
+      const { data: o, error } = await supabaseAdmin
         .from('kunden_objekte')
         .select('freigabe_schwelle_eur, notfall_direkt')
         .eq('id', lead.kunde_objekt_id)
         .maybeSingle()
+      if (error) logDbError('app/auftraege/lebenszyklus-abrechnung-actions:kunden_objekte', error)
       objektOverride = o as typeof objektOverride
     }
   }

@@ -1,17 +1,21 @@
 'use client'
-import { actionBusy, useTransition } from '@/components/ui/action-busy'
-import { confirmAction } from '@/components/ui/confirm-action'
 
+import { MockBtn } from '@/components/mock-ui'
+import {
+  DetailShell,
+  EntityDetailLayout,
+  type DetailShellGroup,
+} from '@/components/layout/EntityDetailLayout'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { openActionConfirm, ConfirmPopup } from '@/components/ui/ConfirmPopup'
+import { actionBusy, useTransition } from '@/components/ui/action-busy'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { primaryCta } from '@/lib/vorgang/primary-cta'
 import { gesendetDetailSubline, rechnungStatusDisplay } from '@/lib/status/status-display'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
-import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
@@ -48,9 +52,12 @@ import { RechnungLeistungenMitBautagebuch } from '@/components/rechnungen/Rechnu
 import { RechnungZahlplanTab } from '@/components/rechnungen/RechnungAuftragZahlplanTabs'
 import { RechnungDokumenteTab } from '@/components/rechnungen/RechnungDokumenteTab'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
+<<<<<<< Updated upstream
+=======
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { RechnungKorrekturWahlModal } from '@/components/rechnungen/RechnungKorrekturWahlModal'
 import { RechnungKorrekturKetteCard } from '@/components/rechnungen/RechnungKorrekturKetteCard'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
@@ -79,6 +86,7 @@ import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-
 import { formatEurKurz } from '@/lib/vorgang/projekt-kontext-labels'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { PipelineKontextLead } from '@/lib/leads/pipeline-kontext'
+import { TOAST } from '@/lib/copy'
 import type {
   AngebotDetail,
   AuftragDetail,
@@ -311,7 +319,7 @@ export function RechnungDetailClient({
   ) {
     const r = await updateRechnungStatus(detail.id, s, opts)
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     if (s === 'bezahlt') {
@@ -350,10 +358,10 @@ export function RechnungDetailClient({
     startTransition(async () => {
       const r = await createGutschriftFromRechnung(detail.id)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Gutschrift erstellt')
+      toast.success(TOAST.gutschrift_erstellt)
       router.push(`/rechnungen/${r.id}`)
       refresh()
     })
@@ -362,7 +370,7 @@ export function RechnungDetailClient({
   function handleKorrigieren() {
     const modus = rechnungKorrekturModus(detail.status)
     if (modus === 'gesperrt') {
-      toast.error('Diese Rechnung kann nicht korrigiert werden.')
+      toast.error(TOAST.diese_rechnung_kann_nicht_korrigiert_werden)
       return
     }
     if (modus === 'storno_neu') {
@@ -383,13 +391,13 @@ export function RechnungDetailClient({
       router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kundeId)}`)
       return
     }
-    toast.error('Kein Auftrag verknüpft')
+    toast.error(TOAST.kein_auftrag_verknuepft)
   }
 
   function handleSenden() {
     const istKorrektur = Boolean(String(detail.korrektur_von ?? '').trim())
     const nr = detail.rechnungsnummer?.trim()
-    confirmAction({
+    openActionConfirm({
       title: istKorrektur
         ? 'Korrektur mit Storno wirklich versenden?'
         : 'Rechnung wirklich versenden?',
@@ -406,7 +414,7 @@ export function RechnungDetailClient({
       onConfirm: async () => {
         const r = await sendRechnung(detail.id)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           return
         }
         toast.success(istKorrektur ? 'Korrektur mit Storno gesendet' : 'Rechnung gesendet')
@@ -422,7 +430,7 @@ export function RechnungDetailClient({
         ? await loadRechnungWizardBootstrap(detail.id, detail.auftrag_id)
         : await loadRechnungWizardBootstrapStandalone(detail.id)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setWizardBootstrap(res.bootstrap)
@@ -435,10 +443,10 @@ export function RechnungDetailClient({
     void actionBusy.run('Storno wird zurückgenommen…', async () => {
       const r = await nehmeRechnungStornoZurueck(detail.id)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Wieder als versendet')
+      toast.success(TOAST.wieder_als_versendet)
       setDetail((d) => ({ ...d, status: 'gesendet' }))
       refresh()
     })
@@ -478,13 +486,13 @@ export function RechnungDetailClient({
         onClick: () => {
           const auftragId = detail.auftrag_id?.trim()
           if (!auftragId) {
-            toast.error('Keine Auftragsverknüpfung für Bewertung.')
+            toast.error(TOAST.keine_auftragsverknuepfung_fuer_bewertung)
             return
           }
           startTransition(async () => {
             const r = await loadHandwerkerBewertungZiele(auftragId)
             if (!r.ok) {
-              toast.error(r.message)
+              toast.systemError(r)
               return
             }
             setBewertungZiele(r.ziele)
@@ -772,7 +780,7 @@ export function RechnungDetailClient({
     <AnfrageNotizenTab leadId={leadId} notizen={notizenRows} onReload={() => refresh()} />
   ) : (
     <MockCard title="Notizen" icon="messages" className="dshell-framed">
-      <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
+      <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '0.25rem 0' }}>
         Noch keine Notizen — verknüpfe eine Anfrage oder lege später welche an.
       </div>
     </MockCard>
@@ -824,7 +832,7 @@ export function RechnungDetailClient({
                     ? await loadRechnungWizardBootstrap(rechnungId, detail.auftrag_id)
                     : await loadRechnungWizardBootstrapStandalone(rechnungId)
                   if (!res.ok) {
-                    toast.error(res.message)
+                    toast.systemError(res)
                     return
                   }
                   setWizardBootstrap(res.bootstrap)
@@ -974,27 +982,35 @@ export function RechnungDetailClient({
         onNeueRechnung={handleNeueRechnungAnlegen}
       />
 
-      <Modal
+      <ConfirmPopup
         open={rechnungConfirm === 'gutschrift'}
-        onClose={() => setRechnungConfirm(null)}
+        onClose={() => {
+          if (!pending) setRechnungConfirm(null)
+        }}
         title="Gutschrift anlegen?"
+<<<<<<< Updated upstream
+        busy={pending}
+        confirmLabel={pending ? 'Wird erstellt…' : 'Gutschrift erstellen'}
+        onConfirm={ausfuehrenGutschrift}
+=======
         size="sm"
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" variant="secondary" onClick={() => setRechnungConfirm(null)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setRechnungConfirm(null)}>
               Abbrechen
-            </Button>
-            <Button type="button" variant="primary" onClick={ausfuehrenGutschrift} disabled={pending}>
+            </MockBtn>
+            <MockBtn type="button" kind="primary" onClick={ausfuehrenGutschrift} disabled={pending}>
               Gutschrift erstellen
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Es entsteht ein Gutschrift-Beleg (negative Beträge). Die Originalrechnung wird als
           storniert markiert.
         </p>
-      </Modal>
+      </ConfirmPopup>
 
       <ConfirmPopup
         open={rechnungConfirm === 'bezahlt'}

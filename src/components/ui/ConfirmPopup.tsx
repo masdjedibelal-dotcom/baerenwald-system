@@ -1,11 +1,23 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { MockBtn } from '@/components/mock-ui'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { createPortal } from 'react-dom'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { cn } from '@/lib/utils'
+import { actionBusy } from '@/components/ui/action-busy'
 
 /**
  * Zentriertes Bestätigungs-Popup (Mobil + Desktop) —
@@ -26,6 +38,7 @@ export function ConfirmPopup({
   onSaveDraft,
   discardLabel,
   busy = false,
+  confirmDisabled = false,
 }: {
   open: boolean
   onClose: () => void
@@ -42,6 +55,8 @@ export function ConfirmPopup({
   discardLabel?: string
   /** Speichern läuft — Buttons sperren, Dialog bleibt deckend sichtbar. */
   busy?: boolean
+  /** Confirm-Button sperren (z. B. Namens-Confirm noch falsch). */
+  confirmDisabled?: boolean
 }) {
   const [mounted, setMounted] = useState(false)
   const titleId = useId()
@@ -65,6 +80,7 @@ export function ConfirmPopup({
 
   const leaveLabel = discardLabel ?? confirmLabel
   const unsavedClose = Boolean(onSaveDraft)
+  const confirmBlocked = busy || confirmDisabled
 
   return createPortal(
     <div
@@ -99,9 +115,9 @@ export function ConfirmPopup({
         >
           {unsavedClose ? (
             <>
-              <Button
+              <MockBtn
                 type="button"
-                variant="primary"
+                kind="primary"
                 disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -109,21 +125,26 @@ export function ConfirmPopup({
                 }}
               >
                 {saveDraftLabel}
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="danger"
+                kind="danger"
+<<<<<<< Updated upstream
+                disabled={confirmBlocked}
+=======
                 disabled={busy}
+>>>>>>> Stashed changes
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (confirmBlocked) return
                   onConfirm()
                 }}
               >
                 {leaveLabel}
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="secondary"
+                kind="secondary"
                 disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -131,24 +152,29 @@ export function ConfirmPopup({
                 }}
               >
                 {cancelLabel}
-              </Button>
+              </MockBtn>
             </>
           ) : danger ? (
             <>
-              <Button
+              <MockBtn
                 type="button"
-                variant="danger"
+                kind="danger"
+<<<<<<< Updated upstream
+                disabled={confirmBlocked}
+=======
                 disabled={busy}
+>>>>>>> Stashed changes
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (confirmBlocked) return
                   onConfirm()
                 }}
               >
                 {confirmLabel}
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="primary"
+                kind="primary"
                 disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -156,13 +182,13 @@ export function ConfirmPopup({
                 }}
               >
                 {cancelLabel}
-              </Button>
+              </MockBtn>
             </>
           ) : (
             <>
-              <Button
+              <MockBtn
                 type="button"
-                variant="secondary"
+                kind="secondary"
                 disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -170,23 +196,208 @@ export function ConfirmPopup({
                 }}
               >
                 {cancelLabel}
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="primary"
+                kind="primary"
+<<<<<<< Updated upstream
+                disabled={confirmBlocked}
+=======
                 disabled={busy}
+>>>>>>> Stashed changes
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (confirmBlocked) return
                   onConfirm()
                 }}
               >
                 {confirmLabel}
-              </Button>
+              </MockBtn>
             </>
           )}
         </div>
       </div>
     </div>,
     document.body
+  )
+}
+
+/** Imperative Anfrage an ConfirmPopupHost (E1). */
+export type OpenConfirmPopupOpts = {
+  title: string
+  body?: ReactNode
+  sub?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  danger?: boolean
+  /** Busy-Label; bei delete-Default „Wird gelöscht…“; null = kein Overlay */
+  busyLabel?: string | null
+  /** Lösch-Defaults (Titel-?, Body, danger, Labels) */
+  variant?: 'delete' | 'action'
+  onConfirm: () => void | Promise<void>
+}
+
+type HostState = OpenConfirmPopupOpts & { title: string }
+
+let globalOpenConfirmPopup: ((opts: OpenConfirmPopupOpts) => void) | null = null
+
+/** Öffnet ConfirmPopup über ConfirmPopupHost (E1, imperative Bestätigung). */
+export function openConfirmPopup(opts: OpenConfirmPopupOpts) {
+  if (globalOpenConfirmPopup) {
+    globalOpenConfirmPopup(opts)
+    return
+  }
+  console.warn('[openConfirmPopup] ConfirmPopupHost fehlt — Abbruch')
+}
+
+const DELETE_DEFAULT_BODY =
+  'Der Eintrag wird unwiderruflich gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden.'
+
+/** Lösch-Bestätigung (E1) — Titel, Callback, optionale Texte/Labels. */
+export function openDeleteConfirm(
+  title: string,
+  onConfirm: () => void | Promise<void>,
+  opts?: {
+    sub?: string
+    body?: ReactNode
+    confirmLabel?: string
+    cancelLabel?: string
+    busyLabel?: string | null
+  }
+) {
+  openConfirmPopup({
+    variant: 'delete',
+    title,
+    onConfirm,
+    sub: opts?.sub,
+    body: opts?.body,
+    confirmLabel: opts?.confirmLabel,
+    cancelLabel: opts?.cancelLabel,
+    busyLabel: opts?.busyLabel,
+    danger: true,
+  })
+}
+
+/** Aktions-Bestätigung (E1) — Objekt mit title/onConfirm und optionalen Labels. */
+export function openActionConfirm(opts: {
+  title: string
+  body?: ReactNode
+  confirmLabel?: string
+  cancelLabel?: string
+  danger?: boolean
+  busyLabel?: string | null
+  onConfirm: () => void | Promise<void>
+}) {
+  openConfirmPopup({
+    variant: 'action',
+    title: opts.title,
+    body: opts.body,
+    confirmLabel: opts.confirmLabel,
+    cancelLabel: opts.cancelLabel,
+    danger: opts.danger,
+    busyLabel: opts.busyLabel,
+    onConfirm: opts.onConfirm,
+  })
+}
+
+/** Dashboard-Host: ein ConfirmPopup für alle imperativen Bestätigungen. */
+export function ConfirmPopupHost({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<HostState | null>(null)
+  const [pending, setPending] = useState(false)
+
+  const openFn = useCallback((opts: OpenConfirmPopupOpts) => {
+    setPending(false)
+    const variant = opts.variant ?? (opts.danger ? 'delete' : 'action')
+    let title = opts.title.trim()
+    if (variant === 'delete' && !title.endsWith('?')) title = `${title}?`
+    setState({
+      ...opts,
+      title,
+      variant,
+      confirmLabel:
+        opts.confirmLabel?.trim() ||
+        (variant === 'delete' ? 'Löschen' : 'Bestätigen'),
+      cancelLabel: opts.cancelLabel?.trim() || 'Abbrechen',
+      danger: opts.danger ?? variant === 'delete',
+    })
+  }, [])
+
+  globalOpenConfirmPopup = openFn
+
+  async function handleConfirm() {
+    if (!state || pending) return
+    const run = state.onConfirm
+    const variant = state.variant ?? 'action'
+    const busy =
+      state.busyLabel === null
+        ? null
+        : state.busyLabel !== undefined
+          ? state.busyLabel
+          : variant === 'delete'
+            ? 'Wird gelöscht…'
+            : undefined
+    setPending(true)
+    try {
+      if (busy === null) {
+        await Promise.resolve(run())
+      } else if (busy) {
+        await actionBusy.run(busy, async () => {
+          await Promise.resolve(run())
+        })
+      } else if (variant === 'delete') {
+        actionBusy.show('Wird gelöscht…')
+        try {
+          await Promise.resolve(run())
+        } finally {
+          actionBusy.hide()
+        }
+      } else {
+        await Promise.resolve(run())
+      }
+      setState(null)
+    } catch {
+      // Toast vom Aufrufer — Dialog bleibt offen
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const variant = state?.variant ?? 'action'
+  const pendingLabel =
+    variant === 'delete' ? 'Wird gelöscht…' : 'Wird gespeichert…'
+
+  return (
+    <>
+      {children}
+      <ConfirmPopup
+        open={Boolean(state)}
+        onClose={() => {
+          if (!pending) setState(null)
+        }}
+        title={state?.title ?? ''}
+        confirmLabel={pending ? pendingLabel : state?.confirmLabel}
+        cancelLabel={state?.cancelLabel}
+        danger={state?.danger}
+        busy={pending}
+        onConfirm={() => {
+          void handleConfirm()
+        }}
+      >
+        {state ? (
+          variant === 'delete' ? (
+            <>
+              {state.sub ? <p>{state.sub}</p> : <p>Dauerhaft entfernen.</p>}
+              <p>{pending ? 'Bitte warten…' : state.body ?? DELETE_DEFAULT_BODY}</p>
+            </>
+          ) : state.body ? (
+            typeof state.body === 'string' ? (
+              <p>{state.body}</p>
+            ) : (
+              state.body
+            )
+          ) : null
+        ) : null}
+      </ConfirmPopup>
+    </>
   )
 }

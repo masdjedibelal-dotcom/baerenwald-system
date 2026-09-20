@@ -1,7 +1,11 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
-import { revalidatePath } from 'next/cache'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { handwerkerAusGeschwisterPositionen, ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
@@ -44,8 +48,9 @@ export async function updateAuftragNotizen(
     .from('auftraege')
     .update({ notizen, updated_at: new Date().toISOString() })
     .eq('id', auftragId)
+  if (error) logDbError('app/auftraege/actions:auftraege', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -97,6 +102,7 @@ async function setAuftragStatus(
     }
   }
   const { error } = await supabase.from('auftraege').update(patch).eq('id', auftragId)
+  if (error) logDbError('app/auftraege/actions:auftraege', error)
   if (error) return { ok: false, message: error.message }
 
   if (
@@ -117,12 +123,13 @@ async function setAuftragStatus(
   }
 
   if (status === 'in_arbeit') {
-    const { data: exists } = await supabase
+    const { data: exists, error } = await supabase
       .from('auftrag_milestones')
       .select('id')
       .eq('auftrag_id', auftragId)
       .eq('titel', 'Arbeiten gestartet')
       .maybeSingle()
+    if (error) logDbError('app/auftraege/actions:auftrag_milestones', error)
     if (!exists) {
       const ins = await supabase.from('auftrag_milestones').insert({
         auftrag_id: auftragId,
@@ -146,6 +153,7 @@ async function setAuftragStatus(
       .update({ freigabe_datum: freigabeStr })
       .eq('auftrag_id', auftragId)
       .eq('status', 'einbehalten')
+    if (eErr) logDbError('app/auftraege/actions:einbehalte', eErr)
     if (eErr) console.warn('[einbehalte]', eErr.message)
   }
 
@@ -158,8 +166,7 @@ async function setAuftragStatus(
     erstellt_von: uid,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -199,6 +206,7 @@ export async function completeAuftragNachEndabrechnung(input: {
     .select('id, status')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/actions:auftraege', error)
 
   if (error) return { ok: false, message: error.message }
   if (!row) return { ok: true, changed: false }
@@ -214,7 +222,6 @@ export async function completeAuftragNachEndabrechnung(input: {
   })
   if (!res.ok) return res
 
-  revalidatePath('/vorgaenge')
   return { ok: true, changed: true }
 }
 
@@ -228,9 +235,9 @@ export async function updateAuftragFortschrittManual(
     .from('auftraege')
     .update({ fortschritt: v, updated_at: new Date().toISOString() })
     .eq('id', auftragId)
+  if (error) logDbError('app/auftraege/actions:auftraege', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -249,9 +256,9 @@ export async function updateAuftragBetreuer(
     .from('auftraege')
     .update({ betreuer_id: id, updated_at: new Date().toISOString() })
     .eq('id', auftragId)
+  if (error) logDbError('app/auftraege/actions:auftraege', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -280,10 +287,9 @@ export async function updateAuftragProjektFelder(
     db.wiederkehr_turnus = ist ? patch.wiederkehr_turnus?.trim() || null : null
   }
   const { error } = await supabase.from('auftraege').update(db).eq('id', auftragId)
+  if (error) logDbError('app/auftraege/actions:auftraege', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
-  revalidatePath('/vorgaenge')
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -332,10 +338,11 @@ export async function addAuftragPosition(
     data.handwerker_status !== undefined ? data.handwerker_status?.trim() || null : undefined
 
   if (handwerkerId === undefined) {
-    const { data: siblings } = await supabase
+    const { data: siblings, error } = await supabase
       .from('auftrag_positionen')
       .select('handwerker_id, handwerker_status, gewerk_block_key, gewerk_slug, gewerk_name')
       .eq('auftrag_id', auftragId)
+    if (error) logDbError('app/auftraege/actions:auftrag_positionen', error)
 
     const erbt = handwerkerAusGeschwisterPositionen(siblings ?? [], {
       gewerk_block_key: data.gewerk_block_key,
@@ -350,13 +357,14 @@ export async function addAuftragPosition(
     }
   }
 
-  const { data: last } = await supabase
+  const { data: last, error } = await supabase
     .from('auftrag_positionen')
     .select('sort_order')
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/actions:auftrag_positionen', error)
   const nextOrder = (last?.sort_order ?? 0) + 10
   const partnerMeta =
     handwerkerId != null
@@ -366,7 +374,7 @@ export async function addAuftragPosition(
         )
       : {}
 
-  const { data: inserted, error } = await supabase
+  const { data: inserted, error: error2 } = await supabase
     .from('auftrag_positionen')
     .insert({
       auftrag_id: auftragId,
@@ -393,7 +401,8 @@ export async function addAuftragPosition(
     })
     .select('id')
     .single()
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/auftraege/actions:auftrag_positionen', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   if (handwerkerId) {
     await ensureAngebotHandwerkerGewerkId(supabase, {
@@ -406,7 +415,7 @@ export async function addAuftragPosition(
 
   await syncAuftragIstBauprojekt(auftragId)
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true, id: inserted.id as string }
 }
 
@@ -449,15 +458,17 @@ export async function updateAuftragPosition(
 
   let vorherHandwerkerId: string | null = null
   if (positionPatchBenoetigtVertragSync(patch)) {
-    const { data: current } = await supabase
+    const { data: current, error } = await supabase
       .from('auftrag_positionen')
       .select('handwerker_id')
       .eq('id', posId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/actions:auftrag_positionen', error)
     vorherHandwerkerId = current?.handwerker_id ? String(current.handwerker_id) : null
   }
 
   const { error } = await supabase.from('auftrag_positionen').update(patch).eq('id', posId)
+  if (error) logDbError('app/auftraege/actions:auftrag_positionen', error)
   if (error) return { ok: false, message: error.message }
 
   if (positionPatchBenoetigtVertragSync(patch)) {
@@ -476,7 +487,7 @@ export async function updateAuftragPosition(
   }
 
   await syncAuftragIstBauprojekt(auftragId)
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -485,14 +496,16 @@ export async function deleteAuftragPosition(
   auftragId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: pos } = await supabase
+  const { data: pos, error } = await supabase
     .from('auftrag_positionen')
     .select('handwerker_id')
     .eq('id', posId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/actions:auftrag_positionen', error)
 
-  const { error } = await supabase.from('auftrag_positionen').delete().eq('id', posId)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('auftrag_positionen').delete().eq('id', posId)
+  if (error2) logDbError('app/auftraege/actions:auftrag_positionen', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   if (pos?.handwerker_id) {
     syncProjektvertragStilleFireAndForget(auftragId, String(pos.handwerker_id))
@@ -501,7 +514,7 @@ export async function deleteAuftragPosition(
   }
 
   await syncAuftragIstBauprojekt(auftragId)
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -681,10 +694,11 @@ export async function completeAuftragAbnahme(auftragId: string) {
 
   const { supabaseAdmin } = await serverRuntime()
   const { registriereGewaehrleistung } = await import('@/lib/org/hv-auftrag-actions')
-  const { data: hwLinks } = await supabaseAdmin
+  const { data: hwLinks, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('handwerker_id')
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/actions:auftrag_handwerker', error)
 
   const partnerIds = Array.from(
     new Set((hwLinks ?? []).map((r) => r.handwerker_id).filter(Boolean))
@@ -703,6 +717,7 @@ export async function completeAuftragAbnahme(auftragId: string) {
         })(),
         status: 'aktiv',
       })
+      if (gwErr) logDbError('app/auftraege/actions:gewaehrleistungen', gwErr)
       if (gwErr) console.error('[gewaehrleistung]', gwErr.message)
     }
   } else {
@@ -745,7 +760,7 @@ export async function completeAuftragAbnahme(auftragId: string) {
     sichtbar_fuer_kunde: true,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true as const }
 }
 
@@ -779,29 +794,33 @@ export async function createFormularEintragUndEmail(input: CreateFormularEintrag
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/actions:formular_eintraege', error)
 
   if (error || !row) return { ok: false as const, message: error?.message ?? 'Speichern fehlgeschlagen' }
 
-  const { data: tpl } = await supabaseAdmin
+  const { data: tpl, error: error2 } = await supabaseAdmin
     .from('formular_templates')
     .select('name')
     .eq('id', input.templateId)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/actions:formular_templates', error2)
 
   const auftrag = await fetchAuftragDetail(input.auftragId)
   const kunde = auftrag?.kunden
-  const { data: gw } = await supabaseAdmin
+  const { data: gw, error: error3 } = await supabaseAdmin
     .from('gewerke')
     .select('name')
     .eq('id', input.gewerkId)
     .maybeSingle()
+  if (error3) logDbError('app/auftraege/actions:gewerke', error3)
 
   const phaseLabel = FORMULAR_PHASE_LABELS[input.phase] ?? input.phase
-  const { data: hw } = await supabaseAdmin
+  const { data: hw, error: error4 } = await supabaseAdmin
     .from('handwerker')
     .select('name')
     .eq('id', input.handwerkerId)
     .maybeSingle()
+  if (error4) logDbError('app/auftraege/actions:handwerker', error4)
 
   const branding = await getMailBranding(supabaseAdmin)
   const link = `${getPublicAppUrl()}/formular/${token}`
@@ -839,7 +858,7 @@ export async function createFormularEintragUndEmail(input: CreateFormularEintrag
     email_log_id: sent.emailLogId ?? null,
   })
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true as const }
 }
 
@@ -881,6 +900,7 @@ export async function createNachtragEntwurfFromRegiebericht(
     .eq('id', eintragId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/actions:formular_eintraege', error)
 
   if (error || !row) return { ok: false, message: error?.message ?? 'Eintrag nicht gefunden' }
 
@@ -934,6 +954,7 @@ export async function createNachtragEntwurfFromRegiebericht(
     gesamt_max: brutto,
     status: 'entwurf',
   })
+  if (insErr) logDbError('app/auftraege/actions:nachtraege', insErr)
 
   if (insErr) return { ok: false, message: insErr.message }
 
@@ -946,6 +967,6 @@ export async function createNachtragEntwurfFromRegiebericht(
     erstellt_von: uid,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }

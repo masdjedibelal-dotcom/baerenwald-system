@@ -1,14 +1,10 @@
-import type { LucideIcon } from 'lucide-react'
-import { Bell, Building2, List, Users } from 'lucide-react'
-
 export type EinstellungenTabId = 'firma' | 'team' | 'preise' | 'benachrichtigungen'
 
 export type EinstellungenTabDef = {
   id: EinstellungenTabId
   href: string
   label: string
-  icon: LucideIcon
-  /** Mock-Icon-Name für DetailShell-Nav. */
+  /** Mock-Icon-Name für MockIcon / DetailShell-Nav. */
   mockIcon: string
   /** Pfade, bei denen dieser Tab als aktiv gilt (inkl. Legacy-Redirects). */
   matchPrefixes: string[]
@@ -20,7 +16,6 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     id: 'firma',
     href: '/einstellungen/firma',
     label: 'Firma',
-    icon: Building2,
     mockIcon: 'building',
     matchPrefixes: ['/einstellungen/firma'],
   },
@@ -28,7 +23,6 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     id: 'team',
     href: '/einstellungen/benutzer',
     label: 'Team',
-    icon: Users,
     mockIcon: 'users',
     matchPrefixes: ['/einstellungen/benutzer'],
   },
@@ -36,7 +30,6 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     id: 'preise',
     href: '/einstellungen/preise',
     label: 'Preislisten',
-    icon: List,
     mockIcon: 'list',
     matchPrefixes: [
       '/einstellungen/preise',
@@ -49,7 +42,6 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     id: 'benachrichtigungen',
     href: '/einstellungen/benachrichtigungen',
     label: 'Benachrichtigungen',
-    icon: Bell,
     mockIcon: 'bell',
     matchPrefixes: ['/einstellungen/benachrichtigungen'],
   },

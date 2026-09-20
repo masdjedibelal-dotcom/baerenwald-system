@@ -8,6 +8,7 @@ import {
   HINWEIS_REVERSE_CHARGE_13B,
   HINWEIS_35A_TEMPLATE,
 } from '@/lib/rechnung-config'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type AngebotRechtshinweise = {
   hinweis_35a: boolean
@@ -50,8 +51,7 @@ export function parseRechtshinweiseFromWizardMeta(
 }
 
 export function formatHinweis35a(lohnNetto: number): string {
-  const f = (n: number) =>
-    n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const f = (n: number) => formatEuro(n, { suffix: false })
   return HINWEIS_35A_TEMPLATE.replace('{lohnNetto}', `${f(lohnNetto)} €`)
 }
 

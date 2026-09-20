@@ -1,18 +1,20 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { getHandwerkerEinreichungPdfUrl, loescheHandwerkerAnfrage } from '@/app/(dashboard)/angebote/actions'
 import type { AnfragePartnerEinholungRow } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
 import { LvAnfrageDetailSheet } from '@/components/anfragen/LvAnfrageDetailSheet'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { darfPartnerLvAnfrageLoeschen } from '@/lib/angebote/partner-einholung'
 import { hasHwEinreichung, hwStatusLabel } from '@/lib/partner/handwerker-einreichung'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import type { StatusTone } from '@/lib/status/status-tone'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 function statusLabel(z: AnfragePartnerEinholungRow): string {
   if (hasHwEinreichung(z)) {
@@ -63,13 +65,13 @@ function EinholungRow({
   const name =
     (z.handwerker as { firma?: string | null } | null)?.firma?.trim() ||
     z.handwerker?.name?.trim() ||
-    'Handwerker'
+    'Partner'
   const badge = statusForBadge(z)
   const eingereicht = hasHwEinreichung(z)
 
   function loeschen(e: React.MouseEvent) {
     e.stopPropagation()
-    confirmDelete(
+    openDeleteConfirm(
       'LV-Anfrage löschen?',
       async () => {
         const res = await loescheHandwerkerAnfrage({
@@ -77,10 +79,10 @@ function EinholungRow({
           zuweisungId: z.id,
         })
         if (!res.ok) {
-          toast.error(res.message)
+          toast.systemError(res)
           throw new Error(res.message)
         }
-        toast.success('LV-Anfrage gelöscht')
+        toast.success(TOAST.lv_anfrage_geloescht)
         onDeleted?.()
       },
       {
@@ -91,14 +93,10 @@ function EinholungRow({
 
   return (
     <li className="lv-anfrage-item">
-      <button
-        type="button"
-        className={cn(
-          'lv-anfrage-row-btn einst-list-item w-full text-left',
+      <MockBtn fullWidth className={cn(
+          'lv-anfrage-row-btn einst-list-item text-left',
           eingereicht && 'lv-anfrage-row-btn--eingereicht'
-        )}
-        onClick={onOpen}
-      >
+        )} type="button" onClick={onOpen}>
         <div className="min-w-0 flex-1">
           <div className="text-[length:var(--fs-text)] font-semibold text-[var(--text)]">{name}</div>
           <div className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
@@ -114,7 +112,7 @@ function EinholungRow({
             </MockBtn>
           ) : null}
         </div>
-      </button>
+      </MockBtn>
     </li>
   )
 }

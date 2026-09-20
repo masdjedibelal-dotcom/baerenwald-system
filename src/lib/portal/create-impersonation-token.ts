@@ -1,6 +1,7 @@
 /**
  * CRM → Portal Impersonation Token (HMAC, kompatibel mit Portal /auth/crm-enter).
  */
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createHmac, randomUUID } from 'crypto'
 import { publicWebsiteBaseUrl } from '@/lib/portal-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -78,6 +79,7 @@ export async function createPortalImpersonationUrl(input: {
     role_label: input.roleLabel,
     expires_at: new Date(exp * 1000).toISOString(),
   })
+  if (error) logDbError('lib/portal/create-impersonation-token:crm_impersonation_tokens', error)
   if (error) {
     // Tabelle fehlt evtl. lokal — Token trotzdem ausstellen, One-time dann soft
     console.warn('[impersonation] Token-Insert:', error.message)

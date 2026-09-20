@@ -2,7 +2,7 @@ import type { KommunikationListeZeile } from '@/lib/kommunikation/types'
 
 export type KommunikationMailArt = 'system' | 'direkt'
 
-export type KommunikationMailFilter = 'alle' | KommunikationMailArt
+export type MailListeArtFilter = 'alle' | KommunikationMailArt
 
 const SYSTEM_FROM = 'Bärenwald'
 
@@ -31,7 +31,7 @@ export function kommunikationMailAbsender(
 
 export function filterKommunikationRows(
   rows: KommunikationListeZeile[],
-  filter: KommunikationMailFilter
+  filter: MailListeArtFilter
 ): KommunikationListeZeile[] {
   const ausgehend = rows.filter((r) => r.richtung !== 'empfangen')
   if (filter === 'alle') return ausgehend

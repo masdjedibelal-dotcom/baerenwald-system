@@ -1,13 +1,14 @@
 'use client'
+import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { toast } from '@/components/ui/app-toast'
 import { updateLeadBeschreibung, updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
 import { kanalLabel } from '@/lib/utils'
 import type { LeadDetail } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 /**
  * Split-over „Anfrage bearbeiten“ (Desktop Slide-over · mobil Bottom Sheet).
@@ -97,15 +98,15 @@ export function AnfragePhaseEditSheet({
         plz: plz.trim() || null,
       })
       if (!k.ok) {
-        toast.error(k.message)
+        toast.systemError(k)
         return
       }
       const b = await updateLeadBeschreibung(lead.id, notiz)
       if (!b.ok) {
-        toast.error(b.message)
+        toast.systemError(b)
         return
       }
-      toast.success('Anfrage gespeichert')
+      toast.success(TOAST.anfrage_gespeichert)
       setBaseline({
         name,
         telefon,
@@ -129,7 +130,13 @@ export function AnfragePhaseEditSheet({
       size="lg"
       dirty={dirty}
       overlayClassName="editor-sheet-overlay--stack"
-      footer={<AnfragePhaseEditFooter pending={pending} onSave={save} />}
+      primary={{
+        label: 'Speichern',
+        onClick: save,
+        disabled: pending,
+        busy: pending,
+        icon: 'check',
+      }}
     >
       <div className="form-grid" style={{ gridTemplateColumns: '1fr' }}>
         <p className="text-[length:var(--fs-meta)] font-bold uppercase tracking-wide text-bw-text-muted">
@@ -137,15 +144,15 @@ export function AnfragePhaseEditSheet({
         </p>
         <label className="field">
           <span>Name</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+          <MockInput value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         <label className="field">
           <span>Telefon</span>
-          <input className="input" value={telefon} onChange={(e) => setTelefon(e.target.value)} />
+          <MockInput value={telefon} onChange={(e) => setTelefon(e.target.value)} />
         </label>
         <label className="field">
           <span>E-Mail</span>
-          <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <MockInput value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
 
         <p className="text-[length:var(--fs-meta)] font-bold uppercase tracking-wide text-bw-text-muted mt-3">
@@ -153,63 +160,35 @@ export function AnfragePhaseEditSheet({
         </p>
         <label className="field">
           <span>Leistung / Projekt</span>
-          <input
-            className="input"
-            value={anliegen}
-            onChange={(e) => setAnliegen(e.target.value)}
-            readOnly
-            title="Vorhaben über Bearbeiten-Wizard ändern"
-          />
+          <MockInput value={anliegen} onChange={(e) => setAnliegen(e.target.value)} readOnly title="Vorhaben über Bearbeiten-Wizard ändern" />
         </label>
         <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <label className="field">
             <span>Region / Stadtteil</span>
-            <input className="input" value={ort} onChange={(e) => setOrt(e.target.value)} readOnly />
+            <MockInput value={ort} onChange={(e) => setOrt(e.target.value)} readOnly />
           </label>
           <label className="field">
             <span>PLZ</span>
-            <input className="input" value={plz} onChange={(e) => setPlz(e.target.value)} />
+            <MockInput value={plz} onChange={(e) => setPlz(e.target.value)} />
           </label>
           <label className="field">
             <span>Budget von</span>
-            <input className="input" value={budgetVon} readOnly />
+            <MockInput value={budgetVon} readOnly />
           </label>
           <label className="field">
             <span>Budget bis</span>
-            <input className="input" value={budgetBis} readOnly />
+            <MockInput value={budgetBis} readOnly />
           </label>
         </div>
         <label className="field">
           <span>Quelle</span>
-          <input className="input" value={lead ? kanalLabel(lead.kanal) : ''} readOnly />
+          <MockInput value={lead ? kanalLabel(lead.kanal) : ''} readOnly />
         </label>
         <label className="field">
           <span>Notiz</span>
-          <textarea
-            className="input"
-            rows={4}
-            value={notiz}
-            onChange={(e) => setNotiz(e.target.value)}
-          />
+          <MockTextarea rows={4} value={notiz} onChange={(e) => setNotiz(e.target.value)} />
         </label>
       </div>
     </EditorSheet>
-  )
-}
-
-function AnfragePhaseEditFooter({
-  pending,
-  onSave,
-}: {
-  pending: boolean
-  onSave: () => void
-}) {
-  return (
-    <div className="phase-sheet-footer">
-      <button type="button" className="btn primary" onClick={onSave} disabled={pending}>
-        <MockIcon ctx="default" n="check" size={14} />
-        Speichern
-      </button>
-    </div>
   )
 }

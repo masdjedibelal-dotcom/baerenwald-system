@@ -1,10 +1,15 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockFormSection, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockChip } from '@/components/mock-ui/MockPrimitives'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { MockBtn, MockChip } from '@/components/mock-ui/MockPrimitives'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { toast } from '@/components/ui/app-toast'
@@ -22,9 +27,9 @@ import {
 } from '@/lib/preislisten-einheiten'
 import { PreislistenCsvImportModal } from '@/components/preislisten/PreislistenCsvImportModal'
 import type { PreislistenImportResponse } from '@/lib/preislisten-import'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { EntityMenuItem } from '@/lib/entity-menu'
+import { formatNumber } from '@/lib/format/geld-datum'
+import { TOAST } from '@/lib/copy'
 
 const COLS = 'minmax(0, 1.6fr) 120px 140px auto'
 
@@ -34,7 +39,7 @@ function isPresetEinheit(e: string): boolean {
 
 function formatPreisLabel(pl: Preisliste): string {
   const p = preislisteEinzelpreis(pl)
-  return `${p.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €`
+  return `${formatNumber(p, { decimals: 0 })} €`
 }
 
 type LeistungForm = {
@@ -190,7 +195,7 @@ export function PreislistenClient({
             )
           )
         )
-        toast.success('Leistung gespeichert')
+        toast.success(TOAST.leistung_gespeichert)
       } else {
         const res = await createPreisliste({
           gewerk_id: form.gewerk_id,
@@ -220,25 +225,25 @@ export function PreislistenClient({
             },
           ])
         )
-        toast.success('Leistung angelegt')
+        toast.success(TOAST.leistung_angelegt)
       }
       closeModal()
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
   function softDeleteLeistung(row: Preisliste) {
-    confirmDelete(
+    openDeleteConfirm(
       'Leistung löschen?',
       async () => {
         const res = await softDeletePreisliste(row.id)
         if (!res.ok) {
-          toast.error(res.message)
+          toast.systemError(res)
           throw new Error(res.message)
         }
         setRows((prev) => prev.filter((r) => r.id !== row.id))
-        toast.success('Leistung gelöscht')
-        router.refresh()
+        toast.success(TOAST.leistung_geloescht)
+        afterServerActionRefresh()
       },
       { sub: row.leistung?.trim() || 'Leistung' }
     )
@@ -268,7 +273,7 @@ export function PreislistenClient({
         (r.uebersprungen ? `, ${r.uebersprungen} Duplikate übersprungen` : '') +
         (fehlerN ? `, ${fehlerN} Zeilen mit Fehler` : '')
     )
-    router.refresh()
+    afterServerActionRefresh()
   }
 
   return (
@@ -301,12 +306,12 @@ export function PreislistenClient({
       </div>
 
       {gewerkeTabs.length === 0 ? (
-        <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '8px 0' }}>
+        <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '0.5rem 0' }}>
           Kein aktives Gewerk. Bitte zuerst Gewerke anlegen und aktivieren.
         </p>
       ) : filtered.length === 0 ? (
         <div>
-          <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '8px 0' }}>
+          <p style={{ fontSize: 'var(--fs-text)', color: 'var(--text-3)', margin: '0.5rem 0' }}>
             Noch keine Leistungen in {activeGewerkName}.
           </p>
           <MockBtn sm kind="primary" icon="plus" onClick={openNeuModal}>
@@ -355,7 +360,7 @@ export function PreislistenClient({
                       style={{
                         flexDirection: 'row',
                         flexWrap: 'wrap',
-                        gap: '4px 12px',
+                        gap: '0.25rem 0.75rem',
                         alignItems: 'baseline',
                       }}
                     >
@@ -420,26 +425,17 @@ export function PreislistenClient({
         dirty={dirty}
         size="md"
         onConfirm={handleSave}
-        confirmDisabled={pending || !form.leistung.trim() || !form.gewerk_id}
+        confirmDisabled={pending}
         confirmBusy={pending}
       >
         <div className="kunde-create">
           {err ? <p className="kunde-create__err">{err}</p> : null}
           <MockFormSection>
             <MockField label="Bezeichnung" required full>
-              <input
-                className="input"
-                value={form.leistung}
-                onChange={(e) => markForm({ leistung: e.target.value })}
-                placeholder="Dusche bodengleich einbauen"
-              />
+              <MockInput value={form.leistung} onChange={(e) => markForm({ leistung: e.target.value })} placeholder="Dusche bodengleich einbauen" />
             </MockField>
             <MockField label="Gewerk">
-              <select
-                className="input"
-                value={form.gewerk_id}
-                onChange={(e) => markForm({ gewerk_id: e.target.value })}
-              >
+              <MockSelect value={form.gewerk_id} onChange={(e) => markForm({ gewerk_id: e.target.value })}>
                 <option value="">Bitte wählen…</option>
                 {gewAll
                   .filter((x) => x.aktiv || x.id === form.gewerk_id)
@@ -449,34 +445,25 @@ export function PreislistenClient({
                       {g.name}
                     </option>
                   ))}
-              </select>
+              </MockSelect>
             </MockField>
             <MockField label="Einheit">
-              <select
-                className="input"
-                value={einheitSelectValue}
-                onChange={(e) => {
+              <MockSelect value={einheitSelectValue} onChange={(e) => {
                   const v = e.target.value
                   if (v === EINHEIT_CUSTOM) markForm({ einheit: '' })
                   else markForm({ einheit: v })
-                }}
-              >
+                }}>
                 {EINHEIT_VORSCHLAEGE.map((u) => (
                   <option key={u} value={u}>
                     {u}
                   </option>
                 ))}
                 <option value={EINHEIT_CUSTOM}>Andere…</option>
-              </select>
+              </MockSelect>
             </MockField>
             {showCustomEinheit ? (
               <MockField label="Einheit (frei)" full>
-                <input
-                  className="input"
-                  value={form.einheit}
-                  onChange={(e) => markForm({ einheit: e.target.value })}
-                  placeholder="z. B. pro Baum"
-                />
+                <MockInput value={form.einheit} onChange={(e) => markForm({ einheit: e.target.value })} placeholder="z. B. pro Baum" />
               </MockField>
             ) : null}
             <MockField label="Preis (netto)" full>
@@ -487,14 +474,7 @@ export function PreislistenClient({
               />
             </MockField>
             <MockField label="Beschreibung" full>
-              <textarea
-                className="input"
-                rows={3}
-                value={form.beschreibung}
-                onChange={(e) => markForm({ beschreibung: e.target.value })}
-                placeholder="Was ist enthalten…"
-                style={{ resize: 'vertical', minHeight: 72 }}
-              />
+              <MockTextarea rows={3} value={form.beschreibung} onChange={(e) => markForm({ beschreibung: e.target.value })} placeholder="Was ist enthalten…" style={{ resize: 'vertical', minHeight: 72 }} />
             </MockField>
           </MockFormSection>
         </div>

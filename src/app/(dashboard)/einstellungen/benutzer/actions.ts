@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateEinstellungenPath } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import type { User } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { crmRoleFromUser } from '@/lib/auth/crm-access'
@@ -24,13 +30,14 @@ async function upsertCrmMitarbeiterProfil(input: {
   const email = input.email.trim().toLowerCase()
   const name = input.name.trim() || email.split('@')[0] || 'Team'
   const telefon = input.telefon?.trim() || null
-  await supabaseAdmin.from('user_profiles').upsert({
+  const { error: __dbErr1 } = await supabaseAdmin.from('user_profiles').upsert({
     id: input.authUserId,
     name,
     email,
     telefon,
     phone: telefon,
   })
+  if (__dbErr1) logDbError('app/einstellungen/benutzer/actions:user_profiles', __dbErr1)
 }
 
 /** E-Mail/Login gehört zu Handwerker- oder Kundenportal — nicht für CRM-Team. */
@@ -62,12 +69,13 @@ async function portalKontoFuerEmail(
 function portalFehler(kind: 'handwerker' | 'kunde'): string {
   return kind === 'kunde'
     ? 'Diese E-Mail gehört zu einem Kundenportal. Bitte eine eigene Mitarbeiter-E-Mail verwenden.'
-    : 'Diese E-Mail gehört zu einem Handwerker-/Partner-Portal. Bitte eine eigene Mitarbeiter-E-Mail verwenden.'
+    : 'Diese E-Mail gehört zu einem Partner-/Partner-Portal. Bitte eine eigene Mitarbeiter-E-Mail verwenden.'
 }
 
 export async function loadBenutzerListe(): Promise<BenutzerZeile[]> {
   try {
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+    if (error) logDbError('app/einstellungen/benutzer/actions:query', error)
     if (error) {
       console.warn('loadBenutzerListe', error.message)
       return []
@@ -78,10 +86,11 @@ export async function loadBenutzerListe(): Promise<BenutzerZeile[]> {
     const telById = new Map<string, string>()
     const nameById = new Map<string, string>()
     if (ids.length) {
-      const { data: profiles } = await supabaseAdmin
+      const { data: profiles, error } = await supabaseAdmin
         .from('user_profiles')
         .select('id, telefon, name')
         .in('id', ids)
+      if (error) logDbError('app/einstellungen/benutzer/actions:user_profiles', error)
       for (const p of profiles ?? []) {
         telById.set(p.id as string, (p.telefon as string)?.trim() || '')
         nameById.set(p.id as string, (p.name as string)?.trim() || '')
@@ -129,7 +138,8 @@ export async function inviteBenutzer(
   const displayName = name.trim() || trimmed
   const base = getPublicAppUrl()
 
-  const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+  const { data: existing, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+  if (error) logDbError('app/einstellungen/benutzer/actions:query', error)
   const found = (existing?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === trimmed)
 
   if (found) {
@@ -156,6 +166,7 @@ export async function inviteBenutzer(
         is_crm_admin: rolle === 'admin',
       },
     })
+    if (error) logDbError('app/einstellungen/benutzer/actions:query', error)
     if (error) return { ok: false, message: error.message }
 
     await upsertCrmMitarbeiterProfil({
@@ -163,7 +174,7 @@ export async function inviteBenutzer(
       email: trimmed,
       name: displayName,
     })
-    revalidatePath('/einstellungen/benutzer')
+    revalidateEinstellungenPath('/einstellungen/benutzer')
     return { ok: true, message: 'Mitarbeiter aktualisiert' }
   }
 
@@ -172,13 +183,15 @@ export async function inviteBenutzer(
     return { ok: false, message: portalFehler(portalMail) }
   }
 
-  const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(trimmed, {
+  const { error: error2 } = await supabaseAdmin.auth.admin.inviteUserByEmail(trimmed, {
     data: { name: displayName, role: rolle },
     redirectTo: `${base}/auth/callback`,
   })
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
+  if (error2) return { ok: false, message: error2.message }
 
-  const { data: invited } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+  const { data: invited, error: error3 } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+  if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
   const neu = (invited?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === trimmed)
   if (neu) {
     await supabaseAdmin.auth.admin.updateUserById(neu.id, {
@@ -195,7 +208,7 @@ export async function inviteBenutzer(
     })
   }
 
-  revalidatePath('/einstellungen/benutzer')
+  revalidateEinstellungenPath('/einstellungen/benutzer')
   return { ok: true, message: 'Einladung an Mitarbeiter versendet' }
 }
 
@@ -204,6 +217,7 @@ export async function updateBenutzerProfil(
   patch: { name: string; rolle: 'admin' | 'manager'; telefon?: string; email?: string }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: user, error: gErr } = await supabaseAdmin.auth.admin.getUserById(id)
+  if (gErr) logDbError('app/einstellungen/benutzer/actions:query', gErr)
   if (gErr || !user?.user) return { ok: false, message: gErr?.message ?? 'Nutzer nicht gefunden' }
   if (!crmRoleFromUser(user.user as User)) {
     return { ok: false, message: 'Nur CRM-Mitarbeiter können hier bearbeitet werden.' }
@@ -219,7 +233,8 @@ export async function updateBenutzerProfil(
     const portal = await portalKontoFuerEmail(nextEmail, id)
     if (portal) return { ok: false, message: portalFehler(portal) }
 
-    const { data: existing } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+    const { data: existing, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+    if (error) logDbError('app/einstellungen/benutzer/actions:query', error)
     const taken = (existing?.users ?? []).find(
       (u) => u.id !== id && (u.email ?? '').toLowerCase() === nextEmail
     )
@@ -230,7 +245,7 @@ export async function updateBenutzerProfil(
 
   const prev = (user.user.user_metadata ?? {}) as Record<string, unknown>
   const telefon = patch.telefon?.trim() ?? ''
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+  const { error: error2 } = await supabaseAdmin.auth.admin.updateUserById(id, {
     ...(nextEmail !== currentEmail ? { email: nextEmail, email_confirm: true } : {}),
     user_metadata: {
       ...prev,
@@ -244,7 +259,8 @@ export async function updateBenutzerProfil(
       is_crm_admin: patch.rolle === 'admin',
     },
   })
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   await upsertCrmMitarbeiterProfil({
     authUserId: id,
@@ -253,8 +269,8 @@ export async function updateBenutzerProfil(
     telefon,
   })
 
-  revalidatePath('/einstellungen/benutzer')
-  revalidatePath('/einstellungen/profil')
+  revalidateEinstellungenPath('/einstellungen/benutzer')
+  revalidateEinstellungenPath('/einstellungen/profil')
   return { ok: true }
 }
 
@@ -263,14 +279,20 @@ export async function setBenutzerAktiv(
   aktiv: boolean
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: user, error: gErr } = await supabaseAdmin.auth.admin.getUserById(id)
+  if (gErr) logDbError('app/einstellungen/benutzer/actions:query', gErr)
   if (gErr || !user?.user) return { ok: false, message: gErr?.message ?? 'Nutzer nicht gefunden' }
   if (!crmRoleFromUser(user.user as User)) {
     return { ok: false, message: 'Nur CRM-Mitarbeiter können hier geändert werden.' }
   }
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+  const { error: error2 } = await supabaseAdmin.auth.admin.updateUserById(id, {
     ban_duration: aktiv ? 'none' : '876600h',
   })
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateEinstellungenPath('/einstellungen/benutzer')
+=======
   revalidatePath('/einstellungen/benutzer')
+>>>>>>> Stashed changes
   return { ok: true }
 }

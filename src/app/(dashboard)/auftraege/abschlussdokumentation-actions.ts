@@ -1,8 +1,15 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { writeAuftragStatus } from '@/lib/status/write-auftrag-status'
 import { listAuftragBautagebuch } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
 import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
 import type { AuftragDetail } from '@/lib/types'
@@ -99,13 +106,14 @@ export async function loadAbschlussVoraussetzungen(
 ): Promise<AbschlussVoraussetzungen> {
   const detail = await loadAuftragDetail(auftragId)
   const abnahme = await loadAbnahmeForAbschlussbericht(auftragId)
-  const { data: rechnungen } = await supabaseAdmin
+  const { data: rechnungen, error } = await supabaseAdmin
     .from('rechnungen')
     .select('id, rechnungsnummer, status')
     .eq('auftrag_id', auftragId)
     .neq('status', 'storniert')
     .order('created_at', { ascending: false })
     .limit(1)
+  if (error) logDbError('app/auftraege/abschlussdokumentation-actions:rechnungen', error)
 
   const rechnung = rechnungen?.[0] as
     | { id: string; rechnungsnummer: string | null; status: string | null }
@@ -214,24 +222,21 @@ async function markAuftragAbgeschlossen(
   const detail = await loadAuftragDetail(auftragId)
   const now = new Date().toISOString()
   const existingAbnahme = detail?.abnahme_datum?.trim()?.slice(0, 10) || null
-  await supabaseAdmin
-    .from('auftraege')
-    .update({
-      status: 'abgeschlossen',
-      fortschritt: 100,
-      // Nur setzen wenn Abnahme wirklich vorliegt — Abschluss ohne Abnahme lässt Feld leer.
-      ...(existingAbnahme ? { abnahme_datum: existingAbnahme } : {}),
-      ...(abschlussPdfUrl?.trim()
-        ? {
-            abschlussdokumentation_url: abschlussPdfUrl.trim(),
-            ...(perMail ? { abschlussdokumentation_gesendet_at: now } : {}),
-          }
-        : perMail
-          ? { abschlussdokumentation_gesendet_at: now }
-          : {}),
-      updated_at: now,
-    })
-    .eq('id', auftragId)
+  const { error: __dbErr1 } = await writeAuftragStatus(supabaseAdmin, auftragId, 'abgeschlossen', {
+    fortschritt: 100,
+    // Nur setzen wenn Abnahme wirklich vorliegt — Abschluss ohne Abnahme lässt Feld leer.
+    ...(existingAbnahme ? { abnahme_datum: existingAbnahme } : {}),
+    ...(abschlussPdfUrl?.trim()
+      ? {
+          abschlussdokumentation_url: abschlussPdfUrl.trim(),
+          ...(perMail ? { abschlussdokumentation_gesendet_at: now } : {}),
+        }
+      : perMail
+        ? { abschlussdokumentation_gesendet_at: now }
+        : {}),
+    updated_at: now,
+  })
+  if (__dbErr1) logDbError('app/auftraege/abschlussdokumentation-actions:auftraege', __dbErr1)
 
   const { syncPortalLeadStatusAfterAuftragChange } = await import(
     '@/lib/portal/sync-portal-lead-status'
@@ -257,8 +262,7 @@ async function markAuftragAbgeschlossen(
     email_log_id: perMail ? emailLogId ?? null : null,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
 }
 
 async function buildAbschlussPdf(
@@ -407,8 +411,7 @@ export async function createAbschlussberichtPdf(
     beschreibung: 'Abschlussbericht als PDF gespeichert.',
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
   return { ok: true, publicUrl: stored.publicUrl }
 }
 

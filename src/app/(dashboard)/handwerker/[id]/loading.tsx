@@ -1,5 +1,5 @@
 import { CrmPageLoading } from '@/components/layout/CrmPageLoading'
 
 export default function Loading() {
-  return <CrmPageLoading label="Handwerker wird geladen …" />
+  return <CrmPageLoading label="Partner wird geladen …" />
 }

@@ -1,12 +1,18 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { useTransition } from '@/components/ui/action-busy'
 import { useRef, useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { Download, FileUp, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { deleteBaustellenDokument } from '@/app/(dashboard)/auftraege/baustelle-actions'
 import {
   BAUSTELLEN_DOKUMENT_TYP_LABELS,
@@ -14,6 +20,7 @@ import {
   type BaustellenDokumentTyp,
 } from '@/lib/auftraege/baustelle-types'
 import { formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 const TYPEN: BaustellenDokumentTyp[] = ['tagesbericht', 'wochenbericht', 'regiebericht', 'sonstiges']
 
@@ -49,11 +56,11 @@ export function BaustelleBerichteDokumenteCard({
         toast.error(json.error ?? 'Upload fehlgeschlagen')
         return
       }
-      toast.success('Dokument hochgeladen')
+      toast.success(TOAST.dokumentHochgeladen)
       setTitel('')
       onChanged()
     } catch {
-      toast.error('Upload fehlgeschlagen')
+      toast.error(TOAST.upload_fehlgeschlagen)
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -61,42 +68,33 @@ export function BaustelleBerichteDokumenteCard({
   }
 
   function remove(id: string) {
-    confirmDelete('Dokument löschen?', async () => {
+    openDeleteConfirm('Dokument löschen?', async () => {
       const r = await deleteBaustellenDokument(id, auftragId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         throw new Error(r.message)
       }
-      toast.success('Dokument gelöscht')
+      toast.success(TOAST.dokumentGeloescht)
       onChanged()
     })
   }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-dashed border-bw-border bg-bw-bg/30 p-4 space-y-3">
+      <div className="rounded-card border border-dashed border-bw-border bg-bw-bg/30 p-4 space-y-3">
         <p className="text-[length:var(--fs-text)] font-medium text-bw-text">Fertiges PDF hochladen</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="form-field">
             <label className="form-field-label">Typ</label>
-            <select
-              className="input"
-              value={typ}
-              onChange={(e) => setTyp(e.target.value as BaustellenDokumentTyp)}
-            >
+            <MockSelect value={typ} onChange={(e) => setTyp(e.target.value as BaustellenDokumentTyp)}>
               {TYPEN.map((t) => (
                 <option key={t} value={t}>
                   {BAUSTELLEN_DOKUMENT_TYP_LABELS[t]}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </div>
-          <Input
-            label="Titel"
-            value={titel}
-            onChange={(e) => setTitel(e.target.value)}
-            placeholder="z. B. Wochenbericht KW 25"
-          />
+          <MockField label="Titel"><MockInput value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z. B. Wochenbericht KW 25" /></MockField>
         </div>
         <input
           ref={fileRef}
@@ -108,21 +106,20 @@ export function BaustelleBerichteDokumenteCard({
             if (f) void upload(f)
           }}
         />
-        <Button
+        <MockBtn
           type="button"
-          variant="secondary"
-          size="sm"
+          kind="secondary" sm
           className="gap-1"
           disabled={uploading || pending}
           onClick={() => fileRef.current?.click()}
         >
-          <FileUp className="h-3.5 w-3.5" />
+          <MockIcon n="upload" ctx="default" className="h-3.5 w-3.5" />
           {uploading ? 'Wird hochgeladen…' : 'PDF auswählen'}
-        </Button>
+        </MockBtn>
       </div>
 
       {dokumente.length ? (
-        <div className="divide-y divide-bw-border rounded-lg border border-bw-border">
+        <div className="divide-y divide-bw-border rounded-card border border-bw-border">
           {dokumente.map((d) => (
             <div key={d.id} className="flex items-center gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
@@ -142,11 +139,15 @@ export function BaustelleBerichteDokumenteCard({
                 className="btn ghost sm"
                 aria-label="PDF öffnen"
               >
-                <Download className="h-3.5 w-3.5" />
+                <MockIcon n="download" ctx="default" className="h-3.5 w-3.5" />
               </a>
-              <Button type="button" variant="ghost" size="sm" onClick={() => remove(d.id)}>
+              <MockBtn type="button" kind="ghost" sm onClick={() => remove(d.id)}>
+<<<<<<< Updated upstream
+                <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" />
+=======
                 <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+>>>>>>> Stashed changes
+              </MockBtn>
             </div>
           ))}
         </div>

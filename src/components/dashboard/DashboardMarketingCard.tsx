@@ -1,15 +1,17 @@
 'use client'
+import { MockBtn, MockTable } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
 import { useMemo, useState } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockModal } from '@/components/mock-ui/MockModal'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { formatNumber } from '@/lib/format/geld-datum'
 
 function formatNum(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
-  return new Intl.NumberFormat('de-DE').format(Math.round(n))
+  return formatNumber(Math.round(n))
 }
 
 /** Kompakte Mock-KPI-Kachel: Label oben, Wert (+ optional Detail rechts). */
@@ -36,9 +38,9 @@ function CompactKpi({
         <span className={`mkt-kpi-val${muted ? ' muted' : ''}`}>{value}</span>
         {showDetail ? (
           onErrorClick ? (
-            <button type="button" className="mkt-kpi-detail link" onClick={onErrorClick}>
+            <MockBtn className="mkt-kpi-detail link" type="button" onClick={onErrorClick}>
               {detail}
-            </button>
+            </MockBtn>
           ) : (
             <span className={`mkt-kpi-detail${detailTone === 'positive' ? ' positive' : ''}`}>
               {detail}
@@ -94,44 +96,31 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
         {!data.funnelOk && data.funnelError ? (
           <>
             {' '}
-            <button
-              type="button"
-              className="underline decoration-dotted"
-              onClick={() => setErrorDetail(data.funnelError)}
-            >
+            <MockBtn className="underline decoration-dotted" type="button" onClick={() => setErrorDetail(data.funnelError)}>
               Details
-            </button>
+            </MockBtn>
           </>
         ) : null}
       </div>
     )
 
   return (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">
-          <MockIcon ctx="emphasis" n="trending-up" size={16} />
-          Marketing &amp; Sichtbarkeit
-        </div>
+    <>
+    <MockCard
+      title="Marketing & Sichtbarkeit"
+      icon="trending-up"
+      actions={
         <div className="seg" role="group" aria-label="Marketing-Bereich">
-          <button
-            type="button"
-            className={tab === 'marketing' ? 'on' : undefined}
-            onClick={() => setTab('marketing')}
-          >
+          <MockBtn className={tab === 'marketing' ? 'on' : undefined} type="button" onClick={() => setTab('marketing')}>
             Marketing
-          </button>
-          <button
-            type="button"
-            className={tab === 'sichtbarkeit' ? 'on' : undefined}
-            onClick={() => setTab('sichtbarkeit')}
-          >
+          </MockBtn>
+          <MockBtn className={tab === 'sichtbarkeit' ? 'on' : undefined} type="button" onClick={() => setTab('sichtbarkeit')}>
             Sichtbarkeit
-          </button>
+          </MockBtn>
         </div>
-      </div>
-
-      <div className="card-b" style={{ paddingTop: 4 }}>
+      }
+      bodyClassName="pt-1"
+    >
         {tab === 'marketing' ? (
           <>
             <div className="mkt-kpi-grid mkt-kpi-grid--3">
@@ -172,12 +161,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
 
             <div className={`mkt-funnel-block${isMobile ? ' mkt-funnel-block--acc' : ''}`}>
               {isMobile ? (
-                <button
-                  type="button"
-                  className="mkt-funnel-acc-trigger"
-                  aria-expanded={funnelOpen}
-                  onClick={() => setFunnelOpen((o) => !o)}
-                >
+                <MockBtn className="mkt-funnel-acc-trigger" type="button" aria-expanded={funnelOpen} onClick={() => setFunnelOpen((o) => !o)}>
                   <span className="mkt-funnel-h">Rechner-Funnel</span>
                   <MockIcon
                     ctx="empty"
@@ -185,7 +169,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                     size={16}
                     className={funnelOpen ? 'mkt-funnel-acc-ico open' : 'mkt-funnel-acc-ico'}
                   />
-                </button>
+                </MockBtn>
               ) : (
                 <p className="mkt-funnel-h">Rechner-Funnel</p>
               )}
@@ -219,8 +203,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                 Meistgesucht (Google)
               </p>
               {data.topQueries.length > 0 ? (
-                <div className="overflow-x-auto rounded-[10px] border border-[var(--border)]">
-                  <table className="w-full text-left text-[length:var(--fs-meta)]">
+                <MockTable wrapClassName="overflow-x-auto rounded-[10px] border border-[var(--border)]" className="w-full text-left text-[length:var(--fs-meta)]">
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[length:var(--fs-meta)] uppercase tracking-[0.03em] text-[var(--text-3)]">
                         <th className="px-3 py-2 font-semibold">Suchbegriff</th>
@@ -239,8 +222,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                </MockTable>
               ) : (
                 <div className="rounded-[10px] border border-[var(--border)] px-3 py-6 text-center text-[length:var(--fs-meta)] text-[var(--text-3)]">
                   —
@@ -249,21 +231,16 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
             </div>
           </>
         )}
-      </div>
+    </MockCard>
 
-      <MockModal
+      <EditorSheet
         open={errorDetail != null}
         onClose={() => setErrorDetail(null)}
-        icon="alert-triangle"
         title="Fehlerdetails"
-        footer={
-          <MockBtn kind="ghost" onClick={() => setErrorDetail(null)}>
-            Schließen
-          </MockBtn>
-        }
+        secondary={{ label: 'Schließen', onClick: () => setErrorDetail(null), kind: 'ghost' }}
       >
         <p className="break-words text-[length:var(--fs-text)] text-[var(--text)]">{errorDetail}</p>
-      </MockModal>
-    </div>
+      </EditorSheet>
+    </>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 
+import { MockBtn, MockTabs } from '@/components/mock-ui'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { createClient } from '@/lib/supabase'
 import type { KalenderTermin } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
-import { cn } from '@/lib/utils'
+import { cn, formatMonatJahr, formatWochentagDatumLang } from '@/lib/utils'
 import { TodosPanel } from '@/components/todos/TodosPanel'
 import {
   formatHm,
@@ -44,16 +45,11 @@ function addDays(d: Date, n: number): Date {
 }
 
 function monthTitle(d: Date): string {
-  return d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+  return formatMonatJahr(d)
 }
 
 function dayTitle(d: Date): string {
-  return d.toLocaleDateString('de-DE', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  return formatWochentagDatumLang(d)
 }
 
 function timeToHours(t: string | null | undefined): number | null {
@@ -108,6 +104,7 @@ export function KalenderClient() {
       `
       )
       .order('datum', { ascending: true })
+    if (error) logDbError('components/kalender/KalenderClient:kalender_termine', error)
 
     if (error) {
       setLoadErr(error.message)
@@ -211,33 +208,15 @@ export function KalenderClient() {
       </div>
       <div className="cal-toolbar__controls">
         <div className="cal-toolbar__views" role="group" aria-label="Ansicht">
-          <button
-            type="button"
-            className={cn('cal-toolbar__view', view === 'tag' && 'is-active')}
-            onClick={() => setView('tag')}
-            aria-label="Tag"
-            aria-pressed={view === 'tag'}
-          >
+          <MockBtn className={cn('cal-toolbar__view', view === 'tag' && 'is-active')} type="button" onClick={() => setView('tag')} aria-label="Tag" aria-pressed={view === 'tag'}>
             Tag
-          </button>
-          <button
-            type="button"
-            className={cn('cal-toolbar__view', view === 'woche' && 'is-active')}
-            onClick={() => setView('woche')}
-            aria-label="Woche"
-            aria-pressed={view === 'woche'}
-          >
+          </MockBtn>
+          <MockBtn className={cn('cal-toolbar__view', view === 'woche' && 'is-active')} type="button" onClick={() => setView('woche')} aria-label="Woche" aria-pressed={view === 'woche'}>
             Woche
-          </button>
-          <button
-            type="button"
-            className={cn('cal-toolbar__view', view === 'monat' && 'is-active')}
-            onClick={() => setView('monat')}
-            aria-label="Monat"
-            aria-pressed={view === 'monat'}
-          >
+          </MockBtn>
+          <MockBtn className={cn('cal-toolbar__view', view === 'monat' && 'is-active')} type="button" onClick={() => setView('monat')} aria-label="Monat" aria-pressed={view === 'monat'}>
             Monat
-          </button>
+          </MockBtn>
         </div>
         <MockBtn sm className="cal-toolbar__heute" onClick={goToday}>
           Heute
@@ -374,26 +353,19 @@ export function KalenderClient() {
 
   return (
     <div>
-      <div className="kalender-mode-seg" role="tablist" aria-label="Kalender oder To-dos">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'kalender'}
-          className={cn('kalender-mode-seg__btn', mode === 'kalender' && 'on')}
-          onClick={() => setMode('kalender')}
-        >
-          Kalender
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'todos'}
-          className={cn('kalender-mode-seg__btn', mode === 'todos' && 'on')}
-          onClick={() => setMode('todos')}
-        >
-          To-dos
-        </button>
-      </div>
+      <MockTabs
+        items={[
+          { id: 'kalender', label: 'Kalender' },
+          { id: 'todos', label: 'To-dos' },
+        ]}
+        value={mode}
+        onChange={(id) => setMode(id as UiMode)}
+        aria-label="Kalender oder To-dos"
+        className="kalender-mode-seg"
+        tabClassName="kalender-mode-seg__btn"
+        activeClassName="on"
+        showIcons={false}
+      />
 
       {mode === 'todos' ? (
         <TodosPanel title="To-dos" />
@@ -402,7 +374,7 @@ export function KalenderClient() {
       {nav}
 
       {loadErr ? (
-        <p className="mb-3 rounded-lg border border-status-cancel-bg bg-status-cancel-bg/10 px-3 py-2 text-[length:var(--fs-text)] text-status-cancel-text">
+        <p className="mb-3 rounded-card border border-status-cancel-bg bg-status-cancel-bg/10 px-3 py-2 text-[length:var(--fs-text)] text-status-cancel-text">
           {loadErr}
         </p>
       ) : null}

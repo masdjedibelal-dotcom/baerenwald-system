@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendMail } from '@/lib/mail-service'
 import { getMailBranding } from '@/lib/get-mail-branding'
@@ -110,13 +111,14 @@ export async function sendAngebotNachfassMailForRow(
 
   const leadId = row.lead_id
   if (leadId) {
-    await supabaseAdmin.from('lead_timeline').insert({
+    const { error: __dbErr1 } = await supabaseAdmin.from('lead_timeline').insert({
       lead_id: leadId,
       angebot_id: row.id,
       typ: 'angebot_nachfass',
       titel: 'Nachfass: Rückfrage zum Angebot',
       beschreibung: `${nr} · ${email}`,
     })
+    if (__dbErr1) logDbError('lib/angebote/send-angebot-nachfass-mail:lead_timeline', __dbErr1)
     await erledigeInterneNachfassTodos(leadId, nr)
   }
 
@@ -146,6 +148,7 @@ export async function sendAngebotNachfassMailById(
     )
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('lib/angebote/send-angebot-nachfass-mail:angebote', error)
 
   if (error || !row) {
     return { ok: false, message: error?.message ?? 'Angebot nicht gefunden' }

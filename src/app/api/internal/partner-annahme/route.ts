@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { acceptHandwerkerZuweisung } from '@/lib/angebote/handwerker-annahme'
 import { isHandwerkerAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
@@ -63,11 +64,12 @@ export async function POST(req: Request) {
 
   // Standard: angebot_handwerker-Zuweisung
   if (zuweisungId) {
-    const { data: asZuweisung } = await supabaseAdmin
+    const {data: asZuweisung, error: error1} = await supabaseAdmin
       .from('angebot_handwerker')
       .select('id')
       .eq('id', zuweisungId)
       .maybeSingle()
+    if (error1) logDbError('app/api/internal/partner-annahme/route:angebot_handwerker', error1)
 
     if (asZuweisung?.id) {
       const r = await acceptHandwerkerZuweisung({
@@ -91,11 +93,12 @@ export async function POST(req: Request) {
 
     // Legacy-Bug: Portal sandte manchmal auftragId als zuweisungId
     if (!auftragId) {
-      const { data: asAuftrag } = await supabaseAdmin
+      const {data: asAuftrag, error: error2} = await supabaseAdmin
         .from('auftraege')
         .select('id')
         .eq('id', zuweisungId)
         .maybeSingle()
+      if (error2) logDbError('app/api/internal/partner-annahme/route:auftraege', error2)
       if (asAuftrag?.id) {
         const notified = await notifyDirektauftragAntwort({
           auftragId: zuweisungId,
@@ -136,25 +139,27 @@ async function notifyDirektauftragAntwort(input: {
   notiz?: string | null
   grund?: string | null
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { data: auftrag, error } = await supabaseAdmin
+  const { data: auftrag, error: error3 } = await supabaseAdmin
     .from('auftraege')
     .select('id, lead_id, angebot_id, titel')
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (error3) logDbError('app/api/internal/partner-annahme/route:auftraege', error3)
 
-  if (error || !auftrag) {
-    return { ok: false, error: error?.message ?? 'Auftrag nicht gefunden' }
+  if (error3 || !auftrag) {
+    return { ok: false, error: error3?.message ?? 'Auftrag nicht gefunden' }
   }
 
-  const { data: hw } = await supabaseAdmin
+  const {data: hw, error: error4} = await supabaseAdmin
     .from('handwerker')
     .select('name')
     .eq('id', input.handwerkerId)
     .maybeSingle()
+  if (error4) logDbError('app/api/internal/partner-annahme/route:handwerker', error4)
 
-  const handwerkerName = (hw as { name?: string } | null)?.name?.trim() || 'Handwerker'
+  const handwerkerName = (hw as { name?: string } | null)?.name?.trim() || 'Partner'
   const titel =
-    input.antwort === 'akzeptiert' ? 'Handwerker hat zugesagt' : 'Handwerker hat abgelehnt'
+    input.antwort === 'akzeptiert' ? 'Partner hat zugesagt' : 'Partner hat abgelehnt'
   const auftragTitel = String((auftrag as { titel?: string | null }).titel ?? '').trim()
   const leadId = (auftrag as { lead_id?: string | null }).lead_id?.trim() || null
   const angebotId = (auftrag as { angebot_id?: string | null }).angebot_id?.trim() || null

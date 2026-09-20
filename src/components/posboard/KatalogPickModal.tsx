@@ -1,7 +1,9 @@
 'use client'
 
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { useEffect, useMemo, useState } from 'react'
-import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { PickerSheet } from '@/components/surfaces/PickerSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { listKatalogPositionen } from '@/app/(dashboard)/katalog/actions'
@@ -147,13 +149,7 @@ export function KatalogPickModal({
       title="Position hinzufügen"
       context="canvas"
       search={
-        <input
-          className="sel w-full"
-          placeholder="Leistung suchen…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          autoFocus
-        />
+        <MockInput className="sel w-full" placeholder="Leistung suchen…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
       }
       searchPlacement="top"
       sourceChips={[
@@ -174,12 +170,12 @@ export function KatalogPickModal({
         katalogLoading && !rows.length ? (
           <p className="picker-sheet__empty">Lädt…</p>
         ) : !katalogLoading && !filtered.length ? (
-          <p className="picker-sheet__empty">Keine Treffer.</p>
+          <MockEmpty title="Keine Treffer." />
         ) : undefined
       }
     >
       <div className="space-y-3">
-        <div className="max-h-[280px] overflow-y-auto rounded-md border border-bw-border">
+        <div className="max-h-[280px] overflow-y-auto rounded-field border border-bw-border">
           {grouped.map(([gewerkName, items]) => (
             <div key={gewerkName}>
               <div className="sticky top-0 bg-bw-surface-2 px-3 py-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
@@ -191,35 +187,27 @@ export function KatalogPickModal({
                   const selectedHere = picked?.position.id === p.id
                   return (
                     <li key={p.id} className="border-t border-bw-border/60">
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-bw-surface-2"
-                        onClick={() => tryPickPosition(p)}
-                      >
+                      <MockBtn fullWidth className="flex items-center gap-2 px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-bw-surface-2" type="button" onClick={() => tryPickPosition(p)}>
                         <span className="min-w-0 flex-1 font-medium">{p.titel}</span>
                         <MockBadge kind="fertig">{p.kategorie}</MockBadge>
                         <span className="shrink-0 text-[length:var(--fs-meta)] text-bw-text-muted">
                           {p.varianten.length} Var.
                         </span>
-                      </button>
+                      </MockBtn>
                       {(expanded || (selectedHere && p.varianten.length > 1)) && (
                         <ul className="bg-bw-surface-2/50 px-3 pb-2">
                           {p.varianten.map((v) => (
                             <li key={v.id}>
-                              <button
-                                type="button"
-                                className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[length:var(--fs-meta)] ${
+                              <MockBtn className={`flex w-full items-center justify-between gap-2 rounded-button px-2 py-1.5 text-[length:var(--fs-meta)] ${
                                   picked?.variante.id === v.id
-                                    ? 'bg-emerald-50 text-emerald-950'
+                                    ? 'bg-status-order-bg text-status-order-text'
                                     : 'hover:bg-white'
-                                }`}
-                                onClick={() => selectVariante(p, v)}
-                              >
+                                }`} type="button" onClick={() => selectVariante(p, v)}>
                                 <span>{katalogVarianteLabel(v)}</span>
                                 <span className="tabular-nums text-bw-text-muted">
                                   {katalogPreisLabel(v)} / {v.einheit}
                                 </span>
-                              </button>
+                              </MockBtn>
                             </li>
                           ))}
                         </ul>
@@ -233,8 +221,8 @@ export function KatalogPickModal({
         </div>
 
         {picked ? (
-          <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
-            <p className="text-[length:var(--fs-meta)] font-medium text-emerald-950">
+          <div className="space-y-2 rounded-field border border-status-order-bg bg-status-order-bg/40 p-3">
+            <p className="text-[length:var(--fs-meta)] font-medium text-status-order-text">
               {picked.position.titel}
               {picked.variante.variante?.trim()
                 ? ` · ${picked.variante.variante}`
@@ -243,12 +231,7 @@ export function KatalogPickModal({
             </p>
             <label className="block text-[length:var(--fs-meta)] text-bw-text-muted">
               Menge
-              <input
-                className="sel mt-0.5 w-full"
-                value={menge}
-                onChange={(e) => setMenge(e.target.value)}
-                inputMode="decimal"
-              />
+              <MockInput className="sel mt-0.5 w-full" value={menge} onChange={(e) => setMenge(e.target.value)} inputMode="decimal" />
             </label>
             <SheetEditableField
               label="Beschreibung"
@@ -266,7 +249,7 @@ export function KatalogPickModal({
               disabled={!picked || katalogLoading}
               onClick={confirm}
             >
-              Übernehmen
+              Speichern
             </MockBtn>
           </div>
         ) : null}

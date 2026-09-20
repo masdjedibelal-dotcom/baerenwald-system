@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { loadFormularTemplate } from '@/app/(dashboard)/formulare/actions'
@@ -10,7 +11,6 @@ export default async function FormularBearbeitenPage({ params }: { params: { id:
     loadFormularTemplate(params.id),
     supabase.from('gewerke').select('id, name, slug, aktiv').order('name'),
   ])
-
   if (!template) notFound()
 
   return <FormularTemplateForm initial={template as FormularTemplate} gewerke={(gw ?? []) as Gewerk[]} />

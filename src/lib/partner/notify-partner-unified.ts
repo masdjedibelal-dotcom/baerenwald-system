@@ -3,6 +3,8 @@
  * @see handwerks-plattform/src/app/api/internal/partner-notify/route.ts
  */
 
+import { logNotifyEmailResult } from '@/lib/kommunikation/log-notify-email-result'
+import { buildInternSubject } from '@/lib/mail/build-subject'
 import { partnerVorgangRelativeLink } from '@/lib/portal-utils'
 
 export type PartnerNotifyTyp =
@@ -41,6 +43,17 @@ export async function notifyPartnerUnified(input: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const secret = process.env.PARTNER_INTERNAL_API_SECRET?.trim()
   if (!secret) {
+    await logNotifyEmailResult({
+      typ: 'partner_notify',
+      betreff: buildInternSubject({
+        objekt: input.projektName,
+        ereignis: `Partner-Notify (${input.typ})`,
+      }),
+      ok: false,
+      error: 'PARTNER_INTERNAL_API_SECRET fehlt.',
+      auftragId: input.auftragId ?? null,
+      leadId: input.anfrageId ?? null,
+    })
     return { ok: false, error: 'PARTNER_INTERNAL_API_SECRET fehlt.' }
   }
 
@@ -60,6 +73,16 @@ export async function notifyPartnerUnified(input: {
   if (input.sendMail === false) body.sendMail = false
   if (input.sendMail === true) body.sendMail = true
 
+  const logCtx = {
+    typ: 'partner_notify',
+    betreff: buildInternSubject({
+      objekt: input.projektName,
+      ereignis: `Partner-Notify (${input.typ})`,
+    }),
+    auftragId: input.auftragId ?? null,
+    leadId: input.anfrageId ?? null,
+  }
+
   let res: Response
   try {
     res = await fetch(url, {
@@ -73,6 +96,7 @@ export async function notifyPartnerUnified(input: {
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Netzwerkfehler'
+    await logNotifyEmailResult({ ...logCtx, ok: false, error: msg })
     return { ok: false, error: msg }
   }
 
@@ -84,8 +108,11 @@ export async function notifyPartnerUnified(input: {
   }
 
   if (!res.ok || !parsed.ok) {
-    return { ok: false, error: parsed.error?.trim() || `HTTP ${res.status}` }
+    const err = parsed.error?.trim() || `HTTP ${res.status}`
+    await logNotifyEmailResult({ ...logCtx, ok: false, error: err })
+    return { ok: false, error: err }
   }
+  await logNotifyEmailResult({ ...logCtx, ok: true })
   return { ok: true }
 }
 

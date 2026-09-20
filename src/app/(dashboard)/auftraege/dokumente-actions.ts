@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
@@ -12,6 +18,7 @@ async function assertAuftrag(auftragId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet' }
   const { data, error } = await supabase.from('auftraege').select('id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/dokumente-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden' }
   return { ok: true as const, userId: user.id }
 }
@@ -44,7 +51,7 @@ export async function createAuftragDokumentEintrag(input: {
   })
   if (!tl.ok) return { ok: false, message: tl.message ?? 'Speichern fehlgeschlagen' }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, timelineId: tl.id ?? '' }
 }
 
@@ -66,9 +73,10 @@ export async function updateAuftragDokumentMeta(input: {
     })
     .eq('id', input.timelineId)
     .eq('auftrag_id', input.auftragId)
+  if (error) logDbError('app/auftraege/dokumente-actions:auftrag_timeline', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -85,9 +93,10 @@ export async function deleteAuftragDokumentEintrag(input: {
     .delete()
     .eq('id', input.timelineId)
     .eq('auftrag_id', input.auftragId)
+  if (error) logDbError('app/auftraege/dokumente-actions:auftrag_timeline', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 

@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { openActionConfirm } from '@/components/ui/ConfirmPopup'
+import { useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { SwipeRow } from '@/components/ui/SwipeRow'
-import { confirmAction } from '@/components/ui/confirm-action'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import { deleteCrmTagebuchEintrag } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
@@ -15,6 +18,7 @@ import type { PositionEintrag } from '@/lib/auftraege/position-lebenszyklus'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatDatum } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 export type BautagebuchListenEintrag = PositionEintrag & {
   leistungName?: string | null
@@ -130,7 +134,7 @@ export function AuftragBautagebuchSection({
   }
 
   function askDelete(e: BautagebuchListenEintrag) {
-    confirmAction({
+    openActionConfirm({
       title: 'Eintrag löschen?',
       body: 'Der Tagebuch-Eintrag und zugehörige Fotos werden unwiderruflich gelöscht.',
       confirmLabel: 'Löschen',
@@ -145,10 +149,10 @@ export function AuftragBautagebuchSection({
               auftragId,
             })
             if (!r.ok) {
-              toast.error(r.message)
+              toast.systemError(r)
               throw new Error(r.message)
             }
-            toast.success('Eintrag gelöscht')
+            toast.success(TOAST.eintrag_geloescht)
             closeDetail()
             onChanged?.()
           })
@@ -167,15 +171,9 @@ export function AuftragBautagebuchSection({
         </div>
         {!disabled ? (
           <div className="bt-feed-h__actions">
-            <button
-              type="button"
-              className="btn primary sm bt-feed-h__add"
-              onClick={onAdd}
-              aria-label="Eintrag hinzufügen"
-              title="Eintrag hinzufügen"
-            >
+            <MockBtn kind="primary" sm className="bt-feed-h__add" type="button" onClick={onAdd} aria-label="Eintrag hinzufügen" title="Eintrag hinzufügen">
               <MockIcon ctx="btn" n="plus" size={18} />
-            </button>
+            </MockBtn>
           </div>
         ) : null}
       </div>
@@ -193,15 +191,11 @@ export function AuftragBautagebuchSection({
             const hasFotoSlot = (e.eintrag_fotos?.length ?? 0) > 0
             const desc = eintragText(e)
             const card = (
-              <button
-                type="button"
-                className={cn(
+              <MockBtn className={cn(
                   'bt-inserat',
                   'bt-inserat--clickable',
                   !hasFotoSlot && 'bt-inserat--text-only'
-                )}
-                onClick={() => setOpenId(e.id)}
-              >
+                )} type="button" onClick={() => setOpenId(e.id)}>
                 {hasFotoSlot ? (
                   <div className="bt-inserat__media" aria-hidden>
                     {cover ? (
@@ -244,7 +238,7 @@ export function AuftragBautagebuchSection({
                     ) : null}
                   </div>
                 </div>
-              </button>
+              </MockBtn>
             )
 
             return (
@@ -285,27 +279,47 @@ export function AuftragBautagebuchSection({
         title={active ? eintragTitel(active) : 'Tagebuch-Eintrag'}
         subtitle={active ? eintragZeit(active) : null}
         size="md"
+<<<<<<< Updated upstream
+        danger={
+          active && !disabled && !isPartnerEintrag(active)
+            ? {
+                label: 'Löschen',
+                disabled: deletePending,
+                onClick: () => askDelete(active),
+              }
+            : null
+        }
+        primary={
+          active && !disabled && !isPartnerEintrag(active)
+            ? {
+                label: 'Bearbeiten',
+                disabled: deletePending,
+                onClick: () => startEdit(active),
+              }
+            : null
+=======
         footer={
           active && !disabled && !isPartnerEintrag(active) ? (
             <div className="sheet-footer-actions ldr-cta">
-              <Button
+              <MockBtn
                 type="button"
-                variant="danger"
+                kind="danger"
                 disabled={deletePending}
                 onClick={() => askDelete(active)}
               >
                 Löschen
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="primary"
+                kind="primary"
                 disabled={deletePending}
                 onClick={() => startEdit(active)}
               >
                 Bearbeiten
-              </Button>
+              </MockBtn>
             </div>
           ) : null
+>>>>>>> Stashed changes
         }
       >
         {active ? (
@@ -336,16 +350,10 @@ export function AuftragBautagebuchSection({
                   const src = f.display_url || f.storage_path
                   if (!src) return null
                   return (
-                    <button
-                      key={f.id ?? src}
-                      type="button"
-                      className="bt-eintrag-sheet__foto"
-                      onClick={() => setLightboxUrl(src)}
-                      aria-label="Foto vergrößern"
-                    >
+                    <MockBtn className="bt-eintrag-sheet__foto" key={f.id ?? src} type="button" onClick={() => setLightboxUrl(src)} aria-label="Foto vergrößern">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt="" />
-                    </button>
+                    </MockBtn>
                   )
                 })}
               </div>
@@ -365,14 +373,9 @@ export function AuftragBautagebuchSection({
             if (ev.key === 'Escape') setLightboxUrl(null)
           }}
         >
-          <button
-            type="button"
-            className="bt-foto-lightbox__close"
-            aria-label="Schließen"
-            onClick={() => setLightboxUrl(null)}
-          >
-            <X size={20} strokeWidth={2} />
-          </button>
+          <MockBtn className="bt-foto-lightbox__close" type="button" aria-label="Schließen" onClick={() => setLightboxUrl(null)}>
+            <MockIcon n="x" ctx="default" size={20} />
+          </MockBtn>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={lightboxUrl}

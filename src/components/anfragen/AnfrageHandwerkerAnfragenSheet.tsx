@@ -1,4 +1,7 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -9,11 +12,12 @@ import { anfrageHandwerkerAnfragen } from '@/app/(dashboard)/anfragen/anfrage-ha
 import { HandwerkerSuchenSheet } from '@/components/auftraege/leistungen-v3/HandwerkerSuchenSheet'
 import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
 import { PosBoard } from '@/components/posboard/PosBoard'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { posBoardToPartnerLvVorgabe } from '@/lib/angebote/partner-lv'
 import { type PosBoardLine } from '@/lib/posboard/pos-board-line'
 import type { Preisliste } from '@/lib/types'
 import { BEREICH_LABELS } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function gewerkeLabel(h: HandwerkerGewerkListeEintrag): string {
   const raw = h.gewerke ?? []
@@ -43,6 +47,7 @@ export function AnfrageHandwerkerAnfragenSheet({
   preislisten?: Preisliste[]
   onDone: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useTransition()
   const [dirty, setDirty] = useState(false)
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())
@@ -74,8 +79,6 @@ export function AnfrageHandwerkerAnfragenSheet({
       .filter(Boolean) as HandwerkerGewerkListeEintrag[]
   }, [selectedHwRows, selectedHwIds])
 
-  const canSend = selectedHwIds.size > 0 && titel.trim().length > 0 && !pending
-
   function removeHw(id: string) {
     setDirty(true)
     setSelectedHwIds((prev) => {
@@ -89,11 +92,11 @@ export function AnfrageHandwerkerAnfragenSheet({
   function confirm() {
     const ids = Array.from(selectedHwIds)
     if (!ids.length) {
-      toast.error('Bitte mindestens einen Handwerker auswählen.')
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_einen_partner_auswaehlen })
       return
     }
     if (!titel.trim()) {
-      toast.error('Titel fehlt.')
+      applyFieldErrors({ titel: TOAST.titel_fehlt })
       return
     }
     setPickerOpen(false)
@@ -107,13 +110,13 @@ export function AnfrageHandwerkerAnfragenSheet({
         positionen: posBoardToPartnerLvVorgabe(positionen),
       })
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       toast.success(
         res.gesendet === 1
-          ? 'Anfrage an Handwerker gesendet'
-          : `${res.gesendet} Anfragen an Handwerker gesendet`
+          ? 'Anfrage an Partner gesendet'
+          : `${res.gesendet} Anfragen an Partner gesendet`
       )
       onDone()
       onClose()
@@ -132,32 +135,25 @@ export function AnfrageHandwerkerAnfragenSheet({
         compose
         composeLabel={pending ? 'Senden…' : 'Senden'}
         confirmBusy={pending}
-        confirmDisabled={!canSend}
+        confirmDisabled={pending}
         onConfirm={confirm}
         className="hw-anfrage-modal"
         bodyClassName="hw-anfrage-body"
         overlayClassName={pickerOpen ? 'editor-sheet-overlay--recessed' : undefined}
       >
-        <div className="hw-anfrage-section">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                <div className="hw-anfrage-section">
           <div className="hw-anfrage-section-head">
             <span>Partner suchen</span>
             {selectedHwIds.size > 0 ? <span>{selectedHwIds.size} ausgewählt</span> : null}
           </div>
 
-          <input
-            className="sel w-full"
-            readOnly
-            placeholder="Partner suchen…"
-            disabled={pending}
-            aria-label="Partner suchen"
-            onFocus={(e) => {
+          <MockInput className="sel w-full" readOnly placeholder="Partner suchen…" disabled={pending} aria-label="Partner suchen" onFocus={(e) => {
               e.currentTarget.blur()
               if (!pending) setPickerOpen(true)
-            }}
-            onClick={() => {
+            }} onClick={() => {
               if (!pending) setPickerOpen(true)
-            }}
-          />
+            }} />
 
           {selectedDisplay.length > 0 ? (
             <ul className="hw-anfrage-list mt-3">
@@ -183,15 +179,9 @@ export function AnfrageHandwerkerAnfragenSheet({
                           ) : null}
                         </span>
                       </span>
-                      <button
-                        type="button"
-                        className="hw-anfrage-remove"
-                        aria-label={`${displayName} entfernen`}
-                        disabled={pending}
-                        onClick={() => removeHw(h.id)}
-                      >
+                      <MockBtn className="hw-anfrage-remove" type="button" aria-label={`${displayName} löschen`} disabled={pending} onClick={() => removeHw(h.id)}>
                         <MockIcon ctx="btn" n="x" size={14} />
-                      </button>
+                      </MockBtn>
                     </div>
                   </li>
                 )
@@ -202,41 +192,26 @@ export function AnfrageHandwerkerAnfragenSheet({
 
         <label className="hw-anfrage-field">
           <span className="hw-anfrage-label">Titel</span>
-          <input
-            className="input"
-            value={titel}
-            onChange={(e) => {
+          <MockInput value={titel} onChange={(e) => {
               setDirty(true)
               setTitel(e.target.value)
-            }}
-            disabled={pending}
-          />
+            }} disabled={pending} />
         </label>
 
         <label className="hw-anfrage-field">
           <span className="hw-anfrage-label">Beschreibung</span>
-          <textarea
-            className="input min-h-[88px]"
-            value={beschreibung}
-            onChange={(e) => {
+          <MockTextarea className="min-h-[88px]" value={beschreibung} onChange={(e) => {
               setDirty(true)
               setBeschreibung(e.target.value)
-            }}
-            disabled={pending}
-          />
+            }} disabled={pending} />
         </label>
 
         <label className="hw-anfrage-field">
           <span className="hw-anfrage-label">Notiz</span>
-          <textarea
-            className="input min-h-[64px]"
-            value={notiz}
-            onChange={(e) => {
+          <MockTextarea className="min-h-[64px]" value={notiz} onChange={(e) => {
               setDirty(true)
               setNotiz(e.target.value)
-            }}
-            disabled={pending}
-          />
+            }} disabled={pending} />
         </label>
 
         <div className="hw-anfrage-field">

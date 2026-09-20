@@ -1,23 +1,31 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { useTransition } from '@/components/ui/action-busy'
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   deleteKommunikationMailVorlage,
   saveKommunikationMailVorlage,
   type KommunikationMailVorlage,
 } from '@/app/(dashboard)/kommunikation/actions'
 import { KOMMUNIKATION_VORLAGE_KONTEXT_OPTIONS } from '@/lib/kommunikation/types'
+import { TOAST } from '@/lib/copy'
 
 export function KommunikationVorlagenClient({
   initial,
@@ -61,10 +69,10 @@ export function KommunikationVorlagenClient({
     startTransition(async () => {
       const res = await saveKommunikationMailVorlage(edit)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
-      toast.success('Gespeichert')
+      toast.success(TOAST.gespeichert)
       setEditOpen(false)
       if (edit.id) {
         setRows((prev) =>
@@ -91,14 +99,14 @@ export function KommunikationVorlagenClient({
   }
 
   function remove(id: string) {
-    confirmDelete('Vorlage löschen?', async () => {
+    openDeleteConfirm('Vorlage löschen?', async () => {
       const res = await deleteKommunikationMailVorlage(id)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         throw new Error(res.message)
       }
       setRows((prev) => prev.filter((r) => r.id !== id))
-      toast.success('Gelöscht')
+      toast.success(TOAST.geloescht)
     })
   }
 
@@ -107,10 +115,14 @@ export function KommunikationVorlagenClient({
       <Card
         title="Vorlagen"
         action={
-          <Button type="button" variant="primary" size="sm" onClick={openNew}>
+          <MockBtn type="button" kind="primary" sm onClick={openNew}>
+<<<<<<< Updated upstream
+            <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+=======
             <Plus className="h-3.5 w-3.5" aria-hidden />
+>>>>>>> Stashed changes
             Neu
-          </Button>
+          </MockBtn>
         }
       >
         {rows.length === 0 ? (
@@ -128,22 +140,12 @@ export function KommunikationVorlagenClient({
                   </p>
                 </div>
                 <div className="flex gap-1">
-                  <button
-                    type="button"
-                    className="btn ghost sm"
-                    onClick={() => openRow(r)}
-                    aria-label="Bearbeiten"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn ghost sm text-red-700"
-                    onClick={() => remove(r.id)}
-                    aria-label="Löschen"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <MockBtn kind="ghost" sm type="button" onClick={() => openRow(r)} aria-label="Bearbeiten">
+                    <MockIcon n="pencil" ctx="default" className="h-4 w-4" />
+                  </MockBtn>
+                  <MockBtn kind="ghost" sm className="text-danger" type="button" onClick={() => remove(r.id)} aria-label="Löschen">
+                    <MockIcon n="trash" ctx="default" className="h-4 w-4" />
+                  </MockBtn>
                 </div>
               </li>
             ))}
@@ -162,43 +164,28 @@ export function KommunikationVorlagenClient({
       >
         {edit ? (
           <div className="space-y-3">
-            <Input label="Name" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
-            <Select
-              label="Kontext"
-              name="vorlage-kontext"
-              value={edit.kontext_typ}
-              onChange={(e) =>
-                setEdit({
-                  ...edit,
-                  kontext_typ: e.target.value as KommunikationMailVorlage['kontext_typ'],
-                })
-              }
-              options={KOMMUNIKATION_VORLAGE_KONTEXT_OPTIONS.map((o) => ({
+            <MockField label="Name"><MockInput value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></MockField>
+            <Combobox label="Kontext" id="vorlage-kontext" name="vorlage-kontext" options={KOMMUNIKATION_VORLAGE_KONTEXT_OPTIONS.map((o) => ({
                 value: o.value,
                 label: o.label,
-              }))}
-            />
+              }))} value={edit.kontext_typ == null ? '' : String(edit.kontext_typ)} placeholder="Auswählen…" onChange={(next) => { setEdit({
+                  ...edit,
+                  kontext_typ: next as KommunikationMailVorlage['kontext_typ'],
+                }); }} />
             <KiAssistFieldLabel
               label="Betreff (optional)"
               value={edit.betreff}
               onApply={(text) => setEdit({ ...edit, betreff: text })}
               multiline={false}
             >
-              <Input
-                value={edit.betreff}
-                onChange={(e) => setEdit({ ...edit, betreff: e.target.value })}
-              />
+              <MockInput value={edit.betreff} onChange={(e) => setEdit({ ...edit, betreff: e.target.value })} />
             </KiAssistFieldLabel>
             <KiAssistFieldLabel
               label="Nachricht"
               value={edit.body_text}
               onApply={(text) => setEdit({ ...edit, body_text: text })}
             >
-              <Textarea
-                rows={8}
-                value={edit.body_text}
-                onChange={(e) => setEdit({ ...edit, body_text: e.target.value })}
-              />
+              <RichTextEditor value={typeof (edit.body_text) === 'string' ? (edit.body_text) : ''} onChange={(__v) => setEdit({ ...edit, body_text: __v })} minHeight={192} />
             </KiAssistFieldLabel>
           </div>
         ) : null}

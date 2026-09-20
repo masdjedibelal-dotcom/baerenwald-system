@@ -1,10 +1,13 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { Suspense, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BrandLogo } from '@/components/brand/BrandLogo'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   requestCrmPasswordReset,
   verifyCrmStaffSession,
@@ -27,10 +30,9 @@ const LOGIN_RL_WINDOW_MS = 15 * 60 * 1000
 const LOGIN_RL_MESSAGE =
   'Zu viele fehlgeschlagene Anmeldeversuche. Bitte in 15 Minuten erneut versuchen.'
 
-
 const BENEFITS: { icon: string; text: string }[] = [
   { icon: 'folders', text: 'Alle Vorgänge – von Anfrage bis Rechnung an einem Ort' },
-  { icon: 'users', text: 'Kunden, Handwerker & Partner immer griffbereit' },
+  { icon: 'users', text: 'Kunden, Partner & Partner immer griffbereit' },
   { icon: 'calendar', text: 'Termine, Angebote & Aufträge im Überblick' },
 ]
 
@@ -171,7 +173,7 @@ function LoginPageContent() {
           aria-busy="true"
           aria-label="Anmeldung läuft"
         >
-          <div className="crm-login__busy-card">
+          <div className="crm-login__busy">
             <div className="crm-login__brand-mark" aria-hidden>
               <BrandLogo variant="green" height={22} priority />
             </div>
@@ -246,16 +248,7 @@ function LoginPageContent() {
                   </label>
                   <div className="crm-login__input-wrap">
                     <MockIcon ctx="btn" n="mail" size={16} className="crm-login__input-ico" />
-                    <input
-                      id="crm-login-email"
-                      className="crm-login__input"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="b.baerenwald@crm.de"
-                      autoComplete="email"
-                      onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
-                    />
+                    <MockInput id="crm-login-email" className="crm-login__input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="b.baerenwald@crm.de" autoComplete="email" onKeyDown={(e) => e.key === 'Enter' && void handleLogin()} />
                   </div>
                 </div>
 
@@ -264,39 +257,24 @@ function LoginPageContent() {
                     Passwort
                   </label>
                   <div className="crm-login__input-wrap">
-                    <input
-                      id="crm-login-password"
-                      className="crm-login__input crm-login__input--plain"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
-                    />
-                    <button
-                      type="button"
-                      className="crm-login__eye"
-                      aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
-                      onClick={() => setShowPassword((v) => !v)}
-                    >
+                    <MockInput id="crm-login-password" className="crm-login__input crm-login__input--plain" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" onKeyDown={(e) => e.key === 'Enter' && void handleLogin()} />
+                    <MockBtn className="crm-login__eye" type="button" aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'} onClick={() => setShowPassword((v) => !v)}>
                       <MockIcon ctx="btn" n="eye" size={16} />
-                    </button>
+                    </MockBtn>
                   </div>
                 </div>
 
                 <div className="crm-login__row">
                   <label className="crm-login__remember">
-                    <input
-                      type="checkbox"
+                    <MockCheckbox
                       checked={remember}
                       onChange={(e) => setRemember(e.target.checked)}
                     />
                     <span>Angemeldet bleiben</span>
                   </label>
-                  <button type="button" className="crm-login__link" onClick={openForgot}>
+                  <MockBtn className="crm-login__link" type="button" onClick={openForgot}>
                     Passwort vergessen?
-                  </button>
+                  </MockBtn>
                 </div>
 
                 {devError ? (
@@ -313,13 +291,7 @@ function LoginPageContent() {
                   <div className="crm-login__alert crm-login__alert--error">{error}</div>
                 ) : null}
 
-                <button
-                  type="button"
-                  className={cn('crm-login__submit', loading && 'is-loading')}
-                  disabled={loading || !email.trim() || !password}
-                  onClick={() => void handleLogin()}
-                  aria-busy={loading}
-                >
+                <MockBtn className={cn('crm-login__submit', loading && 'is-loading')} type="button" disabled={loading || !email.trim() || !password} onClick={() => void handleLogin()} aria-busy={loading}>
                   {loading ? (
                     <>
                       <span className="crm-login__submit-spinner" aria-hidden />
@@ -328,7 +300,7 @@ function LoginPageContent() {
                   ) : (
                     'Anmelden'
                   )}
-                </button>
+                </MockBtn>
               </div>
             </>
           ) : (
@@ -345,15 +317,7 @@ function LoginPageContent() {
                   </label>
                   <div className="crm-login__input-wrap">
                     <MockIcon ctx="btn" n="mail" size={16} className="crm-login__input-ico" />
-                    <input
-                      id="crm-forgot-email"
-                      className="crm-login__input"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="b.baerenwald@crm.de"
-                      autoComplete="email"
-                    />
+                    <MockInput id="crm-forgot-email" className="crm-login__input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="b.baerenwald@crm.de" autoComplete="email" />
                   </div>
                 </div>
 
@@ -364,26 +328,17 @@ function LoginPageContent() {
                   <div className="crm-login__alert crm-login__alert--ok">{info}</div>
                 ) : null}
 
-                <button
-                  type="button"
-                  className="crm-login__submit"
-                  disabled={loading || !email.trim()}
-                  onClick={() => void handleForgot()}
-                >
+                <MockBtn className="crm-login__submit" type="button" disabled={loading || !email.trim()} onClick={() => void handleForgot()}>
                   {loading ? 'Bitte warten…' : 'Reset-Link senden'}
-                </button>
+                </MockBtn>
 
-                <button
-                  type="button"
-                  className="crm-login__back"
-                  onClick={() => {
+                <MockBtn className="crm-login__back" type="button" onClick={() => {
                     setMode('login')
                     setError(null)
                     setInfo(null)
-                  }}
-                >
+                  }}>
                   ← Zurück zum Login
-                </button>
+                </MockBtn>
               </div>
             </>
           )}
@@ -398,7 +353,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="crm-login crm-login--loading" role="status" aria-busy="true">
-          <div className="crm-login__busy-card">
+          <div className="crm-login__busy">
             <div className="crm-login__brand-mark" aria-hidden>
               <BrandLogo variant="green" height={22} priority />
             </div>

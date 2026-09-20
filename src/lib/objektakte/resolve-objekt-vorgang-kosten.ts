@@ -2,6 +2,7 @@ import { betragAnzeigeBrutto } from '@/lib/angebot-einfach'
 import { isPhaseWinningRechnung } from '@/lib/vorgang/resolve-vorgang'
 import type { VorgangRechnungInput } from '@/lib/vorgang/types'
 import { parseVorgangWertLabelEuro } from '@/lib/vorgang/vorgaenge-liste-summe'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type ObjektVorgangKostenQuelle = 'rechnung' | 'auftrag' | 'offen'
 
@@ -39,10 +40,6 @@ function euroFromAngebotRow(ang: AngebotKostenRow | null | undefined): number | 
   return parseVorgangWertLabelEuro(label === '—' ? null : label)
 }
 
-function formatEuro(euro: number): string {
-  return `${Math.round(euro).toLocaleString('de-DE')} €`
-}
-
 /**
  * Spec-Kaskade für Objekt-Historie / Bericht / KPI:
  * Rechnungssumme → Auftragswert (Angebot) → „offen".
@@ -63,7 +60,7 @@ export function resolveObjektVorgangKosten(input: {
     const brutto = Number(newest?.brutto)
     if (Number.isFinite(brutto) && brutto > 0) {
       const euro = Math.round(brutto)
-      return { euro, label: formatEuro(euro), quelle: 'rechnung' }
+      return { euro, label: formatEuro(euro, { rounded: true, decimals: 0 }), quelle: 'rechnung' }
     }
   }
 
@@ -80,7 +77,7 @@ export function resolveObjektVorgangKosten(input: {
       }
     }
     if (euro != null) {
-      return { euro, label: formatEuro(euro), quelle: 'auftrag' }
+      return { euro, label: formatEuro(euro, { rounded: true, decimals: 0 }), quelle: 'auftrag' }
     }
   }
 

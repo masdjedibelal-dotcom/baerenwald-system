@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createAngebot } from '@/app/(dashboard)/angebote/actions'
 import { angebotWizardPositionenFromLead } from '@/lib/angebote/angebot-positionen-from-lead'
 import { wizardPositionsToAngebot } from '@/lib/angebote/angebot-wizard-types'
@@ -26,17 +27,19 @@ export async function ensureAutoAngebotEntwurfForLead(leadId: string): Promise<A
     )
     .eq('id', id)
     .maybeSingle()
+  if (leadErr) logDbError('lib/angebote/auto-angebot-from-lead:leads', leadErr)
 
   if (leadErr || !lead) {
     return { ok: false, message: leadErr?.message ?? 'Lead nicht gefunden.' }
   }
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error: error2 } = await supabaseAdmin
     .from('angebote')
     .select('id, status_einfach, status')
     .eq('lead_id', id)
     .order('created_at', { ascending: false })
     .limit(5)
+  if (error2) logDbError('lib/angebote/auto-angebot-from-lead:angebote', error2)
 
   const hasActive = (existing ?? []).some((a) => {
     const s = String(a.status_einfach ?? a.status ?? '').toLowerCase()
@@ -55,7 +58,6 @@ export async function ensureAutoAngebotEntwurfForLead(leadId: string): Promise<A
     supabaseAdmin.from('gewerke').select('id, name, slug, aktiv, sort_order').eq('aktiv', true),
     supabaseAdmin.from('preislisten').select('*').eq('aktiv', true),
   ])
-
   const wizardPos = angebotWizardPositionenFromLead(
     lead as Lead,
     (gewerke ?? []) as Gewerk[],
@@ -84,7 +86,7 @@ export async function ensureAutoAngebotEntwurfForLead(leadId: string): Promise<A
 
   if (!res.ok) return res
 
-  await supabaseAdmin.from('lead_timeline').insert({
+  const { error: __dbErr1 } = await supabaseAdmin.from('lead_timeline').insert({
     lead_id: id,
     angebot_id: res.id,
     typ: 'angebot',
@@ -92,6 +94,7 @@ export async function ensureAutoAngebotEntwurfForLead(leadId: string): Promise<A
     beschreibung: `${wizardPos.length} Position(en) aus Lead-Funnel übernommen.`,
     erstellt_von: null,
   })
+  if (__dbErr1) logDbError('lib/angebote/auto-angebot-from-lead:lead_timeline', __dbErr1)
 
   return { ok: true, angebotId: res.id, created: true }
 }

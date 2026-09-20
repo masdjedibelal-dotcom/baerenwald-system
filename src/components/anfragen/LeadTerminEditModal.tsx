@@ -1,5 +1,6 @@
 'use client'
 
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { loadCrmTeamFuerTermin } from '@/app/(dashboard)/anfragen/actions'
@@ -11,6 +12,8 @@ import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { TimeInput } from '@/components/ui/TimeInput'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type { KalenderTermin } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type Props = {
   open: boolean
@@ -20,6 +23,7 @@ type Props = {
 }
 
 export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [datum, setDatum] = useState(termin.datum)
   const [von, setVon] = useState(termin.uhrzeit_von?.slice(0, 5) ?? '')
   const [bis, setBis] = useState(termin.uhrzeit_bis?.slice(0, 5) ?? '')
@@ -46,11 +50,11 @@ export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
 
   async function speichern() {
     if (!datum.trim()) {
-      toast.error('Bitte Datum wählen.')
+      applyFieldErrors({ _form: TOAST.bitte_datum_waehlen })
       return
     }
     if (istBesichtigung && !mitarbeiterId.trim()) {
-      toast.error('Bitte Mitarbeiter wählen.')
+      applyFieldErrors({ _form: TOAST.bitte_mitarbeiter_waehlen })
       return
     }
     setSaving(true)
@@ -70,10 +74,10 @@ export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
     })
     setSaving(false)
     if (!res.ok) {
-      toast.error(res.message)
+      toast.systemError(res)
       return
     }
-    toast.success('Termin gespeichert')
+    toast.success(TOAST.termin_gespeichert)
     onClose()
     onSaved()
   }
@@ -88,6 +92,8 @@ export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
       onConfirm={() => void speichern()}
     >
       <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+        {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+        
         <label className="md:col-span-2">
           <span className="input-label">Datum</span>
           <DateInput size="sm" value={datum} onChange={(e) => setDatum(e.target.value)} required />
@@ -106,13 +112,7 @@ export function LeadTerminEditModal({ open, onClose, termin, onSaved }: Props) {
         </div>
         <label className="md:col-span-2">
           <span className="input-label">Adresse</span>
-          <input
-            type="text"
-            className="input"
-            value={adresse}
-            onChange={(e) => setAdresse(e.target.value)}
-            placeholder="Ort"
-          />
+          <MockInput type="text" value={adresse} onChange={(e) => setAdresse(e.target.value)} placeholder="Ort" />
         </label>
         {istBesichtigung ? (
           <TerminMitarbeiterSelect

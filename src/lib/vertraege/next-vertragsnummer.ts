@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { HandwerkerVertragTyp } from '@/lib/vertraege/types'
 
@@ -13,12 +14,13 @@ export async function nextVertragsnummer(
   const jahr = new Date().getFullYear()
   const prefix = vertragsnummerPrefix(typ, jahr)
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('handwerker_vertraege')
     .select('vertrags_nr')
     .like('vertrags_nr', `${prefix}%`)
     .order('vertrags_nr', { ascending: false })
     .limit(50)
+  if (error) logDbError('lib/vertraege/next-vertragsnummer:handwerker_vertraege', error)
 
   let max = 0
   for (const row of data ?? []) {

@@ -1,9 +1,11 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
+import { safeVoidNotify } from '@/lib/errors/safe-void-notify'
 import { notifyNewLeadAlert } from '@/lib/copilot/crm-actions'
 import { sendMail } from '@/lib/mail-service'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import type { LeadStatus } from '@/lib/types'
+import { writeLeadStatus } from '@/lib/status/write-lead-status'
 
 export {
   createAngebotEntwurfCopilot,
@@ -34,7 +36,7 @@ function parseTerminFromIso(startIso: string, endIso?: string) {
 // ── Lesen ──
 
 export async function getNeueAnfragen() {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('leads')
     .select(
       `
@@ -47,12 +49,13 @@ export async function getNeueAnfragen() {
     .eq('status', 'neu')
     .order('created_at', { ascending: false })
     .limit(10)
+  if (error) logDbError('lib/copilot/tools:leads', error)
   return data ?? []
 }
 
 export async function getHeutigeTermine() {
   const heute = new Date().toISOString().split('T')[0]
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('kalender_termine')
     .select(
       `
@@ -64,11 +67,12 @@ export async function getHeutigeTermine() {
     )
     .eq('datum', heute)
     .order('uhrzeit_von', { ascending: true, nullsFirst: false })
+  if (error) logDbError('lib/copilot/tools:kalender_termine', error)
   return data ?? []
 }
 
 export async function getOffeneAngebote() {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('angebote')
     .select(
       `
@@ -82,11 +86,12 @@ export async function getOffeneAngebote() {
     .in('status_einfach', ['entwurf', 'gesendet'])
     .order('created_at', { ascending: false })
     .limit(10)
+  if (error) logDbError('lib/copilot/tools:angebote', error)
   return data ?? []
 }
 
 export async function getOffeneRechnungen() {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('rechnungen')
     .select(
       `
@@ -98,11 +103,12 @@ export async function getOffeneRechnungen() {
     .eq('status', 'gesendet')
     .order('faellig_am', { ascending: true, nullsFirst: false })
     .limit(15)
+  if (error) logDbError('lib/copilot/tools:rechnungen', error)
   return data ?? []
 }
 
 export async function getAuftragStatus() {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('auftraege')
     .select(
       `
@@ -114,11 +120,12 @@ export async function getAuftragStatus() {
     .neq('status', 'abgeschlossen')
     .order('created_at', { ascending: false })
     .limit(10)
+  if (error) logDbError('lib/copilot/tools:auftraege', error)
   return data ?? []
 }
 
 export async function getHandwerkerOffen() {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('angebot_handwerker')
     .select(
       `
@@ -130,6 +137,7 @@ export async function getHandwerkerOffen() {
     .in('hw_status', ['eingereicht', 'offen'])
     .order('created_at', { ascending: false })
     .limit(15)
+  if (error) logDbError('lib/copilot/tools:angebot_handwerker', error)
   return data ?? []
 }
 
@@ -160,6 +168,7 @@ export async function createTermin(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('lib/copilot/tools:kalender_termine', error)
   if (error) throw error
   return data
 }
@@ -173,6 +182,7 @@ export async function createNotiz(input: {
     lead_id: input.lead_id,
     inhalt: input.text,
   })
+  if (error) logDbError('lib/copilot/tools:lead_notizen', error)
   if (error) throw error
   return { ok: true }
 }
@@ -202,16 +212,22 @@ export async function createLead(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('lib/copilot/tools:leads', error)
   if (error) throw error
-  void notifyNewLeadAlert(data.id).catch(() => undefined)
+  safeVoidNotify('notifyNewLeadAlert', notifyNewLeadAlert(data.id))
   return data
 }
 
 export async function updateLeadStatus(leadId: string, status: string) {
+<<<<<<< Updated upstream
+  const { error } = await writeLeadStatus(supabaseAdmin, leadId, status)
+=======
   const { error } = await supabaseAdmin
     .from('leads')
     .update({ status: status as LeadStatus, updated_at: new Date().toISOString() })
     .eq('id', leadId)
+>>>>>>> Stashed changes
+  if (error) logDbError('lib/copilot/tools:leads', error)
   if (error) throw error
   return { ok: true }
 }

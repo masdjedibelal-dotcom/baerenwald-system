@@ -1,17 +1,19 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { CRM_LOGIN_PORTAL_ONLY_MESSAGE } from '@/lib/auth/crm-access'
 import { isStagingAdminEmail, STAGING_ADMIN_EMAIL, STAGING_ADMIN_NAME } from '@/lib/auth/staging-admin'
 import { crmPasswordResetRedirectUrl } from '@/lib/auth/crm-auth-url'
 import { sendMail } from '@/lib/mail-service'
+import { C } from '@/lib/tokens/colors'
 
 export async function verifyCrmStaffSession(
   /** Nach Client-Login: User-ID direkt prüfen (Cookie oft noch nicht im Server Action). */
   userId?: string
 ): Promise<{ ok: true } | { ok: false; message: string; reason: 'no_session' | 'portal_only' }> {
-  let uid = userId?.trim() || ''
+let uid = userId?.trim() || ''
   if (!uid) {
     const supabase = createClient()
     const {
@@ -22,21 +24,23 @@ export async function verifyCrmStaffSession(
   if (!uid) return { ok: false, message: 'Nicht angemeldet.', reason: 'no_session' }
 
   // Service-Role: unabhängig vom Cookie-Timing der Browser-Session
-  const { data: profile } = await supabaseAdmin
+  const {data: profile, error} = await supabaseAdmin
     .from('user_profiles')
     .select('id')
     .eq('id', uid)
     .maybeSingle()
+  if (error) logDbError('app/auth-actions:user_profiles', error)
 
   if (profile) return { ok: true }
 
   const { data: authData } = await supabaseAdmin.auth.admin.getUserById(uid)
   if (isStagingAdminEmail(authData.user?.email)) {
-    await supabaseAdmin.from('user_profiles').upsert({
+    const { error: __dbErr1 } = await supabaseAdmin.from('user_profiles').upsert({
       id: uid,
       name: STAGING_ADMIN_NAME,
       email: STAGING_ADMIN_EMAIL,
     })
+    if (__dbErr1) logDbError('app/auth-actions:user_profiles', __dbErr1)
     return { ok: true }
   }
 
@@ -56,11 +60,12 @@ export async function requestCrmPasswordReset(
     return { ok: true }
   }
 
-  const { data: profile } = await supabaseAdmin
+  const {data: profile, error} = await supabaseAdmin
     .from('user_profiles')
     .select('id')
     .eq('id', authUser.id)
     .maybeSingle()
+  if (error) logDbError('app/auth-actions:user_profiles', error)
 
   if (!profile) {
     return {
@@ -92,16 +97,16 @@ export async function requestCrmPasswordReset(
       <p>Hallo,</p>
       <p>du hast ein neues Passwort für das <strong>Bärenwald CRM</strong> angefordert.</p>
       <p style="margin:24px 0">
-        <a href="${actionLink}" style="display:inline-block;padding:12px 20px;background:#2E7D52;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">
+        <a href="${actionLink}" style="display:inline-block;padding:12px 20px;background:${C.green};color:${C.white};text-decoration:none;border-radius:8px;font-weight:600">
           Neues CRM-Passwort setzen
         </a>
       </p>
-      <p style="font-size:13px;color:#666">
+      <p style="font-size:13px;color:${C.grayNeutral3}">
         Dieser Link führt ins CRM (<code>baerenwald-backend.netlify.app</code>), nicht zu MeinBärenwald.
         Falls du nur das Kundenportal meinst, nutze
         <a href="https://baerenwaldmuenchen.de/portal/login">baerenwaldmuenchen.de/portal</a>.
       </p>
-      <p style="font-size:13px;color:#666">Wenn du das nicht warst, ignoriere diese E-Mail.</p>
+      <p style="font-size:13px;color:${C.grayNeutral3}">Wenn du das nicht warst, ignoriere diese E-Mail.</p>
     `,
   })
 

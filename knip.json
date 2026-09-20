@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/app/**/{page,layout,loading,error,not-found,route,default,template,instrumentation}.{ts,tsx,js}",
+    "src/instrumentation.ts",
+    "sentry.{client,server,edge}.config.ts",
+    "scripts/**/*.{mjs,js,ts,cjs,mts}"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.{mjs,js,ts,cjs,mts}"],
+  "ignore": [
+    "supabase/**",
+    "docs/**",
+    "scripts/_tmp-*"
+  ],
+  "ignoreDependencies": ["@netlify/plugin-nextjs"],
+  "ignoreBinaries": ["bash"]
+}

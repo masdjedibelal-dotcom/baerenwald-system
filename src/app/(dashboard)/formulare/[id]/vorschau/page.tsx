@@ -1,8 +1,8 @@
+import { MockCard } from '@/components/mock-ui/MockCard'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { loadFormularTemplate } from '@/app/(dashboard)/formulare/actions'
 import { FormularFelderRenderer } from '@/components/formulare/FormularFelderRenderer'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import { FORMULAR_PHASE_LABELS } from '@/lib/utils'
 
 export default async function FormularVorschauPage({ params }: { params: { id: string } }) {
@@ -25,7 +25,7 @@ export default async function FormularVorschauPage({ params }: { params: { id: s
       </div>
       <MockCard className="p-4">
         <p className="text-sm text-muted">
-          {template.typ === 'betreuer' ? 'Betreuer' : 'Handwerker'}
+          {template.typ === 'betreuer' ? 'Betreuer' : 'Partner'}
           {template.phase ? ` · ${FORMULAR_PHASE_LABELS[template.phase] ?? template.phase}` : null}
         </p>
         <p className="mt-2 text-xs text-muted">Nur-Lese-Ansicht (leere Werte).</p>

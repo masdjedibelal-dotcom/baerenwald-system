@@ -1,14 +1,5 @@
-import type { LucideIcon } from 'lucide-react'
-import {
-  Building2,
-  Circle,
-  Globe,
-  Link2,
-  Mail,
-  MapPin,
-  MessageCircle,
-  Phone,
-} from 'lucide-react'
+import type { MockIconName } from '@/lib/mock-icons'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { cn, kanalLabel } from '@/lib/utils'
 import type { LeadKanal, LeadStatus } from '@/lib/types'
@@ -18,21 +9,21 @@ export function LeadStatusBadge({ status }: { status: LeadStatus | string }) {
   return <StatusBadge status={status} />
 }
 
-const kanalIcon: Record<LeadKanal, LucideIcon> = {
-  website: Globe,
-  telefon: Phone,
-  whatsapp: MessageCircle,
-  email: Mail,
-  vor_ort: MapPin,
-  hv_melder_link: Link2,
-  hv_einladung: Mail,
-  hv_direkt: Building2,
-  hv_katalog: Building2,
-  hv_manuell: Building2,
-  org_portal: Building2,
-  org_funnel: Building2,
-  org_service: Building2,
-  sonstiges: Circle,
+const kanalIcon: Record<LeadKanal, MockIconName> = {
+  website: 'world',
+  telefon: 'phone',
+  whatsapp: 'message',
+  email: 'mail',
+  vor_ort: 'map-pin',
+  hv_melder_link: 'link',
+  hv_einladung: 'mail',
+  hv_direkt: 'building',
+  hv_katalog: 'building',
+  hv_manuell: 'building',
+  org_portal: 'building',
+  org_funnel: 'building',
+  org_service: 'building',
+  sonstiges: 'circle',
 }
 
 export function KanalBadge({
@@ -42,15 +33,15 @@ export function KanalBadge({
   kanal: LeadKanal | string
   className?: string
 }) {
-  const Icon = (kanalIcon as Record<string, LucideIcon>)[kanal] ?? Circle
+  const icon = (kanalIcon as Record<string, MockIconName>)[kanal] ?? 'circle'
   return (
     <span
       className={cn(
-        'inline-flex min-h-[28px] items-center gap-1 rounded-lg border border-bw-border bg-bw-bg px-2 py-0.5 text-xs font-medium text-bw-text',
+        'inline-flex min-h-[28px] items-center gap-1 rounded-card border border-bw-border bg-bw-bg px-2 py-0.5 text-xs font-medium text-bw-text',
         className
       )}
     >
-      <Icon className="h-3.5 w-3.5 shrink-0 text-bw-light" aria-hidden />
+      <MockIcon n={icon} ctx="default" size={14} className="text-bw-light" />
       <span>{kanalLabel(kanal)}</span>
     </span>
   )
@@ -66,7 +57,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex min-h-[28px] items-center rounded-lg bg-status-done-bg px-2 py-0.5 text-xs font-medium text-status-done-text',
+        'inline-flex min-h-[28px] items-center rounded-card bg-status-done-bg px-2 py-0.5 text-xs font-medium text-status-done-text',
         className
       )}
     >

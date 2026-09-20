@@ -1,12 +1,19 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockBtn, MockTextarea } from '@/components/mock-ui'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ImageIcon, Loader2, Sparkles, X } from 'lucide-react'
 import { AppFlowScreen, WizardMobileToolbar } from '@/components/layout/app'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Modal } from '@/components/ui/Modal'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { VizPrepareQuestions } from '@/components/angebote/VizPrepareQuestions'
 import { VizZielbildCard } from '@/components/angebote/VizZielbildCard'
@@ -25,6 +32,8 @@ import type {
 } from '@/lib/visualize/types'
 import type { AngebotDetail } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type Modus = 'prompt' | 'zielbild'
 
@@ -79,7 +88,7 @@ function VizImageDropzone({
     <label
       htmlFor={inputId}
       className={cn(
-        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-bw-border p-4 text-center transition-colors',
+        'flex cursor-pointer flex-col items-center justify-center rounded-card border-2 border-dashed border-bw-border p-4 text-center transition-colors',
         isDragging && 'border-bw-primary bg-bw-hover/40',
         blocked && 'pointer-events-none opacity-60',
         className
@@ -116,6 +125,7 @@ export function AngebotVisualisierungClient({
   /** Aus Wizard: Foto-URL als Ist-Bild übernehmen */
   initialIstUrl?: string | null
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [session, setSession] = useState<KiVisualisierung | null>(initialSession ?? null)
@@ -309,13 +319,13 @@ export function AngebotVisualisierungClient({
       const idx = nextUrls.indexOf(istUrl)
       setAktivesIstIndex(idx >= 0 ? idx : 0)
       void analyzeRoom(istUrl, sid)
-      toast.success('Foto aus Angebot als Ist-Bild übernommen')
+      toast.success(TOAST.foto_aus_angebot_als_ist_bild_uebernommen)
     })()
   }, [initialIstUrl, initialSession, ensureSession, detail.id, analyzeRoom])
 
   async function uploadFile(file: File, kind: 'ist' | 'ziel') {
     if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
-      toast.error('Bitte ein Bild (JPEG, PNG oder WebP) wählen')
+      applyFieldErrors({ _form: TOAST.bitte_ein_bild_jpeg_png_oder_webp_waehlen })
       return
     }
 
@@ -349,7 +359,7 @@ export function AngebotVisualisierungClient({
         void analyzeInspiration(data.session.ziel_bild_url, sid)
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploading(false)
     }
@@ -369,7 +379,7 @@ export function AngebotVisualisierungClient({
     })
     const data = (await res.json()) as { session?: KiVisualisierung; error?: string }
     if (!res.ok || !data.session) {
-      toast.error(data.error ?? 'Entfernen fehlgeschlagen')
+      toast.error(data.error ?? 'Löschen fehlgeschlagen')
       return
     }
     setSession(data.session)
@@ -379,7 +389,7 @@ export function AngebotVisualisierungClient({
   function uebernehmeLeadFotos() {
     const urls = leadFotos.map((f) => f.url).slice(0, VIZ_MAX_IST_BILDER)
     if (!urls.length) {
-      toast.error('Keine Projekt-Fotos im Angebot')
+      toast.error(TOAST.keine_projekt_fotos_im_angebot)
       return
     }
     void (async () => {
@@ -396,11 +406,11 @@ export function AngebotVisualisierungClient({
       })
       const data = (await res.json()) as { session?: KiVisualisierung; error?: string }
       if (!res.ok || !data.session) {
-        toast.error(data.error ?? 'Übernehmen fehlgeschlagen')
+        toast.error(data.error ?? 'Speichern fehlgeschlagen')
         return
       }
       setSession(data.session)
-      toast.success('Fotos aus Angebot übernommen')
+      toast.success(TOAST.fotos_aus_angebot_uebernommen)
     })()
   }
 
@@ -410,7 +420,7 @@ export function AngebotVisualisierungClient({
     const istUrl = istBilderUrls[aktivesIstIndex]?.trim()
     const zielUrl = zielBildUrl?.trim()
     if (!istUrl || !zielUrl) {
-      toast.error('Ist- und Ziel-Bild erforderlich')
+      toast.error(TOAST.ist_und_ziel_bild_erforderlich)
       return
     }
 
@@ -437,9 +447,9 @@ export function AngebotVisualisierungClient({
         throw new Error(data.error ?? `Analyse fehlgeschlagen (HTTP ${res.status})`)
       }
       setPrompt(data.prompt)
-      toast.success('Wunschtext erstellt — bitte prüfen')
+      toast.success(TOAST.wunschtext_erstellt_bitte_pruefen)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Analyse fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Analyse fehlgeschlagen')
     } finally {
       setIsAnalyzing(false)
     }
@@ -450,7 +460,7 @@ export function AngebotVisualisierungClient({
     if (!sid) return
     const istUrl = istBilderUrls[aktivesIstIndex]?.trim()
     if (!istUrl || !wunsch) {
-      toast.error('Ist-Bild und Prompt erforderlich')
+      toast.error(TOAST.ist_bild_und_prompt_erforderlich)
       return
     }
 
@@ -485,7 +495,7 @@ export function AngebotVisualisierungClient({
       }
       toast.success(`Version V${data.version ?? idx + 1} fertig`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Render fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Render fehlgeschlagen')
     } finally {
       setIsRendering(false)
     }
@@ -499,7 +509,7 @@ export function AngebotVisualisierungClient({
     if (!sid) return
     const istUrl = istBilderUrls[aktivesIstIndex]?.trim()
     if (!istUrl || !wunsch) {
-      toast.error('Ist-Bild und Prompt erforderlich')
+      toast.error(TOAST.ist_bild_und_prompt_erforderlich)
       return
     }
 
@@ -533,7 +543,7 @@ export function AngebotVisualisierungClient({
       setPendingQuestion(null)
       await executeRender(wunsch)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Vorbereitung fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Vorbereitung fehlgeschlagen')
     } finally {
       setIsPreparing(false)
     }
@@ -588,7 +598,7 @@ export function AngebotVisualisierungClient({
     }
     if (data.session) setSession(data.session)
     setInsAngebotOpen(false)
-    toast.success('Visualisierung ins Angebot übernommen')
+    toast.success(TOAST.visualisierung_ins_angebot_uebernommen)
   }
 
   const kannRendern =
@@ -616,9 +626,9 @@ export function AngebotVisualisierungClient({
         actions={<span className="sr-only">Aktionen im Formular</span>}
       />
       <div className="wizard-header-desktop hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-4">
-        <button type="button" className="btn ghost sm" onClick={closeWizard} aria-label="Schließen">
-          <X className="h-4 w-4" />
-        </button>
+        <MockBtn kind="ghost" sm type="button" onClick={closeWizard} aria-label="Schließen">
+          <MockIcon n="x" ctx="default" className="h-4 w-4" />
+        </MockBtn>
         <div className="h-6 w-px bg-bw-border" aria-hidden />
         <div className="title-block min-w-0 flex-1">
           <div className="ttl">KI-Visualisierung erstellen</div>
@@ -636,21 +646,21 @@ export function AngebotVisualisierungClient({
     <AppFlowScreen className="wizard-flow" header={wizardHeader}>
       <div className="wizard-inner mx-auto max-w-3xl space-y-4 pb-8">
       {sessionError ? (
-        <div className="rounded-lg border border-status-cancel-bg bg-red-50 px-4 py-3 text-[length:var(--fs-text)] text-status-cancel-text">
+        <div className="rounded-card border border-status-cancel-bg bg-status-cancel-bg px-4 py-3 text-[length:var(--fs-text)] text-status-cancel-text">
           <p className="font-medium">Visualisierung nicht bereit</p>
           <p className="mt-1">{sessionError}</p>
           <p className="mt-2 text-[length:var(--fs-meta)] opacity-90">
             Falls die Tabelle fehlt: Migration{' '}
-            <code className="rounded bg-white/80 px-1">20260620120000_ki_visualisierungen.sql</code> in Supabase
+            <code className="rounded-card bg-white/80 px-1">20260620120000_ki_visualisierungen.sql</code> in Supabase
             ausführen.
           </p>
-          <Button type="button" variant="secondary" className="mt-3" onClick={() => void ensureSession()}>
+          <MockBtn type="button" kind="secondary" className="mt-3" onClick={() => void ensureSession()}>
             Erneut versuchen
-          </Button>
+          </MockBtn>
         </div>
       ) : null}
 
-      <div className="space-y-5 rounded-xl border border-bw-border bg-white p-4 md:p-5">
+      <div className="space-y-5 rounded-button border border-bw-border bg-white p-4 md:p-5">
           <section>
             <h2 className="text-[length:var(--fs-text)] font-semibold text-bw-text">Ist-Zustand (Pflicht)</h2>
             <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">Max. {VIZ_MAX_IST_BILDER} Fotos — pro Render wird das aktive Bild genutzt</p>
@@ -665,51 +675,43 @@ export function AngebotVisualisierungClient({
               className="min-h-[100px]"
             >
               {uploading ? (
-                <Loader2 className="mb-2 h-8 w-8 animate-spin text-bw-text-muted" aria-hidden />
+                <CrmInlineLoading label="Wird hochgeladen…" minHeight={80} />
               ) : (
-                <ImageIcon className="mb-2 h-8 w-8 text-bw-text-muted" aria-hidden />
+                <>
+                  <MockIcon n="photo" ctx="default" className="mb-2 h-8 w-8 text-bw-text-muted" aria-hidden />
+                  <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+                    {istDragging ? 'Bild hier ablegen' : 'Drag & Drop oder klicken'}
+                  </p>
+                </>
               )}
-              <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-                {uploading
-                  ? 'Wird hochgeladen…'
-                  : istDragging
-                    ? 'Bild hier ablegen'
-                    : 'Drag & Drop oder klicken'}
-              </p>
             </VizImageDropzone>
 
             {leadFotos.length > 0 ? (
-              <Button type="button" variant="secondary" className="mt-2 w-full text-[length:var(--fs-text)]" onClick={uebernehmeLeadFotos}>
+              <MockBtn type="button" kind="secondary" className="mt-2 w-full text-[length:var(--fs-text)]" onClick={uebernehmeLeadFotos}>
                 Aus Angebot-Fotos übernehmen
-              </Button>
+              </MockBtn>
             ) : null}
 
             {istBilderUrls.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {istBilderUrls.map((url, i) => (
-                  <button
-                    key={url}
-                    type="button"
-                    className={cn(
-                      'relative h-20 w-20 overflow-hidden rounded-lg border-2',
+                  <MockBtn className={cn(
+                      'relative h-20 w-20 overflow-hidden rounded-card border-2',
                       i === aktivesIstIndex ? 'border-bw-primary' : 'border-bw-border'
-                    )}
-                    onClick={() => setAktivesIstIndex(i)}
-                    title={i === aktivesIstIndex ? 'Aktives Ist-Bild' : 'Als Ist-Bild wählen'}
-                  >
+                    )} key={url} type="button" onClick={() => setAktivesIstIndex(i)} title={i === aktivesIstIndex ? 'Aktives Ist-Bild' : 'Als Ist-Bild wählen'}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} alt="" className="h-full w-full object-cover" />
                     <span
                       role="button"
-                      className="absolute right-0.5 top-0.5 rounded bg-black/60 p-0.5 text-white"
+                      className="absolute right-0.5 top-0.5 rounded-button bg-black/60 p-0.5 text-white"
                       onClick={(e) => {
                         e.stopPropagation()
                         void removeIstBild(url)
                       }}
                     >
-                      <X className="h-3 w-3" />
+                      <MockIcon n="x" ctx="default" className="h-3 w-3" />
                     </span>
-                  </button>
+                  </MockBtn>
                 ))}
               </div>
             ) : null}
@@ -717,27 +719,19 @@ export function AngebotVisualisierungClient({
 
           <section>
             <h2 className="text-[length:var(--fs-text)] font-semibold text-bw-text">Was soll entstehen?</h2>
-            <div className="mt-2 flex gap-1 rounded-lg bg-bw-bg p-1">
-              <button
-                type="button"
-                className={cn(
-                  'flex-1 rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
+            <div className="mt-2 flex gap-1 rounded-button bg-bw-bg p-1">
+              <MockBtn className={cn(
+                  'flex-1 rounded-button px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
                   modus === 'prompt' ? 'bg-white text-bw-primary shadow-sm' : 'text-bw-text-muted'
-                )}
-                onClick={() => setModus('prompt')}
-              >
+                )} type="button" onClick={() => setModus('prompt')}>
                 ✏️ Eigener Prompt
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'flex-1 rounded-md px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
+              </MockBtn>
+              <MockBtn className={cn(
+                  'flex-1 rounded-button px-3 py-1.5 text-[length:var(--fs-text)] font-medium',
                   modus === 'zielbild' ? 'bg-white text-bw-primary shadow-sm' : 'text-bw-text-muted'
-                )}
-                onClick={() => setModus('zielbild')}
-              >
+                )} type="button" onClick={() => setModus('zielbild')}>
                 📷 Ziel-Bild
-              </button>
+              </MockBtn>
             </div>
 
             {modus === 'prompt' ? (
@@ -758,20 +752,20 @@ export function AngebotVisualisierungClient({
                 </VizImageDropzone>
                 {zielBildUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={zielBildUrl} alt="Ziel" className="max-h-40 rounded-lg border border-bw-border object-cover" />
+                  <img src={zielBildUrl} alt="Ziel" className="max-h-40 rounded-card border border-bw-border object-cover" />
                 ) : null}
                 <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
                   Stil-Referenz — nur Material, Farbe und Atmosphäre werden übernommen, nicht das Raumlayout.
                 </p>
-                <Button
+                <MockBtn
                   type="button"
-                  variant="secondary"
+                  kind="secondary"
                   className="w-full"
                   disabled={isAnalyzing || !zielBildUrl || !istBilderUrls.length}
                   onClick={() => void analyzeZielBild()}
                 >
                   {isAnalyzing ? 'Analysiert…' : 'Stil aus Ziel-Bild übernehmen'}
-                </Button>
+                </MockBtn>
               </div>
             )}
           </section>
@@ -781,24 +775,13 @@ export function AngebotVisualisierungClient({
             <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
               Wird serverseitig für die KI ins Englische übersetzt. Text anpassen und erneut auf Rendern klicken.
             </p>
-            <textarea
-              className="input min-h-[120px] w-full text-[length:var(--fs-text)]"
-              rows={5}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="z. B. modernes Bad, weiße Marmorfliesen, warmes Licht, Wände in hellem Grau…"
-            />
+            <MockTextarea className="min-h-[120px] w-full text-[length:var(--fs-text)]" rows={5} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="z. B. modernes Bad, weiße Marmorfliesen, warmes Licht, Wände in hellem Grau…" />
             {modus === 'prompt' ? (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {VIZ_STIL_TAGS.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className="rounded-full border border-bw-border px-2.5 py-0.5 text-[length:var(--fs-meta)] text-bw-text-muted hover:border-bw-primary hover:text-bw-primary"
-                    onClick={() => appendStilTag(tag)}
-                  >
+                  <MockBtn className="rounded-pill border border-bw-border px-2.5 py-0.5 text-[length:var(--fs-meta)] text-bw-text-muted hover:border-bw-primary hover:text-bw-primary" key={tag} type="button" onClick={() => appendStilTag(tag)}>
                     {tag}
-                  </button>
+                  </MockBtn>
                 ))}
               </div>
             ) : null}
@@ -812,13 +795,30 @@ export function AngebotVisualisierungClient({
             />
           ) : null}
 
-          <Button
+          <MockBtn
             type="button"
-            variant="primary"
+            kind="primary"
+<<<<<<< Updated upstream
+            className="w-full bg-bw-dark hover:bg-bw-dark"
+=======
             className="w-full bg-[#1A3D2B] hover:bg-[#153222]"
+>>>>>>> Stashed changes
             disabled={!kannRendern}
+            loading={isRendering || isPreparing}
             onClick={() => requestRender()}
           >
+<<<<<<< Updated upstream
+            {isPreparing
+              ? 'Bereite Render vor…'
+              : isRendering
+                ? 'KI rendert… (~8–60 Sek.)'
+                : (
+                  <>
+                    <MockIcon n="sparkles" ctx="default" className="mr-2 h-4 w-4" aria-hidden />
+                    Rendern →
+                  </>
+                )}
+=======
             {isRendering || isPreparing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
@@ -830,10 +830,11 @@ export function AngebotVisualisierungClient({
                 Rendern →
               </>
             )}
-          </Button>
+>>>>>>> Stashed changes
+          </MockBtn>
           {isRendering || isPreparing ? (
-            <div className="h-1.5 overflow-hidden rounded-full bg-bw-border">
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-bw-primary" />
+            <div className="h-1.5 overflow-hidden rounded-pill bg-bw-border">
+              <div className="h-full w-1/3 animate-pulse rounded-pill bg-bw-primary" />
             </div>
           ) : null}
 
@@ -842,22 +843,17 @@ export function AngebotVisualisierungClient({
               {versionen.length > 1 ? (
                 <div className="flex flex-wrap gap-1">
                   {versionen.map((v, i) => (
-                    <button
-                      key={v.version}
-                      type="button"
-                      className={cn(
-                        'rounded-md px-2.5 py-1 text-[length:var(--fs-meta)] font-medium',
+                    <MockBtn className={cn(
+                        'rounded-button px-2.5 py-1 text-[length:var(--fs-meta)] font-medium',
                         i === aktiveVersion
                           ? 'bg-bw-primary text-white'
                           : 'bg-bw-bg text-bw-text-muted hover:text-bw-text'
-                      )}
-                      onClick={() => {
+                      )} key={v.version} type="button" onClick={() => {
                         setAktiveVersion(i)
                         setPrompt(v.prompt)
-                      }}
-                    >
+                      }}>
                       V{v.version}
-                    </button>
+                    </MockBtn>
                   ))}
                 </div>
               ) : null}
@@ -872,84 +868,91 @@ export function AngebotVisualisierungClient({
                 <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Feintuning (wie Website)</p>
                 <div className="flex flex-wrap gap-1.5">
                   {VIZ_NACHPROMPT_TAGS.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      disabled={isRendering || isPreparing}
-                      className="rounded-full border border-bw-border px-2.5 py-0.5 text-[length:var(--fs-meta)] text-bw-text-muted hover:border-bw-primary hover:text-bw-primary disabled:opacity-50"
-                      onClick={() => renderWithNachprompt(tag)}
-                    >
+                    <MockBtn className="rounded-pill border border-bw-border px-2.5 py-0.5 text-[length:var(--fs-meta)] text-bw-text-muted hover:border-bw-primary hover:text-bw-primary disabled:opacity-50" key={tag} type="button" disabled={isRendering || isPreparing} onClick={() => renderWithNachprompt(tag)}>
                       {tag}
-                    </button>
+                    </MockBtn>
                   ))}
                 </div>
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
+                <MockBtn
                   type="button"
-                  variant="primary"
+                  kind="primary"
+<<<<<<< Updated upstream
+                  className="flex-1 bg-bw-dark"
+=======
                   className="flex-1 bg-[#1A3D2B]"
+>>>>>>> Stashed changes
                   onClick={() => setInsAngebotOpen(true)}
                 >
                   ✓ Ins Angebot übernehmen
-                </Button>
-                <Button
+                </MockBtn>
+                <MockBtn
                   type="button"
-                  variant="secondary"
+                  kind="secondary"
                   className="flex-1"
                   onClick={() => {
                     setPrompt('')
                   }}
                 >
                   + Neue Variante
-                </Button>
+                </MockBtn>
               </div>
             </section>
           ) : null}
         </div>
       </div>
 
-      <Modal
+      <EditorSheet
         open={insAngebotOpen}
         onClose={() => setInsAngebotOpen(false)}
+<<<<<<< Updated upstream
+        title="Ins Angebot speichern"
+        secondary={{ label: 'Abbrechen', onClick: () => setInsAngebotOpen(false) }}
+        primary={{
+          label: 'Speichern',
+          onClick: () => void insAngebotUebernehmen(),
+        }}
+=======
         title="Ins Angebot übernehmen"
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={() => setInsAngebotOpen(false)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setInsAngebotOpen(false)}>
               Abbrechen
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void insAngebotUebernehmen()}>
+            </MockBtn>
+            <MockBtn type="button" kind="primary" onClick={() => void insAngebotUebernehmen()}>
               Übernehmen
-            </Button>
+            </MockBtn>
           </>
         }
+>>>>>>> Stashed changes
       >
-        <div className="grid gap-3 sm:grid-cols-2">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Aktuell</p>
             {istBilderUrls[aktivesIstIndex] ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={istBilderUrls[aktivesIstIndex]} alt="Vorher" className="rounded-lg border border-bw-border" />
+              <img src={istBilderUrls[aktivesIstIndex]} alt="Vorher" className="rounded-card border border-bw-border" />
             ) : null}
           </div>
           <div>
-            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-[#2E7D52]">Visualisierung</p>
+            <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-primary">Visualisierung</p>
             {aktiveErgebnis ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={aktiveErgebnis.ergebnis_url} alt="Nachher" className="rounded-lg border border-bw-border" />
+              <img src={aktiveErgebnis.ergebnis_url} alt="Nachher" className="rounded-card border border-bw-border" />
             ) : null}
           </div>
         </div>
         <label className="mt-4 flex items-center gap-2 text-[length:var(--fs-text)]">
-          <input
-            type="checkbox"
+          <MockCheckbox
             checked={insAngebotPdf}
             onChange={(e) => setInsAngebotPdf(e.target.checked)}
           />
           Auf Visualisierungs-Seite im PDF einfügen
         </label>
-      </Modal>
+      </EditorSheet>
     </AppFlowScreen>
   )
 

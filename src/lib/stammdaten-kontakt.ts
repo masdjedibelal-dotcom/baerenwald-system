@@ -41,7 +41,7 @@ export function emailKontaktMatch(a: string | null | undefined, b: string | null
 
 export function stammdatenTypLabel(typ: StammdatenTyp): string {
   if (typ === 'kunde') return 'Kunde'
-  if (typ === 'handwerker') return 'Handwerker'
+  if (typ === 'handwerker') return 'Partner'
   return 'Partner'
 }
 

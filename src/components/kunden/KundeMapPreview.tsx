@@ -1,6 +1,7 @@
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { C } from '@/lib/tokens/colors'
 
 export function KundeMapPreview({
   adresse,
@@ -22,13 +23,13 @@ export function KundeMapPreview({
         className="relative flex h-36 flex-col items-center justify-center bg-gradient-to-br from-bw-green-bg to-bw-bg-soft"
         aria-hidden
       >
-        <MapPin className="h-10 w-10 text-bw-primary/50" strokeWidth={1.5} />
+        <MockIcon n="map-pin" ctx="default" className="h-10 w-10 text-bw-primary/50" />
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.07]"
           style={{
             backgroundImage:
-              'linear-gradient(var(--bw-border,#e2e8e2) 1px, transparent 1px), linear-gradient(90deg, var(--bw-border,#e2e8e2) 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
+              `linear-gradient(var(--bw-border,${C.greenWash}) 1px, transparent 1px), linear-gradient(90deg, var(--bw-border,${C.greenWash}) 1px, transparent 1px)`,
+            backgroundSize: '1.5rem 1.5rem',
           }}
         />
       </div>

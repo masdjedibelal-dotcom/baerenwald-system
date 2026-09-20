@@ -1,9 +1,13 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useLocalTransition } from '@/components/ui/action-busy'
-
 import { useState } from 'react'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
+>>>>>>> Stashed changes
 import { PropertyRow } from '@/components/ui/PropertyRow'
 import { toast } from '@/components/ui/app-toast'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
@@ -13,10 +17,9 @@ import {
 } from '@/components/einstellungen/EinstellungenUi'
 import type { MeinProfilDaten } from '@/app/(dashboard)/einstellungen/profil/actions'
 import { saveMeinProfil } from '@/app/(dashboard)/einstellungen/profil/actions'
-import { useRouter } from 'next/navigation'
+import { TOAST } from '@/lib/copy'
 
 export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
-  const router = useRouter()
   const [name, setName] = useState(initial.name)
   const [telefon, setTelefon] = useState(initial.telefon)
   const [pending, startTransition] = useLocalTransition()
@@ -25,11 +28,11 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
     startTransition(async () => {
       const r = await saveMeinProfil({ name, telefon })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Profil gespeichert')
-      router.refresh()
+      toast.success(TOAST.profil_gespeichert)
+      // revalidatePath in saveMeinProfil — kein zusätzliches router.refresh
     })
   }
 
@@ -40,8 +43,8 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
         <div className="mb-4 flex items-center gap-3">
           <BrandAvatar size={48} />
           <div>
-            <div className="text-[14px] font-semibold text-bw-text">{name || 'Profil'}</div>
-            <div className="text-[12.5px] text-bw-text-muted">{initial.email || '—'}</div>
+            <div className="text-fs-title font-semibold text-bw-text">{name || 'Profil'}</div>
+            <div className="text-fs-text text-bw-text-muted">{initial.email || '—'}</div>
           </div>
         </div>
         <EinstellungenMeta className="mb-4">
@@ -52,25 +55,19 @@ export function MeinProfilClient({ initial }: { initial: MeinProfilDaten }) {
           <PropertyRow label="E-Mail" value={initial.email || '—'} editable={false} />
         </div>
         <div className="mt-4 space-y-3">
-          <Input label="Anzeigename" required value={name} onChange={(e) => setName(e.target.value)} />
-          <Input
-            label="Handy / Direktwahl"
-            type="tel"
-            value={telefon}
-            onChange={(e) => setTelefon(e.target.value)}
-            placeholder="+49 …"
-          />
+          <MockField label="Anzeigename" required><MockInput required value={name} onChange={(e) => setName(e.target.value)} /></MockField>
+          <MockField label="Handy / Direktwahl"><MockInput type="tel" value={telefon} onChange={(e) => setTelefon(e.target.value)} placeholder="+49 …" /></MockField>
         </div>
         <div className="mt-6 flex justify-end">
-          <Button type="button" variant="primary" loading={pending} onClick={() => save()}>
+          <MockBtn type="button" kind="primary" loading={pending} onClick={() => save()}>
             Speichern
-          </Button>
+          </MockBtn>
         </div>
       </section>
 
       <section>
         <EinstellungenSectionHeading className="mb-2">Rolle</EinstellungenSectionHeading>
-        <p className="text-[13.5px] font-medium capitalize text-bw-text">{initial.rolle}</p>
+        <p className="text-fs-title font-medium capitalize text-bw-text">{initial.rolle}</p>
         <EinstellungenMeta className="mt-1">
           Rollen ändern nur Admins unter Tab „Team“.
         </EinstellungenMeta>

@@ -1,34 +1,29 @@
 'use client'
 
-import Link from 'next/link'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockTabs } from '@/components/mock-ui/MockTabs'
 import { usePathname } from 'next/navigation'
 import { activeEinstellungenTab, EINSTELLUNGEN_TABS } from '@/lib/einstellungen-tabs'
-import { cn } from '@/lib/utils'
 
 export function EinstellungenTabNav({ teamCount }: { teamCount?: number }) {
   const pathname = usePathname()
   const active = activeEinstellungenTab(pathname)
 
   return (
-    <nav className="tabs mb-0 px-4 md:mb-5 md:px-0" aria-label="Einstellungen Bereiche">
-      {EINSTELLUNGEN_TABS.map((tab) => {
-        const isActive = tab.id === active
-        const Icon = tab.icon
-        const count = tab.id === 'team' && teamCount != null && teamCount > 0 ? teamCount : undefined
-        return (
-          <Link
-            key={tab.id}
-            href={tab.href}
-            role="tab"
-            aria-selected={isActive}
-            className={cn('tab', isActive && 'active')}
-          >
-            <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-            {tab.label}
-            {count !== undefined ? <span className="tab-count">{count}</span> : null}
-          </Link>
-        )
-      })}
-    </nav>
+    <MockTabs
+      items={EINSTELLUNGEN_TABS.map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        href: tab.href,
+        iconNode: <MockIcon n={tab.mockIcon} ctx="tab" size={16} className="opacity-80" />,
+        count: tab.id === 'team' && teamCount != null && teamCount > 0 ? teamCount : undefined,
+      }))}
+      value={active}
+      aria-label="Einstellungen Bereiche"
+      className="tabs mb-0 px-4 md:mb-5 md:px-0"
+      tabClassName="tab"
+      activeClassName="active"
+      showIcons={false}
+    />
   )
 }

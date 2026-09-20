@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Bautagebuch</title>
+<style>
+
+  * { box-sizing: border-box; }
+  @page { size: A4; margin: 12mm 12mm 36mm 12mm; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #16201b;
+    font-size: 10pt;
+    font-weight: 400;
+    padding-bottom: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  table { border-collapse: collapse; width: 100%; }
+  .page { padding: 0 4mm; max-width: 210mm; margin: 0 auto; }
+  .pdf-fs-caption { font-size: 7.5pt; color: #6a746f; }
+  .pdf-fs-meta { font-size: 8.5pt; color: #6a746f; }
+  .pdf-fs-text { font-size: 10pt; color: #16201b; }
+  .pdf-fs-title { font-size: 12pt; font-weight: 700; color: #16201b; }
+  .pdf-fs-head { font-size: 16pt; font-weight: 700; letter-spacing: -0.02em; color: #16201b; }
+  .pdf-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .projekt-block { break-inside: avoid-page; }
+  @media print {
+    .avoid-fuss-overlap { break-inside: avoid-page; page-break-inside: avoid; }
+  }
+
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-body">
+    <header class="pdf-kopf" style="display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid #2e7d52;padding-bottom:14px;margin-bottom:18px;">
+  <div style="flex:0 0 auto;">
+    <div style="width:40px;height:40px;border-radius:8px;background:#2e7d52;color:#ffffff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;">BÄ</div>
+    
+  </div>
+  <div style="flex:1;min-width:0;text-align:right;"><div style="font-size:8.5pt;color:#6a746f;line-height:1.45;text-align:right;"><strong style="font-size:12pt;">Bärenwald München</strong><br/>Bärenwaldstraße 20, 81737 München<br/>089 8095 5726 · info@baerenwald-muenchen.de</div></div>
+</header>
+    <div class="pdf-titelzeile" style="margin-bottom:16px;">
+  <h1 class="pdf-fs-head" style="margin:0 0 4px;color:#1a3d2b;">Bautagebuch</h1>
+  <p class="pdf-fs-meta" style="margin:0;">Objekt: Malerarbeiten Wohnräume · 20.09.2026</p>
+</div>
+    <p style="font-size:10pt;color:#6b7280;margin:0 0 12px;">Aus Positions-Dokumentation und Schichten · Auftrag au-muste</p>
+    <div style="margin:0 0 16px;padding:10px 12px;background:#f3f7f4;border:1px solid #d1d5db;border-radius:4px;font-size:9.5pt;line-height:1.5;">
+      <div><strong>Projekt:</strong> Malerarbeiten Wohnräume</div>
+      <div><strong>Auftraggeber:</strong> Max Mustermann</div>
+      <div><strong>Adresse:</strong> Musterstraße 12, 80331 München</div>
+      <div><strong>Summe Zeit:</strong> 3:05 · <strong>Tage:</strong> 1</div>
+    </div>
+    <section style="margin:0 0 20px;page-break-inside:avoid;">
+    <h2 style="font-size:12pt;font-weight:700;color:#1a3d2b;margin:0 0 6px;padding-bottom:4px;border-bottom:2px solid #1a3d2b;">
+      08.07.2026
+    </h2>
+    <p style="font-size:9pt;color:#6b7280;margin:0 0 8px;">
+      Schicht: 08:00–12:05 Uhr · 4:05
+      · erfasst 3:05
+       · Fotos Schicht 2
+    </p>
+    <div style="margin:8px 0 10px;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;background:#ffffff;page-break-inside:avoid;">
+            <div style="font-size:10pt;font-weight:700;color:#1a3d2b;margin-bottom:4px;">
+              Decken streichen
+              <span style="font-weight:400;color:#6b7280;"> · Malerarbeiten</span>
+            </div>
+            <div style="font-size:8.5pt;color:#6b7280;margin-bottom:6px;">
+              Zeit 1:00 · Fotos 0
+            </div>
+            <ul style="margin:0;padding-left:16px;"><li style="margin-bottom:4px;font-size:9pt;line-height:1.45;">
+                <span style="color:#6b7280;">fortschritt</span>
+                 · 1:00
+                — Decken vorbereitet und gestrichen
+              </li></ul>
+          </div><div style="margin:8px 0 10px;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;background:#ffffff;page-break-inside:avoid;">
+            <div style="font-size:10pt;font-weight:700;color:#1a3d2b;margin-bottom:4px;">
+              Wände streichen
+              <span style="font-weight:400;color:#6b7280;"> · Malerarbeiten</span>
+            </div>
+            <div style="font-size:8.5pt;color:#6b7280;margin-bottom:6px;">
+              Zeit 2:05 · Fotos 0
+            </div>
+            <ul style="margin:0;padding-left:16px;"><li style="margin-bottom:4px;font-size:9pt;line-height:1.45;">
+                <span style="color:#6b7280;">fortschritt</span>
+                 · 2:05
+                — Erster Anstrich Wohnzimmer und Flur
+              </li></ul>
+          </div>
+  </section>
+  </div>
+</div>
+</body>
+</html>

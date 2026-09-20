@@ -1,6 +1,13 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockChip } from '@/components/mock-ui/MockPrimitives'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { useLocalTransition } from '@/components/ui/action-busy'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   createAuftragDokumentEintrag,
@@ -9,17 +16,18 @@ import {
   updateAuftragDokumentMeta,
 } from '@/app/(dashboard)/auftraege/dokumente-actions'
 import { setTimelineKundenfreigabe } from '@/app/(dashboard)/auftraege/kunden-status-actions'
+<<<<<<< Updated upstream
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+=======
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
@@ -47,6 +55,7 @@ import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-type
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import type { AuftragDetail, AuftragTimelineEvent, LeadDokumentRow } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 export type { AuftragDokumentZeile }
 export { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
@@ -221,14 +230,14 @@ export function AuftragDokumenteTab({
           foto_urls: urls,
           fuerKunde: false,
         })
-        if (!r.ok) toast.error(r.message)
+        if (!r.ok) toast.systemError(r)
         else {
-          toast.success('Dokument hochgeladen')
+          toast.success(TOAST.dokumentHochgeladen)
           onChanged()
         }
       })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploading(false)
     }
@@ -242,7 +251,7 @@ export function AuftragDokumenteTab({
         fuerKunde,
         kundeBenachrichtigen: false,
       })
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
         toast.success(fuerKunde ? 'Für Kunde freigegeben' : 'Intern markiert')
         onChanged()
@@ -259,9 +268,9 @@ export function AuftragDokumenteTab({
         titel: editName,
         beschreibung: editDesc,
       })
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Metadaten gespeichert')
+        toast.success(TOAST.metadaten_gespeichert)
         setEditRow(null)
         onChanged()
       }
@@ -270,7 +279,7 @@ export function AuftragDokumenteTab({
 
   function removeRow(row: AuftragDokumentZeile) {
     if (!row.timelineId) return
-    confirmDelete(
+    openDeleteConfirm(
       'Dokument löschen?',
       async () => {
         const r = await deleteAuftragDokumentEintrag({
@@ -278,10 +287,10 @@ export function AuftragDokumenteTab({
           timelineId: row.timelineId!,
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Dokument gelöscht')
+        toast.success(TOAST.dokumentGeloescht)
         onChanged()
       },
       { sub: row.name }
@@ -350,8 +359,8 @@ export function AuftragDokumenteTab({
       return (
         <span
           className={cn(
-            'dok-card__tag',
-            row.fuerKunde ? 'dok-card__tag--kunde' : 'dok-card__tag--muted',
+            'dok-mobile__tag',
+            row.fuerKunde ? 'dok-mobile__tag--kunde' : 'dok-mobile__tag--muted',
             row.fuerKunde && 'is-kunde'
           )}
         >
@@ -360,21 +369,16 @@ export function AuftragDokumenteTab({
       )
     }
     return (
-      <button
-        type="button"
-        className={cn(
+      <MockBtn className={cn(
           'dok-freigabe-pill',
           row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-intern',
           row.fuerKunde && 'is-kunde'
-        )}
-        onClick={(e) => {
+        )} type="button" onClick={(e) => {
           e.stopPropagation()
           if (ev) toggleFreigabe(ev, !row.fuerKunde)
-        }}
-        disabled={pending}
-      >
+        }} disabled={pending}>
         {freigabeLabel(row)}
-      </button>
+      </MockBtn>
     )
   }
 
@@ -472,9 +476,9 @@ export function AuftragDokumenteTab({
             ? () => window.open(href, '_blank', 'noopener,noreferrer')
             : undefined
         }
-        className={!openable ? 'dok-card--static' : undefined}
+        className={!openable ? 'dok-mobile--static' : undefined}
         badge={
-          <span className={cn('dok-card__tag', row.fuerKunde && 'is-kunde')}>
+          <span className={cn('dok-mobile__tag', row.fuerKunde && 'is-kunde')}>
             {freigabeLabelText}
           </span>
         }
@@ -557,7 +561,7 @@ export function AuftragDokumenteTab({
               : 'Noch keine Dokumente.'}
           </p>
         ) : isMobile ? (
-          <div className="dok-cards">{zeilen.map(renderMobileCard)}</div>
+          <div className="dok-mobiles">{zeilen.map(renderMobileCard)}</div>
         ) : (
           <div className="dok-list">{zeilen.map(renderDeskRow)}</div>
         )}
@@ -571,32 +575,31 @@ export function AuftragDokumenteTab({
         context="detail"
         dirty
         size="md"
-        footer={<DokumentEditFooter pending={pending} onSave={saveEdit} />}
+        secondary={{ label: 'Abbrechen', disabled: pending }}
+        primary={{ label: 'Speichern', busy: pending, onClick: saveEdit }}
       >
         <div className="space-y-3">
-          <Input label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-          <Textarea
-            label="Beschreibung"
-            value={editDesc}
-            onChange={(e) => setEditDesc(e.target.value)}
-            rows={3}
-          />
+          <MockField label="Name"><MockInput value={editName} onChange={(e) => setEditName(e.target.value)} /></MockField>
+          <MockField label="Beschreibung"><RichTextEditor value={typeof (editDesc) === 'string' ? (editDesc) : ''} onChange={(__v) => setEditDesc(__v)} minHeight={120} aria-label="Beschreibung" /></MockField>
         </div>
       </EditorSheet>
     </div>
   )
 }
+<<<<<<< Updated upstream
+=======
 
 function DokumentEditFooter({ pending, onSave }: { pending: boolean; onSave: () => void }) {
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="sheet-footer-actions ldr-cta">
-      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
+      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()} disabled={pending}>
         Abbrechen
-      </Button>
-      <Button type="button" variant="primary" loading={pending} onClick={onSave}>
+      </MockBtn>
+      <MockBtn type="button" kind="primary" loading={pending} onClick={onSave}>
         Speichern
-      </Button>
+      </MockBtn>
     </div>
   )
 }
+>>>>>>> Stashed changes

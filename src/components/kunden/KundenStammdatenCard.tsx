@@ -32,11 +32,11 @@ export function KundenStammdatenCard({
   return (
     <Card collapsible={collapsible} title={title} action={action}>
       {!kunde ? (
-        <p className="text-[13px] text-bw-text-muted">Kein Kunden-Stammdatensatz verknüpft.</p>
+        <p className="text-fs-text text-bw-text-muted">Kein Kunden-Stammdatensatz verknüpft.</p>
       ) : (
         <>
           {kundenStamm.fehlendeRechnungsfelder.length > 0 ? (
-            <p className="mb-3 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">
+            <p className="mb-3 rounded-card border border-status-contact-bg/60 bg-status-contact-bg px-3 py-2 text-fs-meta text-status-contact-text">
               Für Rechnungen fehlen: {kundenStamm.fehlendeRechnungsfelder.join(', ')}.
             </p>
           ) : null}

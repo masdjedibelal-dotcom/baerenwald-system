@@ -1,12 +1,13 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useTransition } from '@/components/ui/action-busy'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
-import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import {
   deleteRechnungEntwurf,
@@ -23,6 +24,7 @@ import { formatDatum } from '@/lib/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { rechnungDokumentBezeichnung } from '@/lib/rechnungen/zahlungsplan'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 export type { RechnungAuswahlZeile }
 
@@ -79,7 +81,7 @@ export function RechnungAuswahlPanel({
       const res = await loadRechnungWizardBootstrap(rechnungId, auftragId)
       setLoadingId(null)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       onClose?.()
@@ -109,21 +111,21 @@ export function RechnungAuswahlPanel({
       const r = await deleteRechnungEntwurf(target.id)
       setLoadingId(null)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Rechnung gelöscht')
-      router.refresh()
+      toast.success(TOAST.rechnung_geloescht)
+      afterServerActionRefresh()
     })
   }
 
-  function menuItems(r: RechnungAuswahlZeile): ActionsMenuItem[] {
+  function menuItems(r: RechnungAuswahlZeile): EntityMenuItem[] {
     const bearbeitbar = rechnungDarfImWizardBearbeitetWerden(r.status)
     const loeschbar = rechnungDarfGeloeschtWerden(r.status)
-    const items: ActionsMenuItem[] = [
+    const items: EntityMenuItem[] = [
       {
         label: 'Öffnen',
-        icon: <MockIcon ctx="btn" n="eye" size={15} />,
+        icon: 'eye',
         onClick: () => {
           onClose?.()
           router.push(`/rechnungen/${r.id}`)
@@ -134,7 +136,7 @@ export function RechnungAuswahlPanel({
     if (bearbeitbar) {
       items.push({
         label: 'Weiterbearbeiten',
-        icon: <MockIcon ctx="btn" n="pencil" size={15} />,
+        icon: 'pencil',
         onClick: () => openBearbeiten(r.id),
       })
     }
@@ -142,7 +144,7 @@ export function RechnungAuswahlPanel({
     if (loeschbar) {
       items.push('sep', {
         label: 'Löschen',
-        icon: <MockIcon ctx="btn" n="trash" size={15} />,
+        icon: 'trash',
         danger: true,
         onClick: () =>
           handleLoeschen(
@@ -159,7 +161,7 @@ export function RechnungAuswahlPanel({
   return (
     <div className="space-y-4">
       {rows.length === 0 ? (
-        <p className="m-0 rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="m-0 rounded-sheet border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
           Noch keine Rechnungen zu diesem Auftrag.
         </p>
       ) : (
@@ -171,12 +173,7 @@ export function RechnungAuswahlPanel({
 
             return (
               <li key={r.id} className="flex items-center gap-2 px-3 py-2.5">
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left shadow-none"
-                  disabled={pending}
-                  onClick={() => openRow(r)}
-                >
+                <MockBtn className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left shadow-none" type="button" disabled={pending} onClick={() => openRow(r)}>
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="text-[length:var(--fs-text)] font-semibold text-bw-text">
                       {titel}
@@ -190,28 +187,14 @@ export function RechnungAuswahlPanel({
                     {' · '}
                     {formatEurBetrag(r.brutto ?? 0)}
                   </span>
-                </button>
+                </MockBtn>
                 <div className="shrink-0">
                   {loading ? (
                     <span className="inline-flex p-2" aria-busy="true">
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      <span className="page-loading__spinner page-loading__spinner--sm" aria-hidden />
                     </span>
                   ) : (
-                    <ActionsMenu
-                      align="right"
-                      trigger={
-                        <button
-                          type="button"
-                          className="editor-sheet__icon-btn"
-                          disabled={pending}
-                          aria-label="Aktionen"
-                          title="Aktionen"
-                        >
-                          <MockIcon ctx="default" n="dots" size={18} />
-                        </button>
-                      }
-                      items={menuItems(r)}
-                    />
+                    <MockEntityRowMenu items={menuItems(r)} title="Aktionen" />
                   )}
                 </div>
               </li>

@@ -1,4 +1,12 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useRef, useState } from 'react'
@@ -7,15 +15,10 @@ import {
   insertKundeDokument,
 } from '@/app/(dashboard)/kunden/dokumente-actions'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { KundenDokumentRow } from '@/lib/types'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
-import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import {
   DokumenteVorgangAccordions,
@@ -24,9 +27,8 @@ import {
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { resolveAkteVorgangTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { DOC } from '@/lib/crm-labels'
-import { cn } from '@/lib/utils'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-
+import { cn, formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 type DocRow = {
   id: string
   name: string
@@ -50,18 +52,6 @@ function formatBytes(n: number | null | undefined): string | null {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function formatDatum(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-  } catch {
-    return '—'
-  }
 }
 
 function openDokumentDatei(url: string) {
@@ -401,7 +391,7 @@ export function KundenDokumenteTab({
       )
       startTransition(() => onReload())
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
@@ -410,15 +400,15 @@ export function KundenDokumenteTab({
 
   function removeDoc(row: DocRow) {
     if (row.quelle !== 'upload' || !row.dokumentId) return
-    confirmDelete(
+    openDeleteConfirm(
       'Dokument löschen?',
       async () => {
         const r = await deleteKundeDokument(row.dokumentId!, kundeId)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Dokument gelöscht')
+        toast.success(TOAST.dokumentGeloescht)
         if (editId === row.id) setEditId(null)
         onReload()
       },
@@ -453,7 +443,7 @@ export function KundenDokumenteTab({
   function renderDocList(items: DocRow[]) {
     if (isMobile) {
       return (
-        <div className="dok-cards">
+        <div className="dok-mobiles">
           {items.map((d) => {
             const sizeLabel = formatBytes(d.groesse_bytes)
             const metaLine = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(' · ')
@@ -464,7 +454,7 @@ export function KundenDokumenteTab({
                 meta={metaLine}
                 onClick={() => openDokumentDatei(d.href)}
                 badge={
-                  <span className={cn('dok-card__tag', d.freigabe && 'is-kunde')}>
+                  <span className={cn('dok-mobile__tag', d.freigabe && 'is-kunde')}>
                     {d.freigabe ? 'Kunde' : 'intern'}
                   </span>
                 }
@@ -512,13 +502,7 @@ export function KundenDokumenteTab({
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}
                 >
-                  <input
-                    className="txt"
-                    value={d.name}
-                    onChange={(e) => upd(d.id, { name: e.target.value })}
-                    style={{ height: 30 }}
-                    autoFocus
-                  />
+                  <MockInput className="txt" value={d.name} onChange={(e) => upd(d.id, { name: e.target.value })} style={{ height: 30 }} autoFocus />
                 </div>
               ) : (
                 <div className="dok-list__main min-w-0">

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -5,11 +6,12 @@ export async function POST(
   req: Request,
   { params }: { params: { token: string } }
 ) {
-  const { data: row } = await supabaseAdmin
+  const {data: row, error} = await supabaseAdmin
     .from('hw_formular_einreichungen')
     .select('id')
     .eq('token', params.token)
     .maybeSingle()
+  if (error) logDbError('app/api/formular/[token]/foto/route:hw_formular_einreichungen', error)
 
   if (!row) {
     return NextResponse.json({ error: 'Nicht gefunden' }, { status: 404 })
@@ -30,6 +32,7 @@ export async function POST(
   const { error: upErr } = await supabaseAdmin.storage
     .from('hw-formular-fotos')
     .upload(path, buf, { contentType, upsert: false })
+  if (upErr) logDbError('app/api/formular/[token]/foto/route:hw-formular-fotos', upErr)
 
   if (upErr) {
     return NextResponse.json({ error: upErr.message }, { status: 500 })

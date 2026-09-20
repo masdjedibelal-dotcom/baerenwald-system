@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import {
   buildLeadVertriebsKontext,
   type KiAnfragenLogRow,
@@ -13,23 +19,25 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 async function loadKiLogs(leadId: string, sessionIds: string[]): Promise<KiAnfragenLogRow[]> {
-  const { data: byLead } = await supabaseAdmin
+  const { data: byLead, error } = await supabaseAdmin
     .from('ki_anfragen_log')
     .select(
       'id, session_id, anfrage_text, claude_antwort, typ, extrahiertes_json, lead_erstellt, created_at'
     )
     .eq('lead_id', leadId)
     .order('created_at', { ascending: true })
+  if (error) logDbError('app/anfragen/lead-vertriebs-analyse-action:ki_anfragen_log', error)
 
   let bySession: KiAnfragenLogRow[] = []
   if (sessionIds.length) {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('ki_anfragen_log')
       .select(
         'id, session_id, anfrage_text, claude_antwort, typ, extrahiertes_json, lead_erstellt, created_at'
       )
       .in('session_id', sessionIds)
       .order('created_at', { ascending: true })
+    if (error) logDbError('app/anfragen/lead-vertriebs-analyse-action:ki_anfragen_log', error)
     bySession = (data ?? []) as KiAnfragenLogRow[]
   }
 
@@ -62,6 +70,7 @@ export async function ensureLeadVertriebsAnalyse(
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/lead-vertriebs-analyse-action:leads', error)
 
   if (error || !row) return { ok: false, message: 'Anfrage nicht gefunden.' }
 
@@ -97,13 +106,13 @@ export async function ensureLeadVertriebsAnalyse(
         updated_at: new Date().toISOString(),
       })
       .eq('id', leadId)
+    if (updErr) logDbError('app/anfragen/lead-vertriebs-analyse-action:leads', updErr)
 
     if (updErr) {
       console.warn('[vertriebs-analyse speichern]', updErr.message)
     }
 
-    revalidatePath(`/anfragen/${leadId}`)
-    revalidatePath('/anfragen')
+    revalidateLeadDetail(leadId)
     return { ok: true, text, from_cache: false }
   } catch (e) {
     return {

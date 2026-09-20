@@ -1,4 +1,5 @@
-import { revalidatePath } from 'next/cache'
+import { revalidateAngebotDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { sendAngebotToKunde } from '@/app/(dashboard)/angebote/actions'
@@ -35,6 +36,7 @@ async function loadDetail(
     )
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/api/angebote/[id]/senden/route:angebote', error)
   if (error || !data) return null
   const row = data as AngebotDetail
   return {
@@ -128,8 +130,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: r.message }, { status: 502 })
     }
 
-    revalidatePath(`/angebote/${angebotId}`)
-    revalidatePath('/angebote')
+    revalidateAngebotDetail(angebotId)
     return NextResponse.json({ ok: true })
   }
 
@@ -156,6 +157,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       .eq('id', zuweisungId)
       .eq('angebot_id', angebotId)
       .maybeSingle()
+    if (zErr) logDbError('app/api/angebote/[id]/senden/route:angebot_handwerker', zErr)
 
     if (zErr || !zu) {
       return NextResponse.json({ error: 'Zuweisung nicht gefunden' }, { status: 404 })
@@ -176,7 +178,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const status =
         sent.message.includes('E-Mail') || sent.message.includes('RESEND')
           ? 502
-          : sent.message.includes('Handwerker hat keine')
+          : sent.message.includes('Partner hat keine')
             ? 400
             : 500
       return NextResponse.json(
@@ -196,8 +198,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       })
     }
 
-    revalidatePath(`/angebote/${angebotId}`)
-    revalidatePath('/angebote')
+    revalidateAngebotDetail(angebotId)
     return NextResponse.json({ link: sent.link, gesendet: sent.gesendet })
   }
 

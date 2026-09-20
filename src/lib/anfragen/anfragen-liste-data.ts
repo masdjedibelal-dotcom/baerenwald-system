@@ -1,6 +1,7 @@
+import { createClient } from '@/lib/supabase-server'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { ANFRAGEN_LISTE_STATUS, filterLeadsInAnfragenPipeline } from '@/lib/crm/pipeline-liste-filter'
 import { leadAuftraggeberEmbed, leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { countLegacyDemoLeads, filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import type { LeadWithAngebote } from '@/lib/types'
 
@@ -44,15 +45,13 @@ export async function loadAnfragenListe(): Promise<{
   legacyDemoCount: number
   error: string | null
 }> {
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db
+  const { data, error } = await (() => { const db = createClient(); return db
       .from('leads')
       .select(ANFRAGEN_LISTE_SELECT)
       .in('status', [...ANFRAGEN_LISTE_STATUS])
       .is('geloescht_am', null)
       .order('created_at', { ascending: false })
-      .limit(100)
-  )
+      .limit(100) })()
 
   if (error) {
     return { leads: [], legacyDemoCount: 0, error: error.message }

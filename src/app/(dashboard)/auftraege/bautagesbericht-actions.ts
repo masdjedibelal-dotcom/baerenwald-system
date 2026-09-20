@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -94,6 +100,7 @@ export async function listAuftragBautagesberichte(auftragId: string): Promise<Au
     .select(BERICHT_SELECT)
     .eq('auftrag_id', auftragId)
     .order('tag_nummer', { ascending: false })
+  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
 
   if (error) {
     console.warn('[listAuftragBautagesberichte]', error.message)
@@ -111,13 +118,14 @@ export async function listAuftragBautagesberichte(auftragId: string): Promise<Au
 }
 
 async function naechsteTagNummer(auftragId: string): Promise<number> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('auftrag_bautagesberichte')
     .select('tag_nummer')
     .eq('auftrag_id', auftragId)
     .order('tag_nummer', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
   return (Number(data?.tag_nummer) || 0) + 1
 }
 
@@ -192,6 +200,7 @@ export async function createAuftragBautagesbericht(
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
 
@@ -203,7 +212,7 @@ export async function createAuftragBautagesbericht(
     erstellt_von: user.id,
   })
 
-  revalidatePath(`/auftraege/${input.auftrag_id}`)
+  revalidateAuftragDetail(input.auftrag_id)
   return { ok: true, id: data.id as string }
 }
 
@@ -225,9 +234,10 @@ export async function updateAuftragBautagesbericht(
     .select('auftrag_id')
     .eq('id', id)
     .maybeSingle()
+  if (loadErr) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', loadErr)
   if (loadErr || !existing) return { ok: false, message: 'Bautagesbericht nicht gefunden' }
 
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('auftrag_bautagesberichte')
     .update({
       datum: input.datum,
@@ -249,9 +259,14 @@ export async function updateAuftragBautagesbericht(
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
+  if (error2) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateAuftragDetail(existing.auftrag_id)
+=======
   revalidatePath(`/auftraege/${existing.auftrag_id}`)
+>>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -259,16 +274,22 @@ export async function deleteAuftragBautagesbericht(
   id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: existing } = await supabase
+  const { data: existing, error } = await supabase
     .from('auftrag_bautagesberichte')
     .select('auftrag_id, tag_nummer')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
   if (!existing) return { ok: false, message: 'Nicht gefunden' }
 
-  const { error } = await supabase.from('auftrag_bautagesberichte').delete().eq('id', id)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('auftrag_bautagesberichte').delete().eq('id', id)
+  if (error2) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error2)
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateAuftragDetail(existing.auftrag_id)
+=======
   revalidatePath(`/auftraege/${existing.auftrag_id}`)
+>>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -291,14 +312,16 @@ export async function loadBautagesberichtFuerPdf(
     .eq('id', berichtId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
 
   if (error || !row) return { ok: false, message: 'Bautagesbericht nicht gefunden' }
 
-  const { data: auftrag } = await supabaseAdmin
+  const { data: auftrag, error: error2 } = await supabaseAdmin
     .from('auftraege')
     .select('titel, created_at, kunden(*)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/bautagesbericht-actions:auftraege', error2)
 
   const bericht = mapBericht(row as Record<string, unknown>)
   const fotoUrls = await resolveFotoUrlsForPdf(bericht.fotos)
@@ -335,17 +358,19 @@ export async function generateBautagesberichtPdf(
   const { error: upErr } = await supabaseAdmin.storage
     .from('protokolle')
     .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
+  if (upErr) logDbError('app/auftraege/bautagesbericht-actions:protokolle', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 
   const { data: pub } = supabaseAdmin.storage.from('protokolle').getPublicUrl(path)
   const pdfUrl = pub.publicUrl
 
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('auftrag_bautagesberichte')
     .update({ pdf_url: pdfUrl, updated_at: new Date().toISOString() })
     .eq('id', berichtId)
+  if (__dbErr1) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', __dbErr1)
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true, pdfUrl }
 }

@@ -22,18 +22,38 @@ function findHeadlessShell(projectRoot) {
           : null
   if (!folder) return null
   const bin = process.platform === 'win32' ? 'chrome-headless-shell.exe' : 'chrome-headless-shell'
-  for (const entry of readdirSync(base, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue
-    const candidate = join(base, entry.name, folder, bin)
-    if (existsSync(candidate)) {
-      try {
-        return realpathSync(candidate)
-      } catch {
-        return candidate
+  /** @param {string} dir */
+  function walk(dir, depth) {
+    if (depth > 5) return null
+    let entries
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return null
+    }
+    for (const entry of entries) {
+      const full = join(dir, entry.name)
+      if (entry.isFile() && entry.name === bin) {
+        try {
+          return realpathSync(full)
+        } catch {
+          return full
+        }
+      }
+      if (entry.isDirectory()) {
+        // Bevorzugt bekannte Plattform-Ordner, sonst rekursiv
+        if (entry.name === folder || entry.name.startsWith('mac_') || entry.name.startsWith('linux') || entry.name.startsWith('win') || entry.name === 'chrome-headless-shell') {
+          const hit = walk(full, depth + 1)
+          if (hit) return hit
+        } else {
+          const hit = walk(full, depth + 1)
+          if (hit) return hit
+        }
       }
     }
+    return null
   }
-  return null
+  return walk(base, 0)
 }
 
 const shellPath = findHeadlessShell(crmRoot)

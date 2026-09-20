@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateRechnungDetail, revalidateRechnungList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
@@ -191,11 +197,12 @@ async function loadKorrekturOriginalNr(
 ): Promise<string | null> {
   const id = String(korrekturVonId ?? '').trim()
   if (!id) return null
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('rechnungen')
     .select('rechnungsnummer')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
   return String(data?.rechnungsnummer ?? '').trim() || null
 }
 
@@ -241,6 +248,7 @@ async function positionenAusAuftrag(
     )
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/rechnungen/wizard-actions:auftraege', error)
 
   if (error) {
     console.error('[positionenAusAuftrag]', auftragId, error.message)
@@ -262,11 +270,12 @@ async function positionenAusAuftrag(
     const regieZeitMinutenByPositionId: Record<string, number> = {}
     const regieBeschreibungByPositionId: Record<string, string> = {}
     if (regieIds.length) {
-      const { data: eintraege } = await supabase
+      const { data: eintraege, error } = await supabase
         .from('position_eintraege')
         .select('position_id, zeit_minuten, beschreibung, typ, created_at')
         .in('position_id', regieIds)
         .order('created_at', { ascending: true })
+      if (error) logDbError('app/rechnungen/wizard-actions:position_eintraege', error)
       for (const e of eintraege ?? []) {
         const pid = String((e as { position_id?: string }).position_id ?? '')
         if (!pid) continue
@@ -373,12 +382,13 @@ async function rechnungenAbschlagLinks(
   supabase: ReturnType<typeof createClient>,
   auftragId: string
 ) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('rechnungen')
     .select(
       'id, rechnung_art, abschlag_index, zahlungsplan_abschlag_id, status, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, richtung, ersetzt_durch, korrektur_von'
     )
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
   const rows = (data ?? []) as Array<
     import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink & {
       richtung?: string | null
@@ -439,7 +449,7 @@ function abschlagMetaDefaults(
     mail_einleitung: mailVorlage || defaultAbschlagMailEinleitung(ctx),
     mail_betreff:
       betreffVorlage ||
-      defaultAbschlagMailBetreff(ctx, 'Bärenwald', rechnungsnummerPlaceholder?.trim() || 'Rechnung'),
+      defaultAbschlagMailBetreff(ctx, rechnungsnummerPlaceholder?.trim() || 'Rechnung'),
     zahlungsart: 'abschlaege',
     abschlag_zeile_id: zeile.id,
     zahlungsbedingungen: zeile.istSchluss
@@ -459,7 +469,7 @@ function zahlungstextFuerAbschlagZeile(
 }
 
 function revalidateAuftragPfad(auftragId: string | null | undefined) {
-  if (auftragId?.trim()) revalidatePath(`/auftraege/${auftragId.trim()}`)
+  if (auftragId?.trim()) revalidateAuftragDetail(auftragId.trim())
 }
 
 export async function loadRechnungWizardKunde(
@@ -622,11 +632,12 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
       let kundeObjektId: string | null = basis.kunde_objekt_id
       let objektAnlageId: string | null = basis.objekt_anlage_id
       if (rechnungId) {
-        const { data: nrRow } = await supabase
+        const { data: nrRow, error } = await supabase
           .from('rechnungen')
           .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id, objekt_anlage_id')
           .eq('id', rechnungId)
           .maybeSingle()
+        if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
         rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
         ansprechpartnerId = (nrRow?.ansprechpartner_id as string | null) ?? null
         if (nrRow?.kunde_objekt_id) {
@@ -741,11 +752,12 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
     let kundeObjektId: string | null = basis.kunde_objekt_id
     let objektAnlageId: string | null = basis.objekt_anlage_id
     if (draftRechnungId) {
-      const { data: nrRow } = await supabase
+      const { data: nrRow, error } = await supabase
         .from('rechnungen')
         .select('rechnungsnummer, ansprechpartner_id, kunde_objekt_id, objekt_anlage_id')
         .eq('id', draftRechnungId)
         .maybeSingle()
+      if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
       rechnungsnummer = nrRow?.rechnungsnummer ? String(nrRow.rechnungsnummer) : null
       ansprechpartnerId = (nrRow?.ansprechpartner_id as string | null) ?? null
       if (nrRow?.kunde_objekt_id) {
@@ -1289,13 +1301,14 @@ async function saveRechnungWizardDraftInner(
 
   if (input.rechnungId) {
     const supabaseCheck = createClient()
-    const { data: existingRec } = await supabaseCheck
+    const { data: existingRec, error } = await supabaseCheck
       .from('rechnungen')
       .select(
         'id, status, rechnungsnummer, positionen, reverse_charge_13b, hinweis_35a, rechnungsdatum, leistungszeitraum_von, leistungszeitraum_bis, faellig_am, zahlungsbedingungen, einleitung, hinweise, beleg_typ, angebot_id, auftrag_id, ansprechpartner_id, kunde_objekt_id'
       )
       .eq('id', input.rechnungId)
       .maybeSingle()
+    if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
 
     const existingStatus = String(existingRec?.status ?? 'entwurf').toLowerCase()
     const belegTyp = String(
@@ -1337,9 +1350,9 @@ async function saveRechnungWizardDraftInner(
             updated_at: new Date().toISOString(),
           })
           .eq('id', input.rechnungId)
+        if (mailErr) logDbError('app/rechnungen/wizard-actions:rechnungen', mailErr)
         if (mailErr) return { ok: false, message: mailErr.message }
-        revalidatePath('/rechnungen')
-        revalidatePath(`/rechnungen/${input.rechnungId}`)
+        revalidateRechnungDetail(input.rechnungId)
         revalidateAuftragPfad(input.auftrag_id)
         return {
           ok: true,
@@ -1377,17 +1390,16 @@ async function saveRechnungWizardDraftInner(
         art: 'gutschrift',
       })
 
-      const { data: nr } = await supabaseCheck
+      const { data: nr, error } = await supabaseCheck
         .from('rechnungen')
         .select('rechnungsnummer')
         .eq('id', created.id)
         .maybeSingle()
+      if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
 
-      revalidatePath('/rechnungen')
-      revalidatePath(`/rechnungen/${input.rechnungId}`)
-      revalidatePath(`/rechnungen/${gutschrift.id}`)
-      revalidatePath(`/rechnungen/${created.id}`)
-      revalidatePath('/vorgaenge')
+      revalidateRechnungDetail(input.rechnungId)
+      revalidateRechnungDetail(gutschrift.id)
+      revalidateRechnungDetail(created.id)
       revalidateAuftragPfad(input.auftrag_id)
       return {
         ok: true,
@@ -1405,14 +1417,14 @@ async function saveRechnungWizardDraftInner(
     }
 
     const supabase = createClient()
-    const { data: nr } = await supabase
+    const { data: nr, error: error2 } = await supabase
       .from('rechnungen')
       .select('rechnungsnummer')
       .eq('id', input.rechnungId)
       .maybeSingle()
+    if (error2) logDbError('app/rechnungen/wizard-actions:rechnungen', error2)
 
-    revalidatePath('/rechnungen')
-    revalidatePath(`/rechnungen/${input.rechnungId}`)
+    revalidateRechnungDetail(input.rechnungId)
     revalidateAuftragPfad(input.auftrag_id)
     return {
       ok: true,
@@ -1438,15 +1450,14 @@ async function saveRechnungWizardDraftInner(
   }
 
   const supabase = createClient()
-  const { data: nr } = await supabase
+  const { data: nr, error } = await supabase
     .from('rechnungen')
     .select('rechnungsnummer')
     .eq('id', created.id)
     .maybeSingle()
+  if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
 
-  revalidatePath('/rechnungen')
-  revalidatePath(`/rechnungen/${created.id}`)
-  revalidatePath('/vorgaenge')
+  revalidateRechnungDetail(created.id)
   revalidateAuftragPfad(input.auftrag_id)
   return {
     ok: true,
@@ -1573,11 +1584,12 @@ export async function createAllAbschlagRechnungenFromWizard(
 
     const existing = bestehend.find((r) => r.zahlungsplan_abschlag_id === zeile.id)
     if (existing && existing.status !== 'entwurf') {
-      const { data: nrRec } = await supabase
+      const { data: nrRec, error } = await supabase
         .from('rechnungen')
         .select('rechnungsnummer')
         .eq('id', existing.id)
         .maybeSingle()
+      if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
       erstellt.push({
         id: existing.id,
         rechnungsnummer: String(nrRec?.rechnungsnummer ?? ''),
@@ -1609,11 +1621,12 @@ export async function createAllAbschlagRechnungenFromWizard(
         ...payload,
       })
       if (!upd.ok) return upd
-      const { data: nr } = await supabase
+      const { data: nr, error } = await supabase
         .from('rechnungen')
         .select('rechnungsnummer')
         .eq('id', rechnungId)
         .maybeSingle()
+      if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
       rechnungsnummer = String(nr?.rechnungsnummer ?? '')
     } else {
       const created = await createRechnungEntwurf({
@@ -1624,11 +1637,12 @@ export async function createAllAbschlagRechnungenFromWizard(
       })
       if (!created.ok) return created
       rechnungId = created.id
-      const { data: nr } = await supabase
+      const { data: nr, error } = await supabase
         .from('rechnungen')
         .select('rechnungsnummer')
         .eq('id', rechnungId)
         .maybeSingle()
+      if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
       rechnungsnummer = String(nr?.rechnungsnummer ?? '')
     }
 
@@ -1659,7 +1673,7 @@ export async function createAllAbschlagRechnungenFromWizard(
     }
   }
 
-  revalidatePath('/rechnungen')
+  revalidateRechnungList()
   revalidateAuftragPfad(input.auftrag_id)
 
   return { ok: true, rechnungen: erstellt, versandRechnungId: versand.id }
@@ -1675,13 +1689,14 @@ export async function syncRechnungWizardMetaToEntwurf(
   try {
     const supabase = createClient()
     const faelligNeu = normalizeFaelligAmYmd(input.meta.faellig_am)
-    const { data: cur } = await supabase
+    const { data: cur, error } = await supabase
       .from('rechnungen')
       .select('faellig_am')
       .eq('id', rechnungId)
       .maybeSingle()
+    if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
 
-    const { error } = await supabase
+    const { error: error2 } = await supabase
       .from('rechnungen')
       .update({
         kunde_id: input.kunde_id,
@@ -1709,9 +1724,14 @@ export async function syncRechnungWizardMetaToEntwurf(
         updated_at: new Date().toISOString(),
       })
       .eq('id', rechnungId)
+    if (error2) logDbError('app/rechnungen/wizard-actions:rechnungen', error2)
 
-    if (error) return { ok: false, message: error.message }
+    if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+    revalidateRechnungDetail(rechnungId)
+=======
     revalidatePath(`/rechnungen/${rechnungId}`)
+>>>>>>> Stashed changes
     return { ok: true }
   } catch (e) {
     console.error('[syncRechnungWizardMetaToEntwurf]', e)
@@ -1739,9 +1759,7 @@ export async function sendRechnungWizard(input: {
         ? res
         : { ok: false, message: 'Versand fehlgeschlagen.' }
     }
-    revalidatePath('/rechnungen')
-    revalidatePath(`/rechnungen/${input.rechnungId}`)
-    revalidatePath('/vorgaenge')
+    revalidateRechnungDetail(input.rechnungId)
     return { ok: true }
   } catch (e) {
     console.error('[sendRechnungWizard]', e)
@@ -1757,11 +1775,12 @@ export async function sendRechnungWizard(input: {
 export async function finalizeRechnungWizardWithoutMail(
   rechnungId: string
 ): Promise<{ ok: true; rechnungsnummer: string } | { ok: false; message: string }> {
-  const { data: rec } = await supabaseAdmin
+  const { data: rec, error } = await supabaseAdmin
     .from('rechnungen')
     .select('rechnungsnummer, auftrag_id, status')
     .eq('id', rechnungId)
     .maybeSingle()
+  if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
 
   if (!rec) return { ok: false, message: 'Rechnung nicht gefunden' }
 
@@ -1770,10 +1789,8 @@ export async function finalizeRechnungWizardWithoutMail(
     .toLowerCase()
   /** Entwürfe: kein PDF/Nummer — sonst Lücken in der Nummernfolge. */
   if (st === 'entwurf') {
-    if (rec.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id as string}`)
-    revalidatePath('/rechnungen')
-    revalidatePath(`/rechnungen/${rechnungId}`)
-    revalidatePath('/vorgaenge')
+    if (rec.auftrag_id) revalidateAuftragDetail(rec.auftrag_id as string)
+    revalidateRechnungDetail(rechnungId)
     return {
       ok: true,
       rechnungsnummer: String(rec.rechnungsnummer ?? ''),
@@ -1783,11 +1800,8 @@ export async function finalizeRechnungWizardWithoutMail(
   const pdf = await persistPdfForRechnung(rechnungId)
   if (!pdf.ok) return pdf
 
-  if (rec.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id as string}`)
-  revalidatePath('/rechnungen')
-  revalidatePath(`/rechnungen/${rechnungId}`)
-  revalidatePath('/vorgaenge')
-
+  if (rec.auftrag_id) revalidateAuftragDetail(rec.auftrag_id as string)
+  revalidateRechnungDetail(rechnungId)
   return {
     ok: true,
     rechnungsnummer: String(rec.rechnungsnummer ?? ''),
@@ -1800,11 +1814,12 @@ export async function deleteRechnungEntwurf(
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
   const supabase = gate.db
-  const { data: rec } = await supabase
+  const { data: rec, error } = await supabase
     .from('rechnungen')
     .select('status, auftrag_id, rechnungsnummer')
     .eq('id', rechnungId)
     .maybeSingle()
+  if (error) logDbError('app/rechnungen/wizard-actions:rechnungen', error)
 
   if (!rec) return { ok: false, message: 'Rechnung nicht gefunden.' }
 
@@ -1821,12 +1836,12 @@ export async function deleteRechnungEntwurf(
     }
   }
 
-  const { error } = await supabase.from('rechnungen').delete().eq('id', rechnungId)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('rechnungen').delete().eq('id', rechnungId)
+  if (error2) logDbError('app/rechnungen/wizard-actions:rechnungen', error2)
+  if (error2) return { ok: false, message: error2.message }
 
-  revalidatePath('/rechnungen')
-  revalidatePath('/vorgaenge')
-  if (rec.auftrag_id) revalidatePath(`/auftraege/${rec.auftrag_id}`)
+  revalidateRechnungList()
+  if (rec.auftrag_id) revalidateAuftragDetail(rec.auftrag_id)
   return { ok: true }
 }
 

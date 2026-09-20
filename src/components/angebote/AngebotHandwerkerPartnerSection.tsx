@@ -1,16 +1,22 @@
 'use client'
+
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openDeleteConfirm, openActionConfirm } from '@/components/ui/ConfirmPopup'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useTransition } from '@/components/ui/action-busy'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { Check, ExternalLink, FileUp, Trash2, UserPlus } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
-import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
-import { confirmAction } from '@/components/ui/confirm-action'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { HandwerkerEinreichungManuellModal } from '@/components/angebote/HandwerkerEinreichungManuellModal'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
@@ -32,11 +38,12 @@ import {
 } from '@/app/(dashboard)/angebote/actions'
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
 import type { ProjektVertragWizardBootstrap } from '@/lib/vertraege/types'
+import { TOAST } from '@/lib/copy'
 
 function zuweisungStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
   if (v === 'angefragt') return 'Angefragt'
-  if (v === 'akzeptiert' || v === 'angenommen') return 'Akzeptiert'
+  if (v === 'akzeptiert' || v === 'angenommen') return 'Angenommen'
   if (v === 'abgelehnt') return 'Abgelehnt'
   if (v === 'ersetzt') return 'Ersetzt'
   if (v === 'zugewiesen') return 'Zugewiesen'
@@ -46,10 +53,10 @@ function zuweisungStatusLabel(s: string | null | undefined): string {
 function zuweisungStatusBadgeClass(s: string | null | undefined): string {
   const v = (s ?? '').toLowerCase()
   if (v === 'akzeptiert' || v === 'angenommen' || v === 'zugewiesen') {
-    return 'bg-emerald-100 text-emerald-900'
+    return 'bg-status-order-bg text-status-order-text'
   }
-  if (v === 'abgelehnt') return 'bg-red-100 text-red-900'
-  if (v === 'angefragt' || v === 'warten') return 'bg-blue-100 text-blue-900'
+  if (v === 'abgelehnt') return 'bg-status-cancel-bg text-status-cancel-text'
+  if (v === 'angefragt' || v === 'warten') return 'bg-status-new-bg text-status-new-text'
   if (v === 'ersetzt') return 'bg-bw-hover text-bw-text-muted line-through'
   return 'bg-bw-bg-soft text-bw-text-muted'
 }
@@ -110,7 +117,7 @@ function ZuweisungCard({
   function openReplacePicker() {
     setReplaceOpen(true)
     void listHandwerkerFuerGewerk(z.gewerk_id).then((r) => {
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else setHwListe(r.handwerker.filter((h) => h.id !== z.handwerker_id))
     })
   }
@@ -128,7 +135,7 @@ function ZuweisungCard({
           </div>
           <span
             className={cn(
-              'inline-block rounded-md px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+              'inline-block rounded-field px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
               zuweisungStatusBadgeClass(z.status)
             )}
           >
@@ -139,13 +146,12 @@ function ZuweisungCard({
         {(kannBestaetigen || kannLoeschen || kannPartnerWechseln) && (
           <div className="flex flex-wrap gap-2">
             {kannBestaetigen ? (
-              <Button
+              <MockBtn
                 type="button"
-                variant="secondary"
-                size="sm"
+                kind="secondary" sm
                 loading={actionPending}
                 onClick={() => {
-                  confirmAction({
+                  openActionConfirm({
                     title: 'Anfrage bestätigen?',
                     body: `Anfrage von ${z.handwerker?.name ?? 'Partner'} im CRM als akzeptiert markieren?`,
                     confirmLabel: 'Bestätigen',
@@ -157,9 +163,9 @@ function ZuweisungCard({
                           angebotId,
                           zuweisungId: z.id,
                         })
-                        if (!r.ok) toast.error(r.message)
+                        if (!r.ok) toast.systemError(r)
                         else {
-                          toast.success('Anfrage bestätigt')
+                          toast.success(TOAST.anfrage_bestaetigt)
                           onRefresh()
                         }
                       })
@@ -167,42 +173,45 @@ function ZuweisungCard({
                   })
                 }}
               >
-                <Check className="mr-1 h-3.5 w-3.5" aria-hidden />
+                <MockIcon n="check" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
                 Anfrage bestätigen
-              </Button>
+              </MockBtn>
             ) : null}
             {kannPartnerWechseln ? (
-              <Button
+              <MockBtn
                 type="button"
-                variant={abgelehnt ? 'primary' : 'secondary'}
-                size="sm"
+                kind={abgelehnt ? 'primary' : 'secondary'} sm
                 loading={replacePending}
                 onClick={openReplacePicker}
               >
+<<<<<<< Updated upstream
+                <MockIcon n="user" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
+                {abgelehnt ? 'Anderen Partner zuweisen' : 'Partner bearbeiten'}
+=======
                 <UserPlus className="mr-1 h-3.5 w-3.5" aria-hidden />
                 {abgelehnt ? 'Anderen Partner zuweisen' : 'Handwerker bearbeiten'}
-              </Button>
+>>>>>>> Stashed changes
+              </MockBtn>
             ) : null}
             {kannLoeschen ? (
-              <Button
+              <MockBtn
                 type="button"
-                variant="secondary"
-                size="sm"
+                kind="secondary" sm
                 loading={actionPending}
                 className="text-danger"
                 onClick={() => {
-                  confirmDelete(
-                    'Handwerker-Anfrage löschen?',
+                  openDeleteConfirm(
+                    'Partner-Anfrage löschen?',
                     async () => {
                       const r = await loescheHandwerkerAnfrage({
                         angebotId,
                         zuweisungId: z.id,
                       })
                       if (!r.ok) {
-                        toast.error(r.message)
+                        toast.systemError(r)
                         throw new Error(r.message)
                       }
-                      toast.success('Anfrage gelöscht')
+                      toast.success(TOAST.anfrage_geloescht)
                       onRefresh()
                     },
                     {
@@ -211,9 +220,9 @@ function ZuweisungCard({
                   )
                 }}
               >
-                <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden />
+                <MockIcon n="trash" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
                 Anfrage löschen
-              </Button>
+              </MockBtn>
             ) : null}
           </div>
         )}
@@ -249,15 +258,14 @@ function ZuweisungCard({
                 ? 'Wartet auf Angebots-PDF / Preis im Partner-Portal.'
                 : 'Noch keine Einreichung — Portal oder manuell erfassen.'}
             </p>
-            <Button
+            <MockBtn
               type="button"
-              variant="secondary"
-              size="sm"
+              kind="secondary" sm
               onClick={() => setManuellOpen(true)}
             >
-              <FileUp className="mr-1 h-3.5 w-3.5" aria-hidden />
+              <MockIcon n="upload" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
               Manuell erfassen
-            </Button>
+            </MockBtn>
           </div>
         ) : uebernommen && !eingereicht ? (
           <p className="text-[length:var(--fs-meta)] font-medium text-bw-primary">Angebot bestätigt und übernommen.</p>
@@ -269,7 +277,7 @@ function ZuweisungCard({
             className="inline-flex items-center gap-1 text-[length:var(--fs-meta)] text-bw-link hover:underline"
           >
             Auftrag
-            <ExternalLink className="h-3 w-3" aria-hidden />
+            <MockIcon n="external-link" ctx="default" className="h-3 w-3" aria-hidden />
           </Link>
         ) : null}
 
@@ -278,18 +286,18 @@ function ZuweisungCard({
           onClose={() => setManuellOpen(false)}
           angebotId={angebotId}
           zuweisungId={z.id}
-          handwerkerName={z.handwerker?.name ?? 'Handwerker'}
+          handwerkerName={z.handwerker?.name ?? 'Partner'}
           gewerkName={z.gewerke?.name ?? 'Gewerk'}
           onSaved={onRefresh}
         />
 
-        <Modal
+        <EditorSheet
           open={replaceOpen}
           onClose={() => setReplaceOpen(false)}
           title={
             abgelehnt
               ? `Anderen Partner — ${z.gewerke?.name ?? 'Gewerk'}`
-              : `Handwerker bearbeiten — ${z.gewerke?.name ?? 'Gewerk'}`
+              : `Partner bearbeiten — ${z.gewerke?.name ?? 'Gewerk'}`
           }
           size="md"
         >
@@ -301,10 +309,9 @@ function ZuweisungCard({
           <ul className="max-h-64 space-y-2 overflow-y-auto">
             {hwListe.map((h) => (
               <li key={h.id}>
-                <Button
+                <MockBtn
                   type="button"
-                  variant="secondary"
-                  size="sm"
+                  kind="secondary" sm
                   className="w-full justify-start"
                   disabled={replacePending}
                   onClick={() => {
@@ -315,7 +322,7 @@ function ZuweisungCard({
                           alteZuweisungId: z.id,
                           neuerHandwerkerId: h.id,
                         })
-                        if (!r.ok) toast.error(r.message)
+                        if (!r.ok) toast.systemError(r)
                         else {
                           toast.success(`Anfrage an ${h.name} gesendet — muss neu annehmen.`)
                           setReplaceOpen(false)
@@ -327,7 +334,7 @@ function ZuweisungCard({
                       runReplace()
                       return
                     }
-                    confirmAction({
+                    openActionConfirm({
                       title: 'Partner wechseln?',
                       body: `Partner wechseln zu ${h.name}? Die bisherige Anfrage endet — ${h.name} muss neu annehmen.`,
                       confirmLabel: 'Wechseln',
@@ -340,7 +347,7 @@ function ZuweisungCard({
                 >
                   {h.name}
                   {h.firma ? ` · ${h.firma}` : ''}
-                </Button>
+                </MockBtn>
               </li>
             ))}
           </ul>
@@ -349,7 +356,7 @@ function ZuweisungCard({
               Keine weiteren Partner für dieses Gewerk.
             </p>
           ) : null}
-        </Modal>
+        </EditorSheet>
       </Card>
     </>
   )
@@ -391,7 +398,7 @@ export function AngebotHandwerkerPartnerSection({
       startWizardTransition(async () => {
         const res = await openHandwerkerAcceptWizard(ctx)
         if (!res.ok) {
-          toast.error(res.message)
+          toast.systemError(res)
           return
         }
         setWizardBootstrap(res.bootstrap)
@@ -405,7 +412,7 @@ export function AngebotHandwerkerPartnerSection({
       <Card className="p-4 md:p-5">
         <h2 className="mb-3 text-[length:var(--fs-text)] font-semibold text-bw-text">Partner</h2>
         {rows.length === 0 ? (
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine Partner zugewiesen.</p>
+          <MockEmpty title="Keine Partner zugewiesen." />
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {rows.map((z) => (
@@ -415,7 +422,7 @@ export function AngebotHandwerkerPartnerSection({
                 angebotId={detail.id}
                 angebotTitel={angebotTitel}
                 auftragId={auftragId}
-                onRefresh={() => router.refresh()}
+                onRefresh={() => afterServerActionRefresh()}
                 onAcceptWizard={auftragId ? openAcceptWizard : undefined}
                 kundeHatAngenommen={kundeHatAngenommen}
               />
@@ -448,7 +455,7 @@ export function AngebotHandwerkerPartnerSection({
           onClose={() => setWizardBootstrap(null)}
           onDone={() => {
             setWizardBootstrap(null)
-            router.refresh()
+            afterServerActionRefresh()
           }}
         />
       ) : null}

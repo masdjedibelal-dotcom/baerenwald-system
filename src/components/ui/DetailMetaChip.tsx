@@ -1,24 +1,23 @@
-import type { LucideIcon } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import type { MockIconName } from '@/lib/mock-icons'
 import { cn } from '@/lib/utils'
 
 type Props = {
-  icon?: LucideIcon
+  icon?: MockIconName | string
   children: React.ReactNode
   className?: string
 }
 
 /** Kleine Meta-Zeile im Projekt-Kopf (PLZ, Betrag, Datum …) */
-export function DetailMetaChip({ icon: Icon, children, className }: Props) {
+export function DetailMetaChip({ icon, children, className }: Props) {
   return (
     <span
       className={cn(
-        'inline-flex min-h-[28px] items-center gap-1.5 rounded-lg border border-bw-border/80 bg-bw-bg px-2.5 py-1 text-xs font-medium text-bw-text-mid',
+        'inline-flex min-h-[28px] items-center gap-1.5 rounded-card border border-bw-border/80 bg-bw-bg px-2.5 py-1 text-xs font-medium text-bw-text-mid',
         className
       )}
     >
-      {Icon ? (
-        <Icon className="icon-lucide icon-ctx-default h-3.5 w-3.5 shrink-0" aria-hidden />
-      ) : null}
+      {icon ? <MockIcon n={icon} ctx="default" size={14} /> : null}
       {children}
     </span>
   )

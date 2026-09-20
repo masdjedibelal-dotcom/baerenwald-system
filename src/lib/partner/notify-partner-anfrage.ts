@@ -3,6 +3,8 @@
  * @see handwerks-plattform/docs/PARTNER_CRM_NOTIFY_API.md
  */
 
+import { logNotifyEmailResult } from '@/lib/kommunikation/log-notify-email-result'
+
 function partnerSiteBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
@@ -18,13 +20,18 @@ export async function notifyPartnerHandwerkerAnfrage(
   const id = anfrageId.trim()
   if (!id) return { ok: false, error: 'anfrageId fehlt' }
 
+  const logCtx = {
+    typ: 'partner_notify_anfrage',
+    betreff: `Partner-Anfrage-Notify: ${id}`,
+    leadId: id,
+  }
+
   const secret = process.env.PARTNER_INTERNAL_API_SECRET?.trim()
   if (!secret) {
-    return {
-      ok: false,
-      error:
-        'PARTNER_INTERNAL_API_SECRET fehlt — Partner-Mail kann nicht ausgelöst werden (Netlify/CRM .env).',
-    }
+    const error =
+      'PARTNER_INTERNAL_API_SECRET fehlt — Partner-Mail kann nicht ausgelöst werden (Netlify/CRM .env).'
+    await logNotifyEmailResult({ ...logCtx, ok: false, error })
+    return { ok: false, error }
   }
 
   const url = `${partnerSiteBaseUrl()}/api/internal/partner-notify-anfrage`
@@ -41,7 +48,9 @@ export async function notifyPartnerHandwerkerAnfrage(
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Netzwerkfehler'
-    return { ok: false, error: `Partner-Benachrichtigung: ${msg}` }
+    const error = `Partner-Benachrichtigung: ${msg}`
+    await logNotifyEmailResult({ ...logCtx, ok: false, error })
+    return { ok: false, error }
   }
 
   let body: { ok?: boolean; error?: string } = {}
@@ -53,8 +62,11 @@ export async function notifyPartnerHandwerkerAnfrage(
 
   if (!res.ok || !body.ok) {
     const detail = body.error?.trim() || `HTTP ${res.status}`
-    return { ok: false, error: `Partner-Benachrichtigung fehlgeschlagen: ${detail}` }
+    const error = `Partner-Benachrichtigung fehlgeschlagen: ${detail}`
+    await logNotifyEmailResult({ ...logCtx, ok: false, error })
+    return { ok: false, error }
   }
 
+  await logNotifyEmailResult({ ...logCtx, ok: true })
   return { ok: true }
 }

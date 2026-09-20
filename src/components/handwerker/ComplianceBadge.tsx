@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, Check, X } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { IconText } from '@/components/ui/IconText'
 
@@ -20,7 +20,7 @@ export function ComplianceBadge({ status }: { status: string | null | undefined 
   if (k === 'ok') {
     return (
       <MockBadge kind="aktiv">
-        <IconText icon={Check}>Compliance OK</IconText>
+        <IconText icon="check">Compliance OK</IconText>
       </MockBadge>
     )
   }
@@ -28,7 +28,7 @@ export function ComplianceBadge({ status }: { status: string | null | undefined 
     return (
       <span title="Dokument läuft bald ab">
         <MockBadge kind="warten">
-          <IconText icon={AlertTriangle}>läuft ab</IconText>
+          <IconText icon="alert-triangle">läuft ab</IconText>
         </MockBadge>
       </span>
     )
@@ -36,13 +36,13 @@ export function ComplianceBadge({ status }: { status: string | null | undefined 
   if (k === 'unvollstaendig') {
     return (
       <MockBadge kind="warten">
-        <IconText icon={AlertTriangle}>Nachweis fehlt</IconText>
+        <IconText icon="alert-triangle">Nachweis fehlt</IconText>
       </MockBadge>
     )
   }
   return (
     <MockBadge kind="storniert">
-      <IconText icon={X}>Nachweis fehlt</IconText>
+      <IconText icon="x">Nachweis fehlt</IconText>
     </MockBadge>
   )
 }

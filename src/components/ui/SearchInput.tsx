@@ -1,6 +1,7 @@
 'use client'
 
-import { Search } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { LIST_FILTER_SEARCH_CLASS } from '@/lib/list-filter-ui'
 import { cn } from '@/lib/utils'
 
@@ -24,14 +25,8 @@ export function SearchInput({
 }: SearchInputProps) {
   return (
     <label className={cn(LIST_FILTER_SEARCH_CLASS, flex && 'w-full max-w-none', className)}>
-      <Search aria-hidden />
-      <input
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        aria-label={ariaLabel}
-      />
+      <MockIcon n="search" ctx="default" aria-hidden />
+      <MockInput type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={ariaLabel} />
     </label>
   )
 }

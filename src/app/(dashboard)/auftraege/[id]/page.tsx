@@ -7,7 +7,7 @@ import {
 } from '@/app/(dashboard)/auftraege/auftraege-data'
 import { listVertraegeFuerAuftrag, loadRahmenVertraegeForHandwerker } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/actions'
-import { loadPartnerDokumenteForAuftrag } from '@/app/(dashboard)/handwerker/actions'
+import { loadHandwerkerDokumenteForAuftrag } from '@/app/(dashboard)/handwerker/actions'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { loadProjektKontext } from '@/lib/crm/load-projekt-kontext'
@@ -35,7 +35,7 @@ export default async function AuftragDetailPage({ params }: { params: { id: stri
       fetchFirmenEinstellungen(supabase),
       loadCrmTeamMitglieder(),
       loadComplianceTypen(),
-      loadPartnerDokumenteForAuftrag(params.id),
+      loadHandwerkerDokumenteForAuftrag(params.id),
     ])
 
     if (!detail) notFound()

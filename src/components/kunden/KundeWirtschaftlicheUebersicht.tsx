@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockUebersichtCard } from '@/components/mock-ui/MockUebersichtCard'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockUebersichtCard } from '@/components/mock-ui/MockUebersichtCard'
+import { useMemo, useState } from 'react'
 import { ZeitraumIconPopover } from '@/components/ui/ZeitraumIconPopover'
 import {
   buildKundeWirtschaft,
@@ -13,10 +13,7 @@ import {
 } from '@/lib/kunden/kunde-wirtschaft'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import { cn } from '@/lib/utils'
-
-function formatEurGanz(n: number): string {
-  return `${Math.round(n).toLocaleString('de-DE')} €`
-}
+import { formatEuro } from '@/lib/format/geld-datum'
 
 function UmsatzverlaufBars({
   monate,
@@ -48,13 +45,13 @@ function UmsatzverlaufBars({
             onBlur={() => setHoverKey(null)}
             tabIndex={0}
             role="img"
-            aria-label={`${m.label}: ${formatEurGanz(m.betrag)}`}
+            aria-label={`${m.label}: ${formatEuro(m.betrag, { rounded: true, decimals: 0 })}`}
           >
             <div className="kw-chart-hit">
               {isHover ? (
                 <div className="kw-chart-tip" role="tooltip">
                   <span className="kw-chart-tip-month">{m.label}</span>
-                  <span className="kw-chart-tip-val">{formatEurGanz(m.betrag)}</span>
+                  <span className="kw-chart-tip-val">{formatEuro(m.betrag, { rounded: true, decimals: 0 })}</span>
                 </div>
               ) : null}
               <div
@@ -104,7 +101,7 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
           {
             icon: 'euro',
             label: `Umsatz${zeitraum !== 'all' ? ` · ${snap.zeitraumLabelKurz}` : ''}${delta ? ` (${delta})` : ''}`,
-            value: formatEurGanz(snap.umsatz),
+            value: formatEuro(snap.umsatz, { rounded: true, decimals: 0 }),
           },
           {
             icon: 'receipt',
@@ -112,7 +109,7 @@ export function KundeWirtschaftlicheUebersicht({ kunde }: { kunde: KundeDetailPa
               snap.offenerBetrag > 0
                 ? 'Offener Betrag · offene Posten'
                 : 'Offener Betrag · keine offenen Posten',
-            value: formatEurGanz(snap.offenerBetrag),
+            value: formatEuro(snap.offenerBetrag, { rounded: true, decimals: 0 }),
           },
           {
             icon: 'folders',

@@ -9,8 +9,20 @@
     "dev": "WATCHPACK_POLLING=true next dev",
     "dev:skip-auth": "CRM_DEV_SKIP_AUTH=true WATCHPACK_POLLING=true next dev -p 3001",
     "dev:clean": "rm -rf .next && WATCHPACK_POLLING=true next dev",
-    "build": "node scripts/remove-deploy-blockers.mjs && node scripts/check-critical-files.mjs && node scripts/check-import-paths.mjs && node scripts/check-client-imports.mjs && node scripts/check-icon-context.mjs && node scripts/check-mock-primitives.mjs && next build",
+<<<<<<< Updated upstream
+    "build": "node scripts/check-critical-files.mjs && node scripts/check-import-paths.mjs && node scripts/check-client-imports.mjs && node scripts/check-icon-context.mjs && node scripts/check-mock-primitives.mjs && node scripts/check-button-legacy.mjs && node scripts/check-field-legacy.mjs && node scripts/check-raw-elements.mjs && node scripts/check-modal-gone.mjs && node scripts/check-service-role-gate.mjs && node scripts/check-status-writes.mjs && node scripts/check-void-calls.mjs && node scripts/audit-status.mjs && node scripts/check-p5-13-tokens.mjs && next build",
+    "knip": "knip --include files --no-config-hints",
+    "guard:knip": "knip --include files --no-config-hints --max-issues 500",
+    "audit:status": "node scripts/audit-status.mjs --write-todo",
+    "audit:mobile": "node scripts/mobile-audit-playwright.mjs",
+=======
+    "build": "node scripts/remove-deploy-blockers.mjs && node scripts/check-critical-files.mjs && node scripts/check-import-paths.mjs && node scripts/check-client-imports.mjs && node scripts/check-icon-context.mjs && node scripts/check-mock-primitives.mjs && node scripts/check-button-legacy.mjs && node scripts/audit-status.mjs && next build",
+    "audit:status": "node scripts/audit-status.mjs --write-todo",
+>>>>>>> Stashed changes
     "build:check-imports": "node scripts/check-import-paths.mjs",
+    "sync:shared-domain": "node scripts/sync-shared-domain.mjs",
+    "test:shared-domain": "node scripts/test-shared-domain-parity.mjs",
+    "test:status-contracts": "npx --yes tsx scripts/test-status-contracts.ts",
     "start": "next start",
     "lint": "next lint",
     "setup:chrome": "npx @puppeteer/browsers install chrome-headless-shell@stable --path chrome-headless-shell && node scripts/write-pdf-chrome-env.mjs",
@@ -84,6 +96,7 @@
     "@fullcalendar/timegrid": "^6.1.20",
     "@netlify/plugin-nextjs": "^5.12.1",
     "@react-pdf/renderer": "^4.5.1",
+    "@sentry/nextjs": "^10.75.0",
     "@sparticuz/chromium": "^131.0.1",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.3",
@@ -103,7 +116,8 @@
     "server-only": "^0.0.1",
     "sonner": "^1.7.4",
     "unpdf": "^1.8.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.11",
@@ -116,6 +130,7 @@
     "@types/web-push": "^3.6.4",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
+    "knip": "^6.37.0",
     "playwright": "^1.49.1",
     "postcss": "^8",
     "postgres": "^3.4.5",

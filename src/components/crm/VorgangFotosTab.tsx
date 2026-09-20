@@ -1,9 +1,8 @@
 'use client'
+import { MockBtn, MockCard, MockEmpty } from '@/components/mock-ui'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
 import { useCallback, useState } from 'react'
-import { MockCard, MockEmpty } from '@/components/mock-ui'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockModal } from '@/components/mock-ui/MockModal'
 import type { VorgangFoto } from '@/lib/vorgang/vorgang-fotos'
 import { cn } from '@/lib/utils'
 
@@ -89,110 +88,79 @@ export function VorgangFotosTab({
       <MockCard title={`Fotos · ${fotos.length}`} icon="photo">
         <div className="flex gap-2 overflow-x-auto pb-2">
           {fotos.map((f, i) => (
-            <button
-              key={`${f.quelle}-${f.url}`}
-              type="button"
-              className={cn(
-                'h-[72px] w-[72px] shrink-0 overflow-hidden rounded-lg border transition-shadow',
+            <MockBtn className={cn(
+                'h-[72px] w-[72px] shrink-0 overflow-hidden rounded-card border transition-shadow',
                 i === active
                   ? 'border-[var(--green)] ring-2 ring-[color-mix(in_srgb,var(--green)_28%,transparent)]'
                   : 'border-[var(--border)]'
-              )}
-              onClick={() => setActive(i)}
-              onDoubleClick={() => openLightbox(i)}
-              aria-label={`Foto ${i + 1}`}
-              aria-pressed={i === active}
-            >
+              )} key={`${f.quelle}-${f.url}`} type="button" onClick={() => setActive(i)} onDoubleClick={() => openLightbox(i)} aria-label={`Foto ${i + 1}`} aria-pressed={i === active}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={f.url} alt="" className="h-full w-full object-cover" />
-            </button>
+            </MockBtn>
           ))}
         </div>
 
         {current ? (
           <div className="space-y-2">
-            <button
-              type="button"
-              onClick={() => openLightbox(active)}
-              className="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] text-left"
-              aria-label="Foto vergrößern"
-            >
+            <MockBtn fullWidth className="block cursor-zoom-in overflow-hidden rounded-button border border-[var(--border)] bg-[var(--bg-soft)] text-left" type="button" onClick={() => openLightbox(active)} aria-label="Foto vergrößern">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={current.url}
                 alt={current.beschreibung || 'Vorgangsfoto'}
                 className="mx-auto max-h-[min(420px,55vh)] w-full object-contain"
               />
-            </button>
-            <div className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--text-3)]">
-              <span className="rounded-full bg-[var(--bg-soft)] px-2 py-0.5 font-medium">
+            </MockBtn>
+            <div className="flex flex-wrap items-center gap-2 text-fs-meta text-[var(--text-3)]">
+              <span className="rounded-pill bg-[var(--bg-soft)] px-2 py-0.5 font-medium">
                 {QUELLE_LABEL[current.quelle]}
               </span>
               {current.beschreibung ? <span>{current.beschreibung}</span> : null}
               <div className="ml-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  className="font-medium text-[var(--green)] hover:underline"
-                  onClick={() => openLightbox(active)}
-                >
+                <MockBtn className="font-medium text-[var(--green)] hover:underline" type="button" onClick={() => openLightbox(active)}>
                   Vergrößern
-                </button>
-                <button
-                  type="button"
-                  className="font-medium text-[var(--green)] hover:underline disabled:opacity-50"
-                  disabled={downloading}
-                  onClick={() => void onDownload()}
-                >
+                </MockBtn>
+                <MockBtn className="font-medium text-[var(--green)] hover:underline disabled:opacity-50" type="button" disabled={downloading} onClick={() => void onDownload()}>
                   {downloading ? 'Lädt…' : 'Herunterladen'}
-                </button>
+                </MockBtn>
               </div>
             </div>
           </div>
         ) : null}
       </MockCard>
 
-      <MockModal
+      <EditorSheet
         open={lightboxOpen && !!current}
         onClose={() => setLightboxOpen(false)}
-        icon="photo"
         title={current?.beschreibung?.trim() || `Foto ${active + 1}`}
-        sub={current ? `${QUELLE_LABEL[current.quelle]} · ${active + 1} / ${fotos.length}` : undefined}
-        footer={
-          <>
-            <MockBtn
-              sm
-              kind="ghost"
-              icon="download"
-              disabled={downloading}
-              onClick={() => void onDownload()}
-            >
-              {downloading ? 'Lädt…' : 'Herunterladen'}
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            {fotos.length > 1 ? (
-              <>
-                <MockBtn
-                  sm
-                  kind="ghost"
-                  disabled={active <= 0}
-                  onClick={() => setActive((i) => Math.max(0, i - 1))}
-                >
-                  Zurück
-                </MockBtn>
-                <MockBtn
-                  sm
-                  kind="ghost"
-                  disabled={active >= fotos.length - 1}
-                  onClick={() => setActive((i) => Math.min(fotos.length - 1, i + 1))}
-                >
-                  Weiter
-                </MockBtn>
-              </>
-            ) : null}
-            <MockBtn sm kind="primary" icon="x" onClick={() => setLightboxOpen(false)}>
-              Schließen
-            </MockBtn>
-          </>
+        subtitle={current ? `${QUELLE_LABEL[current.quelle]} · ${active + 1} / ${fotos.length}` : undefined}
+        secondary={{
+          label: downloading ? 'Lädt…' : 'Herunterladen',
+          onClick: () => void onDownload(),
+          disabled: downloading,
+          kind: 'ghost',
+        }}
+        primary={{ label: 'Schließen', onClick: () => setLightboxOpen(false) }}
+        headerEnd={
+          fotos.length > 1 ? (
+            <div className="flex items-center gap-1">
+              <MockBtn
+                sm
+                kind="ghost"
+                disabled={active <= 0}
+                onClick={() => setActive((i) => Math.max(0, i - 1))}
+              >
+                Zurück
+              </MockBtn>
+              <MockBtn
+                sm
+                kind="ghost"
+                disabled={active >= fotos.length - 1}
+                onClick={() => setActive((i) => Math.min(fotos.length - 1, i + 1))}
+              >
+                Weiter
+              </MockBtn>
+            </div>
+          ) : undefined
         }
       >
         {current ? (
@@ -202,7 +170,7 @@ export function VorgangFotosTab({
             alt={current.beschreibung || 'Vorgangsfoto'}
             style={{
               width: '100%',
-              maxHeight: 'min(75vh, 720px)',
+              maxHeight: 'min(75vh, 45rem)',
               objectFit: 'contain',
               borderRadius: 8,
               display: 'block',
@@ -211,7 +179,7 @@ export function VorgangFotosTab({
             }}
           />
         ) : null}
-      </MockModal>
+      </EditorSheet>
     </>
   )
 }

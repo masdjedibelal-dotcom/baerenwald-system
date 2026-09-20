@@ -21,11 +21,11 @@ export const CRM_WISSEN: CrmWissenThema[] = [
     aliases: ['crm', 'überblick', 'ueberblick', 'hilfe', 'was kannst du', 'dashboard'],
     titel: 'CRM-Überblick',
     route: '/',
-    kurz: 'Bärenwald-CRM: Anfragen → Angebote → Aufträge → Rechnungen. Partner = Handwerker, Netzwerk = separate Partner-Tabelle.',
+    kurz: 'Bärenwald-CRM: Anfragen → Angebote → Aufträge → Rechnungen. Partner = Partner, Netzwerk = separate Partner-Tabelle.',
     soFunktioniertEs: [
       'Vorgänge laufen über Anfrage (Lead), Angebot, Auftrag, Rechnung.',
       'Kunden sind Stammdaten; Anfragen hängen oft an einem Kunden.',
-      'FAB „Neu“: Anfrage, Angebot, Rechnung, Kunde, Partner (Handwerker).',
+      'FAB „Neu“: Anfrage, Angebot, Rechnung, Kunde, Partner (Partner).',
       'Assistent (TopBar): Auskunft zu Daten + Erklärung der Funktionen + Ausführung von Aktionen.',
       'Versand (Angebot, Rechnung, Mahnung) immer erst Vorschau, dann Bestätigung.',
     ],
@@ -83,12 +83,12 @@ export const CRM_WISSEN: CrmWissenThema[] = [
     aliases: ['angebot', 'angebote', 'kalkulation', 'offerte', 'wizard angebot'],
     titel: 'Angebote',
     route: '/angebote',
-    kurz: 'Angebots-Wizard: Typ, Positionen (Preisliste/KI), Finalisieren, Vorschau, Versand. Optional Handwerker.',
+    kurz: 'Angebots-Wizard: Typ, Positionen (Preisliste/KI), Finalisieren, Vorschau, Versand. Optional Partner.',
     soFunktioniertEs: [
       'Neu: Kunde wählen → Wizard (einfach oder komplex mit Projektbeschreibung/Fotos).',
       'Positionen: PosBoard — Preisliste, Freitext, Nachlass; KI nur am Positions-Board.',
       'Titel & Beschreibung sind im KI-Assistenten eigene „Positionen“.',
-      'Versand: erst an Handwerker (optional), dann an Kunden.',
+      'Versand: erst an Partner (optional), dann an Kunden.',
       'Nach Kunden-Ja: Auftrag aus Angebot.',
     ],
     typischeAktionen: [
@@ -171,9 +171,9 @@ export const CRM_WISSEN: CrmWissenThema[] = [
   {
     id: 'partner',
     aliases: ['partner', 'handwerker', 'fachbetrieb', 'netzwerk'],
-    titel: 'Partner (Handwerker)',
+    titel: 'Partner (Partner)',
     route: '/handwerker',
-    kurz: 'Partner = Handwerker-Stammdaten. Netzwerk-Tabelle ist getrennt. Anfragen an Partner aus dem Angebot.',
+    kurz: 'Partner = Partner-Stammdaten. Netzwerk-Tabelle ist getrennt. Anfragen an Partner aus dem Angebot.',
     soFunktioniertEs: [
       'Partner anlegen über FAB „Partner“ (/neu?art=handwerker).',
       'Im Angebot Gewerke zuweisen und an Partner senden.',
@@ -181,8 +181,8 @@ export const CRM_WISSEN: CrmWissenThema[] = [
       'Nicht mit „Netzwerk“ (andere Entity) verwechseln.',
     ],
     typischeAktionen: [
-      'Handwerker für Gewerk listen',
-      'Angebot an Handwerker senden',
+      'Partner für Gewerk listen',
+      'Angebot an Partner senden',
       'Einreichungen prüfen',
     ],
     tools: [

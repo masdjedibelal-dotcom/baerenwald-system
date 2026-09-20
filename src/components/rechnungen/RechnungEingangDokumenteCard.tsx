@@ -1,17 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { useState } from 'react'
 import { signPartnerDokumentUrl } from '@/app/(dashboard)/handwerker/actions'
 import { toast } from '@/components/ui/app-toast'
 import type { Rechnung } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 const COLS = 'minmax(0, 1fr) auto auto'
 
 /**
- * Akte einer Eingangsrechnung: nur das Partner-Rechnungs-PDF (signiert öffnen).
+ * Akte einer Eingangsrechnung: nur das Handwerker-Rechnungs-PDF (signiert öffnen).
  */
 export function RechnungEingangDokumenteCard({ detail }: { detail: Rechnung }) {
   const [busy, setBusy] = useState(false)
@@ -28,14 +29,14 @@ export function RechnungEingangDokumenteCard({ detail }: { detail: Rechnung }) {
 
   async function openPdf() {
     if (!stored) {
-      toast.error('Kein Rechnungs-PDF hinterlegt.')
+      toast.error(TOAST.kein_rechnungs_pdf_hinterlegt)
       return
     }
     setBusy(true)
     try {
       const r = await signPartnerDokumentUrl(stored)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       window.open(r.url, '_blank', 'noopener,noreferrer')
@@ -51,14 +52,9 @@ export function RechnungEingangDokumenteCard({ detail }: { detail: Rechnung }) {
           <div className="list-row" style={{ gridTemplateColumns: COLS, cursor: 'default' }}>
             <div className="dok-list__main min-w-0">
               <div className="dok-list__name">
-                <button
-                  type="button"
-                  className="hover:text-bw-link text-left"
-                  disabled={busy}
-                  onClick={() => void openPdf()}
-                >
+                <MockBtn className="hover:text-bw-link text-left" type="button" disabled={busy} onClick={() => void openPdf()}>
                   {label}
-                </button>
+                </MockBtn>
                 <span className="dok-list__name-size">
                   {' '}
                   · Partner-PDF{datum ? ` · ${datum}` : ''}
@@ -89,7 +85,7 @@ export function RechnungEingangDokumenteCard({ detail }: { detail: Rechnung }) {
           </div>
         </div>
       ) : (
-        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '0.25rem 0' }}>
           Kein Partner-PDF hinterlegt.
         </div>
       )}

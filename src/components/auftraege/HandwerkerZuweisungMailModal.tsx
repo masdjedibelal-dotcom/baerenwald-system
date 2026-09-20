@@ -1,15 +1,25 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { useTransition } from '@/components/ui/action-busy'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+<<<<<<< Updated upstream
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+=======
 import { Link2 } from 'lucide-react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
-import { Input } from '@/components/ui/Input'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
+import { buildPartnerSubject } from '@/lib/mail/build-subject'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 export type HandwerkerZuweisungMailTarget = {
   handwerkerId: string
@@ -19,6 +29,8 @@ export type HandwerkerZuweisungMailTarget = {
   positionIds?: string[]
 }
 
+<<<<<<< Updated upstream
+=======
 function MailFooter({
   pending,
   loading,
@@ -37,22 +49,23 @@ function MailFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="sheet-footer-actions ldr-cta">
-      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
+      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()} disabled={pending}>
         Später
-      </Button>
+      </MockBtn>
       {portalLink ? (
-        <Button type="button" variant="secondary" onClick={() => void onCopyLink()}>
+        <MockBtn type="button" kind="secondary" onClick={() => void onCopyLink()}>
           <Link2 className="mr-1.5 h-4 w-4" aria-hidden />
           Link kopieren
-        </Button>
+        </MockBtn>
       ) : null}
-      <Button type="button" variant="primary" loading={pending || loading} disabled={!canSend} onClick={onSend}>
+      <MockBtn type="button" kind="primary" loading={pending || loading} disabled={!canSend} onClick={onSend}>
         Jetzt senden
-      </Button>
+      </MockBtn>
     </div>
   )
 }
 
+>>>>>>> Stashed changes
 /** Partner-Mail — EditorSheet Split-over (Mock Surface B). */
 export function HandwerkerZuweisungMailModal({
   open,
@@ -67,6 +80,7 @@ export function HandwerkerZuweisungMailModal({
   target: HandwerkerZuweisungMailTarget | null
   onSent?: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const router = useRouter()
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
@@ -119,7 +133,7 @@ export function HandwerkerZuweisungMailModal({
         return
       }
       setMail({
-        betreff: json.betreff ?? 'Leistungsanfrage — Bärenwald Partner',
+        betreff: json.betreff ?? buildPartnerSubject({ ereignis: 'Leistungsanfrage' }),
         html: json.html,
         to: (json.defaultTo ?? []).filter(Boolean),
         cc: (json.defaultCc ?? []).filter(Boolean),
@@ -132,9 +146,13 @@ export function HandwerkerZuweisungMailModal({
   }, [open, target, auftragId])
 
   function sendNow() {
-    if (!target || !mail) return
+    if (!target) return
+    if (!mail) {
+      applyFieldErrors({ _form: 'Mail wird geladen…' })
+      return
+    }
     if (!mail.to.length) {
-      toast.error('Bitte mindestens eine Empfänger-Adresse unter An angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_empfaenger_adresse_unter_a })
       return
     }
     startTransition(async () => {
@@ -159,7 +177,7 @@ export function HandwerkerZuweisungMailModal({
       toast.success(`Partner-Mail an ${target.handwerkerName} gesendet`)
       setDirty(false)
       onSent?.()
-      router.refresh()
+      afterServerActionRefresh()
       onClose()
     })
   }
@@ -168,7 +186,7 @@ export function HandwerkerZuweisungMailModal({
     if (!mail?.portalLink) return
     try {
       await navigator.clipboard.writeText(mail.portalLink)
-      toast.success('Portal-Link kopiert')
+      toast.success(TOAST.portal_link_kopiert)
     } catch {
       toast.message('Portal-Link', { description: mail.portalLink })
     }
@@ -187,23 +205,15 @@ export function HandwerkerZuweisungMailModal({
       composeLabel="Senden"
       onConfirm={sendNow}
       confirmBusy={pending || loading}
-      confirmDisabled={!mail}
-      footer={
-        <MailFooter
-          pending={pending}
-          loading={loading}
-          canSend={!!mail}
-          portalLink={mail?.portalLink}
-          onSend={sendNow}
-          onCopyLink={copyPortalLink}
-        />
-      }
+      confirmDisabled={pending || loading}
+      secondary={{ label: 'Abbrechen', disabled: pending }}
     >
-      {loading ? (
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              {loading ? (
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
       ) : mail && target ? (
         <div className="space-y-3">
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
+          <p className="rounded-card border border-status-contact-bg bg-status-contact-bg px-3 py-2 text-[length:var(--fs-text)] text-status-contact-text">
             Leistungsanfrage an den Partner. Bitte Text und Portal-Link prüfen und versenden (An / CC wie
             gewohnt).
           </p>
@@ -216,14 +226,16 @@ export function HandwerkerZuweisungMailModal({
               </span>
             ) : null}
           </p>
-          <Input
-            label="Betreff"
-            value={mail.betreff}
-            onChange={(e) => {
+          {mail.portalLink ? (
+            <MockBtn type="button" kind="secondary" onClick={() => void copyPortalLink()}>
+              <MockIcon n="link" ctx="default" className="mr-1.5 h-4 w-4" aria-hidden />
+              Link kopieren
+            </MockBtn>
+          ) : null}
+          <MockField label="Betreff"><MockInput value={mail.betreff} onChange={(e) => {
               setMail((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))
               setDirty(true)
-            }}
-          />
+            }} /></MockField>
           <EmailPillsField
             label="An"
             required

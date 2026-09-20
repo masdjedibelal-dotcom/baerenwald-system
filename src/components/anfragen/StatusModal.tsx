@@ -1,6 +1,15 @@
 'use client'
+import type { MockIconName } from '@/lib/mock-icons'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { DateInput } from '@/components/ui/DateInput'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useState } from 'react'
+<<<<<<< Updated upstream
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+=======
 import {
   Calendar,
   CircleX,
@@ -9,9 +18,10 @@ import {
   Save,
   type LucideIcon,
 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import {
   loadCrmTeamFuerTermin,
   saveLeadAlsVerloren,
@@ -31,6 +41,8 @@ import type { CrmTeamMitglied } from '@/lib/crm-team'
 import { anfrageAdresseAusPayload, formatAnfrageAdresseZeile } from '@/lib/anfrage-adresse'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { VERLOREN_GRUND_LABELS } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 export type StatusModalKind = 'termin' | 'nicht_erreichbar' | 'verloren'
 
@@ -51,17 +63,17 @@ function todayISO() {
 
 const META: Record<
   StatusModalKind,
-  { title: string; icon: LucideIcon; saveLabel: string; danger?: boolean }
+  { title: string; icon: MockIconName; saveLabel: string; danger?: boolean }
 > = {
-  termin: { title: 'Termin vereinbart', icon: Calendar, saveLabel: 'Termin speichern' },
+  termin: { title: 'Termin vereinbart', icon: 'calendar', saveLabel: 'Termin speichern' },
   nicht_erreichbar: {
     title: 'Nicht erreichbar',
-    icon: PhoneOff,
+    icon: 'phone-off',
     saveLabel: 'Versuch speichern',
   },
   verloren: {
     title: 'Verloren',
-    icon: CircleX,
+    icon: 'circle-x',
     saveLabel: 'Als verloren markieren',
     danger: true,
   },
@@ -83,6 +95,7 @@ export function StatusModal({
   /** Nach 3× Nicht erreichbar: Verloren-Sheet öffnen */
   onSuggestVerloren?: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [datum, setDatum] = useState(todayISO())
   const [uhrzeit, setUhrzeit] = useState('10:00')
   const [notiz, setNotiz] = useState('')
@@ -162,22 +175,22 @@ export function StatusModal({
     if (kind === 'termin') {
       if (!datum.trim()) {
         setSaving(false)
-        toast.error('Bitte Datum wählen.')
+        applyFieldErrors({ _form: TOAST.bitte_datum_waehlen })
         return
       }
       if (!uhrzeit.trim()) {
         setSaving(false)
-        toast.error('Bitte Uhrzeit wählen.')
+        applyFieldErrors({ _form: TOAST.bitte_uhrzeit_waehlen })
         return
       }
       if (!mitarbeiterId.trim()) {
         setSaving(false)
-        toast.error('Bitte Mitarbeiter für den Vor-Ort-Termin wählen.')
+        applyFieldErrors({ _form: TOAST.bitte_mitarbeiter_fuer_den_vor_ort_termin_waehle })
         return
       }
       if (mailToggle && kontaktEmail && !mailDraft?.to.length) {
         setSaving(false)
-        toast.error('Bitte mindestens eine Empfänger-Adresse unter An angeben.')
+        applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_empfaenger_adresse_unter_a })
         return
       }
       res = await saveLeadTerminVereinbart({
@@ -212,7 +225,7 @@ export function StatusModal({
 
     setSaving(false)
     if (!res.ok) {
-      toast.error(res.message)
+      toast.systemError(res)
       return
     }
 
@@ -226,9 +239,9 @@ export function StatusModal({
             label: 'Rückgängig',
             onClick: () => {
               void undoLeadTerminVereinbart(lead.id).then((r) => {
-                if (!r.ok) toast.error(r.message)
+                if (!r.ok) toast.systemError(r)
                 else {
-                  toast.success('Termin rückgängig')
+                  toast.success(TOAST.termin_rueckgaengig)
                   onSaved?.()
                 }
               })
@@ -245,7 +258,7 @@ export function StatusModal({
       if (vorschlag) onSuggestVerloren?.()
       return
     } else {
-      toast.success('Anfrage als verloren markiert.')
+      toast.success(TOAST.anfrage_als_verloren_markiert)
     }
 
     onClose()
@@ -256,26 +269,15 @@ export function StatusModal({
         <div className="modal-compact-b">
           {kind === 'termin' ? (
             <div className="form-grid-2 grid gap-3 md:grid-cols-2">
+        {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+        
               <label>
                 <span className="input-label">Datum *</span>
-                <input
-                  type="date"
-                  className="input"
-                  value={datum}
-                  min={todayISO()}
-                  onChange={(e) => setDatum(e.target.value)}
-                  required
-                />
+                <DateInput value={datum} min={todayISO()} onChange={(e) => setDatum(e.target.value)} required />
               </label>
               <label>
                 <span className="input-label">Uhrzeit *</span>
-                <input
-                  type="time"
-                  className="input"
-                  value={uhrzeit}
-                  onChange={(e) => setUhrzeit(e.target.value)}
-                  required
-                />
+                <MockInput type="time" value={uhrzeit} onChange={(e) => setUhrzeit(e.target.value)} required />
               </label>
               <TerminMitarbeiterSelect
                 team={team}
@@ -290,19 +292,12 @@ export function StatusModal({
                 </p>
               ) : null}
               <div className="md:col-span-2">
-                <Textarea
-                  label="Notiz zum Termin"
-                  value={notiz}
-                  onChange={(e) => setNotiz(e.target.value)}
-                  placeholder="Vor-Ort begehen, Maße aufnehmen, Wünsche notieren…"
-                  rows={3}
-                />
+                <MockField label="Notiz zum Termin"><RichTextEditor value={typeof (notiz) === 'string' ? (notiz) : ''} onChange={(__v) => setNotiz(__v)} placeholder="Vor-Ort begehen, Maße aufnehmen, Wünsche notieren…" minHeight={120} aria-label="Notiz zum Termin" /></MockField>
               </div>
               <div className="md:col-span-2 space-y-3">
                 {kontaktEmail ? (
                   <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
-                    <input
-                      type="checkbox"
+                    <MockCheckbox
                       checked={mailToggle}
                       onChange={(e) => setMailToggle(e.target.checked)}
                     />
@@ -328,7 +323,7 @@ export function StatusModal({
                 />
               </div>
               <div className="status-hint status-hint-green md:col-span-2">
-                <Info className="h-4 w-4 shrink-0" aria-hidden />
+                <MockIcon n="info-circle" ctx="default" className="h-4 w-4 shrink-0" aria-hidden />
                 <span>
                   Status wird auf <strong>„Termin“</strong> gesetzt und ein Kalender-Eintrag angelegt.
                 </span>
@@ -338,15 +333,9 @@ export function StatusModal({
 
           {kind === 'nicht_erreichbar' ? (
             <div className="space-y-3">
-              <Textarea
-                label="Notiz (optional)"
-                value={notiz}
-                onChange={(e) => setNotiz(e.target.value)}
-                placeholder="Mailbox voll, keine Antwort, …"
-                rows={3}
-              />
+              <MockField label="Notiz (optional)"><RichTextEditor value={typeof (notiz) === 'string' ? (notiz) : ''} onChange={(__v) => setNotiz(__v)} placeholder="Mailbox voll, keine Antwort, …" minHeight={120} aria-label="Notiz (optional)" /></MockField>
               <div className="status-hint status-hint-neutral">
-                <Info className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
+                <MockIcon n="info-circle" ctx="default" className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
                 <span>
                   Status bleibt unverändert. Der Versuch landet in der Timeline. Ab dem dritten
                   Versuch schlägt das System „Als verloren markieren“ vor.
@@ -357,25 +346,13 @@ export function StatusModal({
 
           {kind === 'verloren' ? (
             <div className="space-y-3">
-              <Select
-                label="Warum verloren? *"
-                name="grund"
-                value={grund}
-                onChange={(e) => setGrund(e.target.value)}
-                options={Object.entries(VERLOREN_GRUND_LABELS).map(([value, label]) => ({
+              <Combobox label="Warum verloren? *" id="grund" name="grund" options={Object.entries(VERLOREN_GRUND_LABELS).map(([value, label]) => ({
                   value,
                   label,
-                }))}
-              />
-              <Textarea
-                label="Anmerkung (optional)"
-                value={notiz}
-                onChange={(e) => setNotiz(e.target.value)}
-                placeholder="Optional: Details zur Auswertung…"
-                rows={2}
-              />
+                }))} value={grund == null ? '' : String(grund)} placeholder="Auswählen…" onChange={(next) => { setGrund(next); }} />
+              <MockField label="Anmerkung (optional)"><RichTextEditor value={typeof (notiz) === 'string' ? (notiz) : ''} onChange={(__v) => setNotiz(__v)} placeholder="Optional: Details zur Auswertung…" minHeight={120} aria-label="Anmerkung (optional)" /></MockField>
               <div className="status-hint status-hint-neutral">
-                <Info className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
+                <MockIcon n="info-circle" ctx="default" className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
                 <span>
                   Status wird auf <strong>„Verloren“</strong> gesetzt. Die Anfrage erscheint in der Übersicht
                   unter diesem Status.
@@ -386,23 +363,32 @@ export function StatusModal({
         </div>
   )
 
+<<<<<<< Updated upstream
+  const saveAction = {
+    label: meta.saveLabel,
+    onClick: () => void handleSave(),
+    busy: saving,
+    icon: 'check' as const,
+  }
+=======
   const formFooter = (
     <div className="sheet-footer-actions">
-      <Button type="button" variant="secondary" onClick={onClose}>
+      <MockBtn type="button" kind="secondary" onClick={onClose}>
         Abbrechen
-      </Button>
-      <Button
+      </MockBtn>
+      <MockBtn
         type="button"
-        variant={meta.danger ? 'danger' : 'primary'}
+        kind={meta.danger ? 'danger' : 'primary'}
         loading={saving}
         className="inline-flex gap-1.5"
         onClick={() => void handleSave()}
       >
         <Save className="h-4 w-4" aria-hidden />
         {meta.saveLabel}
-      </Button>
+      </MockBtn>
     </div>
   )
+>>>>>>> Stashed changes
 
   return (
     <EditorSheet
@@ -411,7 +397,9 @@ export function StatusModal({
       title={meta.title}
       context="detail"
       size="lg"
-      footer={formFooter}
+      secondary={{ label: 'Abbrechen', onClick: onClose }}
+      primary={meta.danger ? null : saveAction}
+      danger={meta.danger ? saveAction : null}
     >
       <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">{sub}</p>
       {formBody}

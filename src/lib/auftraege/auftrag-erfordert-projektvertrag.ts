@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { auftragIstBauprojekt, gewerkSlugsSuggerierenBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import type { GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
@@ -14,6 +15,7 @@ export async function auftragErfordertProjektvertrag(auftragId: string): Promise
     .select('ist_bauprojekt')
     .eq('id', aid)
     .maybeSingle()
+  if (error) logDbError('lib/auftraege/auftrag-erfordert-projektvertrag:auftraege', error)
 
   if (error || !auftrag) return false
 
@@ -25,7 +27,6 @@ export async function auftragErfordertProjektvertrag(auftragId: string): Promise
     supabaseAdmin.from('auftrag_positionen').select('gewerk_slug').eq('auftrag_id', aid),
     supabaseAdmin.from('gewerke').select('slug, ist_bauleistung'),
   ])
-
   const slugs = (posRows ?? [])
     .map((p) => (p as { gewerk_slug?: string | null }).gewerk_slug?.trim())
     .filter(Boolean) as string[]

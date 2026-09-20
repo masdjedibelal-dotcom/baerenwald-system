@@ -1,5 +1,7 @@
 'use client'
 
+
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { KundeModal } from '@/components/kunden/KundeModal'
@@ -133,7 +135,7 @@ export function FabCreateHost() {
         onClose={() => setArt(null)}
         onSaved={() => {
           setArt(null)
-          router.refresh()
+          afterServerActionRefresh()
         }}
       />
 
@@ -143,7 +145,7 @@ export function FabCreateHost() {
         onClose={() => setArt(null)}
         onSaved={() => {
           setArt(null)
-          router.refresh()
+          afterServerActionRefresh()
         }}
       />
     </>

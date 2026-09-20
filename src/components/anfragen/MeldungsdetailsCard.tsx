@@ -1,5 +1,6 @@
 'use client'
 
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { useMemo } from 'react'
 
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
@@ -74,20 +75,15 @@ export function MeldungsdetailsCard({ lead }: { lead: LeadDetail }) {
   if (!hatInhalt) return null
 
   return (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">Meldungsdetails</div>
+    <MockCard title="Meldungsdetails">
+      <div className="props">
+        <PropRow label="Situation" value={situation} />
+        <PropRow label="Bereich(e)" value={bereiche} />
+        <PropRow label="Umfang" value={umfang} />
+        <PropRow label="Zeitraum" value={zeitraum} />
+        <PropRow label="Dringlichkeit" value={dringlichkeit} />
+        <PropRow label="Freitext Melder" value={freitext} />
       </div>
-      <div className="card-b">
-        <div className="props">
-          <PropRow label="Situation" value={situation} />
-          <PropRow label="Bereich(e)" value={bereiche} />
-          <PropRow label="Umfang" value={umfang} />
-          <PropRow label="Zeitraum" value={zeitraum} />
-          <PropRow label="Dringlichkeit" value={dringlichkeit} />
-          <PropRow label="Freitext Melder" value={freitext} />
-        </div>
-      </div>
-    </div>
+    </MockCard>
   )
 }

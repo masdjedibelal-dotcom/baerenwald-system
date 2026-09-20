@@ -4,6 +4,7 @@ import {
   terminTypToKategorie,
   type TerminKategorie,
 } from '@/lib/kalender/termin-kategorien'
+import { C } from '@/lib/tokens/colors'
 
 /** Nur echte Termine (Vor-Ort, Baubeginn, Abnahme) — keine CRM-Auto-Erinnerungen. */
 export const ECHTE_KALENDER_TERMIN_TYPEN = [
@@ -26,18 +27,18 @@ export function istEchterKalenderTermin(
 export const VOR_ORT_TERMIN_TITEL = 'Vor-Ort-Termin'
 
 const MARKER: Record<string, string> = {
-  besichtigung: '#C4922A',
-  vor_ort: '#C4922A',
-  aufmass: '#C4922A',
-  beginn: '#2E7D52',
-  projekttermin: '#2E7D52',
-  abnahme: '#0091AE',
-  sonstiges: '#6B7280',
-  allgemein: '#6B7280',
-  kundentermin: '#2563EB',
-  kundengespraech: '#2563EB',
-  intern: '#9333EA',
-  privat: '#9333EA',
+  besichtigung: C.accent,
+  vor_ort: C.accent,
+  aufmass: C.accent,
+  beginn: C.green,
+  projekttermin: C.green,
+  abnahme: C.teal,
+  sonstiges: C.gray500,
+  allgemein: C.gray500,
+  kundentermin: C.blue,
+  kundengespraech: C.blue,
+  intern: C.purple,
+  privat: C.purple,
 }
 
 export const KALENDER_TYP_MARKER: Record<KalenderTermin['typ'], string> = MARKER as Record<
@@ -70,5 +71,5 @@ export function kalenderTypMarkerClass(typ: KalenderTermin['typ']): string {
 }
 
 export function kalenderTypMarkerColor(typ: string): string {
-  return MARKER[typ] ?? MARKER[terminTypToKategorie(typ)] ?? '#6B7280'
+  return MARKER[typ] ?? MARKER[terminTypToKategorie(typ)] ?? C.gray500
 }

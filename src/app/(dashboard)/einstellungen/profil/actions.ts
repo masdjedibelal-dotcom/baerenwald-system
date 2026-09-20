@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateEinstellungenPath } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { updateBenutzerProfil } from '@/app/(dashboard)/einstellungen/benutzer/actions'
@@ -20,11 +26,12 @@ export async function loadMeinProfil(): Promise<MeinProfilDaten | null> {
   } = await supabase.auth.getUser()
   if (!user?.id) return null
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('user_profiles')
     .select('name, telefon')
     .eq('id', user.id)
     .maybeSingle()
+  if (error) logDbError('app/einstellungen/profil/actions:user_profiles', error)
 
   const meta = (user.user_metadata ?? {}) as {
     name?: string
@@ -58,7 +65,8 @@ export async function saveMeinProfil(patch: {
   } = await supabase.auth.getUser()
   if (!user?.id) return { ok: false, message: 'Nicht angemeldet' }
 
-  const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id)
+  const { data: authUser, error } = await supabaseAdmin.auth.admin.getUserById(user.id)
+  if (error) logDbError('app/einstellungen/profil/actions:query', error)
   const meta = (authUser?.user?.user_metadata ?? {}) as { role?: string }
   const rolle = meta.role === 'admin' ? 'admin' : 'manager'
 
@@ -69,6 +77,6 @@ export async function saveMeinProfil(patch: {
   })
   if (!r.ok) return r
 
-  revalidatePath('/einstellungen/profil')
+  revalidateEinstellungenPath('/einstellungen/profil')
   return { ok: true }
 }

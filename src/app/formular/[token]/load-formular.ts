@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { FormularFeld } from '@/lib/types'
 import {
@@ -30,6 +31,7 @@ export async function loadOeffentlichesFormular(
     )
     .eq('token', token)
     .maybeSingle()
+  if (error) logDbError('app/formular/[token]/load-formular:hw_formular_einreichungen', error)
 
   if (error || !data) return null
 

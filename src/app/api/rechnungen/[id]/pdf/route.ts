@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { buildRechnungPdfBuffer } from '@/lib/rechnungen/persist-pdf'
@@ -28,21 +29,23 @@ export async function GET(
   }
 
   // Eingangsrechnung: Partner-PDF ausliefern (nicht Baerenwald-Beleg neu rendern)
-  const { data: meta } = await supabaseAdmin
+  const {data: meta, error} = await supabaseAdmin
     .from('rechnungen')
     .select('richtung, pdf_url, angebot_handwerker_id, rechnungsnummer')
     .eq('id', rechnungId)
     .maybeSingle()
+  if (error) logDbError('app/api/rechnungen/[id]/pdf/route:rechnungen', error)
 
   if (meta && isEingehendeRechnung(meta)) {
     let partnerStored = String(meta.pdf_url ?? '').trim()
     const ahId = String(meta.angebot_handwerker_id ?? '').trim()
     if ((!partnerStored || /^https?:\/\//i.test(partnerStored) === false) && ahId) {
-      const { data: ah } = await supabaseAdmin
+      const {data: ah, error} = await supabaseAdmin
         .from('angebot_handwerker')
         .select('hw_rechnung_pdf_url')
         .eq('id', ahId)
         .maybeSingle()
+      if (error) logDbError('app/api/rechnungen/[id]/pdf/route:angebot_handwerker', error)
       const fromAh = String(ah?.hw_rechnung_pdf_url ?? '').trim()
       if (fromAh) partnerStored = fromAh
     }

@@ -1,10 +1,11 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import {
   AnfrageNeuForm,
   ANFRAGE_BEARBEITEN_FORM_ID,
@@ -100,7 +101,7 @@ export function AnfrageWizard({
             disabled={!meta.isValid || meta.loading}
             onClick={submitForm}
           >
-            <Save className="mr-1.5 h-4 w-4" aria-hidden />
+            <MockIcon n="device-floppy" ctx="default" className="mr-1.5 h-4 w-4" aria-hidden />
             {meta.loading ? 'Speichern…' : 'Speichern'}
           </MockBtn>
         )}
@@ -125,20 +126,15 @@ export function AnfrageWizard({
     >
       <nav className="document-section-nav" aria-label="Phasen">
         {PHASES.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            className={cn(
+          <MockBtn className={cn(
               'document-section-nav__chip',
               step === p.id && 'document-section-nav__chip--active'
-            )}
-            onClick={() => {
+            )} key={p.id} type="button" onClick={() => {
               if (p.id === 2 && !meta.isValid) return
               setStep(p.id)
-            }}
-          >
+            }}>
             {p.label}
-          </button>
+          </MockBtn>
         ))}
         <div className="ml-auto hidden md:block">{navActions}</div>
       </nav>
@@ -161,7 +157,7 @@ export function AnfrageWizard({
           onSuccess={(id) => {
             onSuccess?.(id)
             onClose()
-            router.refresh()
+            afterServerActionRefresh()
           }}
           onCancel={onClose}
         />

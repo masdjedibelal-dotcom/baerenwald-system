@@ -1,5 +1,4 @@
 export { AppListScreen } from '@/components/layout/app/AppListScreen'
-export { AppFilterRail, AppFilterPill } from '@/components/layout/app/AppFilterRail'
 export { AppListFilterRail } from '@/components/layout/app/AppListFilterStack'
 export { AppEntityCard, AppEntityCardLink } from '@/components/layout/app/AppEntityCard'
 export { AppEntityListRow } from '@/components/layout/app/AppEntityListRow'

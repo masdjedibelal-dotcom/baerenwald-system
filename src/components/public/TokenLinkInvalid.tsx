@@ -27,30 +27,40 @@ export function PublicTokenLegalFooter({
   const ds = datenschutzHref || `${base}/datenschutz`
   const im = impressumHref || `${base}/impressum`
   return (
-    <footer className="border-t border-[#E2E8E2] bg-[#F7F6F3] px-4 py-6 text-center text-xs text-[#6B7280]">
-      <a href={ds} className="underline hover:text-[#16201B]">
-        Datenschutz
-      </a>
-      {' · '}
-      <a href={im} className="underline hover:text-[#16201B]">
-        Impressum
-      </a>
+    <footer className="border-t border-bw-border bg-bw-bg-soft px-4 py-6 text-center text-xs text-muted">
+      <nav className="inline-flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
+        <a
+          href={ds}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 underline hover:text-bw-dark"
+        >
+          Datenschutz
+        </a>
+        <span aria-hidden className="text-muted/60">
+          ·
+        </span>
+        <a
+          href={im}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 underline hover:text-bw-dark"
+        >
+          Impressum
+        </a>
+      </nav>
     </footer>
   )
 }
 
 export function TokenLinkInvalid() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#F7F6F3] text-[#16201B]">
+    <div className="flex min-h-screen flex-col bg-bw-bg-soft text-bw-dark">
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-16 text-center">
         <div
-          className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#E8EEE9] text-xl font-bold text-[#4a5c54]"
+          className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-pill bg-bw-green-bg text-xl font-bold text-bw-text-mid"
           aria-hidden
         >
           !
         </div>
         <h1 className="text-xl font-semibold">{TOKEN_LINK_INVALID_TITLE}</h1>
-        <p className="mt-3 text-sm leading-relaxed text-[#4a5c54]">
+        <p className="mt-3 text-sm leading-relaxed text-bw-text-mid">
           {TOKEN_LINK_INVALID_BODY}
         </p>
       </main>

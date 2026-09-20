@@ -18,7 +18,7 @@ export function KiGewerkeAblaufCard({ analyse, onGenerateKi, kiLoading }: KiCard
         />
         <KiHeroStat label="Marge" value={`${top.marge_prozent.toFixed(1)} %`} />
       </div>
-      <p className="rounded-lg bg-bw-bg px-3 py-2 text-xs text-bw-text">{top.ablauf_text}</p>
+      <p className="rounded-card bg-bw-bg px-3 py-2 text-xs text-bw-text">{top.ablauf_text}</p>
     </div>
   ) : (
     <p className="text-sm text-muted">Kein Ablauf</p>
@@ -39,7 +39,7 @@ export function KiGewerkeAblaufCard({ analyse, onGenerateKi, kiLoading }: KiCard
             {(z.typische_leistungen ?? []).slice(0, 5).map((l) => (
               <li
                 key={l.name}
-                className="rounded-full bg-bw-bg px-2 py-0.5 text-[11px] text-muted"
+                className="rounded-pill bg-bw-bg px-2 py-0.5 text-fs-caption text-muted"
               >
                 {l.name} ({l.anteil_prozent}%)
               </li>

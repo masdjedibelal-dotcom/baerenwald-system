@@ -10,6 +10,7 @@ import { resolvePositionBeschreibungExport } from '@/lib/gewerke-ausfuehrung'
 import { withResolvedGewerkMeta } from '@/lib/angebote/resolve-position-gewerk'
 import type { AngebotPosition, Gewerk } from '@/lib/types'
 import type { WizardPosition } from '@/lib/angebote/angebot-wizard-types'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export const ZEILE_SLUG_FREITEXT = '__freitext__'
 export const ZEILE_SLUG_GESAMTRABATT = '__gesamtrabatt__'
@@ -583,6 +584,5 @@ export function dokumentArtikelToWizardPosition(z: DokumentArtikelZeile): Wizard
 }
 
 export function formatEurBetrag(n: number): string {
-  const v = Number.isFinite(n) ? n : 0
-  return `${v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  return formatEuro(Number.isFinite(n) ? n : 0)
 }

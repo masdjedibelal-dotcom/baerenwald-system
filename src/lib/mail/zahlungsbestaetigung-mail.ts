@@ -1,5 +1,6 @@
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
+import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -8,17 +9,15 @@ import {
   mailSummaryBlock,
 } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { formatEuro } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-function formatEur(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export type ZahlungsbestaetigungMailInput = {
@@ -32,13 +31,14 @@ export type ZahlungsbestaetigungMailInput = {
 }
 
 export function zahlungsbestaetigungMailBetreff(
-  anrede: AngebotMailAnrede,
-  rechnungsnummer: string,
-  firmenname: string
+  projektTitel: string | null | undefined,
+  rechnungsnummer: string
 ): string {
-  return anrede === 'du'
-    ? `Zahlung erhalten — Rechnung ${rechnungsnummer} · ${firmenname}`
-    : `Zahlung erhalten — Rechnung ${rechnungsnummer} · ${firmenname}`
+  return buildSubject({
+    objekt: projektTitel,
+    ereignis: 'Zahlung erhalten',
+    nummer: rechnungsnummer,
+  })
 }
 
 export function buildZahlungsbestaetigungMail(
@@ -65,7 +65,7 @@ export function buildZahlungsbestaetigungMail(
     label: anrede === 'du' ? `ZAHLUNG ERHALTEN · ${nr}` : `ZAHLUNG ERHALTEN · ${nr}`,
     title: titel,
     priceHtml: mailBetragPriceHtml(data.brutto, { reverseCharge: data.reverseCharge }),
-    metaHtml: `<p style="font-size:13px;color:#374151;margin:8px 0 0;"><strong>Bezahlt am:</strong> ${bezahltAm}</p>`,
+    metaHtml: `<p style="font-size:13px;color:${C.gray700};margin:8px 0 0;"><strong>Bezahlt am:</strong> ${bezahltAm}</p>`,
   })
 
   const contact = mailKundenContactLine(anrede, b.telefon)
@@ -76,15 +76,15 @@ export function buildZahlungsbestaetigungMail(
       ? 'Du erhältst diese Mail als Bestätigung deiner Zahlung.'
       : 'Sie erhalten diese Mail als Bestätigung Ihrer Zahlung.'
 
-  const preheader = `${data.rechnungsnummer} · ${formatEur(data.brutto)} € · bezahlt am ${data.bezahltAm}`
+  const preheader = `${data.rechnungsnummer} · ${formatEuro(data.brutto)} · bezahlt am ${data.bezahltAm}`
 
   const html = mailHtmlBase(
-    `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
+    `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
-      <p style="font-size:14px;color:#374151;margin:0 0 12px;line-height:1.6;">${esc(abschlussHinweis)}</p>
-      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
-      <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
+      <p style="font-size:14px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${esc(abschlussHinweis)}</p>
+      <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,
     disclaimer,
@@ -92,7 +92,7 @@ export function buildZahlungsbestaetigungMail(
   )
 
   return {
-    betreff: zahlungsbestaetigungMailBetreff(anrede, data.rechnungsnummer, b.firmenname),
+    betreff: zahlungsbestaetigungMailBetreff(data.projektTitel, data.rechnungsnummer),
     html,
   }
 }

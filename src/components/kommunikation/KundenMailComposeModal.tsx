@@ -1,15 +1,18 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
-
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useEffect, useMemo, useState } from 'react'
-import { Save } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -23,6 +26,7 @@ import {
 import { type MailComposeContext } from '@/lib/kommunikation/types'
 import type { MailAnrede } from '@/lib/mail/anrede'
 import { parseEmailTokens } from '@/lib/email-recipients'
+import { TOAST } from '@/lib/copy'
 
 export function KundenMailComposeModal({
   open,
@@ -57,7 +61,7 @@ export function KundenMailComposeModal({
       setVorlagen(vList)
       setVorlageId('')
       if (!draft.ok) {
-        toast.error(draft.message)
+        toast.systemError(draft)
         return
       }
       setTo(parseEmailTokens(draft.to))
@@ -107,10 +111,10 @@ export function KundenMailComposeModal({
         anrede,
       })
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
-      toast.success('E-Mail gesendet')
+      toast.success(TOAST.emailGesendet)
       onClose()
       onSent?.()
     })
@@ -126,10 +130,10 @@ export function KundenMailComposeModal({
         body_text: bodyHtml,
       })
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
-      toast.success('Vorlage gespeichert')
+      toast.success(TOAST.vorlage_gespeichert)
       setSaveVorlageOpen(false)
       setVorlageName('')
       const vList = await loadKommunikationMailVorlagen(ctx.kontextTyp)
@@ -156,23 +160,17 @@ export function KundenMailComposeModal({
             <EmailPillsField label="CC" emails={cc} onChange={setCc} placeholder="optional" />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1">
-                <Select
-                  label="Vorlage"
-                  name="mail-vorlage"
-                  value={vorlageId}
-                  onChange={(e) => applyVorlage(e.target.value)}
-                  options={vorlageOptions}
-                />
+                <Combobox label="Vorlage" id="mail-vorlage" name="mail-vorlage" options={vorlageOptions} value={vorlageId == null ? '' : String(vorlageId)} placeholder="Auswählen…" onChange={(next) => { applyVorlage(next); }} />
               </div>
-              <Button
+              <MockBtn
                 type="button"
-                variant="secondary"
+                kind="secondary"
                 className="shrink-0"
                 onClick={() => setSaveVorlageOpen(true)}
               >
-                <Save className="h-3.5 w-3.5" aria-hidden />
+                <MockIcon n="device-floppy" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                 Vorlage
-              </Button>
+              </MockBtn>
             </div>
             <KiAssistFieldLabel
               label="Betreff"
@@ -181,7 +179,7 @@ export function KundenMailComposeModal({
               extraHint="Kunden-Mail Betreff (Sie-Anrede)."
               multiline={false}
             >
-              <Input value={betreff} onChange={(e) => setBetreff(e.target.value)} />
+              <MockInput value={betreff} onChange={(e) => setBetreff(e.target.value)} />
             </KiAssistFieldLabel>
             <KiAssistFieldLabel
               label="Nachricht"
@@ -189,7 +187,7 @@ export function KundenMailComposeModal({
               onApply={setBodyHtml}
               extraHint="Kunden-Mail Text (Sie-Anrede)."
             >
-              <Textarea rows={8} value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} />
+              <RichTextEditor value={typeof (bodyHtml) === 'string' ? (bodyHtml) : ''} onChange={(__v) => setBodyHtml(__v)} minHeight={192} />
             </KiAssistFieldLabel>
             <CollapsibleMailPreview previewHtml={previewHtml} />
           </div>
@@ -205,12 +203,7 @@ export function KundenMailComposeModal({
         onConfirm={speichereVorlage}
         size="md"
       >
-        <Input
-          label="Name"
-          value={vorlageName}
-          onChange={(e) => setVorlageName(e.target.value)}
-          placeholder="z. B. Terminbestätigung"
-        />
+        <MockField label="Name"><MockInput value={vorlageName} onChange={(e) => setVorlageName(e.target.value)} placeholder="z. B. Terminbestätigung" /></MockField>
       </EditorSheet>
     </>
   )

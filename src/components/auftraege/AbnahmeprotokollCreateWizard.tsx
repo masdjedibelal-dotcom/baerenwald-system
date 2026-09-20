@@ -1,15 +1,10 @@
 'use client'
-import {
-  actionBusy,
-  showRouteBusy,
-  useLocalTransition,
-} from '@/components/ui/action-busy'
+import { DateInput } from '@/components/ui/DateInput'
+import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Eye, Plus, Trash2 } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   AbnahmeBegehListe,
@@ -17,19 +12,22 @@ import {
   AbnahmeProgressBar,
   countAbgenommeneLeistungen,
 } from '@/components/auftraege/AbnahmeBegehListe'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+<<<<<<< Updated upstream
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+=======
 import { Input } from '@/components/ui/Input'
+>>>>>>> Stashed changes
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { SignatureCanvas } from '@/components/ui/SignatureCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { toast } from '@/components/ui/app-toast'
 import {
-  deleteAbnahmeprotokoll,
+  downloadAbnahmeprotokollPdf,
   getAbnahmeprotokollMailDefaults,
-  previewAbnahmeprotokollPdf,
   saveAbnahmeAndAbschliessen,
-  saveAbnahmeprotokollDraft,
   saveAbnahmeprotokollPdfOnly,
   saveAndSendAbnahmeprotokoll,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
@@ -50,12 +48,13 @@ import {
   type AbnahmeMangelCheckItem,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
-import type { AbnahmeFreigabeStatus } from '@/lib/auftraege/abnahme-freigabe'
-import { downloadPdfFromBase64, openPreviewTab } from '@/lib/download-pdf-base64'
-import { optimizeImageForAbnahmePdf } from '@/lib/media/optimize-image-for-upload'
+import { downloadPdfFromBase64, openPdfFromBase64 } from '@/lib/download-pdf-base64'
 import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
-import { cn, formatDatum } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
+import { CONFIRM, COPY_BUTTON, TOAST } from '@/lib/copy'
+import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
+import type { DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
 
 const ABNAHME_ERGEBNIS_UI: Record<AbnahmeErgebnis, { label: string; cls: string }> = {
   abgenommen: { label: 'Abgenommen', cls: 'abnahme-erg-abgenommen' },
@@ -72,30 +71,25 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]['id']
 
-/** Standard „Ort, Datum“ aus Übergabe-Feldern (Datum immer TT.MM.JJJJ). */
-function defaultUnterschriftOrtDatum(ort: string, datum: string): string {
-  const o = ort.trim()
-  const de = formatDatum(datum)
-  const deOk = de !== '—' ? de : ''
-  if (o && deOk) return `${o}, ${deOk}`
-  return o || deOk
+type AbnahmeDraft = {
+  punkte: AbnahmePunkt[]
+  maengelItems: AbnahmeMangelCheckItem[]
+  abnahmeDatum: string
+  notizen: string
+  meta: AbnahmeProtokollMeta
+  activeSection: SectionId
 }
 
-/** Anzeige: eingebettete ISO-YMD → TT.MM.JJJJ. */
-function displayDeDatum(value: string): string {
-  const t = value.trim()
-  if (!t) return '—'
-  const replaced = t.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y, m, d) => `${d}.${m}.${y}`)
-  return replaced
+/** Standard „Ort, Datum“ aus Übergabe-Feldern. */
+function defaultUnterschriftOrtDatum(ort: string, datum: string): string {
+  const o = ort.trim()
+  const d = datum.trim().slice(0, 10)
+  if (o && d) return `${o}, ${d}`
+  return o || d
 }
 
 function FieldCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="abnahme-field-card">
-      <h3 className="abnahme-field-card__title">{title}</h3>
-      {children}
-    </section>
-  )
+  return <MockCard title={title}>{children}</MockCard>
 }
 
 export function AbnahmeprotokollCreateWizard({
@@ -109,7 +103,7 @@ export function AbnahmeprotokollCreateWizard({
   initialPunkte,
   initialAbnahmeDatum,
   initialNotizen,
-  initialMaengelItems,
+  initialMaengelItems = [],
   initialFreigabeStatus = null,
   isEdit = false,
   protokollId = null,
@@ -125,31 +119,19 @@ export function AbnahmeprotokollCreateWizard({
   initialAbnahmeDatum?: string
   initialNotizen?: string | null
   initialMaengelItems?: AbnahmeMangelCheckItem[]
-  initialFreigabeStatus?: AbnahmeFreigabeStatus | null
+  /** Nur für Badge/Anzeige; Speichern steuern die Actions. */
+  initialFreigabeStatus?: string | null
   isEdit?: boolean
   protokollId?: string | null
 }) {
   const router = useRouter()
   const [activeSection, setActiveSection] = useState<SectionId>('checkliste')
   const [pending, startTransition] = useLocalTransition('Wird gespeichert…')
-  const [sendBusy, setSendBusy] = useState(false)
   const [previewBusy, setPreviewBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  const [sessionProtokollId, setSessionProtokollId] = useState<string | null>(
-    protokollId?.trim() || null
-  )
-  const [draftDirty, setDraftDirty] = useState(false)
-  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
-  const [draftSaving, setDraftSaving] = useState(false)
-  const interactionBusy = pending || draftSaving || sendBusy
-  const skipDirtyRef = useRef(true)
-  const canDiscardEntwurf =
-    !initialFreigabeStatus ||
-    initialFreigabeStatus === 'entwurf' ||
-    initialFreigabeStatus === 'abgelehnt'
 
-  const [punkte, setPunkte] = useState<AbnahmePunkt[]>(() => {
+  const [punkte, setPunkteState] = useState<AbnahmePunkt[]>(() => {
     if (initialPunkte?.length) return initialPunkte
     // CRM-Neu: alle Leistungen vorausgewählt → landen im PDF
     return buildAbnahmePunkteInitial({
@@ -158,113 +140,84 @@ export function AbnahmeprotokollCreateWizard({
       gewerke,
     }).map((p) => ({ ...p, status: 'ok' as const }))
   })
-  const [maengelItems, setMaengelItems] = useState<AbnahmeMangelCheckItem[]>(
-    () => initialMaengelItems ?? []
+  const [maengelItems, setMaengelItemsState] = useState<AbnahmeMangelCheckItem[]>(() =>
+    initialMaengelItems.length ? initialMaengelItems : []
   )
-  const [abnahmeDatum, setAbnahmeDatum] = useState(initialAbnahmeDatum || heuteYmd())
-  const [notizen, setNotizen] = useState(initialNotizen?.trim() || '')
+  const [abnahmeDatum, setAbnahmeDatumState] = useState(initialAbnahmeDatum || heuteYmd())
+  const [notizen, setNotizenState] = useState(initialNotizen?.trim() || '')
   const [meta, setMeta] = useState<AbnahmeProtokollMeta>(() =>
     emptyAbnahmeProtokollMeta(initialMeta)
   )
+  const [draftDirty, setDraftDirty] = useState(false)
 
-  useEffect(() => {
-    if (skipDirtyRef.current) {
-      skipDirtyRef.current = false
-      return
+  /* FORM_ZWISCHENSTAND: abnahme */
+  const storageKey = useMemo(
+    () => `bw:crm-abnahme-draft:${auftragId}:${protokollId ?? 'neu'}`,
+    [auftragId, protokollId]
+  )
+  const draftData = useMemo<AbnahmeDraft>(
+    () => ({
+      punkte,
+      maengelItems,
+      abnahmeDatum,
+      notizen,
+      meta,
+      activeSection,
+    }),
+    [punkte, maengelItems, abnahmeDatum, notizen, meta, activeSection]
+  )
+  const onRestoreDraft = useCallback((data: AbnahmeDraft) => {
+    setPunkteState(data.punkte)
+    setMaengelItemsState(data.maengelItems)
+    setAbnahmeDatumState(data.abnahmeDatum)
+    setNotizenState(data.notizen)
+    setMeta(data.meta)
+    if (SECTIONS.some((s) => s.id === data.activeSection)) {
+      setActiveSection(data.activeSection)
     }
     setDraftDirty(true)
-  }, [punkte, maengelItems, meta, notizen, abnahmeDatum])
+  }, [])
+  const zwischen = useFormZwischenstand<AbnahmeDraft>({
+    storageKey,
+    enabled: true,
+    data: draftData,
+    onRestore: onRestoreDraft,
+  })
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  useEffect(() => {
+    if (zwischen.savedHint) setLastSavedAt(Date.now())
+  }, [zwischen.savedHint])
 
-  function leaveWizard() {
-    setDraftDirty(false)
-    setCloseConfirmOpen(false)
+  const setPunkte = (
+    next: AbnahmePunkt[] | ((prev: AbnahmePunkt[]) => AbnahmePunkt[])
+  ) => {
+    setDraftDirty(true)
+    setPunkteState(next)
+  }
+  const setMaengelItems = (
+    next: AbnahmeMangelCheckItem[] | ((prev: AbnahmeMangelCheckItem[]) => AbnahmeMangelCheckItem[])
+  ) => {
+    setDraftDirty(true)
+    setMaengelItemsState(next)
+  }
+  const setAbnahmeDatum = (next: string) => {
+    setDraftDirty(true)
+    setAbnahmeDatumState(next)
+  }
+  const setNotizen = (next: string) => {
+    setDraftDirty(true)
+    setNotizenState(next)
+  }
+
+  const freigabeBadgeLabel =
+    (initialFreigabeStatus ?? '').trim() || (isEdit ? 'Entwurf' : 'Offen')
+
+  const onClose = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back()
       return
     }
     router.push(`/auftraege/${auftragId}?tab=leistungen`)
-  }
-
-  async function persistDraft(opts?: { notify?: boolean }): Promise<string | null> {
-    try {
-      const r = await saveAbnahmeprotokollDraft({
-        auftragId,
-        abnahmeDatum,
-        punkte,
-        maengel: buildSaveMaengel(),
-        notizen: notizen.trim() || null,
-        meta: ensureUnterschriftOrtDatum(meta),
-        protokollId: sessionProtokollId,
-      })
-      if (!r?.ok) {
-        if (opts?.notify !== false) toast.error(r?.message ?? 'Entwurf speichern fehlgeschlagen')
-        return null
-      }
-      setSessionProtokollId(r.protokollId)
-      if (r.meta) setMeta(r.meta)
-      setDraftDirty(false)
-      if (opts?.notify) toast.success('Entwurf gespeichert')
-      return r.protokollId
-    } catch (e) {
-      if (opts?.notify !== false) {
-        toast.error(e instanceof Error ? e.message : 'Entwurf speichern fehlgeschlagen')
-      }
-      return null
-    }
-  }
-
-  /** Schließen = Entwurf speichern (Fotos/Mängel bleiben). */
-  async function handleClose() {
-    if (interactionBusy) return
-    if (!draftDirty) {
-      leaveWizard()
-      return
-    }
-    setDraftSaving(true)
-    try {
-      const id = await persistDraft({ notify: true })
-      if (!id) {
-        setCloseConfirmOpen(true)
-        return
-      }
-      leaveWizard()
-      router.refresh()
-    } finally {
-      setDraftSaving(false)
-    }
-  }
-
-  /** Verwerfen = Entwurf löschen, Stand weg — Auftrag läuft ohne Abnahme weiter. */
-  async function handleDiscard() {
-    if (interactionBusy) return
-    setDraftSaving(true)
-    try {
-      if (sessionProtokollId && canDiscardEntwurf) {
-        const r = await deleteAbnahmeprotokoll(sessionProtokollId, auftragId)
-        if (!r?.ok) {
-          toast.error(r?.message ?? 'Löschen fehlgeschlagen')
-          return
-        }
-        toast.success('Abnahme-Entwurf entfernt')
-      }
-      setSessionProtokollId(null)
-      setDraftDirty(false)
-      leaveWizard()
-      router.refresh()
-    } finally {
-      setDraftSaving(false)
-    }
-  }
-
-  async function handleSaveDraftOnly() {
-    if (interactionBusy) return
-    setDraftSaving(true)
-    try {
-      const id = await persistDraft({ notify: true })
-      if (id) router.refresh()
-    } finally {
-      setDraftSaving(false)
-    }
   }
 
   const ausgewaehlt = useMemo(
@@ -308,6 +261,7 @@ export function AbnahmeprotokollCreateWizard({
   })()
 
   function patchMeta(patch: Partial<AbnahmeProtokollMeta>) {
+    setDraftDirty(true)
     setMeta((m) => ({ ...m, ...patch }))
   }
 
@@ -345,7 +299,7 @@ export function AbnahmeprotokollCreateWizard({
   function goSection(id: SectionId) {
     if (id === 'pruefen' || id === 'angaben') {
       if (ausgewaehlt === 0) {
-        toast.error('Mindestens eine Leistung für die Abnahme auswählen (OK).')
+        toast.error(TOAST.mindestens_eine_leistung_fuer_die_abnahme_auswae)
         return
       }
     }
@@ -356,34 +310,7 @@ export function AbnahmeprotokollCreateWizard({
         setActiveSection('angaben')
         return
       }
-      if (!hasSignatur && !meta.ohne_unterschrift) {
-        toast.error(
-          'Unterschrift fehlt — bitte Kunde unterschreiben lassen oder „PDF ohne Unterschrift“ anhaken.'
-        )
-        setActiveSection('angaben')
-        return
-      }
-      const ready = ensureUnterschriftOrtDatum(meta)
-      setMeta(ready)
-      // Entwurf sichern bevor Prüfen — Vorschau/Remount darf nichts verlieren
-      void saveAbnahmeprotokollDraft({
-        auftragId,
-        abnahmeDatum,
-        punkte,
-        maengel: buildSaveMaengel(),
-        notizen: notizen.trim() || null,
-        meta: ready,
-        protokollId: sessionProtokollId,
-      })
-        .then((r) => {
-          if (!r?.ok) return
-          setSessionProtokollId(r.protokollId)
-          if (r.meta) setMeta(r.meta)
-          setDraftDirty(false)
-        })
-        .catch(() => {
-          /* Toast nur bei explizitem Speichern — hier still */
-        })
+      setMeta((m) => ensureUnterschriftOrtDatum(m))
     }
     setActiveSection(id)
   }
@@ -393,17 +320,11 @@ export function AbnahmeprotokollCreateWizard({
     setUploading(true)
     try {
       const urls: string[] = []
-      const room = Math.max(0, 8 - meta.uebergabe_foto_urls.length)
+      const room = Math.max(0, 4 - meta.uebergabe_foto_urls.length)
       for (const file of Array.from(files).slice(0, room)) {
-        let uploadFile = file
-        try {
-          uploadFile = await optimizeImageForAbnahmePdf(file)
-        } catch {
-          uploadFile = file
-        }
         const fd = new FormData()
-        fd.set('file', uploadFile)
-        fd.set('filename', uploadFile.name)
+        fd.set('file', file)
+        fd.set('filename', file.name)
         const res = await fetch(`/api/auftraege/${auftragId}/timeline-foto/upload`, {
           method: 'POST',
           body: fd,
@@ -412,14 +333,14 @@ export function AbnahmeprotokollCreateWizard({
         if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
         urls.push(json.url)
       }
-      const nextUrls = [...meta.uebergabe_foto_urls, ...urls].slice(0, 8)
+      const nextUrls = [...meta.uebergabe_foto_urls, ...urls].slice(0, 4)
       const nextCaptions = nextUrls.map((_, i) => meta.uebergabe_foto_captions[i] ?? '')
       patchMeta({
         uebergabe_foto_urls: nextUrls,
         uebergabe_foto_captions: nextCaptions,
       })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -452,38 +373,22 @@ export function AbnahmeprotokollCreateWizard({
     }
     const metaReady = ensureUnterschriftOrtDatum(meta)
     setMeta(metaReady)
-    // Synchron im Tap öffnen — sonst blockiert Mobil den Tab nach dem await
-    const previewTab = openPreviewTab()
     setPreviewBusy(true)
     try {
-      // Zuerst Entwurf speichern: Remount/Fehler nach Vorschau darf Daten nicht vernichten.
-      // PDF als Storage-URL öffnen (kein riesiges Base64 → kein „Exceed Maximum“).
-      const r = await previewAbnahmeprotokollPdf({
+      const r = await downloadAbnahmeprotokollPdf({
         auftragId,
         abnahmeDatum,
         punkte,
         maengel: buildSaveMaengel(),
         notizen: notizen.trim() || null,
         meta: metaReady,
-        protokollId: sessionProtokollId,
       })
-      if (!r?.ok) {
-        previewTab?.close()
-        toast.error(r?.message ?? 'Vorschau fehlgeschlagen')
+      if (!r.ok) {
+        toast.systemError(r)
         return
       }
-      setSessionProtokollId(r.protokollId)
-      if (r.meta) setMeta(r.meta)
-      setDraftDirty(false)
-      if (previewTab && !previewTab.closed) {
-        previewTab.location.href = r.url
-      } else {
-        window.open(r.url, '_blank', 'noopener,noreferrer')
-      }
-      toast.success('Vorschau geöffnet')
-    } catch {
-      previewTab?.close()
-      toast.error('Vorschau fehlgeschlagen')
+      openPdfFromBase64(r.pdfBase64)
+      toast.success(TOAST.vorschau_geoeffnet)
     } finally {
       setPreviewBusy(false)
     }
@@ -501,146 +406,109 @@ export function AbnahmeprotokollCreateWizard({
       metaReady.abnahme_ergebnis = 'mit_vorbehalt'
     }
     setMeta(metaReady)
-
-    const ohneUnterschrift = Boolean(metaReady.ohne_unterschrift)
-    const abschliessen = Boolean(opts?.abschliessen)
+    const abschliessen = Boolean(opts?.abschliessen ?? hasSignatur)
     const send = Boolean(opts?.send)
-
-    if (!hasSignatur && !ohneUnterschrift) {
-      toast.error(
-        'Unterschriften fehlen — bitte zeichnen oder „PDF ohne Unterschrift“ anhaken.'
-      )
-      setActiveSection('angaben')
-      return
-    }
-
-    const payload = {
-      auftragId,
-      abnahmeDatum,
-      punkte,
-      maengel,
-      notizen: notizen.trim() || null,
-      meta: metaReady,
-      protokollId: sessionProtokollId,
-    }
-
-    async function afterAbschliessenSuccess(r: {
-      pdfBase64: string
-      filename: string
-      previousStatus: string
-      sentToKunde: boolean
-      sendWarning?: string
-    }) {
-      downloadPdfFromBase64(r.pdfBase64, r.filename)
-      const prev = r.previousStatus
-      if (r.sendWarning) {
-        toast.error(`Gespeichert — Versand fehlgeschlagen: ${r.sendWarning}`, {
-          action: {
-            label: 'Rückgängig',
-            onClick: () => {
-              void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
-                if (!u?.ok) toast.error(u?.message ?? 'Rückgängig fehlgeschlagen')
-                else {
-                  toast.success('Abschluss rückgängig')
-                  router.refresh()
-                }
-              })
-            },
-          },
-        })
-      } else {
-        toast.success(
-          r.sentToKunde
-            ? 'Abnahme an Kunden gesendet — Auftrag abgeschlossen · PDF heruntergeladen'
-            : 'Abnahme gespeichert — Auftrag abgeschlossen · PDF heruntergeladen',
-          {
-            action: {
-              label: 'Rückgängig',
-              onClick: () => {
-                void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
-                  if (!u?.ok) toast.error(u?.message ?? 'Rückgängig fehlgeschlagen')
-                  else {
-                    toast.success('Abschluss rückgängig')
-                    router.refresh()
-                  }
-                })
-              },
-            },
-          }
-        )
-      }
-      setDraftDirty(false)
-      showRouteBusy('Wird geschlossen…')
-      router.push(`/auftraege/${auftragId}?tab=dokumente`)
-      router.refresh()
-    }
-
-    /** An Kunden senden: globales Loading, PDF-Download, Wizard zu — Auftrag bleibt offen. */
-    if (send && !abschliessen) {
-      if (interactionBusy) return
-      setSendBusy(true)
-      void actionBusy
-        .run('Abnahme wird an Kunden gesendet…', async () => {
-          const mailDefaults = await getAbnahmeprotokollMailDefaults(auftragId, {
-            ohneUnterschrift: ohneUnterschrift,
-            kundeSigniert: Boolean(metaReady.signature_kunde_url?.trim()),
-            protokollId: sessionProtokollId,
-          })
-          if (!mailDefaults?.ok) {
-            toast.error(mailDefaults?.message ?? 'Mail-Defaults fehlgeschlagen')
-            return
-          }
-          const r = await saveAndSendAbnahmeprotokoll({
-            ...payload,
-            betreff: mailDefaults.defaultBetreff,
-            nachricht: mailDefaults.defaultNachricht,
-            anrede: mailDefaults.defaultAnrede,
-          })
-          if (!r?.ok) {
-            toast.error(r?.message ?? 'Senden fehlgeschlagen')
-            return
-          }
-          downloadPdfFromBase64(r.pdfBase64, r.filename)
-          toast.success('Abnahme an Kunden gesendet · PDF heruntergeladen')
-          setDraftDirty(false)
-          showRouteBusy('Wird geschlossen…')
-          router.push(`/auftraege/${auftragId}?tab=dokumente`)
-          router.refresh()
-        })
-        .finally(() => setSendBusy(false))
-      return
-    }
-
     startTransition(async () => {
+      const payload = {
+        auftragId,
+        abnahmeDatum,
+        punkte,
+        maengel,
+        notizen: notizen.trim() || null,
+        meta: metaReady,
+        protokollId,
+      }
       if (abschliessen) {
         const r = await saveAbnahmeAndAbschliessen({
           ...payload,
           sendToKunde: send,
         })
-        if (!r?.ok) {
-          toast.error(r?.message ?? 'Speichern fehlgeschlagen')
+        if (!r.ok) {
+          toast.systemError(r)
           return
         }
-        afterAbschliessenSuccess(r)
+        zwischen.clear()
+        downloadPdfFromBase64(r.pdfBase64, r.filename)
+        const prev = r.previousStatus
+        if (r.sendWarning) {
+          toast.error(
+            `Gespeichert — Versand fehlgeschlagen: ${r.sendWarning}`,
+            {
+              action: {
+                label: 'Rückgängig',
+                onClick: () => {
+                  void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
+                    if (!u.ok) toast.systemError(u)
+                    else {
+                      toast.success(TOAST.abschluss_rueckgaengig)
+                      router.refresh()
+                    }
+                  })
+                },
+              },
+            }
+          )
+        } else {
+          toast.success(
+            r.sentToKunde
+              ? 'Abnahme gesendet — Auftrag abgeschlossen'
+              : 'Abnahme gespeichert — Auftrag abgeschlossen',
+            {
+              action: {
+                label: 'Rückgängig',
+                onClick: () => {
+                  void updateAuftragStatusFromUi(auftragId, prev as AuftragStatus).then((u) => {
+                    if (!u.ok) toast.systemError(u)
+                    else {
+                      toast.success(TOAST.abschluss_rueckgaengig)
+                      router.refresh()
+                    }
+                  })
+                },
+              },
+            }
+          )
+        }
+        router.push(`/auftraege/${auftragId}?tab=leistungen`)
+        router.refresh()
+        return
+      }
+      if (send) {
+        const mailDefaults = await getAbnahmeprotokollMailDefaults(auftragId)
+        if (!mailDefaults.ok) {
+          toast.systemError(mailDefaults)
+          return
+        }
+        const r = await saveAndSendAbnahmeprotokoll({
+          ...payload,
+          betreff: mailDefaults.defaultBetreff,
+          nachricht: mailDefaults.defaultNachricht,
+          anrede: mailDefaults.defaultAnrede,
+        })
+        if (!r.ok) {
+          toast.systemError(r)
+          return
+        }
+        zwischen.clear()
+        toast.success(TOAST.protokoll_gesendet)
+        router.push(`/auftraege/${auftragId}?tab=leistungen`)
+        router.refresh()
         return
       }
       const r = await saveAbnahmeprotokollPdfOnly(payload)
-      if (!r?.ok) {
-        toast.error(r?.message ?? 'Speichern fehlgeschlagen')
+      if (!r.ok) {
+        toast.systemError(r)
         return
       }
-      setSessionProtokollId(r.protokollId)
-      setDraftDirty(false)
+      zwischen.clear()
+      setLastSavedAt(Date.now())
       downloadPdfFromBase64(r.pdfBase64, r.filename)
       toast.success(
-        ohneUnterschrift
-          ? 'PDF ohne Unterschrift gespeichert — in CRM-Dokumenten & Unterlagen. Später an Kunden senden.'
-          : r.updated || isEdit
-            ? 'Abnahmeprotokoll aktualisiert — PDF neu erzeugt'
-            : 'Abnahmeprotokoll erstellt'
+        r.updated || isEdit
+          ? 'Abnahmeprotokoll aktualisiert — PDF neu erzeugt'
+          : 'Abnahmeprotokoll erstellt'
       )
-      showRouteBusy('Wird geschlossen…')
-      router.push(`/auftraege/${auftragId}?tab=dokumente`)
+      router.push(`/auftraege/${auftragId}?tab=leistungen`)
       router.refresh()
     })
   }
@@ -688,12 +556,13 @@ export function AbnahmeprotokollCreateWizard({
         kiExtraHint="Abnahmeprotokoll-Hinweis für den Kunden (PDF)."
         placeholder="Optional…"
       />
-      <Input
-        label="Mängelbeseitigung (global, PDF)"
+      <MockField label="Mängelbeseitigung (global, PDF)">
+        <MockInput
         value={meta.maengel_beseitigung_spaetestens}
         onChange={(e) => patchMeta({ maengel_beseitigung_spaetestens: e.target.value })}
         placeholder="z. B. spätestens am 15.08.2026"
       />
+      </MockField>
       <SheetEditableField
         label="Interne / weitere Anmerkungen"
         value={notizen}
@@ -706,7 +575,11 @@ export function AbnahmeprotokollCreateWizard({
   )
 
   const phaseCheckliste = (
-    <div id="abnahme-sec-checkliste" className="document-canvas-sec space-y-5">
+    <div
+      id="abnahme-sec-checkliste"
+      data-doc-section="checkliste"
+      className="document-canvas-sec space-y-5"
+    >
       <p className="section-h" style={{ marginBottom: 4 }}>
         Leistungen begehen &amp; abnehmen
       </p>
@@ -717,11 +590,7 @@ export function AbnahmeprotokollCreateWizard({
       />
 
       <FieldCard title="Mängel (optional)">
-        <AbnahmeMaengelCheckliste
-          items={maengelItems}
-          onChange={setMaengelItems}
-          auftragId={auftragId}
-        />
+        <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} />
       </FieldCard>
 
       {maengelListe.length > 0 ? (
@@ -729,25 +598,11 @@ export function AbnahmeprotokollCreateWizard({
           <ul className="space-y-3">
             {maengelListe.map((m) => {
               const punkt = punkte.find((p) => p.id === m.punkt_id)
-              const fotos = (m.foto_urls ?? []).filter(Boolean)
               return (
                 <li key={m.punkt_id} className="abnahme-mangel-row space-y-2">
                   <p className="text-[length:var(--fs-text)] font-medium text-bw-text">
                     {m.beschreibung}
                   </p>
-                  {fotos.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {fotos.slice(0, 8).map((url, i) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={`${url}-${i}`}
-                          src={url}
-                          alt=""
-                          className="h-14 w-14 rounded border border-bw-border object-cover"
-                        />
-                      ))}
-                    </div>
-                  ) : null}
                   {punkt ? (
                     <>
                       <SheetEditableField
@@ -761,20 +616,20 @@ export function AbnahmeprotokollCreateWizard({
                         kiExtraHint="Mangel-Text im Abnahmeprotokoll (kundensichtbar)."
                         placeholder={punkt.beschreibung || 'Was ist mangelhaft?'}
                       />
-                      <Input
-                        label="Beseitigung bis"
-                        type="date"
-                        value={punkt.mangel_frist?.slice(0, 10) ?? ''}
-                        onChange={(e) =>
-                          setPunkte((prev) =>
-                            prev.map((p) =>
-                              p.id === punkt.id
-                                ? { ...p, mangel_frist: e.target.value.trim() || null }
-                                : p
-                            )
-                          )
-                        }
-                      />
+                      <MockField label="Beseitigung bis">
+        <DateInput
+        value={punkt.mangel_frist?.slice(0, 10) ?? ''}
+        onChange={(e) =>
+        setPunkte((prev) =>
+        prev.map((p) =>
+        p.id === punkt.id
+        ? { ...p, mangel_frist: e.target.value.trim() || null }
+        : p
+        )
+        )
+        }
+      />
+      </MockField>
                     </>
                   ) : null}
                 </li>
@@ -787,7 +642,6 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Ergebnis">
         <MobileEditableBlock
           sheetTitle="Ergebnis bearbeiten"
-          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
@@ -808,14 +662,17 @@ export function AbnahmeprotokollCreateWizard({
   )
 
   const phaseAngaben = (
-    <div id="abnahme-sec-angaben" className="document-canvas-sec space-y-5">
+    <div
+      id="abnahme-sec-angaben"
+      data-doc-section="angaben"
+      className="document-canvas-sec space-y-5"
+    >
       <FieldCard title="Übergabe">
         <MobileEditableBlock
           sheetTitle="Übergabe bearbeiten"
-          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
-              <MobileOverviewField label="Datum" value={displayDeDatum(abnahmeDatum)} />
+              <MobileOverviewField label="Datum" value={abnahmeDatum || '—'} />
               <MobileOverviewField
                 label="Uhrzeit"
                 value={meta.uebergabe_uhrzeit ? `${meta.uebergabe_uhrzeit} Uhr` : '—'}
@@ -825,24 +682,26 @@ export function AbnahmeprotokollCreateWizard({
           }
         >
           <div className="space-y-3">
-            <Input
-              label="Übergabedatum"
-              type="date"
-              value={abnahmeDatum}
-              onChange={(e) => setAbnahmeDatum(e.target.value)}
-            />
-            <Input
-              label="Uhrzeit"
-              type="time"
-              value={meta.uebergabe_uhrzeit}
-              onChange={(e) => patchMeta({ uebergabe_uhrzeit: e.target.value })}
-            />
-            <Input
-              label="Übergabeort"
-              value={meta.uebergabe_ort}
-              onChange={(e) => patchMeta({ uebergabe_ort: e.target.value })}
-              placeholder="PLZ Ort / Stadtteil"
-            />
+            <MockField label="Übergabedatum">
+        <DateInput
+        value={abnahmeDatum}
+        onChange={(e) => setAbnahmeDatum(e.target.value)}
+      />
+      </MockField>
+            <MockField label="Uhrzeit">
+        <MockInput
+        type="time"
+        value={meta.uebergabe_uhrzeit}
+        onChange={(e) => patchMeta({ uebergabe_uhrzeit: e.target.value })}
+      />
+      </MockField>
+            <MockField label="Übergabeort">
+        <MockInput
+        value={meta.uebergabe_ort}
+        onChange={(e) => patchMeta({ uebergabe_ort: e.target.value })}
+        placeholder="PLZ Ort / Stadtteil"
+      />
+      </MockField>
           </div>
         </MobileEditableBlock>
       </FieldCard>
@@ -850,7 +709,6 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Personen">
         <MobileEditableBlock
           sheetTitle="Personen bearbeiten"
-          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField label="Handwerker vor Ort" value={meta.vertreter_an.trim() || '—'} />
@@ -866,23 +724,26 @@ export function AbnahmeprotokollCreateWizard({
           }
         >
           <div className="space-y-3">
-            <Input
-              label="Handwerker vor Ort"
-              value={meta.vertreter_an}
-              onChange={(e) => patchMeta({ vertreter_an: e.target.value })}
-              placeholder="Name"
-            />
-            <Input
-              label="Kunde vor Ort"
-              value={meta.ansprechpartner_kunde}
-              onChange={(e) => patchMeta({ ansprechpartner_kunde: e.target.value })}
-            />
-            <Input
-              label="Anwesend bei Übergabe"
-              value={meta.anwesend_uebergabe}
-              onChange={(e) => patchMeta({ anwesend_uebergabe: e.target.value })}
-              placeholder="Optional, dritte Unterschrift"
-            />
+            <MockField label="Handwerker vor Ort">
+        <MockInput
+        value={meta.vertreter_an}
+        onChange={(e) => patchMeta({ vertreter_an: e.target.value })}
+        placeholder="Name"
+      />
+      </MockField>
+            <MockField label="Kunde vor Ort">
+        <MockInput
+        value={meta.ansprechpartner_kunde}
+        onChange={(e) => patchMeta({ ansprechpartner_kunde: e.target.value })}
+      />
+      </MockField>
+            <MockField label="Anwesend bei Übergabe">
+        <MockInput
+        value={meta.anwesend_uebergabe}
+        onChange={(e) => patchMeta({ anwesend_uebergabe: e.target.value })}
+        placeholder="Optional, dritte Unterschrift"
+      />
+      </MockField>
           </div>
         </MobileEditableBlock>
       </FieldCard>
@@ -890,7 +751,6 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Bauvorhaben">
         <MobileEditableBlock
           sheetTitle="Bauvorhaben bearbeiten"
-          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
@@ -906,23 +766,25 @@ export function AbnahmeprotokollCreateWizard({
           }
         >
           <div className="space-y-3">
-            <Input
-              label="Projektbezeichnung"
-              value={meta.projektbezeichnung}
-              onChange={(e) => patchMeta({ projektbezeichnung: e.target.value })}
-            />
-            <Input
-              label="Projektadresse"
-              value={meta.projektadresse}
-              onChange={(e) => patchMeta({ projektadresse: e.target.value })}
-            />
+            <MockField label="Projektbezeichnung">
+        <MockInput
+        value={meta.projektbezeichnung}
+        onChange={(e) => patchMeta({ projektbezeichnung: e.target.value })}
+      />
+      </MockField>
+            <MockField label="Projektadresse">
+        <MockInput
+        value={meta.projektadresse}
+        onChange={(e) => patchMeta({ projektadresse: e.target.value })}
+      />
+      </MockField>
             <SheetEditableField
               label="Leistungsumfang (Kurz)"
               value={meta.leistungsumfang_kurz}
               onSave={(leistungsumfang_kurz) => patchMeta({ leistungsumfang_kurz })}
               multiline
               rows={14}
-              sheetContext="canvas"
+              sheetContext="detail"
               placeholder="Leistungsumfang…"
             />
           </div>
@@ -938,49 +800,52 @@ export function AbnahmeprotokollCreateWizard({
           className="hidden"
           onChange={(e) => void uploadFotos(e.target.files)}
         />
-        <Button
+        <MockBtn
           type="button"
-          variant="secondary"
-          size="sm"
+          kind="secondary" sm
           className="gap-1.5"
-          disabled={uploading || meta.uebergabe_foto_urls.length >= 8}
+          disabled={uploading || meta.uebergabe_foto_urls.length >= 4}
           onClick={() => fileRef.current?.click()}
         >
-          <Plus className="h-3.5 w-3.5" />
+          <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" />
           {uploading ? 'Lädt…' : 'Fotos hinzufügen'}
-        </Button>
+        </MockBtn>
+<<<<<<< Updated upstream
+=======
         <p className="mt-1.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
           Max. 8 Fotos · erscheinen im PDF unter „Vor-Ort“
         </p>
+>>>>>>> Stashed changes
         {meta.uebergabe_foto_urls.length > 0 ? (
           <div className="mt-3 space-y-3">
             {meta.uebergabe_foto_urls.map((url, i) => (
               <div
                 key={url}
-                className="flex flex-col gap-2 rounded-xl border border-bw-border p-2 sm:flex-row sm:items-start"
+                className="flex flex-col gap-2 rounded-sheet border border-bw-border p-2 sm:flex-row sm:items-start"
               >
                 <button
                   type="button"
-                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-bw-border"
-                  title="Entfernen"
+                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-card border border-bw-border"
+                  title="Löschen"
                   onClick={() => removeFoto(url)}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="" className="h-full w-full object-cover" />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <Input
-                    label={`Beschriftung Foto ${i + 1}`}
-                    value={meta.uebergabe_foto_captions[i] ?? ''}
-                    onChange={(e) => setFotoCaption(i, e.target.value)}
-                    placeholder="z. B. Ansicht Südseite"
-                  />
+                  <MockField label={`Beschriftung Foto ${i + 1}`}>
+                    <MockInput
+                      value={meta.uebergabe_foto_captions[i] ?? ''}
+                      onChange={(e) => setFotoCaption(i, e.target.value)}
+                      placeholder="z. B. Ansicht Südseite"
+                    />
+                  </MockField>
                   <button
                     type="button"
                     className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted underline"
                     onClick={() => removeFoto(url)}
                   >
-                    Entfernen
+                    Löschen
                   </button>
                 </div>
               </div>
@@ -994,7 +859,6 @@ export function AbnahmeprotokollCreateWizard({
       <FieldCard title="Unterschriften">
         <MobileEditableBlock
           sheetTitle="Unterschriften bearbeiten"
-          sheetContext="canvas"
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
@@ -1020,59 +884,47 @@ export function AbnahmeprotokollCreateWizard({
               <MobileOverviewField
                 label="Ort/Datum"
                 value={
-                  displayDeDatum(
-                    meta.unterschrift_ort_datum_an.trim() ||
-                      meta.unterschrift_ort_datum_ag.trim() ||
-                      ''
-                  )
+                  meta.unterschrift_ort_datum_an.trim() ||
+                  meta.unterschrift_ort_datum_ag.trim() ||
+                  '—'
                 }
               />
-              {meta.ohne_unterschrift ? (
-                <MobileOverviewField label="Modus" value="Ohne Unterschrift" />
-              ) : null}
             </dl>
           }
         >
           <div className="space-y-6">
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-bw-border bg-[var(--bg-2,var(--card))] p-3">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 shrink-0"
-                checked={Boolean(meta.ohne_unterschrift)}
-                onChange={(e) => patchMeta({ ohne_unterschrift: e.target.checked })}
-              />
-              <span className="min-w-0">
-                <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">
-                  PDF ohne Unterschrift erstellen
-                </span>
-              </span>
-            </label>
+            <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+              Name und Unterschrift wie vor Ort — erscheint im PDF unter Auftragnehmer /
+              Auftraggeber. Ort/Datum leer = aus Übergabe.
+            </p>
 
             <div className="space-y-3">
               <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
                 Auftragnehmer (Handwerker)
               </p>
-              <Input
-                label="Name"
-                value={meta.hw_unterschrift_name ?? meta.vertreter_an ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value
-                  patchMeta({
-                    hw_unterschrift_name: v,
-                    vertreter_an: v.trim() || meta.vertreter_an,
-                  })
-                }}
-                placeholder="Vor- und Nachname"
-                required={!meta.ohne_unterschrift}
-              />
-              <Input
-                label="Ort, Datum"
-                value={meta.unterschrift_ort_datum_an}
-                onChange={(e) => patchMeta({ unterschrift_ort_datum_an: e.target.value })}
-                placeholder={
-                  defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-                }
-              />
+              <MockField label="Name">
+        <MockInput
+        value={meta.hw_unterschrift_name ?? meta.vertreter_an ?? ''}
+        onChange={(e) => {
+        const v = e.target.value
+        patchMeta({
+        hw_unterschrift_name: v,
+        vertreter_an: v.trim() || meta.vertreter_an,
+        })
+        }}
+        placeholder="Vor- und Nachname"
+        required
+      />
+      </MockField>
+              <MockField label="Ort, Datum">
+        <MockInput
+        value={meta.unterschrift_ort_datum_an}
+        onChange={(e) => patchMeta({ unterschrift_ort_datum_an: e.target.value })}
+        placeholder={
+        defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
+        }
+      />
+      </MockField>
               <SignatureCanvas
                 initialDataUrl={meta.signature_hw_url}
                 onChange={(has, dataUrl) => {
@@ -1085,32 +937,34 @@ export function AbnahmeprotokollCreateWizard({
               <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
                 Auftraggeber (Kunde)
               </p>
-              <Input
-                label="Name"
-                value={
-                  meta.kunde_unterschrift_name ??
-                  meta.ansprechpartner_kunde ??
-                  kundeName ??
-                  ''
-                }
-                onChange={(e) => {
-                  const v = e.target.value
-                  patchMeta({
-                    kunde_unterschrift_name: v,
-                    ansprechpartner_kunde: v.trim() || meta.ansprechpartner_kunde,
-                  })
-                }}
-                placeholder="Vor- und Nachname des Kunden"
-                required={!meta.ohne_unterschrift}
-              />
-              <Input
-                label="Ort, Datum"
-                value={meta.unterschrift_ort_datum_ag}
-                onChange={(e) => patchMeta({ unterschrift_ort_datum_ag: e.target.value })}
-                placeholder={
-                  defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-                }
-              />
+              <MockField label="Name">
+        <MockInput
+        value={
+        meta.kunde_unterschrift_name ??
+        meta.ansprechpartner_kunde ??
+        kundeName ??
+        ''
+        }
+        onChange={(e) => {
+        const v = e.target.value
+        patchMeta({
+        kunde_unterschrift_name: v,
+        ansprechpartner_kunde: v.trim() || meta.ansprechpartner_kunde,
+        })
+        }}
+        placeholder="Vor- und Nachname des Kunden"
+        required
+      />
+      </MockField>
+              <MockField label="Ort, Datum">
+        <MockInput
+        value={meta.unterschrift_ort_datum_ag}
+        onChange={(e) => patchMeta({ unterschrift_ort_datum_ag: e.target.value })}
+        placeholder={
+        defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
+        }
+      />
+      </MockField>
               <SignatureCanvas
                 initialDataUrl={meta.signature_kunde_url}
                 onChange={(has, dataUrl) => {
@@ -1123,22 +977,22 @@ export function AbnahmeprotokollCreateWizard({
               <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
                 Anwesend (optional)
               </p>
-              <Input
-                label="Ort, Datum"
-                value={meta.unterschrift_ort_datum_anwesend}
-                onChange={(e) =>
-                  patchMeta({ unterschrift_ort_datum_anwesend: e.target.value })
-                }
-                placeholder={
-                  defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
-                }
-              />
+              <MockField label="Ort, Datum">
+        <MockInput
+        value={meta.unterschrift_ort_datum_anwesend}
+        onChange={(e) =>
+        patchMeta({ unterschrift_ort_datum_anwesend: e.target.value })
+        }
+        placeholder={
+        defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) || 'Ort, Datum'
+        }
+      />
+      </MockField>
             </div>
 
-            <Button
+            <MockBtn
               type="button"
-              variant="ghost"
-              size="sm"
+              kind="ghost" sm
               onClick={() => {
                 const fallback = defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum)
                 patchMeta({
@@ -1149,7 +1003,7 @@ export function AbnahmeprotokollCreateWizard({
               }}
             >
               Ort/Datum aus Übergabe setzen
-            </Button>
+            </MockBtn>
           </div>
         </MobileEditableBlock>
       </FieldCard>
@@ -1157,65 +1011,63 @@ export function AbnahmeprotokollCreateWizard({
   )
 
   const footerActions = (
-    <div className="abnahme-canvas-footer">
-      <div className="abnahme-canvas-footer__start">
-        {activeSection !== 'checkliste' ? (
-          <button
-            type="button"
-            className="btn abnahme-canvas-footer__nav"
-            disabled={interactionBusy}
-            onClick={() =>
-              goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
-            }
-          >
-            Zurück
-          </button>
-        ) : null}
-        {canDiscardEntwurf && sessionProtokollId ? (
-          <button
-            type="button"
-            className="btn abnahme-canvas-footer__nav abnahme-canvas-footer__discard"
-            disabled={interactionBusy}
-            onClick={() => void handleDiscard()}
-          >
-            <Trash2 className="h-4 w-4" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-            Verwerfen
-          </button>
-        ) : activeSection === 'checkliste' ? (
-          <span className="abnahme-canvas-footer__spacer" aria-hidden />
-        ) : null}
-      </div>
-      <div className="abnahme-canvas-footer__end">
-        {activeSection !== 'pruefen' ? (
-          <button
-            type="button"
-            className="btn primary abnahme-canvas-footer__primary"
-            disabled={interactionBusy}
-            onClick={() => goSection(activeSection === 'checkliste' ? 'angaben' : 'pruefen')}
-          >
-            Weiter
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="btn primary abnahme-canvas-footer__primary"
-            disabled={interactionBusy || previewBusy}
-            onClick={() => erstellen({ send: true })}
-          >
-            {sendBusy ? 'Wird gesendet…' : 'An Kunden senden'}
-          </button>
-        )}
-      </div>
+    <div className="flex flex-wrap gap-2">
+      {activeSection !== 'checkliste' ? (
+        <MockBtn
+          type="button"
+          kind="secondary"
+          sm
+          disabled={pending}
+          onClick={() =>
+            goSection(activeSection === 'pruefen' ? 'angaben' : 'checkliste')
+          }
+        >
+          Zurück
+        </MockBtn>
+      ) : null}
+      {activeSection !== 'pruefen' ? (
+        <MockBtn
+          type="button"
+          kind="primary"
+          sm
+          disabled={pending}
+          onClick={() => goSection(activeSection === 'checkliste' ? 'angaben' : 'pruefen')}
+        >
+          Weiter
+        </MockBtn>
+      ) : (
+        <MockBtn
+          type="button"
+          kind="secondary"
+          sm
+          className="gap-1.5"
+          loading={previewBusy}
+          disabled={pending}
+          onClick={() => void vorschauPdf()}
+        >
+          <MockIcon n="eye" ctx="default" className="h-4 w-4" />
+          Vorschau
+        </MockBtn>
+      )}
     </div>
   )
 
   const phasePruefen = (
-    <div id="abnahme-sec-pruefen" className="document-canvas-sec space-y-5">
+    <div
+      id="abnahme-sec-pruefen"
+      data-doc-section="pruefen"
+      className="document-canvas-sec space-y-5"
+    >
+      <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+        {hasSignatur
+          ? 'Vorschau prüfen — Speichern schließt den Auftrag ab. „Speichern und senden“ schickt das PDF zusätzlich an den Kunden.'
+          : 'Beide Unterschriften (Auftragnehmer + Auftraggeber: Name und Zeichnung) setzen für Abschluss — oder ohne Signatur speichern / speichern und senden.'}
+      </p>
       <FieldCard title="Zusammenfassung">
         <dl className="space-y-2.5">
           <MobileOverviewField
             label="Übergabe"
-            value={`${displayDeDatum(abnahmeDatum)}${meta.uebergabe_uhrzeit ? ` · ${meta.uebergabe_uhrzeit} Uhr` : ''} · ${meta.uebergabe_ort || '—'}`}
+            value={`${abnahmeDatum}${meta.uebergabe_uhrzeit ? ` · ${meta.uebergabe_uhrzeit} Uhr` : ''} · ${meta.uebergabe_ort || '—'}`}
           />
           <MobileOverviewField label="Handwerker vor Ort" value={meta.vertreter_an || '—'} />
           <MobileOverviewField label="Projekt" value={meta.projektbezeichnung || '—'} />
@@ -1229,11 +1081,7 @@ export function AbnahmeprotokollCreateWizard({
             label="Mängel"
             value={
               maengelListe.length
-                ? `${maengelListe.length}${
-                    meta.maengel_beseitigung_spaetestens.trim()
-                      ? ` · ${displayDeDatum(meta.maengel_beseitigung_spaetestens)}`
-                      : ''
-                  }`
+                ? `${maengelListe.length}${meta.maengel_beseitigung_spaetestens.trim() ? ` · ${meta.maengel_beseitigung_spaetestens.trim()}` : ''}`
                 : 'Keine'
             }
           />
@@ -1260,34 +1108,8 @@ export function AbnahmeprotokollCreateWizard({
           placeholder="Rechtshinweise…"
         />
       </FieldCard>
+      <div className="hidden sm:block">{footerActions}</div>
     </div>
-  )
-
-  const headerEnd = (
-    <>
-      {activeSection === 'pruefen' ? (
-        <button
-          type="button"
-          className="editor-sheet__icon-btn"
-          disabled={interactionBusy || previewBusy}
-          onClick={() => void vorschauPdf()}
-          aria-label="PDF-Vorschau"
-          title="PDF-Vorschau"
-        >
-          <Eye className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className={cn('editor-sheet__confirm', interactionBusy && 'opacity-50')}
-        disabled={interactionBusy}
-        onClick={() => void handleSaveDraftOnly()}
-        aria-label="Entwurf speichern"
-        title="Entwurf speichern"
-      >
-        <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-      </button>
-    </>
   )
 
   return (
@@ -1297,10 +1119,47 @@ export function AbnahmeprotokollCreateWizard({
       manageHistory={false}
       title="Abnahme"
       subtitle={subtitle || undefined}
-      onClose={() => void handleClose()}
-      headerEnd={headerEnd}
+      onClose={onClose}
+      onSaveDraftClose={() => erstellen({ abschliessen: false })}
       draftDirty={draftDirty}
-      saveBusy={interactionBusy}
+      lastSavedAt={lastSavedAt}
+      sections={
+        [
+          {
+            id: 'checkliste',
+            label: 'Checkliste',
+            complete: progress.total > 0 && progress.done >= progress.total,
+          },
+          {
+            id: 'angaben',
+            label: 'Angaben',
+            complete: Boolean(abnahmeDatum.trim()),
+          },
+          {
+            id: 'pruefen',
+            label: 'Prüfen',
+            complete: hasSignatur,
+          },
+        ] satisfies DocCanvasSection[]
+      }
+      draftAction={{
+        label: COPY_BUTTON.entwurfSpeichern,
+        onClick: () => erstellen({ abschliessen: false }),
+        busy: pending,
+        disabled: previewBusy,
+      }}
+      primaryAction={{
+        label: 'Abnehmen',
+        onClick: () => erstellen({ abschliessen: true }),
+        busy: pending,
+        disabled: previewBusy,
+        getGaps: () => {
+          const gaps: { id: string; label: string }[] = []
+          if (!abnahmeDatum.trim()) gaps.push({ id: 'angaben', label: 'Abnahmedatum' })
+          if (!hasSignatur) gaps.push({ id: 'pruefen', label: 'Unterschriften' })
+          return gaps
+        },
+      }}
       footerCta={footerActions}
       className="wizard-flow abnahme-canvas"
     >
@@ -1325,12 +1184,10 @@ export function AbnahmeprotokollCreateWizard({
         </div>
       ) : null}
 
-      <div className="abnahme-canvas-card">
-        <div className="abnahme-canvas-card__head">
-          <h2 className="abnahme-canvas-card__title">Abnahmeprotokoll</h2>
-          <span className="badge warten">
-            {sessionProtokollId || isEdit ? 'Entwurf' : 'Offen'}
-          </span>
+      <div className="abnahme-canvas">
+        <div className="abnahme-canvas__head">
+          <h2 className="abnahme-canvas__title">Abnahmeprotokoll</h2>
+          <span className="badge warten">{freigabeBadgeLabel}</span>
         </div>
 
         <nav className="stepper abnahme-canvas-stepper" aria-label="Abnahme-Schritte">
@@ -1343,6 +1200,7 @@ export function AbnahmeprotokollCreateWizard({
                 <button
                   type="button"
                   className={cn('step', active && 'active', done && 'done')}
+                  data-doc-section={s.id}
                   onClick={() => goSection(s.id)}
                 >
                   <span className="step-n">{done ? '✓' : i + 1}</span>
@@ -1355,47 +1213,27 @@ export function AbnahmeprotokollCreateWizard({
 
         <AbnahmeProgressBar done={progress.done} total={progress.total} />
 
-        {pending || uploading || previewBusy || draftSaving || sendBusy ? (
+        {pending || uploading || previewBusy ? (
           <p className="abnahme-canvas-busy">
-            {sendBusy
-              ? 'Abnahme wird an Kunden gesendet…'
-              : draftSaving
-                ? 'Entwurf wird gespeichert…'
-                : pending
-                  ? 'Erzeugt PDF…'
-                  : previewBusy
-                    ? 'Vorschau…'
-                    : 'Lädt Fotos…'}
+            {pending ? 'Erzeugt PDF…' : previewBusy ? 'Vorschau…' : 'Lädt Fotos…'}
           </p>
         ) : null}
 
-        <div className="abnahme-canvas-card__body">
+        <div className="abnahme-canvas__body">
           {activeSection === 'checkliste' ? phaseCheckliste : null}
           {activeSection === 'angaben' ? phaseAngaben : null}
           {activeSection === 'pruefen' ? phasePruefen : null}
         </div>
       </div>
     </DocumentCanvas>
-
     <ConfirmPopup
-      open={closeConfirmOpen}
-      onClose={() => setCloseConfirmOpen(false)}
-      title="Entwurf speichern?"
-      cancelLabel="Weiter bearbeiten"
-      discardLabel="Verwerfen & schließen"
-      saveDraftLabel="Erneut speichern"
-      danger
-      onConfirm={() => {
-        void handleDiscard()
-      }}
-      onSaveDraft={() => {
-        setCloseConfirmOpen(false)
-        void handleClose()
-      }}
-    >
-      Speichern ist fehlgeschlagen. Entwurf erneut speichern oder verwerfen (Fotos/Mängel gehen
-      dann verloren).
-    </ConfirmPopup>
+      open={zwischen.promptOpen}
+      title={zwischen.promptTitle}
+      confirmLabel={CONFIRM.restoreDraft}
+      cancelLabel={CONFIRM.restoreDecline}
+      onConfirm={zwischen.acceptRestore}
+      onClose={zwischen.declineRestore}
+    />
     </>
   )
 }

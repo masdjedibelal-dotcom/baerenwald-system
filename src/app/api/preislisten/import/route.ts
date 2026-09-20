@@ -1,4 +1,5 @@
-import { revalidatePath } from 'next/cache'
+import { revalidatePreislistenList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import Papa from 'papaparse'
 import { createClient } from '@/lib/supabase-server'
@@ -98,6 +99,7 @@ export async function POST(req: Request) {
   )
 
   const { data: gewRows, error: gewErr } = await supabase.from('gewerke').select('id, slug, name')
+  if (gewErr) logDbError('app/api/preislisten/import/route:gewerke', gewErr)
   if (gewErr || !gewRows?.length) {
     return NextResponse.json({ error: gewErr?.message ?? 'Gewerke nicht ladbar' }, { status: 500 })
   }
@@ -107,6 +109,7 @@ export async function POST(req: Request) {
   const { data: existingRows, error: exErr } = await supabase
     .from('preislisten')
     .select('gewerk_id, leistung')
+  if (exErr) logDbError('app/api/preislisten/import/route:preislisten', exErr)
   if (exErr) {
     return NextResponse.json({ error: exErr.message }, { status: 500 })
   }
@@ -170,6 +173,7 @@ export async function POST(req: Request) {
       preis_min: preisRaw,
       aktiv: true,
     })
+    if (insErr) logDbError('app/api/preislisten/import/route:preislisten', insErr)
 
     if (insErr) {
       fehler.push({ zeile, grund: insErr.message })
@@ -181,7 +185,7 @@ export async function POST(req: Request) {
   }
 
   if (importiert > 0) {
-    revalidatePath('/preislisten')
+    revalidatePreislistenList()
   }
 
   const body: PreislistenImportResponse = { importiert, uebersprungen, fehler }

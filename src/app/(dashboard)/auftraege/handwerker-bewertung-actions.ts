@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import type { HandwerkerBewertungWerte } from '@/lib/handwerker/bewertung-kategorien'
 import { istHandwerkerBewertungVollstaendig } from '@/lib/handwerker/bewertung-kategorien'
@@ -41,6 +47,7 @@ export async function loadHandwerkerBewertungenFuerAuftrag(
       'id, handwerker_id, gewerk_id, qualitaet, termintreue, sauberkeit, kommunikation, preis_leistung, notiz, updated_at'
     )
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/handwerker-bewertung-actions:handwerker_bewertungen', error)
 
   if (error) return { ok: false, message: error.message }
   return { ok: true, bewertungen: (data ?? []).map((r) => mapRow(r as Record<string, unknown>)) }
@@ -60,6 +67,7 @@ export async function saveHandwerkerBewertungen(
     .select('id, status')
     .eq('id', auftragId)
     .maybeSingle()
+  if (aErr) logDbError('app/auftraege/handwerker-bewertung-actions:auftraege', aErr)
 
   if (aErr || !auftrag) return { ok: false, message: 'Auftrag nicht gefunden' }
   if (auftrag.status !== 'abgeschlossen') {
@@ -68,7 +76,7 @@ export async function saveHandwerkerBewertungen(
 
   const valide = eingaben.filter((e) => istHandwerkerBewertungVollstaendig(e))
   if (!valide.length) {
-    return { ok: false, message: 'Bitte für mindestens einen Handwerker alle 5 Kategorien bewerten.' }
+    return { ok: false, message: 'Bitte für mindestens einen Partner alle 5 Kategorien bewerten.' }
   }
 
   const now = new Date().toISOString()
@@ -91,13 +99,13 @@ export async function saveHandwerkerBewertungen(
       },
       { onConflict: 'handwerker_id,auftrag_id' }
     )
+    if (error) logDbError('app/auftraege/handwerker-bewertung-actions:handwerker_bewertungen', error)
     if (error) return { ok: false, message: error.message }
     gespeichert++
-    revalidatePath(`/handwerker/${e.handwerkerId}`)
+    revalidateHandwerkerDetail(e.handwerkerId)
   }
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/handwerker')
+  revalidateAuftragDetail(auftragId)
   return { ok: true, gespeichert }
 }
 
@@ -125,6 +133,7 @@ export async function loadHandwerkerBewertungZiele(
     .from('auftrag_handwerker')
     .select('handwerker_id, gewerk_id, handwerker(id, name, firma), gewerke(id, name)')
     .eq('auftrag_id', id)
+  if (ahErr) logDbError('app/auftraege/handwerker-bewertung-actions:auftrag_handwerker', ahErr)
 
   if (ahErr) return { ok: false, message: ahErr.message }
 
@@ -158,10 +167,11 @@ export async function loadHandwerkerBewertungZiele(
   }
 
   if (map.size === 0) {
-    const { data: pos } = await supabase
+    const { data: pos, error } = await supabase
       .from('auftrag_positionen')
       .select('handwerker_id, gewerk_name, handwerker(id, name, firma)')
       .eq('auftrag_id', id)
+    if (error) logDbError('app/auftraege/handwerker-bewertung-actions:auftrag_positionen', error)
     for (const p of pos ?? []) {
       const hwRaw = p.handwerker
       const hw = (Array.isArray(hwRaw) ? hwRaw[0] : hwRaw) as

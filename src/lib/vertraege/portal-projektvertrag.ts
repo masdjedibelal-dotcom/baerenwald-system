@@ -1,4 +1,10 @@
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { bauvorhabenAusAuftrag, leistungsumfangAusPositionen, verguetungAusPositionen } from '@/lib/vertraege/build-vertrag-texte'
 import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'
@@ -7,6 +13,7 @@ import {
   letzterHauptvertrag,
   offeneErgaenzungFuerPortal,
 } from '@/lib/vertraege/portal-vertrag-helpers'
+import { writeHandwerkerVertragStatus } from '@/lib/status/write-handwerker-vertrag-status'
 import type { HandwerkerVertragRow, ProjektVertragWizardMeta } from '@/lib/vertraege/types'
 import type { AuftragPosition } from '@/lib/types'
 
@@ -48,13 +55,14 @@ async function vertraegeFuerZuordnung(
   auftragId: string,
   handwerkerId: string
 ): Promise<HandwerkerVertragRow[]> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('handwerker_vertraege')
     .select('*')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .eq('typ', 'projekt')
     .order('created_at', { ascending: false })
+  if (error) logDbError('lib/vertraege/portal-projektvertrag:handwerker_vertraege', error)
   return (data ?? []) as HandwerkerVertragRow[]
 }
 
@@ -62,16 +70,17 @@ export async function loadPortalProjektvertragPreview(
   auftragId: string,
   handwerkerId: string
 ): Promise<{ ok: true; preview: PortalProjektvertragPreview } | { ok: false; message: string }> {
-  const { data: zuordnung } = await supabaseAdmin
+  const { data: zuordnung, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('id, projektvertrag_bestaetigt_am, gewerke(name)')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('lib/vertraege/portal-projektvertrag:auftrag_handwerker', error)
 
   if (!zuordnung) return { ok: false, message: 'Keine Zuordnung zu diesem Auftrag.' }
 
-  const { data: auf, error } = await supabaseAdmin
+  const { data: auf, error: error2 } = await supabaseAdmin
     .from('auftraege')
     .select(
       `
@@ -82,8 +91,9 @@ export async function loadPortalProjektvertragPreview(
     )
     .eq('id', auftragId)
     .maybeSingle()
+  if (error2) logDbError('lib/vertraege/portal-projektvertrag:auftraege', error2)
 
-  if (error || !auf) return { ok: false, message: error?.message ?? 'Auftrag nicht gefunden' }
+  if (error2 || !auf) return { ok: false, message: error2?.message ?? 'Auftrag nicht gefunden' }
 
   const gewerk = unwrapJoin(
     (zuordnung as { gewerke?: { name: string } | { name: string }[] | null }).gewerke
@@ -183,12 +193,13 @@ async function confirmPortalErgaenzung(
 
   const signiertAm = new Date().toISOString()
 
-  await supabaseAdmin
-    .from('handwerker_vertraege')
-    .update({ status: 'unterschrieben', signiert_am: signiertAm, updated_at: signiertAm })
-    .eq('id', ergaenzung.id)
+  const { error: __dbErr1 } = await writeHandwerkerVertragStatus(supabaseAdmin, ergaenzung.id, 'unterschrieben', {
+    signiert_am: signiertAm,
+    updated_at: signiertAm,
+  })
+  if (__dbErr1) logDbError('lib/vertraege/portal-projektvertrag:handwerker_vertraege', __dbErr1)
 
-  await supabaseAdmin
+  const { error: __dbErr2 } = await supabaseAdmin
     .from('auftrag_handwerker')
     .update({
       projektvertrag_bestaetigt_am: signiertAm,
@@ -196,9 +207,10 @@ async function confirmPortalErgaenzung(
     })
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
+  if (__dbErr2) logDbError('lib/vertraege/portal-projektvertrag:auftrag_handwerker', __dbErr2)
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath(`/handwerker/${handwerkerId}`)
+  revalidateAuftragDetail(auftragId)
+  revalidateHandwerkerDetail(handwerkerId)
 
   return {
     ok: true,
@@ -232,12 +244,13 @@ export async function confirmPortalProjektvertrag(
     }
   }
 
-  const { data: zuordnung } = await supabaseAdmin
+  const { data: zuordnung, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('id, gewerk_id, gewerke(name)')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('lib/vertraege/portal-projektvertrag:auftrag_handwerker', error)
   if (!zuordnung) return { ok: false, message: 'Keine Zuordnung.' }
 
   const gewerk = unwrapJoin(
@@ -246,11 +259,12 @@ export async function confirmPortalProjektvertrag(
   const gewerkName = gewerk?.name ?? ''
   const gewerkId = (zuordnung as { gewerk_id?: string | null }).gewerk_id ?? null
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error: error2 } = await supabaseAdmin
     .from('auftraege')
     .select('id, titel, kunden(plz, ort, adresse, strasse, hausnummer), auftrag_positionen(*)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error2) logDbError('lib/vertraege/portal-projektvertrag:auftraege', error2)
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
 
   const positionen = (auf.auftrag_positionen ?? []) as AuftragPosition[]
@@ -313,6 +327,7 @@ export async function confirmPortalProjektvertrag(
 
   if (vertragId) {
     const { error } = await supabaseAdmin.from('handwerker_vertraege').update(row).eq('id', vertragId)
+    if (error) logDbError('lib/vertraege/portal-projektvertrag:handwerker_vertraege', error)
     if (error) return { ok: false, message: error.message }
   } else {
     vertragsNr = await nextVertragsnummer(supabaseAdmin, 'projekt')
@@ -326,6 +341,7 @@ export async function confirmPortalProjektvertrag(
       })
       .select('id, vertrags_nr')
       .single()
+    if (error) logDbError('lib/vertraege/portal-projektvertrag:handwerker_vertraege', error)
     if (error || !ins) return { ok: false, message: error?.message ?? 'Vertrag anlegen fehlgeschlagen' }
     vertragId = ins.id as string
     vertragsNr = ins.vertrags_nr as string
@@ -335,12 +351,12 @@ export async function confirmPortalProjektvertrag(
   if (!pdf.ok) return pdf
 
   const signiertAm = new Date().toISOString()
-  await supabaseAdmin
-    .from('handwerker_vertraege')
-    .update({ status: 'unterschrieben', signiert_am: signiertAm })
-    .eq('id', vertragId)
+  const { error: __dbErr3 } = await writeHandwerkerVertragStatus(supabaseAdmin, vertragId, 'unterschrieben', {
+    signiert_am: signiertAm,
+  })
+  if (__dbErr3) logDbError('lib/vertraege/portal-projektvertrag:handwerker_vertraege', __dbErr3)
 
-  await supabaseAdmin
+  const { error: __dbErr4 } = await supabaseAdmin
     .from('auftrag_handwerker')
     .update({
       projektvertrag_bestaetigt_am: signiertAm,
@@ -348,9 +364,10 @@ export async function confirmPortalProjektvertrag(
     })
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
+  if (__dbErr4) logDbError('lib/vertraege/portal-projektvertrag:auftrag_handwerker', __dbErr4)
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath(`/handwerker/${handwerkerId}`)
+  revalidateAuftragDetail(auftragId)
+  revalidateHandwerkerDetail(handwerkerId)
 
   return {
     ok: true,

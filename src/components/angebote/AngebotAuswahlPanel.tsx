@@ -1,13 +1,14 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openDeleteConfirm, openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
-import { AngebotStatusBadge } from '@/components/ui/AngebotStatusBadge'
-import { ActionsMenu, type ActionsMenuItem } from '@/components/ui/actions-menu'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import type { EntityMenuItem } from '@/lib/entity-menu'
 import { deleteAngebot } from '@/app/(dashboard)/angebote/actions'
 import {
   loadAngebotWizardBootstrap,
@@ -20,9 +21,7 @@ import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels
 import { findeNeuestenEntwurf } from '@/lib/angebote/angebot-lebenszyklus'
 import { ANGEBOT_STATUS_LABELS, formatRelativeDate } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
-import { confirmAction } from '@/components/ui/confirm-action'
-import { confirmDelete } from '@/components/ui/confirm-delete'
-
+import { TOAST } from '@/lib/copy'
 export type AngebotAuswahlZeile = {
   id: string
   status: string
@@ -74,7 +73,7 @@ export function AngebotAuswahlPanel({
       const nr =
         offenerEntwurf.angebotsnr?.trim() ||
         `AN-${offenerEntwurf.id.slice(0, 8).toUpperCase()}`
-      confirmAction({
+      openActionConfirm({
         title: 'Neues Angebot anlegen?',
         body: `Es gibt bereits einen offenen Entwurf (${nr}). Wirklich ein neues Angebot anlegen? Der Entwurf wird dabei als „Ersetzt“ markiert, sobald das neue Angebot gespeichert wird.`,
         confirmLabel: 'Neues Angebot',
@@ -94,7 +93,7 @@ export function AngebotAuswahlPanel({
       const res = await loadAngebotWizardBootstrap(angebotId, leadId)
       setLoadingId(null)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       onClose?.()
@@ -112,7 +111,7 @@ export function AngebotAuswahlPanel({
   }
 
   function handleLoeschen(angebotId: string) {
-    confirmDelete('Angebot löschen?', async () => {
+    openDeleteConfirm('Angebot löschen?', async () => {
       setLoadingId(angebotId)
       try {
         const r = await deleteAngebot(angebotId)
@@ -120,8 +119,8 @@ export function AngebotAuswahlPanel({
           toast.error(r.error)
           throw new Error(r.error)
         }
-        toast.success('Angebot gelöscht')
-        router.refresh()
+        toast.success(TOAST.angebot_geloescht)
+        afterServerActionRefresh()
       } finally {
         setLoadingId(null)
       }
@@ -134,7 +133,7 @@ export function AngebotAuswahlPanel({
       const res = await loadAngebotWizardBootstrapKopie(angebotId, leadId)
       setLoadingId(null)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       onClose?.()
@@ -142,12 +141,12 @@ export function AngebotAuswahlPanel({
     })
   }
 
-  function menuItems(a: AngebotAuswahlZeile): ActionsMenuItem[] {
+  function menuItems(a: AngebotAuswahlZeile): EntityMenuItem[] {
     const bearbeitbar = angebotDarfImWizardBearbeitetWerden(a.status)
-    const items: ActionsMenuItem[] = [
+    const items: EntityMenuItem[] = [
       {
         label: 'Öffnen',
-        icon: <MockIcon ctx="btn" n="eye" size={15} />,
+        icon: 'eye',
         onClick: () => {
           onClose?.()
           router.push(`/angebote/${a.id}`)
@@ -158,20 +157,20 @@ export function AngebotAuswahlPanel({
     if (bearbeitbar) {
       items.push({
         label: a.status === 'entwurf' ? 'Weiterbearbeiten' : 'Bearbeiten',
-        icon: <MockIcon ctx="btn" n="pencil" size={15} />,
+        icon: 'pencil',
         onClick: () => openBearbeiten(a.id),
       })
     }
 
     items.push({
       label: 'Kopieren',
-      icon: <MockIcon ctx="btn" n="copy" size={15} />,
+      icon: 'copy',
       onClick: () => handleKopieren(a.id),
     })
 
     items.push('sep', {
       label: 'Löschen',
-      icon: <MockIcon ctx="btn" n="trash" size={15} />,
+      icon: 'trash',
       danger: true,
       onClick: () => handleLoeschen(a.id),
     })
@@ -182,7 +181,7 @@ export function AngebotAuswahlPanel({
   return (
     <div className="space-y-4">
       {rows.length === 0 ? (
-        <p className="m-0 rounded-xl border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
+        <p className="m-0 rounded-sheet border border-dashed border-bw-border bg-[var(--app-card)] px-4 py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
           Noch keine Angebote zu dieser Anfrage.
         </p>
       ) : (
@@ -194,17 +193,12 @@ export function AngebotAuswahlPanel({
 
             return (
               <li key={a.id} className="flex items-center gap-2 px-3 py-2.5">
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left shadow-none"
-                  disabled={pending}
-                  onClick={() => openRow(a)}
-                >
+                <MockBtn className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left shadow-none" type="button" disabled={pending} onClick={() => openRow(a)}>
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
                       {nr}
                     </span>
-                    <AngebotStatusBadge status={a.status} />
+                    <StatusBadge status={a.status} />
                   </span>
                   <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
                     {a.created_at ? formatRelativeDate(a.created_at) : '—'}
@@ -212,28 +206,14 @@ export function AngebotAuswahlPanel({
                     {' · '}
                     {formatAngebotEurKurzBrutto(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                   </span>
-                </button>
+                </MockBtn>
                 <div className="shrink-0">
                   {loading ? (
                     <span className="inline-flex p-2" aria-busy="true">
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      <span className="page-loading__spinner page-loading__spinner--sm" aria-hidden />
                     </span>
                   ) : (
-                    <ActionsMenu
-                      align="right"
-                      trigger={
-                        <button
-                          type="button"
-                          className="editor-sheet__icon-btn"
-                          disabled={pending}
-                          aria-label="Aktionen"
-                          title="Aktionen"
-                        >
-                          <MockIcon ctx="default" n="dots" size={18} />
-                        </button>
-                      }
-                      items={menuItems(a)}
-                    />
+                    <MockEntityRowMenu items={menuItems(a)} title="Aktionen" />
                   )}
                 </div>
               </li>

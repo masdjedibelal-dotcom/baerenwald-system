@@ -2,6 +2,7 @@
  * Melde-Aushang-PDF (einseitig) — HV-Objekt oder ganze HV, QR, Branding.
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import QRCode from 'qrcode'
 import { renderHtmlToPdfBuffer } from '@/lib/angebote/render-angebot-html-pdf'
 import {
@@ -12,10 +13,11 @@ import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 import { buildAushangHtml, type AushangHtmlInput } from '@/lib/templates/aushang-template'
+import { C } from '@/lib/tokens/colors'
 
 export type RenderAushangResult =
   | { ok: true; buffer: Buffer; filename: string; meldeUrl: string }
-  | { ok: false; message: string }
+| { ok: false; message: string }
 
 type OrgKundePick = {
   name?: string | null
@@ -30,7 +32,7 @@ type OrgKundePick = {
 }
 
 /** Neutraler Whitelabel-Fallback (kein BW-Grün / kein Steiner-Blau). */
-const AUSHANG_PRIMARY_NEUTRAL = '#363B41'
+const AUSHANG_PRIMARY_NEUTRAL = C.grayNeutral7
 
 async function requireAuthUser() {
   const supabase = createClient()
@@ -69,6 +71,7 @@ export async function renderMeldeAushangPdf(objektId: string): Promise<RenderAus
     )
     .eq('id', objektId)
     .maybeSingle()
+  if (error) logDbError('lib/org/render-melde-aushang-pdf:kunden_objekte', error)
 
   if (error || !objekt) {
     return { ok: false, message: error?.message || 'Objekt nicht gefunden.' }
@@ -119,6 +122,7 @@ export async function renderHvMeldeAushangPdf(kundeId: string): Promise<RenderAu
     )
     .eq('id', kundeId)
     .maybeSingle()
+  if (error) logDbError('lib/org/render-melde-aushang-pdf:kunden', error)
 
   if (error || !kunde) {
     return { ok: false, message: error?.message || 'Kunde nicht gefunden.' }

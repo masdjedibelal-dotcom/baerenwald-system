@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { listAuftragBautagebuch } from '@/app/(dashboard)/auftraege/bautagebuch-actions'
 import { loadAbnahmeprotokollSummary } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
@@ -44,7 +45,7 @@ export async function loadAbnahmeForAbschlussbericht(
   // Wenn jüngstes = Teilabnahme HW: versuche gesamt/freigegeben
   if (latest.ebene === 'handwerker') {
     const { supabaseAdmin } = await import('@/lib/supabase-admin')
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('auftrag_abnahmeprotokolle')
       .select('id')
       .eq('auftrag_id', auftragId)
@@ -52,6 +53,7 @@ export async function loadAbnahmeForAbschlussbericht(
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('lib/auftraege/abschlussdokumentation-collect:auftrag_abnahmeprotokolle', error)
     if (data?.id) {
       const gesamt = await loadAbnahmeprotokollSummary(auftragId, String(data.id))
       if (gesamt) {

@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { extractText, getDocumentProxy } from 'unpdf'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -85,6 +86,7 @@ export async function readCrmDocument(input: {
       )
       .eq('id', id)
       .maybeSingle()
+    if (error) logDbError('lib/copilot/read-document:angebote', error)
     if (error) return { error: error.message }
     if (!data) return { error: 'Angebot nicht gefunden' }
     const pdf = wantPdf ? await pdfTextFromUrl(data.pdf_url as string | null) : null
@@ -123,6 +125,7 @@ export async function readCrmDocument(input: {
       )
       .eq('id', id)
       .maybeSingle()
+    if (error) logDbError('lib/copilot/read-document:rechnungen', error)
     if (error) return { error: error.message }
     if (!data) return { error: 'Rechnung nicht gefunden' }
     const pdf = wantPdf ? await pdfTextFromUrl(data.pdf_url as string | null) : null
@@ -159,6 +162,7 @@ export async function readCrmDocument(input: {
       )
       .eq('id', id)
       .maybeSingle()
+    if (error) logDbError('lib/copilot/read-document:handwerker_vertraege', error)
     if (error) return { error: error.message }
     if (!data) return { error: 'Vertrag nicht gefunden' }
     const pdf = wantPdf ? await pdfTextFromUrl(data.pdf_url as string | null) : null
@@ -197,6 +201,7 @@ export async function readCrmDocument(input: {
       )
       .eq('id', id)
       .maybeSingle()
+    if (error) logDbError('lib/copilot/read-document:auftraege', error)
     if (error) return { error: error.message }
     if (!data) return { error: 'Auftrag/Abnahme nicht gefunden' }
     const protos = Array.isArray(data.auftrag_abnahmeprotokolle)

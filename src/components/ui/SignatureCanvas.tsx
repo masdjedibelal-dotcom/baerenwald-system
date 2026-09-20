@@ -1,7 +1,9 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { C } from '@/lib/tokens/colors'
 
 type Props = {
   onChange: (hasSignature: boolean, dataUrl: string | null) => void
@@ -36,7 +38,7 @@ export function SignatureCanvas({
     if (!ctx) return
     ctx.lineWidth = 2.2
     ctx.lineCap = 'round'
-    ctx.strokeStyle = '#1c211e'
+    ctx.strokeStyle = C.textInk2
 
     function pos(e: MouseEvent | TouchEvent) {
       const r = cv!.getBoundingClientRect()
@@ -104,7 +106,7 @@ export function SignatureCanvas({
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      <div className="relative overflow-hidden rounded-lg border border-dashed border-bw-border bg-white">
+      <div className="relative overflow-hidden rounded-card border border-dashed border-bw-border bg-white">
         {previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -129,13 +131,9 @@ export function SignatureCanvas({
           </p>
         ) : null}
       </div>
-      <button
-        type="button"
-        onClick={clear}
-        className="text-[length:var(--fs-meta)] text-bw-text-muted underline"
-      >
+      <MockBtn className="text-[length:var(--fs-meta)] text-bw-text-muted underline" type="button" onClick={clear}>
         Unterschrift löschen
-      </button>
+      </MockBtn>
     </div>
   )
 }

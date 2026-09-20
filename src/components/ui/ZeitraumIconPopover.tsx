@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockPopover } from '@/components/mock-ui/MockPopover'
+import { useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 export type ZeitraumOption<T extends string = string> = {
@@ -30,18 +31,9 @@ export function ZeitraumIconPopover<T extends string>({
 
   return (
     <div className="zeitraum-icon-pop">
-      <button
-        ref={anchorRef}
-        type="button"
-        className={cn('btn sm icon ghost zeitraum-icon-pop__btn', open && 'is-open')}
-        title={`${title}: ${activeLabel}`}
-        aria-label={`${title}: ${activeLabel}`}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        onClick={() => setOpen((v) => !v)}
-      >
+      <MockBtn kind="ghost" sm className={cn('icon zeitraum-icon-pop__btn', open && 'is-open')} ref={anchorRef} type="button" title={`${title}: ${activeLabel}`} aria-label={`${title}: ${activeLabel}`} aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen((v) => !v)}>
         <MockIcon ctx="btn" n="calendar" size={15} />
-      </button>
+      </MockBtn>
       <MockPopover
         open={open}
         onClose={() => setOpen(false)}
@@ -54,20 +46,13 @@ export function ZeitraumIconPopover<T extends string>({
           {options.map((opt) => {
             const active = opt.id === value
             return (
-              <button
-                key={opt.id}
-                type="button"
-                role="option"
-                aria-selected={active}
-                className={cn('pop-item', active && 'is-active')}
-                onClick={() => {
+              <MockBtn className={cn('pop-item', active && 'is-active')} key={opt.id} type="button" role="option" aria-selected={active} onClick={() => {
                   onChange(opt.id)
                   setOpen(false)
-                }}
-              >
+                }}>
                 <MockIcon ctx="btn" n={active ? 'check' : 'calendar'} size={16} />
                 <span>{opt.label}</span>
-              </button>
+              </MockBtn>
             )
           })}
         </div>

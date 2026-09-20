@@ -24,7 +24,7 @@ const LUCIDE_GUARD_FILES = [
   'components/kunden/KundeDetailClient.tsx',
   'components/handwerker/HandwerkerDetailClient.tsx',
   'components/rechnungen/RechnungDetailClient.tsx',
-  'components/mock-ui/DetailShell.tsx',
+  'components/layout/EntityDetailLayout.tsx',
   'components/ui/detail-tab-bar.tsx',
   'components/layout/Sidebar.tsx',
   'components/layout/BottomNav.tsx',

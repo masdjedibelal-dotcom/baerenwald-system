@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
@@ -57,6 +63,7 @@ async function assertAuftrag(auftragId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet', userId: null }
   const { data, error } = await supabase.from('auftraege').select('id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden', userId: null }
   return { ok: true as const, userId: user.id }
 }
@@ -125,6 +132,7 @@ export async function listAuftragBautagebuch(
     .eq('auftrag_id', auftragId)
     .order('datum', { ascending: false })
     .order('sort_order', { ascending: false })
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
 
   if (error) {
     if (error.code === 'PGRST205' || error.code === '42P01') return []
@@ -157,6 +165,7 @@ async function syncTimelineFromEintrag(
       .update(payload)
       .eq('id', eintrag.timeline_id)
       .eq('auftrag_id', eintrag.auftrag_id)
+    if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_timeline', error)
     if (error) return { ok: false, message: bautagebuchDbErrorMessage(error.message) }
     return { ok: true, timelineId: eintrag.timeline_id }
   }
@@ -174,10 +183,11 @@ async function syncTimelineFromEintrag(
   })
   if (!ins.ok) return ins
   const timelineId = ins.id!
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .update({ timeline_id: timelineId, updated_at: now })
     .eq('id', eintrag.id)
+  if (__dbErr1) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', __dbErr1)
   return { ok: true, timelineId }
 }
 
@@ -211,11 +221,12 @@ export async function createAuftragBautagebuchEintrag(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
 
   if (error || !data) {
     return { ok: false, message: bautagebuchDbErrorMessage(error?.message ?? 'Speichern fehlgeschlagen') }
   }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, id: data.id as string }
 }
 
@@ -252,21 +263,23 @@ export async function updateAuftragBautagebuchEintrag(input: {
     .update(patch)
     .eq('id', input.eintragId)
     .eq('auftrag_id', input.auftragId)
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
 
   if (error) return { ok: false, message: bautagebuchDbErrorMessage(error.message) }
 
-  const { data: row } = await supabaseAdmin
+  const { data: row, error: error2 } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .select('*')
     .eq('id', input.eintragId)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error2)
 
   if (row && (row as { fuer_kunde_freigegeben?: boolean }).fuer_kunde_freigegeben) {
     const e = mapEintrag(row as Record<string, unknown>)
     await syncTimelineFromEintrag(e, gate.userId, true)
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -277,36 +290,40 @@ export async function deleteAuftragBautagebuchEintrag(input: {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
 
-  const { data: row } = await supabaseAdmin
+  const { data: row, error } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .select('timeline_id')
     .eq('id', input.eintragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
 
   const supabase = createClient()
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('auftrag_bautagebuch_eintraege')
     .delete()
     .eq('id', input.eintragId)
     .eq('auftrag_id', input.auftragId)
+  if (error2) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error2)
 
-  if (error) return { ok: false, message: bautagebuchDbErrorMessage(error.message) }
+  if (error2) return { ok: false, message: bautagebuchDbErrorMessage(error2.message) }
 
   const tlId = (row as { timeline_id?: string } | null)?.timeline_id
   if (tlId) {
-    await supabaseAdmin.from('auftrag_timeline').delete().eq('id', tlId)
+    const { error: __dbErr2 } = await supabaseAdmin.from('auftrag_timeline').delete().eq('id', tlId)
+    if (__dbErr2) logDbError('app/auftraege/bautagebuch-actions:auftrag_timeline', __dbErr2)
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
 async function loadBautagebuchMailKontext(auftragId: string, anredeOverride?: AngebotMailAnrede) {
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, titel, kunde_id, lead_id, kunden(name, email, typ, vorname, nachname, ansprechpartner), angebote(leistungsumfang, notizen)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftraege', error)
   if (!auf) return { ok: false as const, message: 'Auftrag nicht gefunden' }
 
   const kundeRaw = (Array.isArray(auf.kunden) ? auf.kunden[0] : auf.kunden) as Kunde | null
@@ -324,13 +341,15 @@ async function loadBautagebuchMailKontext(auftragId: string, anredeOverride?: An
     kundeName: empfaenger.name,
   })
 
-  const { data: posRows } = await supabaseAdmin
+  const { data: posRows, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: true })
+  if (error2) logDbError('app/auftraege/bautagebuch-actions:auftrag_positionen', error2)
 
-  const { data: gwRows } = await supabaseAdmin.from('gewerke').select('id, name, slug').eq('aktiv', true)
+  const { data: gwRows, error: error3 } = await supabaseAdmin.from('gewerke').select('id, name, slug').eq('aktiv', true)
+  if (error2) logDbError('app/auftraege/bautagebuch-actions:gewerke', error2)
 
   return {
     ok: true as const,
@@ -363,12 +382,13 @@ export async function getBautagebuchMailDefaults(
   const ctx = await loadBautagebuchMailKontext(auftragId)
   if (!ctx.ok) return ctx
 
-  const { data: eintragRow } = await supabaseAdmin
+  const { data: eintragRow, error } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .select('*')
     .eq('id', eintragId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
   if (!eintragRow) return { ok: false, message: 'Eintrag nicht gefunden' }
 
   const eintrag = mapEintrag(eintragRow as Record<string, unknown>)
@@ -440,12 +460,13 @@ async function buildBautagebuchKundenMail(input: {
   const ctx = await loadBautagebuchMailKontext(input.auftragId, input.anrede)
   if (!ctx.ok) return ctx
 
-  const { data: eintragRow } = await supabaseAdmin
+  const { data: eintragRow, error } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .select('*')
     .eq('id', input.eintragId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
   if (!eintragRow) return { ok: false, message: 'Eintrag nicht gefunden' }
 
   const eintrag = mapEintrag(eintragRow as Record<string, unknown>)
@@ -493,12 +514,13 @@ export async function sendBautagebuchAnKunde(input: {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
 
-  const { data: row } = await supabaseAdmin
+  const { data: row, error } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .select('*')
     .eq('id', input.eintragId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
   if (!row) return { ok: false, message: 'Eintrag nicht gefunden' }
 
   let eintrag = mapEintrag(row as Record<string, unknown>)
@@ -562,7 +584,7 @@ export async function sendBautagebuchAnKunde(input: {
     console.warn('[sendBautagebuchAnKunde] Portal-Notify:', e)
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -574,12 +596,13 @@ export async function freigebenBautagebuchEintrag(input: {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
 
-  const { data: row } = await supabaseAdmin
+  const { data: row, error } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .select('*')
     .eq('id', input.eintragId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
   if (!row) return { ok: false, message: 'Eintrag nicht gefunden' }
 
   let eintrag = mapEintrag(row as Record<string, unknown>)
@@ -618,6 +641,6 @@ export async function freigebenBautagebuchEintrag(input: {
     console.warn('[freigebenBautagebuchEintrag] Portal-Notify:', e)
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }

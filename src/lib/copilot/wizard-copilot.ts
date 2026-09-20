@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
 
 import {
@@ -160,6 +161,7 @@ export async function prepareAngebotWizardCopilot(input: PrepareAngebotWizardInp
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/copilot/wizard-copilot:leads', error)
   if (error) throw error
   if (!leadRow) return { error: 'Lead nicht gefunden' }
 
@@ -294,13 +296,14 @@ export async function prepareAngebotWizardCopilot(input: PrepareAngebotWizardInp
 
 export async function saveAngebotWizardCopilot(input: SaveAngebotWizardCopilotInput) {
   const leadId = input.lead_id.trim()
-  const { data: leadRow } = await supabaseAdmin
+  const { data: leadRow, error } = await supabaseAdmin
     .from('leads')
     .select(
       'id, kunde_id, auftraggeber_kunde_id, kontakt_name, kundentyp, bereiche, situation, kunden!kunde_id(id, name, typ), auftraggeber:kunden!auftraggeber_kunde_id(id, name, typ, org_anzeigename)'
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/copilot/wizard-copilot:leads', error)
   if (!leadRow) return { error: 'Lead nicht gefunden' }
 
   let kundeId =
@@ -429,7 +432,7 @@ export async function saveAngebotWizardCopilot(input: SaveAngebotWizardCopilotIn
     crm_href: `/anfragen/${leadId}?angebot_wizard=1&wizard_step=2&focus=positionen`,
     crm_label: 'Positionen prüfen / KI',
     hinweis:
-      'Entwurf gespeichert. Im Sidepanel „Öffnen“ → Positionen. Dann Handwerker/Kunde senden (erst Vorschau).',
+      'Entwurf gespeichert. Im Sidepanel „Öffnen“ → Positionen. Dann Partner/Kunde senden (erst Vorschau).',
   }
 }
 

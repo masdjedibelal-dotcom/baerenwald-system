@@ -1,7 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useState, useTransition } from 'react'
-import { Plus } from 'lucide-react'
 import {
   listTodos,
   setTodoErledigt,
@@ -15,13 +16,13 @@ import {
 } from '@/components/todos/TodoEditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import type { CrmTodo } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, formatTagMonatKurz } from '@/lib/utils'
 
 function formatFrist(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(`${iso.slice(0, 10)}T12:00:00`)
   if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })
+  return formatTagMonatKurz(d)
 }
 
 function isOverdue(iso: string | null, erledigt: boolean): boolean {
@@ -132,7 +133,7 @@ export function TodosPanel({
       const res = await setTodoErledigt(t.id, nextDone)
       setBusyId(null)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         await load()
         return
       }
@@ -173,48 +174,27 @@ export function TodosPanel({
     <div className={cn('todos-panel', compact && 'todos-panel--compact')}>
       <div className="todos-panel__head">
         {!compact ? <h2 className="todos-panel__title">{title}</h2> : <span />}
-        <button
-          type="button"
-          className="todos-panel__add"
-          onClick={openNew}
-          aria-label="To-do hinzufügen"
-          title="Hinzufügen"
-        >
-          <Plus className="h-5 w-5" aria-hidden />
-        </button>
+        <MockBtn className="todos-panel__add" type="button" onClick={openNew} aria-label="To-do hinzufügen" title="Hinzufügen">
+          <MockIcon n="plus" ctx="default" className="h-5 w-5" aria-hidden />
+        </MockBtn>
       </div>
       {showFilterChips ? (
         <div className="todos-panel__chips" role="group" aria-label="Filter">
-          <button
-            type="button"
-            className={cn('chip', view === 'alle' && 'active')}
-            aria-pressed={view === 'alle'}
-            onClick={() => setView('alle')}
-          >
+          <MockBtn className={cn('chip', view === 'alle' && 'active')} type="button" aria-pressed={view === 'alle'} onClick={() => setView('alle')}>
             Alle
-          </button>
-          <button
-            type="button"
-            className={cn('chip', view === 'offen' && 'active')}
-            aria-pressed={view === 'offen'}
-            onClick={() => setView('offen')}
-          >
+          </MockBtn>
+          <MockBtn className={cn('chip', view === 'offen' && 'active')} type="button" aria-pressed={view === 'offen'} onClick={() => setView('offen')}>
             Offen
-          </button>
-          <button
-            type="button"
-            className={cn('chip', view === 'erledigt' && 'active')}
-            aria-pressed={view === 'erledigt'}
-            onClick={() => setView('erledigt')}
-          >
+          </MockBtn>
+          <MockBtn className={cn('chip', view === 'erledigt' && 'active')} type="button" aria-pressed={view === 'erledigt'} onClick={() => setView('erledigt')}>
             Erledigt
-          </button>
+          </MockBtn>
         </div>
       ) : null}
 
       {loadErr ? <p className="text-[length:var(--fs-meta)] text-[var(--red-tx)]">{loadErr}</p> : null}
 
-      <div className="todo-card">
+      <div className="todo-row">
         <ul
           className="todo-list"
           aria-label={
@@ -237,9 +217,9 @@ export function TodosPanel({
               return (
                 <li
                   key={t.id}
-                  className={cn('todo-card__item', leaving && 'todo-card__item--leaving')}
+                  className={cn('todo-row__item', leaving && 'todo-row__item--leaving')}
                 >
-                  <button type="button" className={cn('todo-row', done && 'todo-row--done')} onClick={() => openEdit(t)}>
+                  <MockBtn className={cn('todo-row', done && 'todo-row--done')} type="button" onClick={() => openEdit(t)}>
                     <TodoCheckButton
                       erledigt={done}
                       busy={busyId === t.id}
@@ -267,7 +247,7 @@ export function TodosPanel({
                         </div>
                       ) : null}
                     </div>
-                  </button>
+                  </MockBtn>
                 </li>
               )
             })

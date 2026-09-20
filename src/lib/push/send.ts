@@ -2,6 +2,7 @@
  * Server: Web-Push an Staff mit aktiver Subscription + Prefs.
  * Phase 2 — Aufruf von Event-Hooks (z. B. neue Anfrage).
  */
+import { logDbError } from '@/lib/errors/log-db-error'
 import webpush from 'web-push'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -41,7 +42,22 @@ export async function sendCrmPushToStaff(input: {
   url: string
   tag?: string
 }): Promise<{ sent: number; skipped: string }> {
+  const logPush = async (sent: number, skipped: string) => {
+    try {
+      const { logNotifyEmailResult } = await import('@/lib/kommunikation/log-notify-email-result')
+      await logNotifyEmailResult({
+        typ: 'crm_push',
+        betreff: `CRM-Push: ${input.typ}`,
+        ok: sent > 0,
+        error: sent > 0 ? null : skipped || 'kein Empfänger',
+      })
+    } catch (e) {
+      logDbError('lib/push/send:email_log', e)
+    }
+  }
+
   if (!configureVapid()) {
+    await logPush(0, 'vapid_missing')
     return { sent: 0, skipped: 'vapid_missing' }
   }
 
@@ -49,24 +65,33 @@ export async function sendCrmPushToStaff(input: {
     .from('crm_push_prefs')
     .select('*')
     .eq('push_enabled', true)
+  if (prefsErr) logDbError('lib/push/send:crm_push_prefs', prefsErr)
 
   if (prefsErr || !prefsRows?.length) {
-    return { sent: 0, skipped: prefsErr?.message || 'no_prefs' }
+    const skipped = prefsErr?.message || 'no_prefs'
+    await logPush(0, skipped)
+    return { sent: 0, skipped }
   }
 
   const eligibleUserIds = prefsRows
     .filter((row) => isPushPrefEnabledForTyp(rowToPrefs(row as Record<string, unknown>), input.typ))
     .map((row) => String((row as { user_id: string }).user_id))
 
-  if (!eligibleUserIds.length) return { sent: 0, skipped: 'no_eligible_users' }
+  if (!eligibleUserIds.length) {
+    await logPush(0, 'no_eligible_users')
+    return { sent: 0, skipped: 'no_eligible_users' }
+  }
 
   const { data: subs, error: subErr } = await supabaseAdmin
     .from('crm_push_subscriptions')
     .select('id, endpoint, p256dh, auth, user_id')
     .in('user_id', eligibleUserIds)
+  if (subErr) logDbError('lib/push/send:crm_push_subscriptions', subErr)
 
   if (subErr || !subs?.length) {
-    return { sent: 0, skipped: subErr?.message || 'no_subscriptions' }
+    const skipped = subErr?.message || 'no_subscriptions'
+    await logPush(0, skipped)
+    return { sent: 0, skipped }
   }
 
   const rawTitle = String(input.title ?? '').trim()
@@ -95,12 +120,15 @@ export async function sendCrmPushToStaff(input: {
     } catch (e) {
       const status = (e as { statusCode?: number })?.statusCode
       if (status === 404 || status === 410) {
-        await supabaseAdmin.from('crm_push_subscriptions').delete().eq('id', sub.id)
+        const { error: __dbErr1 } = await supabaseAdmin.from('crm_push_subscriptions').delete().eq('id', sub.id)
+        if (__dbErr1) logDbError('lib/push/send:crm_push_subscriptions', __dbErr1)
       } else {
         console.warn('[crm-push]', e instanceof Error ? e.message : e)
       }
     }
   }
 
-  return { sent, skipped: sent ? '' : 'send_failed' }
+  const skipped = sent ? '' : 'send_failed'
+  await logPush(sent, skipped)
+  return { sent, skipped }
 }

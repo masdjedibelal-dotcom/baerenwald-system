@@ -1,3 +1,4 @@
+import { formatMonatNummerJahr } from '@/lib/utils'
 import type {
   EinheitBewohnerRolle,
   ObjektAnlageStatus,
@@ -86,6 +87,6 @@ export function formatAnlageGarantieHint(
   if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
   const d = new Date(raw)
   if (Number.isNaN(d.getTime())) return null
-  const label = d.toLocaleDateString('de-DE', { month: '2-digit', year: 'numeric' })
+  const label = formatMonatNummerJahr(d)
   return `Garantie bis ${label}`
 }

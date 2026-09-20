@@ -89,7 +89,10 @@ export async function sendTelegramTyping(): Promise<void> {
       chat_id: process.env.TELEGRAM_CHAT_ID,
       action: 'typing',
     }),
-  }).catch(() => undefined)
+  }).catch((err) => {
+    console.error('[copilot/telegram] sendChatAction', err)
+    return undefined
+  })
 }
 
 export async function downloadTelegramFile(fileId: string): Promise<Buffer> {

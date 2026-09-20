@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import {
   CRM_PUSH_PREF_DEFAULTS,
@@ -36,7 +37,6 @@ export async function getCrmPushSetup(): Promise<{
       .eq('user_id', user.id)
       .limit(1),
   ])
-
   const prefs: CrmPushPrefs = {
     ...CRM_PUSH_PREF_DEFAULTS,
     ...(prefsRow
@@ -87,6 +87,7 @@ export async function upsertCrmPushPrefs(
     },
     { onConflict: 'user_id' }
   )
+  if (error) logDbError('app/einstellungen/benachrichtigungen/actions:crm_push_prefs', error)
   if (error) return { ok: false, message: error.message }
   return { ok: true, prefs: next }
 }
@@ -121,6 +122,7 @@ export async function saveCrmPushSubscription(input: {
     },
     { onConflict: 'endpoint' }
   )
+  if (error) logDbError('app/einstellungen/benachrichtigungen/actions:crm_push_subscriptions', error)
   if (error) return { ok: false, message: error.message }
 
   await upsertCrmPushPrefs({ push_enabled: true })

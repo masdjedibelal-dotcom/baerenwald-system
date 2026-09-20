@@ -1,5 +1,6 @@
 import { toast } from '@/components/ui/app-toast'
 import type { ExportField } from '@/hooks/useExport'
+import { TOAST } from '@/lib/copy'
 
 /** Einfacher CSV-Export für Card-Listen (Mehrfachauswahl). */
 export function exportSimpleCsv(filename: string, rows: Record<string, string>[]) {
@@ -20,7 +21,7 @@ export function exportSimpleCsv(filename: string, rows: Record<string, string>[]
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
-  toast.success('Export gestartet')
+  toast.success(TOAST.exportGestartet)
 }
 
 export function runMockListExport(
@@ -34,5 +35,5 @@ export function runMockListExport(
   filename: string
 ) {
   exportToCSV(data, fields, filename)
-  toast.success('Export gestartet')
+  toast.success(TOAST.exportGestartet)
 }

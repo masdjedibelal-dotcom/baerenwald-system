@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function copilotAlertAlreadySent(
@@ -7,13 +8,14 @@ export async function copilotAlertAlreadySent(
   entityType: string,
   entityId: string
 ): Promise<boolean> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('copilot_alerts')
     .select('id')
     .eq('alert_type', alertType)
     .eq('entity_type', entityType)
     .eq('entity_id', entityId)
     .maybeSingle()
+  if (error) logDbError('lib/copilot/alerts:copilot_alerts', error)
   return Boolean(data)
 }
 
@@ -22,7 +24,7 @@ export async function recordCopilotAlert(
   entityType: string,
   entityId: string
 ): Promise<void> {
-  await supabaseAdmin.from('copilot_alerts').upsert(
+  const { error: __dbErr1 } = await supabaseAdmin.from('copilot_alerts').upsert(
     {
       alert_type: alertType,
       entity_type: entityType,
@@ -31,4 +33,5 @@ export async function recordCopilotAlert(
     },
     { onConflict: 'alert_type,entity_type,entity_id' }
   )
+  if (__dbErr1) logDbError('lib/copilot/alerts:copilot_alerts', __dbErr1)
 }

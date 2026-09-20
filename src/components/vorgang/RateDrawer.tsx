@@ -1,10 +1,11 @@
 'use client'
 
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockProp } from '@/components/mock-ui/MockProp'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockProp } from '@/components/mock-ui/MockProp'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
@@ -84,17 +85,9 @@ export function RateDrawer({
     ctas.length > 0 ? (
       <div className="flex items-center gap-0.5">
         {ctas.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className="editor-sheet__icon-btn"
-            disabled={c.disabled}
-            aria-label={c.label}
-            title={c.label}
-            onClick={c.onClick}
-          >
+          <MockBtn className="editor-sheet__icon-btn" key={c.id} type="button" disabled={c.disabled} aria-label={c.label} title={c.label} onClick={c.onClick}>
             <MockIcon ctx="default" n={c.icon ?? 'eye'} size={20} />
-          </button>
+          </MockBtn>
         ))}
       </div>
     ) : undefined
@@ -102,7 +95,7 @@ export function RateDrawer({
   if (!rate) {
     return (
       <EditorSheet open={open} onClose={onClose} title="Abschlag">
-        <div className="rate-drawer-empty">Keine Rate ausgewählt.</div>
+        <MockEmpty title="Keine Rate ausgewählt." />
       </EditorSheet>
     )
   }

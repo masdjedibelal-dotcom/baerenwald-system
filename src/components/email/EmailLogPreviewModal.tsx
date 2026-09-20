@@ -1,11 +1,15 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
-import { Download, Mail } from 'lucide-react'
 import { loadEmailLogDetail, type EmailLogDetail } from '@/app/(dashboard)/email-log/actions'
+<<<<<<< Updated upstream
+=======
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { freitextMailTypLabel } from '@/lib/kommunikation/types'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import { formatDatumZeit } from '@/lib/utils'
@@ -51,19 +55,23 @@ export function EmailLogPreviewModal({
     row?.richtung === 'empfangen' ? 'Empfangene E-Mail' : 'Gesendete E-Mail'
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
       title={title}
       size="lg"
+<<<<<<< Updated upstream
+      secondary={{ label: 'Schließen', onClick: onClose }}
+=======
       footer={
-        <Button type="button" variant="secondary" onClick={onClose}>
+        <MockBtn type="button" kind="secondary" onClick={onClose}>
           Schließen
-        </Button>
+        </MockBtn>
       }
+>>>>>>> Stashed changes
     >
       {pending && !row ? <p className="text-sm text-bw-text-muted">Lade Vorschau …</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
       {row ? (
         <div className="space-y-4">
           <dl className="grid gap-2 text-sm sm:grid-cols-[120px_1fr]">
@@ -101,7 +109,7 @@ export function EmailLogPreviewModal({
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs font-medium text-bw-green hover:underline"
                     >
-                      <Download className="h-3.5 w-3.5" aria-hidden />
+                      <MockIcon n="download" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                       PDF öffnen
                     </a>
                   ) : null}
@@ -111,23 +119,23 @@ export function EmailLogPreviewModal({
             {row.status === 'fehler' && row.fehler_nachricht ? (
               <>
                 <dt className="text-bw-text-muted">Fehler</dt>
-                <dd className="text-red-700">{row.fehler_nachricht}</dd>
+                <dd className="text-danger">{row.fehler_nachricht}</dd>
               </>
             ) : null}
           </dl>
 
           <div>
             <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-bw-text-muted">
-              <Mail className="h-3.5 w-3.5" aria-hidden />
+              <MockIcon n="mail" ctx="default" className="h-3.5 w-3.5" aria-hidden />
               Nachricht
             </p>
             <div
-              className="max-h-[420px] overflow-auto rounded-lg border border-bw-border bg-white p-4"
+              className="max-h-[420px] overflow-auto rounded-card border border-bw-border bg-white p-4"
               dangerouslySetInnerHTML={{ __html: row.inhalt_html ?? '<p>Kein Inhalt gespeichert.</p>' }}
             />
           </div>
         </div>
       ) : null}
-    </Modal>
+    </EditorSheet>
   )
 }

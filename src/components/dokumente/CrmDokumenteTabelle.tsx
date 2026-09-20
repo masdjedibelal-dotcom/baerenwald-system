@@ -1,7 +1,7 @@
 'use client'
 
-import { FileText } from 'lucide-react'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockEmpty, MockTable } from '@/components/mock-ui'
 import { formatDatum } from '@/lib/utils'
 
 export type CrmDokumentZeile = {
@@ -25,39 +25,37 @@ export function CrmDokumenteTabelle({
   }
 
   return (
-    <div className="dok-table-wrap">
-      <table className="dok-table">
-        <thead>
-          <tr>
-            <th>Datum</th>
-            <th>Dateiname</th>
-            <th className="text-right w-14" aria-label="PDF öffnen" />
+    <MockTable wrapClassName="dok-table-wrap" className="dok-table">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Dateiname</th>
+          <th className="text-right w-14" aria-label="PDF öffnen" />
+        </tr>
+      </thead>
+      <tbody>
+        {zeilen.map((row) => (
+          <tr key={row.id}>
+            <td className="tabular-nums text-bw-text-muted whitespace-nowrap">
+              {row.datum ? formatDatum(row.datum) : '—'}
+            </td>
+            <td className="font-medium text-bw-text max-w-[min(100%,28rem)]">
+              <span className="line-clamp-2">{row.name}</span>
+            </td>
+            <td className="text-right">
+              <a
+                href={row.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-card border border-bw-border bg-surface text-[var(--red-tx)] transition-colors hover:bg-[var(--red-bg)]"
+                aria-label={`${row.name} öffnen`}
+              >
+                <MockIcon n="file-text" ctx="default" className="h-4 w-4" aria-hidden />
+              </a>
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {zeilen.map((row) => (
-            <tr key={row.id}>
-              <td className="tabular-nums text-bw-text-muted whitespace-nowrap">
-                {row.datum ? formatDatum(row.datum) : '—'}
-              </td>
-              <td className="font-medium text-bw-text max-w-[min(100%,28rem)]">
-                <span className="line-clamp-2">{row.name}</span>
-              </td>
-              <td className="text-right">
-                <a
-                  href={row.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-bw-border bg-bw-card text-[#c62828] transition-colors hover:bg-red-50"
-                  aria-label={`${row.name} öffnen`}
-                >
-                  <FileText className="h-4 w-4" aria-hidden />
-                </a>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </MockTable>
   )
 }

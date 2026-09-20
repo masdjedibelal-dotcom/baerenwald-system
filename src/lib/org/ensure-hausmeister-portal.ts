@@ -3,6 +3,7 @@
  * Ausnahme info@baerenwald-muenchen.de: gleiches Login wie CRM/Partner —
  * kein zweites Registrieren, sofort „Portal aktiv“.
  */
+import { logDbError } from '@/lib/errors/log-db-error'
 import 'server-only'
 
 import { isBaerenwaldPrimaryStaffEmail } from '@/lib/auth/crm-access'
@@ -15,30 +16,33 @@ async function findAuthUserIdByEmail(email: string): Promise<string | null> {
   if (!e) return null
   const db = getSupabaseAdmin()
 
-  const { data: hw } = await db
+  const { data: hw, error } = await db
     .from('handwerker')
     .select('auth_user_id')
     .ilike('email', e)
     .not('auth_user_id', 'is', null)
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('lib/org/ensure-hausmeister-portal:handwerker', error)
   if (hw?.auth_user_id) return String(hw.auth_user_id)
 
-  const { data: k } = await db
+  const { data: k, error: error2 } = await db
     .from('kunden')
     .select('auth_user_id')
     .ilike('email', e)
     .not('auth_user_id', 'is', null)
     .limit(1)
     .maybeSingle()
+  if (error2) logDbError('lib/org/ensure-hausmeister-portal:kunden', error2)
   if (k?.auth_user_id) return String(k.auth_user_id)
 
-  const { data: profile } = await db
+  const { data: profile, error: error3 } = await db
     .from('user_profiles')
     .select('id')
     .ilike('email', e)
     .limit(1)
     .maybeSingle()
+  if (error3) logDbError('lib/org/ensure-hausmeister-portal:user_profiles', error3)
   if (profile?.id) return String(profile.id)
 
   return null
@@ -66,6 +70,7 @@ export async function ensureHausmeisterPortalActivation(opts: {
     .eq('id', hmId)
     .eq('org_kunde_id', orgId)
     .maybeSingle()
+  if (hmErr) logDbError('lib/org/ensure-hausmeister-portal:org_hausmeister', hmErr)
   if (hmErr || !hm?.id) {
     return { ok: false, error: hmErr?.message ?? 'Hausmeister nicht gefunden.' }
   }
@@ -82,13 +87,14 @@ export async function ensureHausmeisterPortalActivation(opts: {
   let portalKundeId = hm.portal_kunde_id ? String(hm.portal_kunde_id) : ''
 
   if (!portalKundeId) {
-    const { data: existingHmKunde } = await db
+    const { data: existingHmKunde, error } = await db
       .from('kunden')
       .select('id, auth_user_id, portal_modus')
       .ilike('email', email)
       .eq('portal_modus', 'hausmeister')
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('lib/org/ensure-hausmeister-portal:kunden', error)
 
     if (existingHmKunde?.id) {
       portalKundeId = String(existingHmKunde.id)
@@ -103,6 +109,7 @@ export async function ensureHausmeisterPortalActivation(opts: {
         })
         .select('id')
         .single()
+      if (createErr) logDbError('lib/org/ensure-hausmeister-portal:kunden', createErr)
       if (createErr || !created?.id) {
         return {
           ok: false,
@@ -117,11 +124,12 @@ export async function ensureHausmeisterPortalActivation(opts: {
   const authUserId = await findAuthUserIdByEmail(email)
 
   if (authUserId) {
-    const { data: occupied } = await db
+    const { data: occupied, error } = await db
       .from('kunden')
       .select('id, portal_modus')
       .eq('auth_user_id', authUserId)
       .maybeSingle()
+    if (error) logDbError('lib/org/ensure-hausmeister-portal:kunden', error)
 
     if (!occupied?.id) {
       const { error: linkErr } = await db
@@ -134,6 +142,7 @@ export async function ensureHausmeisterPortalActivation(opts: {
           updated_at: new Date().toISOString(),
         })
         .eq('id', portalKundeId)
+      if (linkErr) logDbError('lib/org/ensure-hausmeister-portal:kunden', linkErr)
       if (linkErr) {
         console.warn('[ensureHausmeisterPortal] auth link:', linkErr.message)
       } else {
@@ -149,11 +158,12 @@ export async function ensureHausmeisterPortalActivation(opts: {
     // Primary Staff ohne Auth wäre ungewöhnlich; UI zeigt „noch nicht registriert“.
     hasAuthAccount = false
   } else {
-    const { data: stub } = await db
+    const { data: stub, error } = await db
       .from('kunden')
       .select('auth_user_id')
       .eq('id', portalKundeId)
       .maybeSingle()
+    if (error) logDbError('lib/org/ensure-hausmeister-portal:kunden', error)
     hasAuthAccount = Boolean(stub?.auth_user_id)
   }
 
@@ -167,6 +177,7 @@ export async function ensureHausmeisterPortalActivation(opts: {
     })
     .eq('id', hmId)
     .eq('org_kunde_id', orgId)
+  if (upHmErr) logDbError('lib/org/ensure-hausmeister-portal:org_hausmeister', upHmErr)
 
   if (upHmErr) return { ok: false, error: upHmErr.message }
 

@@ -1,5 +1,7 @@
 'use client'
 
+
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useRouter } from 'next/navigation'
 import { AbnahmeMaengelBearbeitenFlow } from '@/components/auftraege/AbnahmeMaengelBearbeitenFlow'
 
@@ -19,7 +21,7 @@ export function AuftragAbnahmeMaengelFlowClient({
       onClose={() => router.push(`/auftraege/${auftragId}?tab=abnahme`)}
       onDone={() => {
         router.push(`/auftraege/${auftragId}?tab=abnahme`)
-        router.refresh()
+        afterServerActionRefresh()
       }}
     />
   )

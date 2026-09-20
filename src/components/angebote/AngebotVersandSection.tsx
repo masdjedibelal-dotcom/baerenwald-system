@@ -1,15 +1,24 @@
 'use client'
+
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openDeleteConfirm, openActionConfirm } from '@/components/ui/ConfirmPopup'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Link2, Mail, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
+<<<<<<< Updated upstream
+=======
 import { confirmAction } from '@/components/ui/confirm-action'
 import { confirmDelete } from '@/components/ui/confirm-delete'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
+>>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
@@ -31,6 +40,7 @@ import {
 } from '@/lib/angebot-positionen'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { firmenEinstellungenToMailBranding } from '@/lib/mail-branding'
+import { buildPartnerSubject } from '@/lib/mail/build-subject'
 import { mailAngebot } from '@/lib/mail-templates'
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { kundeBegruessungsVorname } from '@/lib/kunde-rechnungsempfaenger'
@@ -39,11 +49,12 @@ import {
   loescheHandwerkerAnfrage,
 } from '@/app/(dashboard)/angebote/actions'
 import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
+import { TOAST } from '@/lib/copy'
 
 function hwStatusLabel(s: string | null | undefined): string {
   const v = (s ?? 'ausstehend').toLowerCase()
   if (v === 'angefragt') return 'Angefragt'
-  if (v === 'akzeptiert' || v === 'angenommen') return 'Akzeptiert'
+  if (v === 'akzeptiert' || v === 'angenommen') return 'Angenommen'
   if (v === 'abgelehnt') return 'Abgelehnt'
   if (v === 'zugewiesen') return 'Zugewiesen'
   if (v === 'ersetzt') return 'Ersetzt'
@@ -53,10 +64,10 @@ function hwStatusLabel(s: string | null | undefined): string {
 function hwBadgeClass(s: string | null | undefined): string {
   const v = (s ?? '').toLowerCase()
   if (v === 'akzeptiert' || v === 'angenommen' || v === 'zugewiesen') {
-    return 'bg-emerald-100 text-emerald-900'
+    return 'bg-status-order-bg text-status-order-text'
   }
-  if (v === 'abgelehnt') return 'bg-red-100 text-red-900'
-  if (v === 'angefragt' || v === 'warten') return 'bg-blue-100 text-blue-900'
+  if (v === 'abgelehnt') return 'bg-status-cancel-bg text-status-cancel-text'
+  if (v === 'angefragt' || v === 'warten') return 'bg-status-new-bg text-status-new-text'
   if (v === 'ersetzt') return 'bg-bw-hover text-bw-text-muted line-through'
   return 'bg-canvas text-muted'
 }
@@ -102,7 +113,7 @@ export function AngebotVersandSection({
     if (kundeModalControlled) onKundeModalOpenChange?.(open)
     else setKundeModalInternal(open)
   }
-  const [subject, setSubject] = useState('Ihr Angebot von Bärenwald München')
+  const [subject, setSubject] = useState('Vorgang – Angebot bereit')
 
   const [hwModal, setHwModal] = useState<{
     id: string
@@ -240,7 +251,7 @@ export function AngebotVersandSection({
       toast.success(`Angebot an ${kundeEmail || kundeName} gesendet`)
       setKundeModal(false)
       onKundeSent?.()
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -259,19 +270,19 @@ export function AngebotVersandSection({
       toast.error(json.error ?? 'Aktion fehlgeschlagen')
       return
     }
-    const name = z.handwerker?.name?.trim() ?? 'Handwerkerin'
+    const name = z.handwerker?.name?.trim() ?? 'Partnerin'
     if (sendEmail && json.gesendet) {
       toast.success(`Partner-Mail an ${name} gesendet`)
     }
     if (!sendEmail && json.link) {
       try {
         await navigator.clipboard.writeText(json.link)
-        toast.success('Partner-Login kopiert — in WhatsApp einfügen')
+        toast.success(TOAST.partner_login_kopiert_in_whatsapp_einfuegen)
       } catch {
         toast.message('Link', { description: json.link })
       }
     }
-    router.refresh()
+    afterServerActionRefresh()
   }
 
   function openHandwerkerModal(z: AngebotHandwerkerRow) {
@@ -299,9 +310,12 @@ export function AngebotVersandSection({
       }
       setHwModal({
         id: z.id,
-        name: z.handwerker?.name ?? 'Handwerker',
+        name: z.handwerker?.name ?? 'Partner',
         gewerk: z.gewerke?.name ?? 'Gewerk',
-        betreff: json.betreff ?? `Neue Anfrage: ${z.gewerke?.name ?? 'Gewerk'} — Bärenwald München`,
+        betreff: json.betreff ?? buildPartnerSubject({
+          gewerk: z.gewerke?.name ?? 'Gewerk',
+          ereignis: 'Neue Anfrage',
+        }),
         html: json.html,
         to: (json.defaultTo ?? []).filter(Boolean),
         cc: (json.defaultCc ?? []).filter(Boolean),
@@ -331,7 +345,7 @@ export function AngebotVersandSection({
       }
       toast.success(`Partner-Mail an ${hwModal.name} gesendet`)
       setHwModal(null)
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -353,7 +367,7 @@ export function AngebotVersandSection({
       ) : null}
 
       {allHandwerkerAngefragt && rows.length > 0 && showHandwerkerBlock ? (
-        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[length:var(--fs-text)] text-emerald-950">
+        <div className="mb-4 rounded-card border border-status-order-bg bg-status-order-bg px-3 py-2 text-[length:var(--fs-text)] text-status-order-text">
           Alle Partner wurden angefragt.
         </div>
       ) : null}
@@ -362,9 +376,9 @@ export function AngebotVersandSection({
       <Card id="angebot-versand-kunde" className="mb-4 space-y-4 p-4">
         <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">An Kunden</h3>
         {kannAnKunde ? (
-          <Button type="button" variant="primary" onClick={() => setKundeModal(true)} disabled={pending}>
+          <MockBtn type="button" kind="primary" onClick={() => setKundeModal(true)} disabled={pending}>
             E-Mail an Kunden senden
-          </Button>
+          </MockBtn>
         ) : (
           <p className="text-[length:var(--fs-text)] text-muted">
             {!kundeEmail
@@ -386,7 +400,7 @@ export function AngebotVersandSection({
       <Card id="angebot-versand-handwerker" className="space-y-4 p-4">
         <h3 className="text-[length:var(--fs-text)] font-semibold text-bw-text">Partner anfragen</h3>
         {rows.length === 0 ? (
-          <p className="text-[length:var(--fs-text)] text-muted">Keine Partner zugewiesen.</p>
+          <MockEmpty title="Keine Partner zugewiesen." />
         ) : (
           <ul className="divide-y divide-border">
             {rows.map((z) => {
@@ -419,7 +433,7 @@ export function AngebotVersandSection({
                       </p>
                       <span
                         className={cn(
-                          'mt-1 inline-block rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                          'mt-1 inline-block rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                           hwBadgeClass(z.status as string)
                         )}
                       >
@@ -427,36 +441,33 @@ export function AngebotVersandSection({
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button
+                      <MockBtn
                         type="button"
-                        variant="primary"
-                        size="sm"
+                        kind="primary" sm
                         disabled={pending}
                         title={!hwEmail ? 'Keine E-Mail hinterlegt' : undefined}
                         onClick={() => openHandwerkerModal(z)}
                       >
-                        <Mail className="mr-1 inline h-4 w-4" aria-hidden />
+                        <MockIcon n="mail" ctx="default" className="mr-1 inline h-4 w-4" aria-hidden />
                         {schonAngefragt ? 'Erneut anfragen' : 'Partner anfragen'}
-                      </Button>
-                      <Button
+                      </MockBtn>
+                      <MockBtn
                         type="button"
-                        variant="secondary"
-                        size="sm"
+                        kind="secondary" sm
                         disabled={pending}
                         title="Partner-Login — Status wird auf „angefragt“ gesetzt"
                         onClick={() => void sendHandwerker(z, false)}
                       >
-                        <Link2 className="mr-1 inline h-4 w-4" aria-hidden />
+                        <MockIcon n="link" ctx="default" className="mr-1 inline h-4 w-4" aria-hidden />
                         WhatsApp-Link
-                      </Button>
+                      </MockBtn>
                       {kannBestaetigen ? (
-                        <Button
+                        <MockBtn
                           type="button"
-                          variant="secondary"
-                          size="sm"
+                          kind="secondary" sm
                           disabled={pending}
                           onClick={() => {
-                            confirmAction({
+                            openActionConfirm({
                               title: 'Anfrage bestätigen?',
                               body: `Anfrage von ${name} im CRM als akzeptiert markieren?`,
                               confirmLabel: 'Bestätigen',
@@ -468,29 +479,28 @@ export function AngebotVersandSection({
                                     angebotId: detail.id,
                                     zuweisungId: z.id,
                                   })
-                                  if (!r.ok) toast.error(r.message)
+                                  if (!r.ok) toast.systemError(r)
                                   else {
-                                    toast.success('Anfrage bestätigt')
-                                    router.refresh()
+                                    toast.success(TOAST.anfrage_bestaetigt)
+                                    afterServerActionRefresh()
                                   }
                                 })
                               },
                             })
                           }}
                         >
-                          <Check className="mr-1 inline h-4 w-4" aria-hidden />
+                          <MockIcon n="check" ctx="default" className="mr-1 inline h-4 w-4" aria-hidden />
                           Bestätigen
-                        </Button>
+                        </MockBtn>
                       ) : null}
                       {kannLoeschen ? (
-                        <Button
+                        <MockBtn
                           type="button"
-                          variant="secondary"
-                          size="sm"
+                          kind="secondary" sm
                           disabled={pending}
                           className="text-danger"
                           onClick={() => {
-                            confirmDelete(
+                            openDeleteConfirm(
                               'Partner-Anfrage löschen?',
                               async () => {
                                 const r = await loescheHandwerkerAnfrage({
@@ -498,19 +508,19 @@ export function AngebotVersandSection({
                                   zuweisungId: z.id,
                                 })
                                 if (!r.ok) {
-                                  toast.error(r.message)
+                                  toast.systemError(r)
                                   throw new Error(r.message)
                                 }
-                                toast.success('Anfrage gelöscht')
-                                router.refresh()
+                                toast.success(TOAST.anfrage_geloescht)
+                                afterServerActionRefresh()
                               },
                               { body: `Partner-Anfrage an ${name} wirklich löschen?` }
                             )
                           }}
                         >
-                          <Trash2 className="mr-1 inline h-4 w-4" aria-hidden />
+                          <MockIcon n="trash" ctx="default" className="mr-1 inline h-4 w-4" aria-hidden />
                           Löschen
-                        </Button>
+                        </MockBtn>
                       ) : null}
                     </div>
                   </div>
@@ -519,7 +529,7 @@ export function AngebotVersandSection({
                     angebotId={detail.id}
                     angebotTitel={titel}
                     auftragId={auftragId}
-                    onRefresh={() => router.refresh()}
+                    onRefresh={() => afterServerActionRefresh()}
                     onAcceptWizard={onAcceptWizard}
                   />
                 </li>
@@ -530,21 +540,30 @@ export function AngebotVersandSection({
       </Card>
       ) : null}
 
-      <Modal
+      <EditorSheet
         open={kundeModal}
         onClose={() => setKundeModal(false)}
         title="E-Mail an Kunden"
         size="lg"
+<<<<<<< Updated upstream
+        secondary={{ label: 'Abbrechen', onClick: () => setKundeModal(false) }}
+        primary={{
+          label: 'E-Mail senden',
+          onClick: sendKunde,
+          disabled: pending,
+        }}
+=======
         footer={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => setKundeModal(false)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setKundeModal(false)}>
               Abbrechen
-            </Button>
-            <Button type="button" variant="primary" onClick={sendKunde} disabled={pending}>
+            </MockBtn>
+            <MockBtn type="button" kind="primary" onClick={sendKunde} disabled={pending}>
               E-Mail senden
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         <p className="mb-2 text-[length:var(--fs-text)] text-bw-text-muted">
           Empfänger:{' '}
@@ -553,29 +572,20 @@ export function AngebotVersandSection({
         {(kunde?.email?.trim() || apRows.length > 0) ? (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {kunde?.email?.trim() ? (
-              <button
-                type="button"
-                className={cn(
+              <MockBtn className={cn(
                   'zahlplan-preset-chip',
                   (!mailToOverride || mailToOverride === kunde.email.trim()) && 'is-on'
-                )}
-                onClick={() => setMailToOverride(kunde.email!.trim())}
-              >
+                )} type="button" onClick={() => setMailToOverride(kunde.email!.trim())}>
                 Stamm · {kunde.email.trim()}
-              </button>
+              </MockBtn>
             ) : null}
             {apRows.map((ap) => {
               const mail = ap.email?.trim() || ''
               if (!mail) return null
               return (
-                <button
-                  key={ap.id}
-                  type="button"
-                  className={cn('zahlplan-preset-chip', mailToOverride === mail && 'is-on')}
-                  onClick={() => setMailToOverride(mail)}
-                >
+                <MockBtn className={cn('zahlplan-preset-chip', mailToOverride === mail && 'is-on')} key={ap.id} type="button" onClick={() => setMailToOverride(mail)}>
                   {ap.name} · {mail}
-                </button>
+                </MockBtn>
               )
             })}
           </div>
@@ -587,13 +597,13 @@ export function AngebotVersandSection({
           extraHint="Angebotsversand — Betreff an den Kunden."
           multiline={false}
         >
-          <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
+          <MockInput value={subject} onChange={(e) => setSubject(e.target.value)} className="mb-3" />
         </KiAssistFieldLabel>
         <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Vorschau</p>
         <iframe
           title="Vorschau"
           sandbox="allow-same-origin"
-          className="mb-3 h-[280px] w-full rounded-lg border border-bw-border bg-white"
+          className="mb-3 h-[280px] w-full rounded-card border border-bw-border bg-white"
           srcDoc={previewHtml}
         />
         <p className="mb-3 text-[length:var(--fs-text)] text-bw-text">
@@ -601,34 +611,39 @@ export function AngebotVersandSection({
           <strong>{betragAnzeige(null, bruttoMin, bruttoMax)}</strong>
         </p>
         <p className="text-[length:var(--fs-meta)] text-bw-text-muted">PDF wird angehängt.</p>
-      </Modal>
+      </EditorSheet>
 
-      <Modal
+      <EditorSheet
         open={!!hwModal}
         onClose={() => setHwModal(null)}
         title={hwModal ? `Partner-Mail an ${hwModal.name}` : 'Partner-Mail'}
         size="lg"
+<<<<<<< Updated upstream
+        secondary={{ label: 'Abbrechen', onClick: () => setHwModal(null) }}
+        primary={{
+          label: 'Jetzt senden',
+          onClick: sendHandwerkerAusModal,
+          busy: pending,
+        }}
+=======
         footer={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => setHwModal(null)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setHwModal(null)}>
               Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={sendHandwerkerAusModal}>
+            </MockBtn>
+            <MockBtn type="button" kind="primary" loading={pending} onClick={sendHandwerkerAusModal}>
               Jetzt senden
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         {hwModal ? (
           <div className="space-y-3">
             <p className="text-[length:var(--fs-text)] text-bw-text-muted">
               Gewerk: <span className="font-medium text-bw-text">{hwModal.gewerk}</span>
             </p>
-            <Input
-              label="Betreff"
-              value={hwModal.betreff}
-              onChange={(e) => setHwModal((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))}
-            />
+            <MockField label="Betreff"><MockInput value={hwModal.betreff} onChange={(e) => setHwModal((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))} /></MockField>
             <EmailPillsField
               label="An"
               required
@@ -649,12 +664,12 @@ export function AngebotVersandSection({
             <iframe
               title="Partner-Mail Vorschau"
               sandbox="allow-same-origin"
-              className="h-[300px] w-full rounded-lg border border-bw-border bg-white"
+              className="h-[300px] w-full rounded-card border border-bw-border bg-white"
               srcDoc={hwModal.html}
             />
           </div>
         ) : null}
-      </Modal>
+      </EditorSheet>
     </section>
   )
 }

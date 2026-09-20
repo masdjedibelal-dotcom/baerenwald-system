@@ -1,7 +1,13 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
 
+>>>>>>> Stashed changes
 import { createNachtragManuell } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { setWeitereArbeitAnerkennung } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { neuePositionsId, normalizeAngebotPositionen } from '@/lib/angebot-positionen'
@@ -14,7 +20,9 @@ import {
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { writePartnerPositionsAnfrageStatus } from '@/lib/status/write-partner-positions-anfrage-status'
 import type { AngebotPosition } from '@/lib/types'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type PartnerPositionsAnfrageRow = {
   id: string
@@ -64,6 +72,7 @@ export async function listPartnerPositionsAnfragen(
     )
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:partner_positions_anfragen', error)
 
   if (error) return []
 
@@ -91,7 +100,7 @@ export async function listPartnerPositionsAnfragen(
 export async function listWeitereArbeitInPruefung(
   auftragId: string
 ): Promise<WeitereArbeitInPruefungRow[]> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
       'id, leistung_name, beschreibung, handwerker_id, anerkennung_status, typ, verguetung, preis_partner, stundensatz, menge, einheit, created_at, handwerker:handwerker_id(name)'
@@ -99,6 +108,7 @@ export async function listWeitereArbeitInPruefung(
     .eq('auftrag_id', auftragId)
     .eq('anerkennung_status', 'in_pruefung')
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', error)
 
   const rows = data ?? []
   if (!rows.length) return []
@@ -106,10 +116,11 @@ export async function listWeitereArbeitInPruefung(
   const ids = rows.map((r) => String(r.id))
   const fotoByPos = new Map<string, string[]>()
 
-  const { data: eintraege } = await supabaseAdmin
+  const { data: eintraege, error: error2 } = await supabaseAdmin
     .from('position_eintraege')
     .select('position_id, eintrag_fotos(storage_path)')
     .in('position_id', ids)
+  if (error2) logDbError('app/auftraege/partner-positions-anfrage-actions:position_eintraege', error2)
 
   for (const e of eintraege ?? []) {
     const posId = String(e.position_id)
@@ -152,20 +163,22 @@ export async function listWeitereArbeitInPruefung(
 type DecideResult = { ok: true; message?: string } | { ok: false; message: string }
 
 async function loadAnfrage(id: string) {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('partner_positions_anfragen')
     .select('*')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:partner_positions_anfragen', error)
   return data
 }
 
 async function auftragTitel(auftragId: string): Promise<string> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('auftraege')
     .select('titel, projekt_name')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftraege', error)
   return String(data?.titel ?? data?.projekt_name ?? '').trim() || 'Auftrag'
 }
 
@@ -184,19 +197,21 @@ async function appendLeistungZuAngebot(opts: {
   menge?: number | null
   einheit?: string | null
 }): Promise<boolean> {
-  const { data: auftrag } = await supabaseAdmin
+  const { data: auftrag, error } = await supabaseAdmin
     .from('auftraege')
     .select('angebot_id')
     .eq('id', opts.auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftraege', error)
   const angebotId = String(auftrag?.angebot_id ?? '').trim()
   if (!angebotId) return false
 
-  const { data: ang } = await supabaseAdmin
+  const { data: ang, error: error2 } = await supabaseAdmin
     .from('angebote')
     .select('positionen')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/partner-positions-anfrage-actions:angebote', error2)
   if (!ang) return false
 
   const existing = normalizeAngebotPositionen(ang.positionen)
@@ -238,28 +253,29 @@ async function appendLeistungZuAngebot(opts: {
     preis_typ: 'fix',
     position_quelle: 'frei',
     handwerker_id: opts.handwerkerId?.trim() || undefined,
-    notiz_intern: 'Aus Handwerker-Nacharbeit übernommen',
+    notiz_intern: 'Aus Partner-Nacharbeit übernommen',
   }
 
-  const { error } = await supabaseAdmin
+  const { error: error3 } = await supabaseAdmin
     .from('angebote')
     .update({
       positionen: [...existing, neu],
       updated_at: new Date().toISOString(),
     })
     .eq('id', angebotId)
+  if (error3) logDbError('app/auftraege/partner-positions-anfrage-actions:angebote', error3)
 
-  if (error) {
-    console.error('[appendLeistungZuAngebot]', error.message)
+  if (error3) {
+    console.error('[appendLeistungZuAngebot]', error3.message)
     return false
   }
-  revalidatePath(`/angebote/${angebotId}`)
+  revalidateAngebotDetail(angebotId)
   return true
 }
 
 /**
  * Pfad A: Nacharbeit vom Partner annehmen → Position am Auftrag.
- * Keine klassische Nachreichung: der Handwerker hat selbst gemeldet und muss
+ * Keine klassische Nachreichung: der Partner hat selbst gemeldet und muss
  * nicht erneut im Portal „Änderungen bestätigen“.
  */
 export async function decidePartnerPositionsAnfrageIntern(input: {
@@ -281,13 +297,14 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
   const handwerkerId = String(anfrage.handwerker_id)
   const titel = String(anfrage.titel)
 
-  const { data: siblings } = await supabaseAdmin
+  const { data: siblings, error } = await supabaseAdmin
     .from('auftrag_positionen')
     .select('gewerk_slug, gewerk_name, sort_order')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .order('sort_order', { ascending: false })
     .limit(1)
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', error)
 
   const sib = siblings?.[0]
   const gewerkSlug =
@@ -299,13 +316,14 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
     String(sib?.gewerk_name ?? '').trim() ||
     'Allgemein'
 
-  const { data: last } = await supabaseAdmin
+  const { data: last, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select('sort_order')
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', error2)
 
   const schaetzungEur =
     input.preisPartner ??
@@ -320,7 +338,7 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
       : {}),
   }
 
-  const { data: pos, error } = await supabaseAdmin
+  const { data: pos, error: error3 } = await supabaseAdmin
     .from('auftrag_positionen')
     .insert({
       auftrag_id: auftragId,
@@ -349,22 +367,25 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
     })
     .select('id')
     .single()
+  if (error3) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', error3)
 
   if (error || !pos) {
     return { ok: false, message: error?.message ?? 'Position nicht angelegt.' }
   }
 
-  await supabaseAdmin
-    .from('partner_positions_anfragen')
-    .update({
-      status: 'intern',
+  const { error: __dbErr1 } = await writePartnerPositionsAnfrageStatus(
+    supabaseAdmin,
+    input.anfrageId,
+    'intern',
+    {
       position_id: pos.id,
       crm_notiz: input.notiz?.trim() || null,
       decided_at: new Date().toISOString(),
       decided_by: auth.userId,
       updated_at: new Date().toISOString(),
-    })
-    .eq('id', input.anfrageId)
+    }
+  )
+  if (__dbErr1) logDbError('app/auftraege/partner-positions-anfrage-actions:partner_positions_anfragen', __dbErr1)
 
   await appendLeistungZuAngebot({
     auftragId,
@@ -410,7 +431,7 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
     fuer_kunde_freigegeben: true,
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return {
     ok: true,
     message:
@@ -441,12 +462,13 @@ export async function decidePartnerPositionsAnfrageNachtrag(input: {
       : 0
   const fest = Math.round(Math.max(0, eur) * 100) / 100
 
-  const { data: siblings } = await supabaseAdmin
+  const { data: siblings, error } = await supabaseAdmin
     .from('auftrag_positionen')
     .select('gewerk_slug, gewerk_name')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', String(anfrage.handwerker_id))
     .limit(1)
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', error)
 
   const sib = siblings?.[0]
   const positionen: AngebotPosition[] = [
@@ -487,17 +509,19 @@ export async function decidePartnerPositionsAnfrageNachtrag(input: {
 
   if (!nachtrag.ok) return { ok: false, message: nachtrag.message }
 
-  await supabaseAdmin
-    .from('partner_positions_anfragen')
-    .update({
-      status: 'nachtrag',
+  const { error: __dbErr2 } = await writePartnerPositionsAnfrageStatus(
+    supabaseAdmin,
+    input.anfrageId,
+    'nachtrag',
+    {
       nachtrag_id: nachtrag.id,
       crm_notiz: input.notiz?.trim() || null,
       decided_at: new Date().toISOString(),
       decided_by: auth.userId,
       updated_at: new Date().toISOString(),
-    })
-    .eq('id', input.anfrageId)
+    }
+  )
+  if (__dbErr2) logDbError('app/auftraege/partner-positions-anfrage-actions:partner_positions_anfragen', __dbErr2)
 
   await writeAuditEvent({
     entityType: 'auftrag',
@@ -508,7 +532,7 @@ export async function decidePartnerPositionsAnfrageNachtrag(input: {
     payload: { anfrage_id: input.anfrageId, nachtrag_id: nachtrag.id },
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return {
     ok: true,
     message: 'Nachtrag-Entwurf angelegt — bitte an Kunden senden.',
@@ -528,16 +552,18 @@ export async function decidePartnerPositionsAnfrageAblehnen(input: {
   }
 
   const auftragId = String(anfrage.auftrag_id)
-  await supabaseAdmin
-    .from('partner_positions_anfragen')
-    .update({
-      status: 'abgelehnt',
+  const { error: __dbErr3 } = await writePartnerPositionsAnfrageStatus(
+    supabaseAdmin,
+    input.anfrageId,
+    'abgelehnt',
+    {
       crm_notiz: input.notiz?.trim() || null,
       decided_at: new Date().toISOString(),
       decided_by: auth.userId,
       updated_at: new Date().toISOString(),
-    })
-    .eq('id', input.anfrageId)
+    }
+  )
+  if (__dbErr3) logDbError('app/auftraege/partner-positions-anfrage-actions:partner_positions_anfragen', __dbErr3)
 
   const projekt = await auftragTitel(auftragId)
   await notifyPartnerUnified({
@@ -560,7 +586,7 @@ export async function decidePartnerPositionsAnfrageAblehnen(input: {
     payload: { anfrage_id: input.anfrageId, notiz: input.notiz ?? null },
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true, message: 'Meldung abgelehnt — Partner benachrichtigt.' }
 }
 
@@ -577,13 +603,14 @@ export async function decideWeitereArbeitMitNotify(input: {
   })
   if (!base.ok) return { ok: false, message: base.message }
 
-  const { data: pos } = await supabaseAdmin
+  const { data: pos, error } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
       'id, auftrag_id, handwerker_id, leistung_name, beschreibung, preis_partner, preis_kunde, menge, einheit, gewerk_name, gewerk_slug'
     )
     .eq('id', input.positionId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', error)
 
   if (pos?.handwerker_id && pos.auftrag_id) {
     const projekt = await auftragTitel(String(pos.auftrag_id))
@@ -608,7 +635,7 @@ export async function decideWeitereArbeitMitNotify(input: {
         : null
     const preis =
       preisNum != null
-        ? preisNum.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+        ? formatEuro(preisNum, { style: 'currency' })
         : null
     const zeit =
       pos.menge != null && Number(pos.menge) > 0
@@ -624,10 +651,11 @@ export async function decideWeitereArbeitMitNotify(input: {
         (pos.preis_kunde == null || Number(pos.preis_kunde) <= 0) &&
         preisNum != null
       ) {
-        await supabaseAdmin
+        const { error: __dbErr4 } = await supabaseAdmin
           .from('auftrag_positionen')
           .update({ preis_kunde: preisNum })
           .eq('id', pos.id)
+        if (__dbErr4) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', __dbErr4)
       }
       await appendLeistungZuAngebot({
         auftragId: String(pos.auftrag_id),
@@ -656,7 +684,7 @@ export async function decideWeitereArbeitMitNotify(input: {
       fuer_kunde_freigegeben: true,
       handwerker_id: pos.handwerker_id ? String(pos.handwerker_id) : null,
     })
-    revalidatePath(`/auftraege/${pos.auftrag_id}`)
+    revalidateAuftragDetail(pos.auftrag_id)
   }
 
   return {

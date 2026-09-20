@@ -28,13 +28,13 @@ export function portalMailPsIntro(audience: PortalMailAudience, anrede: 'du' | '
 }
 
 export function defaultPortalInviteBetreff(
-  anrede: 'du' | 'sie',
+  _anrede: 'du' | 'sie',
   opts?: { organisation?: boolean }
 ): string {
   if (opts?.organisation) {
-    return anrede === 'du' ? 'Dein Auftraggeber-Portal' : 'Ihr Auftraggeber-Portal'
+    return 'Auftraggeber-Portal – Zugang bereit'
   }
-  return anrede === 'du' ? 'Dein Zugang zu MeinBärenwald' : 'Ihr Zugang zu MeinBärenwald'
+  return 'MeinBärenwald – Zugang bereit'
 }
 
 export function defaultPortalInviteText(
@@ -65,7 +65,7 @@ export function defaultPortalInviteText(
 }
 
 export function defaultPartnerPortalInviteBetreff(): string {
-  return 'Dein Zugang zum Partner-Portal'
+  return 'Partner-Portal – Zugang bereit'
 }
 
 export function defaultPartnerPortalInviteText(): string {

@@ -1,9 +1,11 @@
 'use client'
+import { EMPTY } from '@/lib/crm-labels'
+import { C } from '@/lib/tokens/colors'
 
-import { useMemo, useState, type ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { useMemo, useState, type ReactNode } from 'react'
 import { PositionModal } from '@/components/posboard/PositionModal'
 import { PositionAddSheet, type PositionAddMode } from '@/components/posboard/PositionAddSheet'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -31,6 +33,8 @@ import { richTextToPlain } from '@/lib/rich-text'
 import type { Preisliste } from '@/lib/types'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { toast } from '@/components/ui/app-toast'
+import { deleteWithUndo } from '@/lib/ui/delete-with-undo'
+import { TOAST } from '@/lib/copy'
 
 export type PosBoardBadge = PosTableBadge
 
@@ -142,9 +146,9 @@ export function PosBoard({
   const [gewerkAddOpen, setGewerkAddOpen] = useState(false)
   const [gewerkAddPick, setGewerkAddPick] = useState('')
   const [gewerkAddCustom, setGewerkAddCustom] = useState('')
+  const [gewerkAddErr, setGewerkAddErr] = useState<string | null>(null)
   /** Leere Gewerk-Abschnitte (noch ohne Zeile) — Angebot/Rechnung Komplex + Standalone. */
   const [pendingGewerke, setPendingGewerke] = useState<string[]>([])
-  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
 
   const _line = lineOf ?? posBoardLineNetto
 
@@ -171,12 +175,21 @@ export function PosBoard({
       delete n[id]
       return n
     })
-    setPendingRemoveId(null)
   }
 
   const requestRemove = (id: string) => {
     if (!onChange) return
-    setPendingRemoveId(id)
+    const snapshot = positionen
+    deleteWithUndo({
+      key: `pos:${id}`,
+      removeOptimistic: () => remove(id),
+      restoreOptimistic: () => onChange(snapshot),
+      commit: () => {
+        /* lokal — Wizard-Speichern übernimmt */
+      },
+      commitImmediate: true,
+      message: TOAST.geloescht,
+    })
   }
 
   const dup = (id: string) => {
@@ -301,7 +314,7 @@ export function PosBoard({
   const addFreitext = (
     gewerk?: string,
     draft?: { name?: string; beschreibung?: string }
-  ) => {
+) => {
     if (!onChange) return
     const g = (gewerk ?? '').trim()
     claimPendingGewerk(g)
@@ -452,7 +465,11 @@ export function PosBoard({
     const fromSelect = gewerkAddPick.trim()
     const fromCustom = gewerkAddCustom.trim()
     let name = (forcedName?.trim() || fromCustom || fromSelect).trim()
-    if (!name) return
+    if (!name) {
+      setGewerkAddErr('Bitte Gewerk wählen oder Bezeichnung eingeben.')
+      return
+    }
+    setGewerkAddErr(null)
     if (used.has(name)) {
       let n = 2
       const base = name
@@ -737,7 +754,7 @@ export function PosBoard({
         <div
           className="section-h posboard-sec-h"
           style={{
-            margin: '2px 2px 10px',
+            margin: '0.1250remrem 0.1250remrem 0.6250remrem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -768,10 +785,10 @@ export function PosBoard({
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            padding: '10px 14px',
+            padding: '0.6250remrem 0.8750remrem',
             marginBottom: 10,
-            background: '#5a615d',
-            color: '#fff',
+            background: C.textMuted,
+            color: C.white,
             borderRadius: 10,
             boxShadow: 'var(--shadow-pop)',
           }}
@@ -780,33 +797,24 @@ export function PosBoard({
           <span style={{ fontWeight: 600, fontSize: 'var(--fs-text)' }}>{selectedIds.length} ausgewählt</span>
           <div style={{ flex: 1 }} />
           {(bulkActions ? bulkActions(selectedPositions, clearSel) : []).map((a, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={a.onClick}
-              style={{
+            <MockBtn key={i} type="button" onClick={a.onClick} style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                padding: '6px 12px',
+                padding: '0.3750remrem 0.75rem',
                 borderRadius: 8,
                 border: 'none',
                 background: 'rgba(255,255,255,0.16)',
-                color: '#fff',
+                color: C.white,
                 fontSize: 'var(--fs-text)',
                 fontWeight: 500,
                 cursor: 'pointer',
-              }}
-            >
+              }}>
               {a.icon ? <MockIcon ctx="default" n={a.icon} size={15} /> : null}
               {a.label}
-            </button>
+            </MockBtn>
           ))}
-          <button
-            type="button"
-            onClick={clearSel}
-            title="Auswahl aufheben"
-            style={{
+          <MockBtn type="button" onClick={clearSel} title="Auswahl aufheben" style={{
               display: 'inline-flex',
               padding: 6,
               borderRadius: 8,
@@ -814,10 +822,9 @@ export function PosBoard({
               background: 'transparent',
               color: 'rgba(255,255,255,0.8)',
               cursor: 'pointer',
-            }}
-          >
+            }}>
             <MockIcon ctx="default" n="x" size={16} />
-          </button>
+          </MockBtn>
         </div>
       ) : null}
       {editable ? (
@@ -868,61 +875,36 @@ export function PosBoard({
             <p className="posboard-empty-hint">Noch keine Positionen.</p>
           ) : null}
           <div className="posboard-add-fabs">
-            <button
-              type="button"
-              className="posboard-add-fab"
-              onClick={() =>
-                openAddSheet(hideAddGewerk ? defaultGewerk() : '', 'preisliste')
-              }
-            >
+            <MockBtn className="posboard-add-fab" type="button" onClick={() =>
+                openAddSheet(hideAddGewerk ? defaultGewerk() : '', 'preisliste')}>
               <MockIcon ctx="btn" n="plus" size={18} />
               Position hinzufügen
-            </button>
+            </MockBtn>
             {!hideAddGewerk ? (
               <>
-                <button
-                  type="button"
-                  className="posboard-add-fab posboard-add-fab--secondary"
-                  onClick={() => onAddKind('freitext')}
-                >
+                <MockBtn className="posboard-add-fab posboard-add-fab--secondary" type="button" onClick={() => onAddKind('freitext')}>
                   <MockIcon ctx="btn" n="align-left" size={18} />
                   Freitext
-                </button>
-                <button
-                  type="button"
-                  className="posboard-add-fab posboard-add-fab--secondary"
-                  onClick={() => onAddKind('nachlass')}
-                >
+                </MockBtn>
+                <MockBtn className="posboard-add-fab posboard-add-fab--secondary" type="button" onClick={() => onAddKind('nachlass')}>
                   <MockIcon ctx="btn" n="percent" size={18} />
                   Nachlass
-                </button>
-                <button
-                  type="button"
-                  className="posboard-add-fab posboard-add-fab--secondary"
-                  onClick={addGewerk}
-                >
+                </MockBtn>
+                <MockBtn className="posboard-add-fab posboard-add-fab--secondary" type="button" onClick={addGewerk}>
                   <MockIcon ctx="btn" n="folder-open" size={18} />
                   Gewerk hinzufügen
-                </button>
+                </MockBtn>
               </>
             ) : (
               <>
-                <button
-                  type="button"
-                  className="posboard-add-fab posboard-add-fab--secondary"
-                  onClick={() => onAddKind('freitext')}
-                >
+                <MockBtn className="posboard-add-fab posboard-add-fab--secondary" type="button" onClick={() => onAddKind('freitext')}>
                   <MockIcon ctx="btn" n="align-left" size={18} />
                   Freitext
-                </button>
-                <button
-                  type="button"
-                  className="posboard-add-fab posboard-add-fab--secondary"
-                  onClick={() => onAddKind('nachlass')}
-                >
+                </MockBtn>
+                <MockBtn className="posboard-add-fab posboard-add-fab--secondary" type="button" onClick={() => onAddKind('nachlass')}>
                   <MockIcon ctx="btn" n="percent" size={18} />
                   Nachlass
-                </button>
+                </MockBtn>
               </>
             )}
           </div>
@@ -944,40 +926,24 @@ export function PosBoard({
             )
         : null}
       {gEdit != null ? (
-        <MockModal
+        <EditorSheet
           open
           onClose={() => setGEdit(null)}
-          icon="folder-open"
           title="Gewerk bearbeiten"
-          sub={gEdit}
-          footer={
-            <>
-              <div style={{ flex: 1 }} />
-              <MockBtn
-                sm
-                kind="primary"
-                icon="check"
-                onClick={() => {
-                  if (gName.trim() && gName.trim() !== gEdit) renameGewerk(gEdit, gName.trim())
-                  setGEdit(null)
-                }}
-              >
-                Speichern
-              </MockBtn>
-            </>
-          }
+          subtitle={gEdit}
+          primary={{
+            label: 'Speichern',
+            onClick: () => {
+              if (gName.trim() && gName.trim() !== gEdit) renameGewerk(gEdit, gName.trim())
+              setGEdit(null)
+            },
+          }}
         >
           <div className="field">
             <div className="field-label">Gewerk-Bezeichnung</div>
-            <input
-              className="txt"
-              value={gName}
-              onChange={(e) => setGName(e.target.value)}
-              placeholder="z.B. Sanitär · Heizung"
-              autoFocus
-            />
+            <MockInput className="txt" value={gName} onChange={(e) => setGName(e.target.value)} placeholder="z.B. Sanitär · Heizung" autoFocus />
           </div>
-        </MockModal>
+        </EditorSheet>
       ) : null}
       {gewerkAddOpen ? (
         <EditorSheet
@@ -988,48 +954,45 @@ export function PosBoard({
             setGewerkAddOpen(false)
             setGewerkAddPick('')
             setGewerkAddCustom('')
+            setGewerkAddErr(null)
           }}
           onConfirm={() => confirmAddGewerk()}
-          confirmDisabled={!gewerkAddCustom.trim() && !gewerkAddPick.trim()}
         >
+          {gewerkAddErr ? (
+            <p className="field-error" role="alert">
+              {gewerkAddErr}
+            </p>
+          ) : null}
           {gewerkeZumHinzufuegen.length > 0 ? (
             <div className="field">
               <div className="field-label">Aus Stammdaten</div>
-              <select
-                className="sel"
-                value={gewerkAddPick}
-                onChange={(e) => {
+              <MockSelect className="sel" value={gewerkAddPick} onChange={(e) => {
+                  setGewerkAddErr(null)
                   setGewerkAddPick(e.target.value)
                   if (e.target.value) setGewerkAddCustom('')
-                }}
-                autoFocus
-              >
+                }} autoFocus>
                 <option value="">Gewerk wählen…</option>
                 {gewerkeZumHinzufuegen.map((g) => (
                   <option key={g} value={g}>
                     {g}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </div>
           ) : (
             <p className="m-0 mb-2.5 text-[length:var(--fs-meta)] text-bw-text-muted">
               {gewerke.length === 0
-                ? 'Keine Gewerke in den Stammdaten — bitte freie Bezeichnung nutzen.'
+                ? EMPTY.gewerkeStammdaten
                 : 'Alle Stammdaten-Gewerke sind bereits als Abschnitt vorhanden.'}
             </p>
           )}
           <div className="field" style={{ marginTop: gewerkeZumHinzufuegen.length ? 12 : 0 }}>
             <div className="field-label">Oder freie Bezeichnung</div>
-            <input
-              className="txt"
-              value={gewerkAddCustom}
-              onChange={(e) => {
+            <MockInput className="txt" value={gewerkAddCustom} onChange={(e) => {
+                setGewerkAddErr(null)
                 setGewerkAddCustom(e.target.value)
                 if (e.target.value.trim()) setGewerkAddPick('')
-              }}
-              placeholder="z.B. Trockenbau · 1. OG"
-            />
+              }} placeholder="z.B. Trockenbau · 1. OG" />
           </div>
         </EditorSheet>
       ) : null}
@@ -1068,42 +1031,27 @@ export function PosBoard({
         />
       ) : null}
       {preislisteOpen ? (
-        <MockModal
+        <EditorSheet
           open
           onClose={() => {
             setPreislisteOpen(false)
             setPreislistePick('')
             setPreislisteTargetGewerk(null)
           }}
-          icon="list-filter"
           title="Aus Preisliste (Legacy)"
-          sub="Fallback bis Katalog importiert ist"
-          footer={
-            <>
-              <div style={{ flex: 1 }} />
-              <MockBtn
-                sm
-                kind="primary"
-                icon="check"
-                disabled={!preislistePick}
-                onClick={() => {
-                  const pl = aktivePreislisten.find((p) => p.id === preislistePick)
-                  if (pl) addFromPreisliste(pl)
-                }}
-              >
-                Übernehmen
-              </MockBtn>
-            </>
-          }
+          subtitle="Fallback bis Katalog importiert ist"
+          primary={{
+            label: 'Speichern',
+            disabled: !preislistePick,
+            onClick: () => {
+              const pl = aktivePreislisten.find((p) => p.id === preislistePick)
+              if (pl) addFromPreisliste(pl)
+            },
+          }}
         >
           <div className="field">
             <div className="field-label">Preisliste</div>
-            <select
-              className="sel"
-              value={preislistePick}
-              onChange={(e) => setPreislistePick(e.target.value)}
-              autoFocus
-            >
+            <MockSelect className="sel" value={preislistePick} onChange={(e) => setPreislistePick(e.target.value)} autoFocus>
               <option value="">Leistung wählen…</option>
               {aktivePreislisten.map((pl) => (
                 <option key={pl.id} value={pl.id}>
@@ -1112,40 +1060,9 @@ export function PosBoard({
                   {formatEurBetrag(preislisteEinheitspreisNetto(pl))}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </div>
-        </MockModal>
-      ) : null}
-      {pendingRemoveId ? (
-        <MockModal
-          open
-          icon="trash"
-          title="Position löschen?"
-          sub="Aus dem Leistungsblatt entfernen."
-          size="sm"
-          onClose={() => setPendingRemoveId(null)}
-          footer={
-            <>
-              <MockBtn kind="ghost" onClick={() => setPendingRemoveId(null)}>
-                Abbrechen
-              </MockBtn>
-              <div style={{ flex: 1 }} />
-              <MockBtn
-                kind="danger"
-                icon="trash"
-                onClick={() => {
-                  if (pendingRemoveId) remove(pendingRemoveId)
-                }}
-              >
-                Position löschen
-              </MockBtn>
-            </>
-          }
-        >
-          <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
-            Die Position wird aus der Liste entfernt. Speichern im Wizard übernimmt die Änderung.
-          </div>
-        </MockModal>
+        </EditorSheet>
       ) : null}
     </div>
   )

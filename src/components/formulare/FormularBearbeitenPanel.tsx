@@ -1,4 +1,12 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import type { MockIconName } from '@/lib/mock-icons'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -19,27 +27,11 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
 import { Toggle } from '@/components/ui/Toggle'
-import { Modal } from '@/components/ui/Modal'
 import { FormularVorschauModal } from '@/components/formulare/FormularVorschauModal'
 import { saveFormularTemplate } from '@/app/(dashboard)/formulare/actions'
 import type { FormularFeld, FormularTemplate } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import {
-  Calendar,
-  Camera,
-  ChevronDown,
-  Hash,
-  Pencil,
-  Pilcrow,
-  Square,
-  Type,
-  type LucideIcon,
-} from 'lucide-react'
-
 const FELD_TYPEN: { value: FormularFeld['typ']; label: string }[] = [
   { value: 'text', label: 'Text' },
   { value: 'textarea', label: 'Langer Text' },
@@ -54,28 +46,27 @@ function newFieldId() {
   return globalThis.crypto?.randomUUID?.() ?? `f_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
-function feldTypIconComponent(typ: FormularFeld['typ']): LucideIcon {
+function feldTypIconName(typ: FormularFeld['typ']): MockIconName {
   switch (typ) {
     case 'checkbox':
-      return Square
+      return 'circle'
     case 'foto':
-      return Camera
+      return 'photo'
     case 'date':
-      return Calendar
+      return 'calendar'
     case 'number':
-      return Hash
+      return 'tag'
     case 'select':
-      return ChevronDown
+      return 'chevron-down'
     case 'textarea':
-      return Pilcrow
+      return 'text-caption'
     default:
-      return Type
+      return 'text-caption'
   }
 }
 
 function FeldTypIcon({ typ }: { typ: FormularFeld['typ'] }) {
-  const Icon = feldTypIconComponent(typ)
-  return <Icon className="h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
+  return <MockIcon n={feldTypIconName(typ)} ctx="default" size={16} className="text-bw-text-muted" />
 }
 
 function BearbeitenSortableRow({
@@ -100,7 +91,7 @@ function BearbeitenSortableRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 rounded-lg bg-bw-hover p-3"
+      className="flex items-center gap-2 rounded-field bg-bw-hover p-3"
     >
       <span
         className="cursor-grab select-none text-lg text-bw-border touch-none"
@@ -115,20 +106,10 @@ function BearbeitenSortableRow({
         {feld.label || `Feld ${idx + 1}`}
         {feld.pflicht ? <span className="ml-0.5 text-bw-accent">*</span> : null}
       </span>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="rounded p-1 text-bw-text-muted hover:text-bw-text"
-        aria-label="Bearbeiten"
-      ><Pencil className="h-4 w-4" aria-hidden /></button>
-      <button
-        type="button"
-        onClick={onDelete}
-        className="rounded p-1 text-bw-text-muted hover:text-status-cancel-text"
-        aria-label="Entfernen"
-      >
+      <MockBtn className="rounded-button p-1 text-bw-text-muted hover:text-bw-text" type="button" onClick={onEdit} aria-label="Bearbeiten"><MockIcon n="pencil" ctx="default" className="h-4 w-4" aria-hidden /></MockBtn>
+      <MockBtn className="rounded-button p-1 text-bw-text-muted hover:text-status-cancel-text" type="button" onClick={onDelete} aria-label="Löschen">
         ×
-      </button>
+      </MockBtn>
     </div>
   )
 }
@@ -315,26 +296,18 @@ export function FormularBearbeitenPanel({
   return (
     <div className="flex max-h-[calc(100vh-6rem)] flex-col">
       <div className="flex shrink-0 border-b border-bw-border px-4 pt-2">
-        <button
-          type="button"
-          onClick={() => setTab('felder')}
-          className={cn(
+        <MockBtn className={cn(
             'border-b-2 px-3 py-2 text-sm font-medium transition-colors',
             tab === 'felder' ? 'border-bw-primary text-bw-primary' : 'border-transparent text-bw-text-muted'
-          )}
-        >
+          )} type="button" onClick={() => setTab('felder')}>
           Felder
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('einstellungen')}
-          className={cn(
+        </MockBtn>
+        <MockBtn className={cn(
             'border-b-2 px-3 py-2 text-sm font-medium transition-colors',
             tab === 'einstellungen' ? 'border-bw-primary text-bw-primary' : 'border-transparent text-bw-text-muted'
-          )}
-        >
+          )} type="button" onClick={() => setTab('einstellungen')}>
           Einstellungen
-        </button>
+        </MockBtn>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -359,60 +332,34 @@ export function FormularBearbeitenPanel({
             </DndContext>
 
             <div className="relative" ref={addWrapRef}>
-              <button
-                type="button"
-                onClick={() => setAddFeldOpen((o) => !o)}
-                className="btn ghost sm w-full"
-              >
+              <MockBtn kind="ghost" sm fullWidth type="button" onClick={() => setAddFeldOpen((o) => !o)}>
                 + Feld hinzufügen
-              </button>
+              </MockBtn>
               {addFeldOpen ? (
-                <div className="absolute bottom-full left-0 right-0 z-10 mb-1 rounded-lg border border-bw-border bg-bw-card p-2 shadow-lg">
+                <div className="absolute bottom-full left-0 right-0 z-10 mb-1 rounded-card border border-bw-border bg-surface p-2 shadow-lg">
                   {FELD_TYPEN.map((typ) => (
-                    <button
-                      key={typ.value}
-                      type="button"
-                      onClick={() => addFeld(typ.value)}
-                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-bw-text hover:bg-bw-hover"
-                    >
+                    <MockBtn fullWidth className="flex items-center gap-2 rounded-button px-3 py-2 text-left text-sm text-bw-text hover:bg-bw-hover" key={typ.value} type="button" onClick={() => addFeld(typ.value)}>
                       <FeldTypIcon typ={typ.value} />
                       {typ.label}
-                    </button>
+                    </MockBtn>
                   ))}
                 </div>
               ) : null}
             </div>
 
-            <button type="button" onClick={() => setVorschauOpen(true)} className="btn ghost sm w-full">
+            <MockBtn kind="ghost" sm fullWidth type="button" onClick={() => setVorschauOpen(true)}>
               Vorschau ansehen
-            </button>
+            </MockBtn>
 
-            <button type="button" onClick={handleSave} disabled={pending} className="btn primary sm w-full">
+            <MockBtn kind="primary" sm fullWidth type="button" onClick={handleSave} disabled={pending}>
               Speichern
-            </button>
+            </MockBtn>
           </div>
         ) : (
           <div className="space-y-4 p-4">
-            <Input
-              label="Name *"
-              value={form.name}
-              onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-              required
-            />
-            <Select
-              label="Typ"
-              name="subtyp"
-              value={form.subtyp}
-              onChange={(e) => setForm((s) => ({ ...s, subtyp: e.target.value }))}
-              options={subtypOptions}
-            />
-            <Select
-              label="Phase"
-              name="phase"
-              value={form.phase || ''}
-              onChange={(e) => setForm((s) => ({ ...s, phase: e.target.value }))}
-              options={phaseOptions}
-            />
+            <MockField label="Name *" required><MockInput value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} required /></MockField>
+            <Combobox label="Typ" id="subtyp" name="subtyp" options={subtypOptions} value={form.subtyp == null ? '' : String(form.subtyp)} placeholder="Auswählen…" onChange={(next) => { setForm((s) => ({ ...s, subtyp: next })); }} />
+            <Combobox label="Phase" id="phase" name="phase" options={phaseOptions} value={form.phase || '' == null ? '' : String(form.phase || '')} placeholder="Auswählen…" onChange={(next) => { setForm((s) => ({ ...s, phase: next })); }} />
             <Toggle
               label="Aktiv"
               hint="Inaktive Templates können nicht gesendet werden"
@@ -420,12 +367,12 @@ export function FormularBearbeitenPanel({
               onChange={(v) => setForm((s) => ({ ...s, aktiv: v }))}
             />
             <div className="flex gap-2 pt-2">
-              <button type="button" onClick={onClose} className="btn ghost flex-1">
+              <MockBtn kind="ghost" className="flex-1" type="button" onClick={onClose}>
                 Abbrechen
-              </button>
-              <button type="button" onClick={handleSave} disabled={pending} className="btn primary flex-1">
+              </MockBtn>
+              <MockBtn kind="primary" className="flex-1" type="button" onClick={handleSave} disabled={pending}>
                 Speichern
-              </button>
+              </MockBtn>
             </div>
           </div>
         )}
@@ -438,40 +385,29 @@ export function FormularBearbeitenPanel({
         felder={felder}
       />
 
-      <Modal open={!!editFeld} onClose={() => setEditFeld(null)} title="Feld bearbeiten" size="md">
+      <EditorSheet open={!!editFeld} onClose={() => setEditFeld(null)} title="Feld bearbeiten" size="md">
         {editFeld ? (
           <div className="space-y-4">
-            <Input label="Label *" value={flLabel} onChange={(e) => setFlLabel(e.target.value)} required />
-            <Select
-              label="Typ"
-              name="fl-typ"
-              value={flTyp}
-              onChange={(e) => setFlTyp(e.target.value as FormularFeld['typ'])}
-              options={typSelectOptions}
-            />
+            <MockField label="Label *" required><MockInput value={flLabel} onChange={(e) => setFlLabel(e.target.value)} required /></MockField>
+            <Combobox label="Typ" id="fl-typ" name="fl-typ" options={typSelectOptions} value={flTyp == null ? '' : String(flTyp)} placeholder="Auswählen…" onChange={(next) => { setFlTyp(next as FormularFeld['typ']); }} />
             <label className="flex items-center gap-2 text-sm text-bw-text">
-              <input type="checkbox" checked={flPflicht} onChange={(e) => setFlPflicht(e.target.checked)} />
+              <MockCheckbox checked={flPflicht} onChange={(e) => setFlPflicht(e.target.checked)} />
               Pflichtfeld
             </label>
             {flTyp === 'select' ? (
-              <Textarea
-                label="Optionen (eine pro Zeile)"
-                value={flOpts}
-                onChange={(e) => setFlOpts(e.target.value)}
-                rows={4}
-              />
+              <MockField label="Optionen (eine pro Zeile)"><RichTextEditor value={typeof (flOpts) === 'string' ? (flOpts) : ''} onChange={(__v) => setFlOpts(__v)} minHeight={120} aria-label="Optionen (eine pro Zeile)" /></MockField>
             ) : null}
             <div className="flex gap-2 pt-2">
-              <button type="button" onClick={() => setEditFeld(null)} className="btn ghost flex-1">
+              <MockBtn kind="ghost" className="flex-1" type="button" onClick={() => setEditFeld(null)}>
                 Abbrechen
-              </button>
-              <button type="button" onClick={saveEditFeld} className="btn primary flex-1">
+              </MockBtn>
+              <MockBtn kind="primary" className="flex-1" type="button" onClick={saveEditFeld}>
                 Speichern
-              </button>
+              </MockBtn>
             </div>
           </div>
         ) : null}
-      </Modal>
+      </EditorSheet>
     </div>
   )
 }

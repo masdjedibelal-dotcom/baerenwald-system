@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import type { VizPrepareQuestion } from '@/lib/visualize/types'
 import { cn } from '@/lib/utils'
 
@@ -19,7 +20,7 @@ export function VizPrepareQuestions({
   return (
     <div
       className={cn(
-        'rounded-xl border border-[#2E7D52]/25 bg-[#EEF3EC] p-4',
+        'rounded-sheet border border-bw-primary/25 bg-bw-green-bg p-4',
         className
       )}
     >
@@ -29,22 +30,16 @@ export function VizPrepareQuestions({
       ) : null}
       <div className="mt-3 flex flex-col gap-2">
         {question.options.map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            disabled={disabled}
-            className={cn(
-              'rounded-lg border border-bw-border bg-white px-3 py-2.5 text-left transition-colors',
+          <MockBtn className={cn(
+              'rounded-button border border-bw-border bg-white px-3 py-2.5 text-left transition-colors',
               'hover:border-bw-primary hover:bg-bw-hover/30',
               disabled && 'pointer-events-none opacity-60'
-            )}
-            onClick={() => onAnswer(question.id, opt.id, opt.label)}
-          >
+            )} key={opt.id} type="button" disabled={disabled} onClick={() => onAnswer(question.id, opt.id, opt.label)}>
             <span className="block text-[length:var(--fs-text)] font-medium text-bw-text">{opt.label}</span>
             {opt.hint ? (
               <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">{opt.hint}</span>
             ) : null}
-          </button>
+          </MockBtn>
         ))}
       </div>
     </div>

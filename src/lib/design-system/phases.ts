@@ -64,7 +64,7 @@ export const UI_PHASES: UiPhase[] = [
     todos: [
       'Angebot-Positionen v3 editierbar (wie Auftrag)',
       'Positionen v3 — Vorgänge-Flow + Badges',
-      'Handwerker-Journey CRM + Portal (Checkliste + Handoff-Doku)',
+      'Partner-Journey CRM + Portal (Checkliste + Handoff-Doku)',
       'Angebot-Wizard + Detail entflechten',
       'Finanzen — ein Einstieg (Tab vs. Route)',
     ],
@@ -76,7 +76,7 @@ export const UI_PHASES: UiPhase[] = [
     todos: [
       'Legacy Positionen-Tab entfernt (v3 aktiv)',
       'RechnungNeuForm entfernt — Wizard ist Create/Edit',
-      'Mock = SoT: Modal/MockModal, MockEmpty/EmptyState, DetailShell vereinheitlicht',
+      'Mock = SoT: EditorSheet/ConfirmPopup, MockEmpty/EmptyState, DetailShell vereinheitlicht',
       'Copy: Staff = Du (Login + Kern-UI); Kunde/Partner = immer Sie',
       'A11y: Focus-Trap in Modal + EditorSheet',
       'Empty/Error/Loading Skeletons (Listen + Detail via CrmPageLoading)',

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireCrmAngebotAccess } from '@/lib/visualize/auth'
@@ -71,6 +72,7 @@ export async function POST(req: Request) {
     contentType: type,
     upsert: false,
   })
+  if (upErr) logDbError('app/api/visualize/upload/route:query', upErr)
   if (upErr) {
     return NextResponse.json({ error: upErr.message }, { status: 500 })
   }

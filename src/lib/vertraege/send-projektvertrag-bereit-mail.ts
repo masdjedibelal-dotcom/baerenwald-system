@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailHandwerkerErgaenzungBereit, mailHandwerkerProjektvertragBereit } from '@/lib/mail-templates'
@@ -34,9 +35,8 @@ export async function sendProjektvertragBereitMail(input: {
       .eq('id', vertragId)
       .maybeSingle(),
   ])
-
-  if (!hw) return { ok: false, message: 'Handwerker nicht gefunden' }
-  if (hw.aktiv === false) return { ok: true, gesendet: false, hinweis: 'Handwerker inaktiv' }
+  if (!hw) return { ok: false, message: 'Partner nicht gefunden' }
+  if (hw.aktiv === false) return { ok: true, gesendet: false, hinweis: 'Partner inaktiv' }
   if (!auftrag) return { ok: false, message: 'Auftrag nicht gefunden' }
   if (!vertrag?.pdf_url?.trim()) {
     return { ok: true, gesendet: false, hinweis: 'Kein Vertrags-PDF — Mail übersprungen' }
@@ -44,18 +44,19 @@ export async function sendProjektvertragBereitMail(input: {
 
   const email = (hw.email as string | null)?.trim() || ''
   if (!email) {
-    return { ok: true, gesendet: false, hinweis: 'Keine E-Mail beim Handwerker hinterlegt' }
+    return { ok: true, gesendet: false, hinweis: 'Keine E-Mail beim Partner hinterlegt' }
   }
 
   let anfrageId: string | null = null
   const angebotId = (auftrag as { angebot_id?: string | null }).angebot_id
   if (angebotId) {
-    const { data: zu } = await supabaseAdmin
+    const { data: zu, error } = await supabaseAdmin
       .from('angebot_handwerker')
       .select('id')
       .eq('angebot_id', angebotId)
       .eq('handwerker_id', handwerkerId)
       .maybeSingle()
+    if (error) logDbError('lib/vertraege/send-projektvertrag-bereit-mail:angebot_handwerker', error)
     anfrageId = (zu?.id as string | undefined) ?? null
   }
 
@@ -118,9 +119,8 @@ export async function sendErgaenzungBereitMail(input: {
       .eq('id', vertragId)
       .maybeSingle(),
   ])
-
-  if (!hw) return { ok: false, message: 'Handwerker nicht gefunden' }
-  if (hw.aktiv === false) return { ok: true, gesendet: false, hinweis: 'Handwerker inaktiv' }
+  if (!hw) return { ok: false, message: 'Partner nicht gefunden' }
+  if (hw.aktiv === false) return { ok: true, gesendet: false, hinweis: 'Partner inaktiv' }
   if (!auftrag) return { ok: false, message: 'Auftrag nicht gefunden' }
   if (!vertrag?.pdf_url?.trim()) {
     return { ok: true, gesendet: false, hinweis: 'Kein Vertrags-PDF — Mail übersprungen' }
@@ -128,18 +128,19 @@ export async function sendErgaenzungBereitMail(input: {
 
   const email = (hw.email as string | null)?.trim() || ''
   if (!email) {
-    return { ok: true, gesendet: false, hinweis: 'Keine E-Mail beim Handwerker hinterlegt' }
+    return { ok: true, gesendet: false, hinweis: 'Keine E-Mail beim Partner hinterlegt' }
   }
 
   let anfrageId: string | null = null
   const angebotId = (auftrag as { angebot_id?: string | null }).angebot_id
   if (angebotId) {
-    const { data: zu } = await supabaseAdmin
+    const { data: zu, error } = await supabaseAdmin
       .from('angebot_handwerker')
       .select('id')
       .eq('angebot_id', angebotId)
       .eq('handwerker_id', handwerkerId)
       .maybeSingle()
+    if (error) logDbError('lib/vertraege/send-projektvertrag-bereit-mail:angebot_handwerker', error)
     anfrageId = (zu?.id as string | undefined) ?? null
   }
 

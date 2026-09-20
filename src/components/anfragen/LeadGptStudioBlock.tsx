@@ -1,10 +1,11 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
-import { ExternalLink, Loader2, MessageSquare, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ensureLeadVertriebsAnalyse } from '@/app/(dashboard)/anfragen/actions'
-import { MockModal } from '@/components/mock-ui/MockModal'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { gptGalerieUrls, isGptProjektStudio, parseGptProjektStudioFunnel } from '@/lib/gpt-viz/funnel-daten'
 import type { LeadDetail } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -142,10 +143,10 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
 
   return (
     <>
-      <div className="ki-bedarf-inline space-y-3 rounded-xl border border-[#2E7D52]/30 bg-[#EAF3DE]/55 p-3.5 md:p-4">
+      <div className="ki-bedarf-inline space-y-3 rounded-sheet border border-bw-primary/30 bg-bw-green-bg/55 p-3.5 md:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[#2E7D52]">
+            <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-primary">
               Lead-Auskunft · KI
             </p>
             {istGpt ? (
@@ -163,26 +164,21 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
           <MockBtn
             sm
             kind="ghost"
-            disabled={loading}
+            loading={loading}
             onClick={() => void analyseAktualisieren()}
             title="Analyse neu berechnen"
           >
-            {loading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <>
-                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
-                <span className="hidden sm:inline">Aktualisieren</span>
-              </>
-            )}
+            <MockIcon n="history" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+            <span className="hidden sm:inline">Aktualisieren</span>
           </MockBtn>
         </div>
 
         {loading && !analyse ? (
-          <div className="flex items-center gap-2 text-[length:var(--fs-text)] text-bw-text-muted">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Chat und Website-Verhalten werden ausgewertet…
-          </div>
+          <CrmInlineLoading
+            label="Chat und Website-Verhalten werden ausgewertet…"
+            minHeight={48}
+            className="text-[length:var(--fs-text)]"
+          />
         ) : analyse ? (
           <AnalyseAbschnitt text={analyse} />
         ) : (
@@ -194,7 +190,7 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
         {error && analyse ? <p className="text-[length:var(--fs-meta)] text-status-cancel-text">{error}</p> : null}
 
         {!analyse && erk && !loading ? (
-          <div className="space-y-3 rounded-lg border border-[#2E7D52]/15 bg-white/60 p-3">
+          <div className="space-y-3 rounded-card border border-bw-primary/15 bg-white/60 p-3">
             <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
               Rohdaten (Website)
             </p>
@@ -225,13 +221,13 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-[#2E7D52]/20"
+                  className="group relative block h-16 w-16 overflow-hidden rounded-card border border-bw-primary/20"
                   title="Bild öffnen"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="" className="h-full w-full object-cover" />
                   <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">
-                    <ExternalLink className="h-3.5 w-3.5 text-white" aria-hidden />
+                    <MockIcon n="external-link" ctx="default" className="h-3.5 w-3.5 text-white" aria-hidden />
                   </span>
                 </a>
               ))}
@@ -240,26 +236,21 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
         ) : null}
 
         {chat.length > 0 ? (
-          <button
-            type="button"
-            className="inline-flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg border border-[#2E7D52]/25 bg-white/70 px-3 py-2 text-left text-[length:var(--fs-text)] font-semibold text-[#1A3D2B] transition hover:bg-white"
-            onClick={() => setChatOpen(true)}
-          >
+          <MockBtn fullWidth className="inline-flex min-h-[40px] items-center justify-between gap-2 rounded-card border border-bw-primary/25 bg-white/70 px-3 py-2 text-left text-[length:var(--fs-text)] font-semibold text-bw-dark transition hover:bg-white" type="button" onClick={() => setChatOpen(true)}>
             <span className="inline-flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 shrink-0 text-[#2E7D52]" aria-hidden />
+              <MockIcon n="message" ctx="default" className="h-4 w-4 shrink-0 text-bw-primary" aria-hidden />
               Chat-Verlauf ({chat.length})
             </span>
             <span className="text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Öffnen</span>
-          </button>
+          </MockBtn>
         ) : null}
       </div>
 
-      <MockModal
+      <EditorSheet
         open={chatOpen}
         onClose={() => setChatOpen(false)}
-        icon="message"
         title="Chat-Verlauf"
-        sub={`${chat.length} Nachrichten · Website-KI`}
+        subtitle={`${chat.length} Nachrichten · Website-KI`}
         size="lg"
       >
         <div className="max-h-[min(70vh,520px)] space-y-2.5 overflow-y-auto overscroll-contain pr-1">
@@ -267,8 +258,8 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
             <div
               key={`${m.role}-${i}`}
               className={cn(
-                'rounded-lg px-3 py-2.5 text-[length:var(--fs-text)] leading-relaxed',
-                m.role === 'user' ? 'bg-bw-bg text-bw-text' : 'bg-[#EAF3DE] text-[#1A3D2B]'
+                'rounded-card px-3 py-2.5 text-[length:var(--fs-text)] leading-relaxed',
+                m.role === 'user' ? 'bg-bw-bg text-bw-text' : 'bg-bw-green-bg text-bw-dark'
               )}
             >
               <p className="mb-0.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide opacity-70">
@@ -278,7 +269,7 @@ export function LeadGptStudioBlock({ lead }: { lead: LeadDetail }) {
             </div>
           ))}
         </div>
-      </MockModal>
+      </EditorSheet>
     </>
   )
 }

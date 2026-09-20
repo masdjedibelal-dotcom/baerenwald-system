@@ -37,8 +37,8 @@ export function KiDauerBautagebuchCard({ analyse, onGenerateKi, kiLoading }: KiC
       {kontext.length > 0 ? (
         <ul className="space-y-2">
           {kontext.map((s, i) => (
-            <li key={i} className="rounded-lg bg-bw-bg px-3 py-2 text-sm">
-              <p className="text-[11px] text-muted">
+            <li key={i} className="rounded-card bg-bw-bg px-3 py-2 text-sm">
+              <p className="text-fs-caption text-muted">
                 {s.quelle} · {s.datum} · {s.gewerk}
               </p>
               <p className="mt-0.5 text-bw-text">{s.text}</p>

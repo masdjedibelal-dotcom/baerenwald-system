@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateRechnungDetail, revalidateRechnungList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import {
   emptyZahlungsplan,
@@ -42,6 +48,7 @@ async function angebotIdForAuftrag(
     .select('angebot_id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/zahlungsplan-actions:auftraege', error)
   if (error) return { ok: false, message: error.message }
   const angebotId = data?.angebot_id ? String(data.angebot_id) : ''
   if (!angebotId) {
@@ -80,15 +87,17 @@ export async function saveAuftragZahlungsplan(
     .select('zahlungsplan')
     .eq('id', angRef.angebotId)
     .maybeSingle()
+  if (loadErr) logDbError('app/auftraege/zahlungsplan-actions:angebote', loadErr)
 
   if (loadErr) return { ok: false, message: loadErr.message }
 
   const bisher = parseZahlungsplan(angRow?.zahlungsplan) ?? emptyZahlungsplan()
 
-  const { data: rechnungen } = await supabase
+  const { data: rechnungen, error: error2 } = await supabase
     .from('rechnungen')
     .select('id, status, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, brutto, faellig_am')
     .eq('auftrag_id', auftragId)
+  if (error2) logDbError('app/auftraege/zahlungsplan-actions:rechnungen', error2)
 
   const links = (rechnungen ?? []).map((r) => ({
     id: r.id as string,
@@ -115,11 +124,12 @@ export async function saveAuftragZahlungsplan(
     normalized = normalizeAbschlagsplanSchluss(merged.plan)
   }
 
-  const { data: auftragPosRows } = await supabase
+  const { data: auftragPosRows, error: error3 } = await supabase
     .from('auftrag_positionen')
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: true })
+  if (error3) logDbError('app/auftraege/zahlungsplan-actions:auftrag_positionen', error3)
 
   let gesamtNetto = 0
   if (auftragPosRows?.length) {
@@ -130,19 +140,20 @@ export async function saveAuftragZahlungsplan(
   const sumGate = validateZahlungsplanGegenGesamt(normalized, gesamtNetto)
   if (!sumGate.ok) return sumGate
 
-  const { error } = await supabase
+  const { error: error4 } = await supabase
     .from('angebote')
     .update({ zahlungsplan: normalized, updated_at: new Date().toISOString() })
     .eq('id', angRef.angebotId)
+  if (error4) logDbError('app/auftraege/zahlungsplan-actions:angebote', error4)
 
-  if (error) {
-    if (error.message.includes('zahlungsplan')) {
+  if (error4) {
+    if (error4.message.includes('zahlungsplan')) {
       return {
         ok: false,
         message: 'Datenbank-Schema veraltet: Migration für Zahlungsplan ausführen.',
       }
     }
-    return { ok: false, message: error.message }
+    return { ok: false, message: error4.message }
   }
 
   // Verwaiste Voll-Entwürfe (z. B. nach Auftrag→Rechnung ohne Plan) bereinigen
@@ -153,10 +164,9 @@ export async function saveAuftragZahlungsplan(
   const entwuerfe = await ensureAbschlagEntwuerfeForAuftrag(auftragId, normalized)
   if (!entwuerfe.ok) return entwuerfe
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath(`/angebote/${angRef.angebotId}`)
-  revalidatePath('/vorgaenge')
-  revalidatePath('/rechnungen')
+  revalidateAuftragDetail(auftragId)
+  revalidateAngebotDetail(angRef.angebotId)
+  revalidateRechnungList()
   return {
     ok: true,
     erstellt: entwuerfe.erstellt,
@@ -179,14 +189,16 @@ export async function clearAuftragZahlungsplan(
     .select('zahlungsplan')
     .eq('id', angRef.angebotId)
     .maybeSingle()
+  if (loadErr) logDbError('app/auftraege/zahlungsplan-actions:angebote', loadErr)
 
   if (loadErr) return { ok: false, message: loadErr.message }
 
   const plan = parseZahlungsplan(angRow?.zahlungsplan)
-  const { data: rechnungen } = await supabase
+  const { data: rechnungen, error: error2 } = await supabase
     .from('rechnungen')
     .select('id, status, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, brutto, faellig_am')
     .eq('auftrag_id', auftragId)
+  if (error2) logDbError('app/auftraege/zahlungsplan-actions:rechnungen', error2)
 
   const links = (rechnungen ?? []).map((r) => ({
     id: r.id as string,
@@ -201,41 +213,43 @@ export async function clearAuftragZahlungsplan(
   const gate = zahlplanDarfGeloeschtWerden(plan, links)
   if (!gate.ok) return gate
 
-  const { error } = await supabase
+  const { error: error3 } = await supabase
     .from('angebote')
     .update({
       zahlungsplan: emptyZahlungsplan(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', angRef.angebotId)
+  if (error3) logDbError('app/auftraege/zahlungsplan-actions:angebote', error3)
 
-  if (error) return { ok: false, message: error.message }
+  if (error3) return { ok: false, message: error3.message }
 
   const stornoDrafts = await storniereAbschlagEntwuerfeForAuftrag(auftragId)
   if (!stornoDrafts.ok) return stornoDrafts
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath(`/angebote/${angRef.angebotId}`)
-  revalidatePath('/vorgaenge')
-  revalidatePath('/rechnungen')
+  revalidateAuftragDetail(auftragId)
+  revalidateAngebotDetail(angRef.angebotId)
+  revalidateRechnungList()
   return { ok: true }
 }
 
 /** Liest den unverbindlichen Vorschlag vom verknüpften Angebot (nicht vom Auftrag). */
 export async function loadAuftragZahlungsplan(auftragId: string): Promise<Zahlungsplan | null> {
   const supabase = createClient()
-  const { data: auf } = await supabase
+  const { data: auf, error } = await supabase
     .from('auftraege')
     .select('angebot_id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/zahlungsplan-actions:auftraege', error)
   const angebotId = auf?.angebot_id ? String(auf.angebot_id) : ''
   if (!angebotId) return null
-  const { data } = await supabase
+  const { data, error: error2 } = await supabase
     .from('angebote')
     .select('zahlungsplan')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/zahlungsplan-actions:angebote', error2)
   return parseZahlungsplan(data?.zahlungsplan)
 }
 
@@ -263,6 +277,7 @@ export async function erfasseExterneAbschlagZahlung(input: {
     .select('id, kunde_id, angebot_id, titel, start_datum, end_datum')
     .eq('id', auftragId)
     .maybeSingle()
+  if (aufErr) logDbError('app/auftraege/zahlungsplan-actions:auftraege', aufErr)
 
   if (aufErr || !auf) return { ok: false, message: aufErr?.message ?? 'Auftrag nicht gefunden.' }
   const kundeId = auf.kunde_id ? String(auf.kunde_id) : ''
@@ -271,11 +286,12 @@ export async function erfasseExterneAbschlagZahlung(input: {
   const angRef = await angebotIdForAuftrag(supabase, auftragId)
   if (!angRef.ok) return angRef
 
-  const { data: angRow } = await supabase
+  const { data: angRow, error: error2 } = await supabase
     .from('angebote')
     .select('zahlungsplan')
     .eq('id', angRef.angebotId)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/zahlungsplan-actions:angebote', error2)
 
   const plan = parseZahlungsplan(angRow?.zahlungsplan)
   if (!plan?.zeilen?.length) {
@@ -284,12 +300,13 @@ export async function erfasseExterneAbschlagZahlung(input: {
   const zeile = plan.zeilen.find((z) => z.id === zeileId)
   if (!zeile) return { ok: false, message: 'Planzeile nicht gefunden.' }
 
-  const { data: rechnungen } = await supabase
+  const { data: rechnungen, error: error3 } = await supabase
     .from('rechnungen')
     .select(
       'id, status, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, brutto, faellig_am, beleg_typ'
     )
     .eq('auftrag_id', auftragId)
+  if (error3) logDbError('app/auftraege/zahlungsplan-actions:rechnungen', error3)
 
   const links = (rechnungen ?? []).map((r) => ({
     id: r.id as string,
@@ -319,11 +336,12 @@ export async function erfasseExterneAbschlagZahlung(input: {
     if (!storno.ok) return storno
   }
 
-  const { data: auftragPosRows } = await supabase
+  const { data: auftragPosRows, error: error4 } = await supabase
     .from('auftrag_positionen')
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: true })
+  if (error4) logDbError('app/auftraege/zahlungsplan-actions:auftrag_positionen', error4)
 
   let gesamtNetto = 0
   if (auftragPosRows?.length) {
@@ -398,7 +416,7 @@ export async function erfasseExterneAbschlagZahlung(input: {
   }
 
   // Als „gestellt“ markieren, damit Plan sie als abgerechnet erkennt (bezahlt zählt bereits)
-  await supabase
+  const { error: __dbErr1 } = await supabase
     .from('rechnungen')
     .update({
       gesendet_at: new Date().toISOString(),
@@ -406,9 +424,9 @@ export async function erfasseExterneAbschlagZahlung(input: {
     })
     .eq('id', created.id)
     .is('gesendet_at', null)
+  if (__dbErr1) logDbError('app/auftraege/zahlungsplan-actions:rechnungen', __dbErr1)
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath(`/rechnungen/${created.id}`)
-  revalidatePath('/vorgaenge')
+  revalidateAuftragDetail(auftragId)
+  revalidateRechnungDetail(created.id)
   return { ok: true, rechnungId: created.id }
 }

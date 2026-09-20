@@ -1,9 +1,15 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EMPTY } from '@/lib/crm-labels'
 
-import { Download, Loader2 } from 'lucide-react'
+import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import {
   composeVizZielbildBlob,
   composeVizZielbildDataUrl,
@@ -73,7 +79,7 @@ export function VizZielbildCard({
   }, [vorherUrl, nachherUrl, resolved])
 
   return (
-    <div className={cn('rounded-xl border border-bw-border bg-bw-bg p-3', className)}>
+    <div className={cn('rounded-sheet border border-bw-border bg-bw-bg p-3', className)}>
       <div className="mb-2">
         <p className="text-[length:var(--fs-text)] font-semibold text-bw-text">Zielbild-Vorschau</p>
         <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
@@ -83,27 +89,33 @@ export function VizZielbildCard({
 
       <div className={cn(zielbildPreviewFrameClass, 'mb-3')}>
         {loading ? (
-          <div className={cn(zielbildPreviewPlaceholderClass, 'flex-col gap-2 py-6')}>
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-            <span>Wird erstellt …</span>
-          </div>
+          <CrmInlineLoading
+            label="Wird erstellt …"
+            minHeight={120}
+            className={zielbildPreviewPlaceholderClass}
+          />
         ) : previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={previewUrl} alt="Bärenwald Zielbild" className={zielbildPreviewMediaClass} />
         ) : (
           <p className={cn(zielbildPreviewPlaceholderClass, 'py-6 text-[length:var(--fs-text)]')}>
-            {error ?? 'Keine Vorschau'}
+            {error ?? EMPTY.vorschau}
           </p>
         )}
       </div>
 
-      <Button
+      <MockBtn
         type="button"
-        variant="secondary"
+        kind="secondary"
         className="w-full"
-        disabled={loading || downloading || !previewUrl}
+        loading={downloading}
+        disabled={loading || !previewUrl}
         onClick={() => void handleDownload()}
       >
+<<<<<<< Updated upstream
+        <MockIcon n="download" ctx="default" className="mr-2 h-4 w-4" aria-hidden />
+        Zielbild herunterladen
+=======
         {downloading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
@@ -115,7 +127,8 @@ export function VizZielbildCard({
             Zielbild herunterladen
           </>
         )}
-      </Button>
+>>>>>>> Stashed changes
+      </MockBtn>
 
       {error && previewUrl ? (
         <p className="mt-2 text-[length:var(--fs-meta)] text-status-cancel-text">{error}</p>

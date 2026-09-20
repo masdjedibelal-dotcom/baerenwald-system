@@ -1,5 +1,6 @@
+import { revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
-import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertEmailLogRow } from '@/lib/kommunikation/insert-email-log'
 import { parseEmailLogIdFromHtml } from '@/lib/kommunikation/types'
@@ -22,18 +23,20 @@ type ResendInboundPayload = {
 async function findParentLogId(data: NonNullable<ResendInboundPayload['data']>): Promise<string | null> {
   const inReplyTo = data.in_reply_to?.trim()
   if (inReplyTo) {
-    const { data: byResend } = await supabaseAdmin
+    const {data: byResend, error: error1} = await supabaseAdmin
       .from('email_log')
       .select('id')
       .eq('resend_id', inReplyTo)
       .maybeSingle()
+    if (error1) logDbError('app/api/webhooks/resend/route:email_log', error1)
     if (byResend?.id) return byResend.id as string
 
-    const { data: byMsg } = await supabaseAdmin
+    const {data: byMsg, error: error2} = await supabaseAdmin
       .from('email_log')
       .select('id')
       .eq('internet_message_id', inReplyTo)
       .maybeSingle()
+    if (error2) logDbError('app/api/webhooks/resend/route:email_log', error2)
     if (byMsg?.id) return byMsg.id as string
   }
 
@@ -71,13 +74,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, unmatched: true })
   }
 
-  const { data: parent } = await supabaseAdmin
+  const {data: parent, error: error3} = await supabaseAdmin
     .from('email_log')
     .select(
       'id, kunde_id, lead_id, angebot_id, auftrag_id, rechnung_id, kontext_typ, an_email'
     )
     .eq('id', parentId)
     .maybeSingle()
+  if (error3) logDbError('app/api/webhooks/resend/route:email_log', error3)
 
   if (!parent) {
     return NextResponse.json({ ok: true, parent_missing: true })
@@ -92,7 +96,7 @@ export async function POST(req: Request) {
       ? `<pre style="font-family:sans-serif;white-space:pre-wrap">${data.text.replace(/</g, '&lt;')}</pre>`
       : '')
 
-  const { id: insertedId, error } = await insertEmailLogRow({
+  const { id: insertedId, error: error4 } = await insertEmailLogRow({
     typ: parent.kontext_typ ? `antwort_${parent.kontext_typ}` : 'antwort',
     kontext_typ: parent.kontext_typ,
     richtung: 'empfangen',
@@ -110,9 +114,9 @@ export async function POST(req: Request) {
     internet_message_id: data.message_id ?? null,
   })
 
-  if (error) {
-    console.error('[resend-webhook]', error)
-    return NextResponse.json({ error }, { status: 500 })
+  if (error4) {
+    console.error('[resend-webhook]', error4)
+    return NextResponse.json({ error: error4 }, { status: 500 })
   }
 
   const leadId = parent.lead_id as string | null
@@ -123,7 +127,7 @@ export async function POST(req: Request) {
       titel: 'Antwort vom Kunden',
       beschreibung: (data.subject ?? '').trim() || from || '(Kein Betreff)',
     })
-    revalidatePath(`/anfragen/${leadId}`)
+    revalidateLeadDetail(leadId)
   }
 
   return NextResponse.json({ ok: true })

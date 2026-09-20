@@ -1,8 +1,10 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { sendCrmPushToStaff } from '@/lib/push/send'
+import { safeVoidNotify } from '@/lib/errors/safe-void-notify'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { CrmNotificationTyp } from '@/app/(dashboard)/notifications/actions'
 
@@ -79,26 +81,28 @@ export async function POST(req: Request) {
   const titel = String(body.titel ?? '').trim() || null
   const isDelete = typ === 'compliance_delete'
 
-  const { data: hw } = await supabaseAdmin
+  const {data: hw, error} = await supabaseAdmin
     .from('handwerker')
     .select('id, name')
     .eq('id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('app/api/internal/partner-dokument-upload/route:handwerker', error)
   if (!hw?.id) {
-    return NextResponse.json({ ok: false, error: 'Handwerker unbekannt' }, { status: 404 })
+    return NextResponse.json({ ok: false, error: 'Partner unbekannt' }, { status: 404 })
   }
-  const hwName = String(hw.name ?? '').trim() || 'Handwerker'
+  const hwName = String(hw.name ?? '').trim() || 'Partner'
 
   let angebotId: string | null = null
   let leadId: string | null = null
   let partnerEinholung = false
 
   if (!auftragId && anfrageId) {
-    const { data: ah } = await supabaseAdmin
+    const {data: ah, error} = await supabaseAdmin
       .from('angebot_handwerker')
       .select('id, angebot_id, ohne_lv, angebote:angebot_id(id, lead_id, ist_partner_einholung)')
       .eq('id', anfrageId)
       .maybeSingle()
+    if (error) logDbError('app/api/internal/partner-dokument-upload/route:angebot_handwerker', error)
     const ang = Array.isArray(ah?.angebote) ? ah?.angebote[0] : ah?.angebote
     const angRec = ang as
       | { id?: string; lead_id?: string | null; ist_partner_einholung?: boolean | null }
@@ -108,7 +112,7 @@ export async function POST(req: Request) {
     leadId = angRec?.lead_id?.trim() || null
     partnerEinholung = Boolean(ah?.ohne_lv) || angRec?.ist_partner_einholung === true
     if (angebotId) {
-      const { data: auf } = await supabaseAdmin
+      const {data: auf, error} = await supabaseAdmin
         .from('auftraege')
         .select('id')
         .eq('angebot_id', angebotId)
@@ -116,16 +120,18 @@ export async function POST(req: Request) {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
+      if (error) logDbError('app/api/internal/partner-dokument-upload/route:auftraege', error)
       auftragId = String(auf?.id ?? '').trim() || null
     }
   }
 
   if (auftragId) {
-    const { data: auf } = await supabaseAdmin
+    const {data: auf, error} = await supabaseAdmin
       .from('auftraege')
       .select('id, titel')
       .eq('id', auftragId)
       .maybeSingle()
+    if (error) logDbError('app/api/internal/partner-dokument-upload/route:auftraege', error)
     if (!auf) {
       return NextResponse.json({ ok: false, error: 'Auftrag unbekannt' }, { status: 404 })
     }
@@ -252,13 +258,16 @@ export async function POST(req: Request) {
               ? `/angebote`
               : `/handwerker/${handwerkerId}`
 
-  void sendCrmPushToStaff({
-    typ: pushTyp,
-    title: pushTitle,
-    body: pushBody,
-    url: href,
-    tag: `partner-${typ}-${dokumentId || slotId || anfrageId || handwerkerId}`,
-  }).catch((e) => console.warn('[partner-dokument-upload] push', e))
+  safeVoidNotify(
+    'partner-dokument-upload:push',
+    sendCrmPushToStaff({
+      typ: pushTyp,
+      title: pushTitle,
+      body: pushBody,
+      url: href,
+      tag: `partner-${typ}-${dokumentId || slotId || anfrageId || handwerkerId}`,
+    })
+  )
 
   return NextResponse.json({ ok: true, auftragId, rechnungId: ensuredRechnungId })
 }

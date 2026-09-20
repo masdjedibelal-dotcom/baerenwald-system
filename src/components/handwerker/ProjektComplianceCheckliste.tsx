@@ -1,18 +1,24 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { DateInput } from '@/components/ui/DateInput'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { logDbError } from '@/lib/errors/log-db-error'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, CheckCircle2, FileText, Trash2, Upload } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
 import {
   ablehnenPartnerDokument,
   deletePartnerDokument,
   freigebenPartnerDokument,
-  replacePartnerDokumentForTyp,
+  replaceHandwerkerDokumentForTyp,
   signPartnerDokumentUrl,
   updatePartnerDokument,
 } from '@/app/(dashboard)/handwerker/actions'
@@ -37,6 +43,7 @@ import {
 } from '@/lib/handwerker/compliance-katalog'
 import type { Gewerk } from '@/lib/types'
 import { cn, formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 const BUCKET = 'partner-dokumente'
 
@@ -58,23 +65,16 @@ function statusLabel(s: ComplianceDokumentStatus, docStatus?: string | null): st
 function StatusIcon({ status }: { status: ComplianceDokumentStatus }) {
   if (status === 'ok') {
     return (
-      <CheckCircle2
-        className="h-5 w-5 shrink-0 text-emerald-600"
-        strokeWidth={2.25}
-        aria-label="Vorhanden"
-      />
+      <MockIcon n="circle-check-filled" ctx="default" className="h-5 w-5 shrink-0 text-bw-success" aria-label="Vorhanden" />
     )
   }
   return (
-    <AlertCircle
-      className={cn(
+    <MockIcon n="alert-triangle" ctx="default" className={cn(
         'h-4 w-4 shrink-0',
         status === 'warnung' || status === 'in_pruefung'
-          ? 'text-amber-600'
+          ? 'text-warning'
           : 'text-status-cancel-text'
-      )}
-      aria-hidden
-    />
+      )} aria-hidden />
   )
 }
 
@@ -173,10 +173,10 @@ export function ProjektComplianceCheckliste({
   function freigeben(docId: string) {
     startTransition(async () => {
       const r = await freigebenPartnerDokument(docId, handwerkerId)
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Dokument bestätigt')
-        router.refresh()
+        toast.success(TOAST.dokument_bestaetigt)
+        afterServerActionRefresh()
       }
     })
   }
@@ -186,10 +186,10 @@ export function ProjektComplianceCheckliste({
     if (grund == null) return
     startTransition(async () => {
       const r = await ablehnenPartnerDokument(docId, handwerkerId, grund)
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Abgelehnt — Partner kann neu hochladen')
-        router.refresh()
+        toast.success(TOAST.abgelehnt_partner_kann_neu_hochladen)
+        afterServerActionRefresh()
       }
     })
   }
@@ -197,7 +197,7 @@ export function ProjektComplianceCheckliste({
   async function openDatei(stored: string | null | undefined) {
     const r = await signPartnerDokumentUrl(stored)
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     window.open(r.url, '_blank', 'noopener,noreferrer')
@@ -212,6 +212,7 @@ export function ProjektComplianceCheckliste({
         upsert: false,
         contentType: file.type || undefined,
       })
+      if (upErr) logDbError('components/handwerker/ProjektComplianceCheckliste:query', upErr)
       if (upErr) throw new Error(upErr.message)
 
       const existing = dokumentFuerTyp(projektDocs, typ.slug)
@@ -222,7 +223,7 @@ export function ProjektComplianceCheckliste({
         gueltigBis = d.toISOString().slice(0, 10)
       }
 
-      const ins = await replacePartnerDokumentForTyp({
+      const ins = await replaceHandwerkerDokumentForTyp({
         handwerker_id: handwerkerId,
         auftrag_id: auftragId,
         typ: typ.slug,
@@ -236,9 +237,9 @@ export function ProjektComplianceCheckliste({
         throw new Error(ins.message)
       }
       toast.success(`${customBezeichnung?.trim() || typ.bezeichnung} hochgeladen`)
-      router.refresh()
+      afterServerActionRefresh()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploadingTyp(null)
     }
@@ -249,22 +250,22 @@ export function ProjektComplianceCheckliste({
       const r = await updatePartnerDokument(docId, handwerkerId, {
         gueltig_bis: value.trim() || null,
       })
-      if (!r.ok) toast.error(r.message)
-      else router.refresh()
+      if (!r.ok) toast.systemError(r)
+      else afterServerActionRefresh()
     })
   }
 
   function removeDoc(docId: string, titel: string) {
-    confirmDelete(
+    openDeleteConfirm(
       `„${titel}“ löschen?`,
       async () => {
         const r = await deletePartnerDokument(docId, handwerkerId)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Gelöscht')
-        router.refresh()
+        toast.success(TOAST.geloescht)
+        afterServerActionRefresh()
       }
     )
   }
@@ -285,7 +286,7 @@ export function ProjektComplianceCheckliste({
           <p
             className={cn(
               'mt-1 text-xs font-medium',
-              pflichtOk ? 'text-emerald-700' : 'text-status-cancel-text'
+              pflichtOk ? 'text-status-order-text' : 'text-status-cancel-text'
             )}
           >
             {fortschritt.pflicht > 0
@@ -293,7 +294,7 @@ export function ProjektComplianceCheckliste({
               : `${fortschritt.gesamt}/${projektTypen.length} Nachweise hochgeladen`}
           </p>
           {!compact ? (
-            <p className="mt-1 text-[11px] text-bw-text-muted">
+            <p className="mt-1 text-fs-caption text-bw-text-muted">
               {COMPLIANCE_EBENE_LABELS.leistung} — Anlagen zum Leistungsvertrag. Rahmen- und
               Projektvertrag im Portal unter Verträge.
             </p>
@@ -313,7 +314,7 @@ export function ProjektComplianceCheckliste({
               {gruppe.kategorie}
             </p>
           ) : null}
-          <ul className="divide-y divide-bw-border rounded-lg border border-bw-border">
+          <ul className="divide-y divide-bw-border rounded-card border border-bw-border">
             {gruppe.typen.map((typ) => {
               const doc = dokumentFuerTyp(projektDocs, typ.slug)
               const status = complianceDokumentStatus(typ, doc)
@@ -338,7 +339,7 @@ export function ProjektComplianceCheckliste({
                       <p className="text-sm font-medium text-bw-text">
                         {typ.bezeichnung}
                         {pflicht ? (
-                          <span className="ml-1.5 text-[10px] font-semibold uppercase text-bw-primary">
+                          <span className="ml-1.5 text-fs-caption font-semibold uppercase text-bw-primary">
                             Pflicht
                           </span>
                         ) : null}
@@ -346,14 +347,14 @@ export function ProjektComplianceCheckliste({
                       {!compact && typ.beschreibung ? (
                         <p className="text-xs text-bw-text-muted line-clamp-1">{typ.beschreibung}</p>
                       ) : null}
-                      <p className="text-[11px] text-bw-text-muted">
+                      <p className="text-fs-caption text-bw-text-muted">
                         {statusLabel(status, doc?.status)}
                         {doc?.status === 'abgelehnt' && doc.ablehnung_grund ? (
                           <span className="block text-status-cancel-text">{doc.ablehnung_grund}</span>
                         ) : null}
                       </p>
                       {ablaufHinweis ? (
-                        <p className="text-[11px] font-medium text-amber-800">{ablaufHinweis}</p>
+                        <p className="text-fs-caption font-medium text-status-contact-text">{ablaufHinweis}</p>
                       ) : null}
                     </div>
                   </div>
@@ -362,53 +363,25 @@ export function ProjektComplianceCheckliste({
                       <>
                         {doc.status && !partnerDokumentIstFreigegeben(doc.status) ? (
                           <>
-                            <button
-                              type="button"
-                              className="btn primary py-1 text-xs"
-                              disabled={busy}
-                              onClick={() => freigeben(doc.id)}
-                            >
+                            <MockBtn kind="primary" className="py-1 text-xs" type="button" disabled={busy} onClick={() => freigeben(doc.id)}>
                               Bestätigen
-                            </button>
-                            <button
-                              type="button"
-                              className="btn ghost py-1 text-xs"
-                              disabled={busy}
-                              onClick={() => ablehnen(doc.id, typ.bezeichnung)}
-                            >
+                            </MockBtn>
+                            <MockBtn kind="ghost" className="py-1 text-xs" type="button" disabled={busy} onClick={() => ablehnen(doc.id, typ.bezeichnung)}>
                               Ablehnen
-                            </button>
+                            </MockBtn>
                           </>
                         ) : null}
-                        <input
-                          type="date"
-                          className="input py-1 text-xs w-[8.5rem]"
-                          defaultValue={doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''}
-                          key={`${doc.id}-${doc.gueltig_bis ?? ''}`}
-                          disabled={busy}
-                          onBlur={(e) => {
+                        <DateInput className="py-1 text-xs w-[8.5rem]" defaultValue={doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''} key={`${doc.id}-${doc.gueltig_bis ?? ''}`} disabled={busy} onBlur={(e) => {
                             const v = e.target.value
                             const cur = doc.gueltig_bis ? String(doc.gueltig_bis).slice(0, 10) : ''
                             if (v !== cur) saveGueltigBis(doc.id, v)
-                          }}
-                          title="Gültig bis"
-                        />
-                        <button
-                          type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-bw-border"
-                          disabled={busy}
-                          onClick={() => void openDatei(doc.datei_url)}
-                        >
-                          <FileText className="h-3.5 w-3.5" aria-hidden />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn text-status-cancel-text"
-                          disabled={busy}
-                          onClick={() => removeDoc(doc.id, typ.bezeichnung)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                        </button>
+                          }} title="Gültig bis" />
+                        <MockBtn className="inline-flex h-8 w-8 items-center justify-center rounded-button border border-bw-border" type="button" disabled={busy} onClick={() => void openDatei(doc.datei_url)}>
+                          <MockIcon n="file-text" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                        </MockBtn>
+                        <MockBtn className="icon-btn text-status-cancel-text" type="button" disabled={busy} onClick={() => removeDoc(doc.id, typ.bezeichnung)}>
+                          <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                        </MockBtn>
                       </>
                     ) : null}
                     <input
@@ -424,15 +397,10 @@ export function ProjektComplianceCheckliste({
                         e.target.value = ''
                       }}
                     />
-                    <button
-                      type="button"
-                      className="btn ghost sm inline-flex items-center gap-1"
-                      disabled={busy}
-                      onClick={() => typRefs.current[typ.slug]?.click()}
-                    >
-                      <Upload className="h-3 w-3" aria-hidden />
+                    <MockBtn kind="ghost" sm className="inline-flex items-center gap-1" type="button" disabled={busy} onClick={() => typRefs.current[typ.slug]?.click()}>
+                      <MockIcon n="upload" ctx="default" className="h-3 w-3" aria-hidden />
                       {uploading ? '…' : doc ? 'Ersetzen' : 'Hochladen'}
-                    </button>
+                    </MockBtn>
                   </div>
                 </li>
               )
@@ -442,7 +410,7 @@ export function ProjektComplianceCheckliste({
       ))}
 
       {indTyp ? (
-        <div className="space-y-2 rounded-lg border border-dashed border-bw-border p-2.5">
+        <div className="space-y-2 rounded-card border border-dashed border-bw-border p-2.5">
           <p className="text-sm font-medium text-bw-text">{indTyp.bezeichnung}</p>
           <p className="text-xs text-bw-text-muted">
             {indTyp.beschreibung ?? 'Frei benennbarer Nachweis — mehrere Dateien möglich.'}
@@ -452,15 +420,7 @@ export function ProjektComplianceCheckliste({
               <label className="input-label text-xs" htmlFor={`ind-bez-${auftragId}`}>
                 Bezeichnung
               </label>
-              <input
-                id={`ind-bez-${auftragId}`}
-                type="text"
-                className="input w-full py-1.5 text-sm"
-                value={individuellTitel}
-                onChange={(e) => setIndividuellTitel(e.target.value)}
-                placeholder="z. B. SiGeKo-Unterweisung, Gerüstfreigabe…"
-                disabled={busy}
-              />
+              <MockInput id={`ind-bez-${auftragId}`} type="text" className="w-full py-1.5 text-sm" value={individuellTitel} onChange={(e) => setIndividuellTitel(e.target.value)} placeholder="z. B. SiGeKo-Unterweisung, Gerüstfreigabe…" disabled={busy} />
             </div>
             <input
               ref={individuellRef}
@@ -480,15 +440,10 @@ export function ProjektComplianceCheckliste({
                 e.target.value = ''
               }}
             />
-            <button
-              type="button"
-              className="btn ghost sm"
-              disabled={busy}
-              onClick={() => individuellRef.current?.click()}
-            >
-              <Upload className="h-3 w-3 inline mr-1" aria-hidden />
+            <MockBtn kind="ghost" sm type="button" disabled={busy} onClick={() => individuellRef.current?.click()}>
+              <MockIcon n="upload" ctx="default" className="h-3 w-3 inline mr-1" aria-hidden />
               Individuell hochladen
-            </button>
+            </MockBtn>
           </div>
           {individuelleDocs.length > 0 ? (
             <ul className="space-y-1 border-t border-bw-border pt-2">
@@ -501,20 +456,12 @@ export function ProjektComplianceCheckliste({
                     ) : null}
                   </span>
                   <div className="flex shrink-0 gap-1">
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      onClick={() => void openDatei(d.datei_url)}
-                    >
-                      <FileText className="h-3.5 w-3.5" aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn text-status-cancel-text"
-                      onClick={() => removeDoc(d.id, d.bezeichnung)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                    </button>
+                    <MockBtn className="icon-btn" type="button" onClick={() => void openDatei(d.datei_url)}>
+                      <MockIcon n="file-text" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                    </MockBtn>
+                    <MockBtn className="icon-btn text-status-cancel-text" type="button" onClick={() => removeDoc(d.id, d.bezeichnung)}>
+                      <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                    </MockBtn>
                   </div>
                 </li>
               ))}
@@ -524,22 +471,17 @@ export function ProjektComplianceCheckliste({
       ) : null}
 
       {!compact ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-bw-border p-2.5 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-2 rounded-card border border-bw-border p-2.5 sm:flex-row sm:items-end">
           <div className="min-w-[12rem] flex-1">
             <label className="input-label text-xs">Weiterer Typ</label>
-            <select
-              className="input w-full py-1.5 text-sm"
-              value={freierTyp}
-              onChange={(e) => setFreierTyp(e.target.value)}
-              disabled={busy}
-            >
+            <MockSelect className="w-full py-1.5 text-sm" value={freierTyp} onChange={(e) => setFreierTyp(e.target.value)} disabled={busy}>
               <option value="">— Typ wählen —</option>
               {alleProjektTypen.map((t) => (
                 <option key={t.slug} value={t.slug}>
                   {t.bezeichnung}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </div>
           <input
             ref={freiRef}
@@ -554,14 +496,9 @@ export function ProjektComplianceCheckliste({
               setFreierTyp('')
             }}
           />
-          <button
-            type="button"
-            className="btn ghost sm"
-            disabled={busy || !freierTyp}
-            onClick={() => freiRef.current?.click()}
-          >
+          <MockBtn kind="ghost" sm type="button" disabled={busy || !freierTyp} onClick={() => freiRef.current?.click()}>
             Hochladen
-          </button>
+          </MockBtn>
         </div>
       ) : null}
     </div>

@@ -1,14 +1,19 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockFormSection, MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { findKundenDuplikate, mergeKunden, saveKunde } from '@/app/actions/kunden'
+<<<<<<< Updated upstream
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
+=======
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   initKundeStammEditFelder,
@@ -155,7 +160,7 @@ export function KundeModal({
       const res = await mergeKunden(survivorId, mergeId)
       if (!res.ok) {
         setErr(res.message)
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       toast.success(res.message)
@@ -163,7 +168,7 @@ export function KundeModal({
       onClose()
       onSaved?.(survivorId)
       router.push(`/kunden/${survivorId}`)
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -221,7 +226,7 @@ export function KundeModal({
       )
       if (!res.ok) {
         setErr(res.message)
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       toast.success(isCreate ? 'Kunde angelegt' : 'Gespeichert')
@@ -249,7 +254,7 @@ export function KundeModal({
         onSaved?.(res.id, saved)
         onClose()
         router.push(`/kunden/${res.id}`)
-        router.refresh()
+        afterServerActionRefresh()
       }
     })
   }
@@ -325,26 +330,15 @@ export function KundeModal({
           <div className="field full">
             <div className="seg" role="group" aria-label="Kundentyp">
               {TYP_OPTS.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  className={typ === o.value ? 'on' : undefined}
-                  onClick={() => mark(() => setTyp(o.value))}
-                >
+                <MockBtn className={typ === o.value ? 'on' : undefined} key={o.value} type="button" onClick={() => mark(() => setTyp(o.value))}>
                   {o.label}
-                </button>
+                </MockBtn>
               ))}
             </div>
           </div>
           {firmaPflicht ? (
             <MockField label="Firma" required full>
-              <input
-                className="input"
-                value={firmaName}
-                onChange={(e) => mark(() => setFirmaName(e.target.value))}
-                placeholder="Muster GmbH"
-                autoComplete="organization"
-              />
+              <MockInput value={firmaName} onChange={(e) => mark(() => setFirmaName(e.target.value))} placeholder="Muster GmbH" autoComplete="organization" />
             </MockField>
           ) : null}
           <div className="full kunde-create__name-row">
@@ -352,118 +346,69 @@ export function KundeModal({
               label={firmaPflicht ? 'Vorname (Ansprechpartner)' : 'Vorname'}
               required
             >
-              <input
-                className="input"
-                value={vorname}
-                onChange={(e) => mark(() => setVorname(e.target.value))}
-                placeholder="Maria"
-                autoComplete="given-name"
-              />
+              <MockInput value={vorname} onChange={(e) => mark(() => setVorname(e.target.value))} placeholder="Maria" autoComplete="given-name" />
             </MockField>
             <MockField
               label={firmaPflicht ? 'Nachname (Ansprechpartner)' : 'Nachname'}
               required
             >
-              <input
-                className="input"
-                value={nachname}
-                onChange={(e) => mark(() => setNachname(e.target.value))}
-                placeholder="Koch"
-                autoComplete="family-name"
-              />
+              <MockInput value={nachname} onChange={(e) => mark(() => setNachname(e.target.value))} placeholder="Koch" autoComplete="family-name" />
             </MockField>
           </div>
         </MockFormSection>
 
         <MockFormSection title="Kontakt" icon="link" columns={2}>
           <MockField label="Telefon" required>
-            <input
-              className="input"
-              type="tel"
-              value={telefon}
-              onChange={(e) => mark(() => setTelefon(e.target.value))}
-              placeholder="089 123 456"
-              autoComplete="tel"
-            />
+            <MockInput type="tel" value={telefon} onChange={(e) => mark(() => setTelefon(e.target.value))} placeholder="089 123 456" autoComplete="tel" />
           </MockField>
           <MockField label="E-Mail">
-            <input
-              className="input"
-              type="email"
-              value={email}
-              onChange={(e) => mark(() => setEmail(e.target.value))}
-              placeholder="kontakt@…"
-              autoComplete="email"
-            />
+            <MockInput type="email" value={email} onChange={(e) => mark(() => setEmail(e.target.value))} placeholder="kontakt@…" autoComplete="email" />
           </MockField>
         </MockFormSection>
 
         <MockFormSection title="Adresse" icon="map-pin" columns={2}>
           <MockField label="Straße" required>
-            <input
-              className="input"
-              value={strasse}
-              onChange={(e) => mark(() => setStrasse(e.target.value))}
-              placeholder="Leopoldstraße"
-              autoComplete="address-line1"
-            />
+            <MockInput value={strasse} onChange={(e) => mark(() => setStrasse(e.target.value))} placeholder="Leopoldstraße" autoComplete="address-line1" />
           </MockField>
           <MockField label="Hausnummer" required>
-            <input
-              className="input"
-              value={hausnummer}
-              onChange={(e) => mark(() => setHausnummer(e.target.value))}
-              placeholder="42"
-              autoComplete="address-line2"
-            />
+            <MockInput value={hausnummer} onChange={(e) => mark(() => setHausnummer(e.target.value))} placeholder="42" autoComplete="address-line2" />
           </MockField>
           <div className="kunde-create__plz-ort full">
             <MockField label="PLZ" required>
-              <input
-                className="input"
-                value={plz}
-                onChange={(e) => mark(() => setPlz(e.target.value))}
-                placeholder="80796"
-                autoComplete="postal-code"
-                inputMode="numeric"
-              />
+              <MockInput value={plz} onChange={(e) => mark(() => setPlz(e.target.value))} placeholder="80796" autoComplete="postal-code" inputMode="numeric" />
             </MockField>
             <MockField label="Stadt" required>
-              <input
-                className="input"
-                value={ort}
-                onChange={(e) => mark(() => setOrt(e.target.value))}
-                placeholder="München"
-                autoComplete="address-level2"
-              />
+              <MockInput value={ort} onChange={(e) => mark(() => setOrt(e.target.value))} placeholder="München" autoComplete="address-level2" />
             </MockField>
           </div>
         </MockFormSection>
 
         <MockFormSection>
           <MockField label="Anmerkungen zum Kunden" full>
-            <textarea
-              className="input ta"
-              rows={4}
-              value={notizen}
-              onChange={(e) => mark(() => setNotizen(e.target.value))}
-              placeholder="Wünsche, Besonderheiten, Empfohlen von…"
-            />
+            <MockTextarea className="ta" rows={4} value={notizen} onChange={(e) => mark(() => setNotizen(e.target.value))} placeholder="Wünsche, Besonderheiten, Empfohlen von…" />
           </MockField>
         </MockFormSection>
       </div>
 
-      <Modal
+      <ConfirmPopup
         open={mergeConfirmOpen && Boolean(editKunde && mergeTarget)}
         onClose={() => setMergeConfirmOpen(false)}
         title="Kunden zusammenführen"
+<<<<<<< Updated upstream
+        confirmLabel="Zusammenführen"
+        busy={pending}
+        onConfirm={() => {
+          if (!editKunde || !mergeTarget) return
+          runMerge(mergeTarget.id, editKunde.id)
+        }}
+=======
         size="sm"
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" variant="secondary" onClick={() => setMergeConfirmOpen(false)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setMergeConfirmOpen(false)}>
               Abbrechen
-            </Button>
-            <Button
+            </MockBtn>
+            <MockBtn kind="primary"
               type="button"
               loading={pending}
               onClick={() => {
@@ -472,9 +417,10 @@ export function KundeModal({
               }}
             >
               Zusammenführen
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         {editKunde && mergeTarget ? (
           <p className="text-[length:var(--fs-text)] text-bw-text">
@@ -483,7 +429,7 @@ export function KundeModal({
             entfernt, Vorgänge und Dokumente werden umgehängt.
           </p>
         ) : null}
-      </Modal>
+      </ConfirmPopup>
     </EditorSheet>
   )
 }

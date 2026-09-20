@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import {
   isHwZuweisungAkzeptiertLenient,
@@ -39,7 +40,7 @@ export type CrmNotificationItem = {
   gelesen: boolean
 }
 
-export type CrmNotificationFilter = 'ungelesen' | 'gelesen'
+export type NotificationReadFilter = 'ungelesen' | 'gelesen'
 
 const DAYS = 7
 /** Max. Einträge in der Glocken-Liste (nach Filter). */
@@ -62,11 +63,11 @@ function typLabel(typ: CrmNotificationTyp): string {
     case 'handwerker_update':
       return 'Update zu Leistung'
     case 'handwerker_angenommen':
-      return 'Handwerker hat zugesagt'
+      return 'Partner hat zugesagt'
     case 'handwerker_abgelehnt':
-      return 'Handwerker hat abgelehnt'
+      return 'Partner hat abgelehnt'
     case 'handwerker_einreichung':
-      return 'Handwerker-Angebot eingereicht'
+      return 'Partner-Angebot eingereicht'
     case 'hw_rechnung_eingegangen':
       return 'HW-Rechnung eingegangen'
     case 'hw_auftrag_erledigt':
@@ -203,7 +204,7 @@ function typHint(typ: CrmNotificationTyp): string {
     case 'partner_weitere_arbeit':
       return 'Partner hat weitere Regie-Arbeit gemeldet. Unter Leistungen anerkennen oder ablehnen.'
     case 'partner_compliance_pruefung':
-      return 'Compliance-Dokument (z. B. Handwerkskarte) wartet auf Freigabe in Akte/Handwerker-Profil.'
+      return 'Compliance-Dokument (z. B. Handwerkskarte) wartet auf Freigabe in Akte/Partner-Profil.'
     case 'partner_compliance_geloescht':
       return 'Partner hat eine Compliance-Unterlage gelöscht. Datei bleibt sichtbar, bis du endgültig löschst.'
     case 'partner_unterlage':
@@ -412,6 +413,7 @@ async function collectCrmNotificationItems(opts?: {
     unterlageTlRes,
     hwRechnungRes,
   ] = await Promise.all([
+    // logDbError: Batch-Ergebnisse werden direkt nach Promise.all geloggt
     supabase
       .from('leads')
       .select(
@@ -463,6 +465,7 @@ async function collectCrmNotificationItems(opts?: {
       .gte('handwerker_angefragt_at', since)
       .order('handwerker_angefragt_at', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
+    // logDbError: Batch-Ergebnisse werden direkt nach Promise.all geloggt
     supabase
       .from('auftrag_handwerker')
       .select(
@@ -513,6 +516,7 @@ async function collectCrmNotificationItems(opts?: {
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
+    // logDbError: Batch-Ergebnisse werden direkt nach Promise.all geloggt
     supabase
       .from('auftrag_positionen')
       .select('id, auftrag_id, leistung_name, created_at, handwerker:handwerker_id(name)')
@@ -570,6 +574,29 @@ async function collectCrmNotificationItems(opts?: {
       .order('hw_rechnung_eingereicht_at', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
   ])
+
+  for (const [ctx, res] of [
+    ['leads', leadsRes],
+    ['lead_befunde', hmBefundRes],
+    ['position_eintraege', peRes],
+    ['angebot_handwerker_antwort', hwAntwortRes],
+    ['angebot_handwerker_einreichung', hwEinreichungRes],
+    ['auftrag_positionen_hw', posHwRes],
+    ['auftrag_handwerker_vertrag', pvRes],
+    ['auftrag_timeline_abnahme', abnahmeTlRes],
+    ['auftrag_abnahmeprotokolle', freigabeRes],
+    ['auftrag_handwerker_erledigt', hwErledigtRes],
+    ['auftraege', auftraegeRes],
+    ['partner_positions_anfragen', posMelRes],
+    ['auftrag_positionen_wa', waRes],
+    ['lead_timeline', angebotEntscheidungTlRes],
+    ['partner_dokumente', complianceRes],
+    ['auftrag_fachdoku_slots', fachdokuRes],
+    ['auftrag_timeline_unterlage', unterlageTlRes],
+    ['angebot_handwerker_rechnung', hwRechnungRes],
+  ] as const) {
+    if (res.error) logDbError(`app/notifications/actions:${ctx}`, res.error)
+  }
 
   // ── Neue Anfrage ─────────────────────────────────────────────
   let leadRows = leadsRes.data ?? []
@@ -670,7 +697,7 @@ async function collectCrmNotificationItems(opts?: {
           | null
       )
       const hwName =
-        hw?.firma?.trim() || hw?.name?.trim() || 'Handwerker'
+        hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
       const nr = ang?.angebotsnr?.trim()
       const subtitle = [gw?.name?.trim(), nr ? `Angebot ${nr}` : null]
         .filter(Boolean)
@@ -720,7 +747,7 @@ async function collectCrmNotificationItems(opts?: {
         (row.auftrag_id as string | null)?.trim() || pos?.auftrag_id?.trim() || null
       if (!auftragId) continue
       const hw = one(pos?.handwerker as { name?: string | null } | { name?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.name?.trim() || 'Partner'
       const leistung = pos?.leistung_name?.trim()
       const desc = (row.beschreibung as string)?.trim()
       items.push({
@@ -760,10 +787,11 @@ async function collectCrmNotificationItems(opts?: {
 
   const auftragByAngebot = new Map<string, string>()
   if (angebotIds.size) {
-    const { data: aufRows } = await supabase
+    const { data: aufRows, error } = await supabase
       .from('auftraege')
       .select('id, angebot_id')
       .in('angebot_id', Array.from(angebotIds))
+    if (error) logDbError('app/notifications/actions:auftraege', error)
     for (const a of aufRows ?? []) {
       const aid = (a.angebot_id as string | null)?.trim()
       const id = (a.id as string | null)?.trim()
@@ -801,7 +829,7 @@ async function collectCrmNotificationItems(opts?: {
         leadId,
         partnerEinholung,
       })
-      const hwName = hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.name?.trim() || 'Partner'
       const gewerkName = gewerk?.name?.trim()
       const angebotsnr = angebot?.angebotsnr?.trim()
       const sub = [gewerkName, angebotsnr].filter(Boolean).join(' · ')
@@ -862,7 +890,7 @@ async function collectCrmNotificationItems(opts?: {
       const typ: CrmNotificationTyp =
         st === 'abgelehnt' ? 'vorgang_abgelehnt' : 'vorgang_angenommen'
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.name?.trim() || 'Partner'
       const leistung = (row.leistung_name as string)?.trim()
       const at = (row.handwerker_angefragt_at as string | null)?.trim() || since
       items.push({
@@ -887,7 +915,7 @@ async function collectCrmNotificationItems(opts?: {
     if (!auftragId || !at) continue
     const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
     const gewerk = one(row.gewerke as { name?: string | null } | { name?: string | null }[] | null)
-    const hwName = hw?.name?.trim() || 'Handwerker'
+    const hwName = hw?.name?.trim() || 'Partner'
     const gewerkName = gewerk?.name?.trim()
     items.push({
       sourceKey: `projektvertrag_bestaetigt:${row.id}`,
@@ -927,10 +955,11 @@ async function collectCrmNotificationItems(opts?: {
     ]
     const auftragByAngebot = new Map<string, string>()
     if (angebotIds.length) {
-      const { data: aufRows } = await supabase
+      const { data: aufRows, error } = await supabase
         .from('auftraege')
         .select('id, angebot_id')
         .in('angebot_id', angebotIds)
+      if (error) logDbError('app/notifications/actions:auftraege', error)
       for (const a of aufRows ?? []) {
         const aid = (a.angebot_id as string | null)?.trim()
         const id = (a.id as string | null)?.trim()
@@ -1001,7 +1030,7 @@ async function collectCrmNotificationItems(opts?: {
           | null
       )
       const auf = one(row.auftraege as { titel?: string | null } | { titel?: string | null }[] | null)
-      const hwName = hw?.firma?.trim() || hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
       items.push({
         sourceKey: `hw_auftrag_erledigt:${row.id}`,
         typ: 'hw_auftrag_erledigt',
@@ -1043,7 +1072,7 @@ async function collectCrmNotificationItems(opts?: {
           | null
       )
       const projekt = auf?.titel?.trim() || auf?.projekt_name?.trim() || null
-      const hwName = hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.name?.trim() || 'Partner'
       const posTitel = (row.titel as string)?.trim()
       items.push({
         sourceKey: `partner_positions_meldung:${row.id}`,
@@ -1063,7 +1092,7 @@ async function collectCrmNotificationItems(opts?: {
       const auftragId = (row.auftrag_id as string | null)?.trim()
       if (!auftragId) continue
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.name?.trim() || 'Partner'
       const leistung = (row.leistung_name as string)?.trim()
       items.push({
         sourceKey: `partner_weitere_arbeit:${row.id}`,
@@ -1081,7 +1110,7 @@ async function collectCrmNotificationItems(opts?: {
   if (!complianceRes.error) {
     for (const row of complianceRes.data ?? []) {
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.name?.trim() || 'Partner'
       const auftragId = (row.auftrag_id as string | null)?.trim() || null
       const hwId = (row.handwerker_id as string | null)?.trim() || null
       const bez = String(row.bezeichnung ?? row.typ ?? 'Dokument').trim()
@@ -1112,12 +1141,13 @@ async function collectCrmNotificationItems(opts?: {
       .gte('geloescht_am', since)
       .order('geloescht_am', { ascending: false })
       .limit(PER_SOURCE_LIMIT)
+    if (geloeschtErr) logDbError('app/notifications/actions:partner_dokumente', geloeschtErr)
     if (!geloeschtErr) {
       for (const row of geloeschtRows ?? []) {
         const hw = one(
           row.handwerker as { name?: string | null } | { name?: string | null }[] | null
         )
-        const hwName = hw?.name?.trim() || 'Handwerker'
+        const hwName = hw?.name?.trim() || 'Partner'
         const auftragId = (row.auftrag_id as string | null)?.trim() || null
         const hwId = (row.handwerker_id as string | null)?.trim() || null
         const bez = String(row.bezeichnung ?? row.typ ?? 'Dokument').trim()
@@ -1145,7 +1175,7 @@ async function collectCrmNotificationItems(opts?: {
       if (!auftragId) continue
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
       const auf = one(row.auftraege as { titel?: string | null } | { titel?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.name?.trim() || 'Partner'
       const label = String(row.label ?? row.slot_code ?? 'Fachnachweis').trim()
       items.push({
         sourceKey: `partner_fachdoku:${row.id}`,
@@ -1165,7 +1195,7 @@ async function collectCrmNotificationItems(opts?: {
       const auftragId = (row.auftrag_id as string | null)?.trim()
       if (!auftragId) continue
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
-      const hwName = hw?.name?.trim() || 'Handwerker'
+      const hwName = hw?.name?.trim() || 'Partner'
       const tlTyp = String(row.typ ?? '').toLowerCase()
       const notifTyp =
         tlTyp === 'partner_rechnung'
@@ -1258,12 +1288,14 @@ async function applyUpdateZeilenAnzeige(
   const kundeByRechnung = new Map<string, string>()
 
   await Promise.all([
+    // logDbError in .then handlers below
     leadIds.size
       ? supabase
           .from('leads')
           .select('id, kontakt_name, kunden:kunde_id(name, vorname, nachname)')
           .in('id', Array.from(leadIds))
-          .then(({ data }) => {
+          .then(({ data, error }) => {
+            if (error) logDbError('app/notifications/actions:leads', error)
             for (const row of data ?? []) {
               const k = one(
                 row.kunden as
@@ -1284,7 +1316,8 @@ async function applyUpdateZeilenAnzeige(
             'id, kunden:kunde_id(name, vorname, nachname), leads:lead_id(kontakt_name, kunden:kunde_id(name, vorname, nachname))'
           )
           .in('id', Array.from(angebotIds))
-          .then(({ data }) => {
+          .then(({ data, error }) => {
+            if (error) logDbError('app/notifications/actions:angebote', error)
             for (const row of data ?? []) {
               const k = one(
                 row.kunden as
@@ -1332,7 +1365,8 @@ async function applyUpdateZeilenAnzeige(
             'id, kunden:kunde_id(name, vorname, nachname), leads:lead_id(kontakt_name)'
           )
           .in('id', Array.from(auftragIds))
-          .then(({ data }) => {
+          .then(({ data, error }) => {
+            if (error) logDbError('app/notifications/actions:auftraege', error)
             for (const row of data ?? []) {
               const k = one(
                 row.kunden as
@@ -1356,7 +1390,8 @@ async function applyUpdateZeilenAnzeige(
           .from('rechnungen')
           .select('id, kunden:kunde_id(name, vorname, nachname)')
           .in('id', Array.from(rechnungIds))
-          .then(({ data }) => {
+          .then(({ data, error }) => {
+            if (error) logDbError('app/notifications/actions:rechnungen', error)
             for (const row of data ?? []) {
               const k = one(
                 row.kunden as
@@ -1395,7 +1430,7 @@ async function applyUpdateZeilenAnzeige(
 
 /** Inbox der letzten 7 Tage: max. LIST_LIMIT Einträge (neueste zuerst). */
 export async function listCrmNotifications(
-  filter: CrmNotificationFilter = 'ungelesen'
+  filter: NotificationReadFilter = 'ungelesen'
 ): Promise<{ ok: true; items: CrmNotificationItem[]; unreadCount: number } | { ok: false; message: string }> {
   const userId = await currentUserId()
   if (!userId) return { ok: false, message: 'Nicht angemeldet' }
@@ -1405,14 +1440,15 @@ export async function listCrmNotifications(
   const supabase = createClient()
 
   const keys = items.map((i) => i.sourceKey)
-  const { data: reads } =
+  const { data: reads, error: readsErr } =
     keys.length > 0
       ? await supabase
           .from('crm_notification_reads')
           .select('source_key')
           .eq('user_id', userId)
           .in('source_key', keys)
-      : { data: [] as { source_key: string }[] }
+      : { data: [] as { source_key: string }[], error: null }
+  if (readsErr) logDbError('app/notifications/actions:crm_notification_reads', readsErr)
 
   const readSet = new Set((reads ?? []).map((r) => r.source_key as string))
   for (const item of items) {
@@ -1440,11 +1476,12 @@ export async function getCrmNotificationUnreadCount(): Promise<number> {
 
   const supabase = createClient()
   const keys = items.map((i) => i.sourceKey)
-  const { data: reads } = await supabase
+  const { data: reads, error } = await supabase
     .from('crm_notification_reads')
     .select('source_key')
     .eq('user_id', userId)
     .in('source_key', keys)
+  if (error) logDbError('app/notifications/actions:crm_notification_reads', error)
 
   const readSet = new Set((reads ?? []).map((r) => String(r.source_key)))
   return keys.filter((k) => !readSet.has(k)).length
@@ -1463,6 +1500,7 @@ export async function markCrmNotificationRead(
     { user_id: userId, source_key: key, read_at: new Date().toISOString() },
     { onConflict: 'user_id,source_key' }
   )
+  if (error) logDbError('app/notifications/actions:crm_notification_reads', error)
   if (error) {
     if (/crm_notification_reads|does not exist/i.test(error.message)) {
       return { ok: false, message: 'Migration crm_notification_reads fehlt noch.' }
@@ -1483,17 +1521,18 @@ export async function markAllCrmNotificationsRead(): Promise<
 
   const supabase = createClient()
   const keys = items.map((i) => i.sourceKey)
-  const { data: reads } = await supabase
+  const { data: reads, error } = await supabase
     .from('crm_notification_reads')
     .select('source_key')
     .eq('user_id', userId)
     .in('source_key', keys)
+  if (error) logDbError('app/notifications/actions:crm_notification_reads', error)
   const readSet = new Set((reads ?? []).map((r) => String(r.source_key)))
   const unread = items.filter((i) => !readSet.has(i.sourceKey))
   if (!unread.length) return { ok: true }
 
   const now = new Date().toISOString()
-  const { error } = await supabase.from('crm_notification_reads').upsert(
+  const { error: error2 } = await supabase.from('crm_notification_reads').upsert(
     unread.map((i) => ({
       user_id: userId,
       source_key: i.sourceKey,
@@ -1501,6 +1540,7 @@ export async function markAllCrmNotificationsRead(): Promise<
     })),
     { onConflict: 'user_id,source_key' }
   )
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/notifications/actions:crm_notification_reads', error2)
+  if (error2) return { ok: false, message: error2.message }
   return { ok: true }
 }

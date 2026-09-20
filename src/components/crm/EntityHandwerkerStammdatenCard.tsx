@@ -1,7 +1,8 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { useEffect, useState, type ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
 import { PartnerEditSheet } from '@/components/handwerker/PartnerEditSheet'
 import type { Handwerker } from '@/lib/types'
@@ -27,7 +28,7 @@ function PropRow({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-export type EntityHandwerkerStammDraft = {
+export type EntityPartnerStammDraft = {
   displayName: string
   firma?: string
   geschaeftsfuehrer?: string
@@ -41,7 +42,7 @@ type GewerkOpt = { id: string; name: string; slug: string }
 
 type Props = {
   handwerkerId: string
-  initial: EntityHandwerkerStammDraft
+  initial: EntityPartnerStammDraft
   /** Volle Zeile für EditorSheet */
   editHandwerker?: Handwerker | null
   gewerkeOptionen?: GewerkOpt[]
@@ -92,65 +93,64 @@ export function EntityHandwerkerStammdatenCard({
 
   return (
     <>
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">Stammdaten</div>
-          {showPencil ? (
+      <MockCard
+        title="Stammdaten"
+        actions={
+          showPencil ? (
             <MockBtn sm kind="secondary" icon="pencil" title="Bearbeiten" onClick={beginEdit} />
-          ) : null}
+          ) : null
+        }
+      >
+        <div className="vgid">
+          <div className="vgid-name">{draft.displayName.trim() || '—'}</div>
+          {gewerk ? <div className="vgid-meta">{gewerk}</div> : null}
         </div>
-        <div className="card-b">
-          <div className="vgid">
-            <div className="vgid-name">{draft.displayName.trim() || '—'}</div>
-            {gewerk ? <div className="vgid-meta">{gewerk}</div> : null}
-          </div>
 
-          <div className="detail-soft-block">
-            <div className="props">
-              {firma && firma !== draft.displayName.trim() ? (
-                <PropRow label="Betrieb" value={firma} />
-              ) : null}
-              <PropRow label="Geschäftsführer" value={gf || '—'} />
-              <PropRow label="Gewerk" value={gewerk || '—'} />
-              <PropRow label="Adresse" value={draft.adresse.trim() || '—'} />
-              <PropRow
-                label="Telefon"
-                value={
-                  tel ? (
-                    <a className="link" href={telHref(tel)}>
-                      {tel}
-                    </a>
-                  ) : (
-                    '—'
-                  )
-                }
-              />
-              <PropRow
-                label="E-Mail"
-                value={
-                  mail ? (
-                    <a className="link" href={`mailto:${mail}`}>
-                      {mail}
-                    </a>
-                  ) : (
-                    '—'
-                  )
-                }
-              />
-            </div>
-          </div>
-
-          <div className="stammdaten-footer">
-            <StammdatenPortalZeile
-              handwerkerId={handwerkerId}
-              fallbackEmail={draft.email}
-              gesperrt={portalGesperrt}
-              onInvite={onInvite}
-              variant="vgid"
+        <div className="detail-soft-block">
+          <div className="props">
+            {firma && firma !== draft.displayName.trim() ? (
+              <PropRow label="Betrieb" value={firma} />
+            ) : null}
+            <PropRow label="Geschäftsführer" value={gf || '—'} />
+            <PropRow label="Gewerk" value={gewerk || '—'} />
+            <PropRow label="Adresse" value={draft.adresse.trim() || '—'} />
+            <PropRow
+              label="Telefon"
+              value={
+                tel ? (
+                  <a className="link" href={telHref(tel)}>
+                    {tel}
+                  </a>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <PropRow
+              label="E-Mail"
+              value={
+                mail ? (
+                  <a className="link" href={`mailto:${mail}`}>
+                    {mail}
+                  </a>
+                ) : (
+                  '—'
+                )
+              }
             />
           </div>
         </div>
-      </div>
+
+        <div className="stammdaten-footer">
+          <StammdatenPortalZeile
+            handwerkerId={handwerkerId}
+            fallbackEmail={draft.email}
+            gesperrt={portalGesperrt}
+            onInvite={onInvite}
+            variant="vgid"
+          />
+        </div>
+      </MockCard>
 
       {!onEdit && editHandwerker ? (
         <PartnerEditSheet

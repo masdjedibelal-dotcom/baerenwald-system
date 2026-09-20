@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 /** Offenes Kundenangebot derselben Anfrage — LV-Karten hängen hier, sobald es eines gibt. */
@@ -11,6 +12,7 @@ export async function latestKundenAngebotIdFuerLead(leadId: string): Promise<str
     .select('id, ist_partner_einholung, ersetzt_durch, created_at')
     .eq('lead_id', lead)
     .order('created_at', { ascending: false })
+  if (error) logDbError('lib/angebote/partner-einholung-server:angebote', error)
 
   if (error) {
     if (/ist_partner_einholung|ersetzt_durch|column/i.test(error.message)) return null
@@ -40,6 +42,7 @@ export async function partnerLvHandwerkerIdsFuerLead(leadId: string): Promise<Se
     .select('handwerker_id, angebote!inner(lead_id)')
     .eq('ohne_lv', true)
     .eq('angebote.lead_id', lead)
+  if (error) logDbError('lib/angebote/partner-einholung-server:angebot_handwerker', error)
 
   if (error) {
     if (/ohne_lv|column/i.test(error.message)) return out
@@ -61,10 +64,12 @@ export async function loescheAngebotHandwerkerAusserPartnerLv(angebotId: string)
     .from('angebot_handwerker')
     .select('id, ohne_lv')
     .eq('angebot_id', id)
+  if (error) logDbError('lib/angebote/partner-einholung-server:angebot_handwerker', error)
 
   if (error) {
     if (/ohne_lv|column/i.test(error.message)) {
-      await supabaseAdmin.from('angebot_handwerker').delete().eq('angebot_id', id)
+      const { error: __dbErr1 } = await supabaseAdmin.from('angebot_handwerker').delete().eq('angebot_id', id)
+      if (__dbErr1) logDbError('lib/angebote/partner-einholung-server:angebot_handwerker', __dbErr1)
       return
     }
     console.warn('[loescheAngebotHandwerkerAusserPartnerLv]', error.message)
@@ -81,6 +86,7 @@ export async function loescheAngebotHandwerkerAusserPartnerLv(angebotId: string)
     .from('angebot_handwerker')
     .delete()
     .in('id', dropIds)
+  if (delErr) logDbError('lib/angebote/partner-einholung-server:angebot_handwerker', delErr)
   if (delErr) console.warn('[loescheAngebotHandwerkerAusserPartnerLv] del:', delErr.message)
 }
 
@@ -98,6 +104,7 @@ export async function reparentPartnerEinholungenZuKundenangebot(
     .select('id')
     .eq('lead_id', lead)
     .eq('ist_partner_einholung', true)
+  if (error) logDbError('lib/angebote/partner-einholung-server:angebote', error)
 
   if (error) {
     if (/ist_partner_einholung|column/i.test(error.message)) return
@@ -110,16 +117,18 @@ export async function reparentPartnerEinholungenZuKundenangebot(
     .filter((id) => id && id !== target)
   if (!internIds.length) return
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error: error2 } = await supabaseAdmin
     .from('angebot_handwerker')
     .select('id, handwerker_id, ohne_lv')
     .eq('angebot_id', target)
+  if (error2) logDbError('lib/angebote/partner-einholung-server:angebot_handwerker', error2)
 
-  const { data: movers } = await supabaseAdmin
+  const { data: movers, error: error3 } = await supabaseAdmin
     .from('angebot_handwerker')
     .select('id, handwerker_id')
     .in('angebot_id', internIds)
     .eq('ohne_lv', true)
+  if (error3) logDbError('lib/angebote/partner-einholung-server:angebot_handwerker', error3)
 
   const moverHwIds = new Set(
     (movers ?? []).map((r) => String((r as { handwerker_id: string }).handwerker_id))
@@ -131,7 +140,8 @@ export async function reparentPartnerEinholungenZuKundenangebot(
     })
     .map((r) => String((r as { id: string }).id))
   if (dupRegularIds.length) {
-    await supabaseAdmin.from('angebot_handwerker').delete().in('id', dupRegularIds)
+    const { error: __dbErr2 } = await supabaseAdmin.from('angebot_handwerker').delete().in('id', dupRegularIds)
+    if (__dbErr2) logDbError('lib/angebote/partner-einholung-server:angebot_handwerker', __dbErr2)
   }
 
   const taken = new Set(
@@ -149,6 +159,7 @@ export async function reparentPartnerEinholungenZuKundenangebot(
     .from('angebot_handwerker')
     .update({ angebot_id: target })
     .in('id', ids)
+  if (upErr) logDbError('lib/angebote/partner-einholung-server:angebot_handwerker', upErr)
 
   if (upErr && !/ohne_lv|column/i.test(upErr.message)) {
     console.warn('[reparentPartnerEinholungen] AH:', upErr.message)

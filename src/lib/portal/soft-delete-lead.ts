@@ -3,6 +3,7 @@
  * Plus Hard-Cascade für Kunden-Löschung.
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 /** HV- + Portal-Glocke zu diesem Lead entfernen. */
@@ -45,6 +46,7 @@ async function deleteByIds(
 ): Promise<string | null> {
   if (!ids.length) return null
   const { error } = await supabaseAdmin.from(table).delete().in(column, ids)
+  if (error) logDbError('lib/portal/soft-delete-lead:query', error)
   return error ? `${table}: ${error.message}` : null
 }
 
@@ -63,6 +65,7 @@ export async function softDeleteLeadForPortal(input: {
     .select('id, geloescht_am')
     .eq('id', id)
     .maybeSingle()
+  if (leadErr) logDbError('lib/portal/soft-delete-lead:leads', leadErr)
 
   if (leadErr) return { ok: false, message: leadErr.message }
   if (!lead?.id) return { ok: false, message: 'Vorgang nicht gefunden.' }
@@ -72,12 +75,13 @@ export async function softDeleteLeadForPortal(input: {
   }
 
   const now = new Date().toISOString()
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('leads')
     .update({ geloescht_am: now, updated_at: now })
     .eq('id', id)
+  if (error2) logDbError('lib/portal/soft-delete-lead:leads', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
 
   await deletePortalNotificationsForLead(id)
   return { ok: true }
@@ -98,49 +102,56 @@ export async function hardDeleteLeadCascade(
     .select('id')
     .eq('id', id)
     .maybeSingle()
+  if (leadErr) logDbError('lib/portal/soft-delete-lead:leads', leadErr)
   if (leadErr) return { ok: false, message: leadErr.message }
   if (!lead?.id) return { ok: true }
 
-  const { data: auftraege } = await supabaseAdmin
+  const { data: auftraege, error: error2 } = await supabaseAdmin
     .from('auftraege')
     .select('id')
     .eq('lead_id', id)
+  if (error2) logDbError('lib/portal/soft-delete-lead:auftraege', error2)
   const auftragIds = (auftraege ?? []).map((a) => a.id as string)
 
-  const { data: angebote } = await supabaseAdmin
+  const { data: angebote, error: error3 } = await supabaseAdmin
     .from('angebote')
     .select('id')
     .eq('lead_id', id)
+  if (error3) logDbError('lib/portal/soft-delete-lead:angebote', error3)
   const angebotIds = (angebote ?? []).map((a) => a.id as string)
 
   const rechnungIdSet = new Set<string>()
   if (auftragIds.length) {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('rechnungen')
       .select('id')
       .in('auftrag_id', auftragIds)
+    if (error) logDbError('lib/portal/soft-delete-lead:rechnungen', error)
     for (const r of data ?? []) rechnungIdSet.add(String(r.id))
   }
   if (angebotIds.length) {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('rechnungen')
       .select('id')
       .in('angebot_id', angebotIds)
+    if (error) logDbError('lib/portal/soft-delete-lead:rechnungen', error)
     for (const r of data ?? []) rechnungIdSet.add(String(r.id))
   }
   // Direkt am Lead hängende Rechnungen
   {
-    const { data } = await supabaseAdmin.from('rechnungen').select('id').eq('lead_id', id)
+    const { data, error } = await supabaseAdmin.from('rechnungen').select('id').eq('lead_id', id)
+    if (error) logDbError('lib/portal/soft-delete-lead:rechnungen', error)
     for (const r of data ?? []) rechnungIdSet.add(String(r.id))
   }
   const rechnungIds = Array.from(rechnungIdSet)
 
   let positionIds: string[] = []
   if (auftragIds.length) {
-    const { data: pos } = await supabaseAdmin
+    const { data: pos, error } = await supabaseAdmin
       .from('auftrag_positionen')
       .select('id')
       .in('auftrag_id', auftragIds)
+    if (error) logDbError('lib/portal/soft-delete-lead:auftrag_positionen', error)
     positionIds = (pos ?? []).map((p) => String(p.id))
   }
 
@@ -184,6 +195,7 @@ export async function hardDeleteLeadCascade(
   }
 
   const { error: delLead } = await supabaseAdmin.from('leads').delete().eq('id', id)
+  if (delLead) logDbError('lib/portal/soft-delete-lead:leads', delLead)
   if (delLead) return { ok: false, message: `leads: ${delLead.message}` }
   return { ok: true }
 }

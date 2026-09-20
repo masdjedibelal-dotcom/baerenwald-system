@@ -7,6 +7,7 @@ import { RECHNUNG_BELEG_TYP_LABELS } from '@/lib/rechnung-config'
 import type { LeadDetail, Rechnung, RechnungBelegTyp } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
+import { C } from '@/lib/tokens/colors'
 
 function artLabel(detail: Rechnung, belegTyp: RechnungBelegTyp): string {
   if (belegTyp === 'gutschrift') return RECHNUNG_BELEG_TYP_LABELS.gutschrift
@@ -75,7 +76,7 @@ export function RechnungDetailsTab({
     }
     if (ueberfaellig) {
       return (
-        <span style={{ color: 'var(--danger, #c0392b)', fontWeight: 600 }}>
+        <span style={{ color: `var(--danger, ${C.redTx3})`, fontWeight: 600 }}>
           {tageUeber} Tag{tageUeber === 1 ? '' : 'e'} überfällig
         </span>
       )
@@ -108,7 +109,7 @@ export function RechnungDetailsTab({
           ) : null}
           {belegTyp === 'rechnung' && detail.faellig_am ? (
             <MockProp label="Fällig">
-              <span style={ueberfaellig ? { color: 'var(--danger, #c0392b)', fontWeight: 600 } : undefined}>
+              <span style={ueberfaellig ? { color: `var(--danger, ${C.redTx3})`, fontWeight: 600 } : undefined}>
                 {formatDatum(detail.faellig_am)}
               </span>
             </MockProp>

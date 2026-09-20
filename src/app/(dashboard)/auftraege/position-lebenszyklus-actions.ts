@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
@@ -47,6 +53,7 @@ async function loadPosition(positionId: string) {
     )
     .eq('id', positionId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', error)
   if (error) throw new Error(migrationHint(error.message))
   return data
 }
@@ -83,6 +90,7 @@ async function insertCrmEintrag(opts: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/position-lebenszyklus-actions:position_eintraege', error)
 
   if (error) return { ok: false, message: migrationHint(error.message) }
   return { ok: true, id: String(data.id) }
@@ -97,6 +105,7 @@ async function linkEintragLeistungen(
   const { error } = await supabaseAdmin.from('position_eintrag_leistungen').insert(
     unique.map((position_id) => ({ eintrag_id: eintragId, position_id }))
   )
+  if (error) logDbError('app/auftraege/position-lebenszyklus-actions:position_eintrag_leistungen', error)
   if (error) {
     if (/position_eintrag_leistungen|does not exist/i.test(error.message)) {
       return {
@@ -129,12 +138,13 @@ async function attachCrmFoto(opts: {
     exif_gps_lat: opts.gpsLat ?? null,
     exif_gps_lng: opts.gpsLng ?? null,
   })
+  if (error) logDbError('app/auftraege/position-lebenszyklus-actions:eintrag_fotos', error)
   if (error) return { ok: false, message: migrationHint(error.message) }
   return { ok: true }
 }
 
 function revalidateAuftrag(auftragId: string) {
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
 }
 
 /** Alle Positions-/Tagebuch-Einträge eines Auftrags (inkl. freie Notizen ohne Leistung). */
@@ -148,6 +158,7 @@ export async function listAuftragPositionEintraege(
     .from('auftrag_positionen')
     .select('id')
     .eq('auftrag_id', auftragId)
+  if (posErr) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', posErr)
   if (posErr) {
     console.error('[listAuftragPositionEintraege] positionen', posErr.message)
     return []
@@ -165,21 +176,22 @@ export async function listAuftragPositionEintraege(
     query = query.eq('auftrag_id', auftragId)
   }
 
-  const { data, error } = await query
+  const { data, error: error2 } = await query
 
-  if (error) {
-    if (/relation .* does not exist|position_eintraege/i.test(error.message)) return []
-    console.error('[listAuftragPositionEintraege]', error.message)
+  if (error2) {
+    if (/relation .* does not exist|position_eintraege/i.test(error2.message)) return []
+    console.error('[listAuftragPositionEintraege]', error2.message)
     return []
   }
 
   const eintragIds = (data ?? []).map((row) => String(row.id))
   const junctionByEintrag = new Map<string, string[]>()
   if (eintragIds.length > 0) {
-    const { data: junctionRows } = await supabaseAdmin
+    const { data: junctionRows, error } = await supabaseAdmin
       .from('position_eintrag_leistungen')
       .select('eintrag_id, position_id')
       .in('eintrag_id', eintragIds)
+    if (error) logDbError('app/auftraege/position-lebenszyklus-actions:position_eintrag_leistungen', error)
     for (const j of junctionRows ?? []) {
       const eid = String(j.eintrag_id)
       const list = junctionByEintrag.get(eid) ?? []
@@ -260,6 +272,7 @@ export async function listAuftragTagesspannen(
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('tag', { ascending: true })
+  if (error) logDbError('app/auftraege/position-lebenszyklus-actions:v_auftrag_tagesspannen', error)
 
   if (error) {
     if (/v_auftrag_tagesspannen|does not exist/i.test(error.message)) return []
@@ -287,6 +300,7 @@ export async function listPositionMaterial(
     .select('*')
     .eq('position_id', positionId)
     .order('created_at', { ascending: true })
+  if (error) logDbError('app/auftraege/position-lebenszyklus-actions:position_material', error)
 
   if (error) {
     if (/position_material|does not exist/i.test(error.message)) return []
@@ -400,21 +414,23 @@ export async function createCrmPositionEintrag(
 
   const now = new Date().toISOString()
   if (input.typ === 'start') {
-    await supabaseAdmin
+    const { error: __dbErr1 } = await supabaseAdmin
       .from('auftrag_positionen')
       .update({
         leistung_status: 'in_arbeit',
         gestartet_am: pos.gestartet_am ?? input.ereignisZeit ?? now,
       })
       .eq('id', positionId)
+    if (__dbErr1) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', __dbErr1)
   } else if (input.typ === 'ergebnis') {
-    await supabaseAdmin
+    const { error: __dbErr2 } = await supabaseAdmin
       .from('auftrag_positionen')
       .update({
         leistung_status: 'erledigt',
         erledigt_am: input.ereignisZeit ?? now,
       })
       .eq('id', positionId)
+    if (__dbErr2) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', __dbErr2)
   }
 
   await writeAuditEvent({
@@ -531,6 +547,7 @@ export async function createCrmTagebuchEintrag(
       .select('id, leistung_name, auftrag_id')
       .eq('auftrag_id', auftragId)
       .in('id', positionIds)
+    if (posErr) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', posErr)
     if (posErr) return { ok: false, message: migrationHint(posErr.message) }
     if ((posRows ?? []).length !== positionIds.length) {
       return { ok: false, message: 'Eine oder mehrere Leistungen gehören nicht zum Auftrag.' }
@@ -578,13 +595,14 @@ export async function createCrmTagebuchEintrag(
 
   if (erledigtIds.length > 0) {
     const now = new Date().toISOString()
-    await supabaseAdmin
+    const { error: __dbErr3 } = await supabaseAdmin
       .from('auftrag_positionen')
       .update({
         leistung_status: 'erledigt',
         erledigt_am: input.ereignisZeit ?? now,
       })
       .in('id', erledigtIds)
+    if (__dbErr3) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', __dbErr3)
   }
 
   await writeAuditEvent({
@@ -650,6 +668,7 @@ export async function updateCrmTagebuchEintrag(
     .select('id, auftrag_id, position_id, erfasst_von')
     .eq('id', eintragId)
     .maybeSingle()
+  if (loadErr) logDbError('app/auftraege/position-lebenszyklus-actions:position_eintraege', loadErr)
   if (loadErr) return { ok: false, message: migrationHint(loadErr.message) }
   if (!existing) return { ok: false, message: 'Eintrag nicht gefunden.' }
   if (!istCrmTagebuchEintragEditierbar(existing.erfasst_von as string | null)) {
@@ -697,6 +716,7 @@ export async function updateCrmTagebuchEintrag(
       .select('id')
       .eq('auftrag_id', auftragId)
       .in('id', positionIds)
+    if (posErr) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', posErr)
     if (posErr) return { ok: false, message: migrationHint(posErr.message) }
     if ((posRows ?? []).length !== positionIds.length) {
       return { ok: false, message: 'Eine oder mehrere Leistungen gehören nicht zum Auftrag.' }
@@ -716,15 +736,17 @@ export async function updateCrmTagebuchEintrag(
       quelle: input.quelle ?? 'vor_ort',
     })
     .eq('id', eintragId)
+  if (updErr) logDbError('app/auftraege/position-lebenszyklus-actions:position_eintraege', updErr)
   if (updErr) return { ok: false, message: migrationHint(updErr.message) }
 
   const linked = await linkEintragLeistungen(eintragId, positionIds)
   if (!linked.ok) return linked
 
-  const { data: fotoRows } = await supabaseAdmin
+  const { data: fotoRows, error: error3 } = await supabaseAdmin
     .from('eintrag_fotos')
     .select('id, storage_path')
     .eq('eintrag_id', eintragId)
+  if (error3) logDbError('app/auftraege/position-lebenszyklus-actions:eintrag_fotos', error3)
 
   const keep = new Set(fotoPaths)
   const existingPaths = new Set<string>()
@@ -733,7 +755,8 @@ export async function updateCrmTagebuchEintrag(
     if (!path) continue
     existingPaths.add(path)
     if (!keep.has(path)) {
-      await supabaseAdmin.from('eintrag_fotos').delete().eq('id', f.id)
+      const { error: __dbErr4 } = await supabaseAdmin.from('eintrag_fotos').delete().eq('id', f.id)
+      if (__dbErr4) logDbError('app/auftraege/position-lebenszyklus-actions:eintrag_fotos', __dbErr4)
     }
   }
   for (const path of fotoPaths) {
@@ -801,6 +824,7 @@ export async function deleteCrmTagebuchEintrag(input: {
     .select('id, auftrag_id, position_id, erfasst_von')
     .eq('id', eintragId)
     .maybeSingle()
+  if (loadErr) logDbError('app/auftraege/position-lebenszyklus-actions:position_eintraege', loadErr)
   if (loadErr) return { ok: false, message: migrationHint(loadErr.message) }
   if (!existing) return { ok: false, message: 'Eintrag nicht gefunden.' }
   if (!istCrmTagebuchEintragEditierbar(existing.erfasst_von as string | null)) {
@@ -809,11 +833,12 @@ export async function deleteCrmTagebuchEintrag(input: {
 
   let rowAuftrag = (existing.auftrag_id as string | null)?.trim() || ''
   if (!rowAuftrag && existing.position_id) {
-    const { data: pos } = await supabaseAdmin
+    const { data: pos, error } = await supabaseAdmin
       .from('auftrag_positionen')
       .select('auftrag_id')
       .eq('id', existing.position_id)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', error)
     rowAuftrag = String(pos?.auftrag_id ?? '').trim()
   }
   if (rowAuftrag && rowAuftrag !== auftragId) {
@@ -824,6 +849,7 @@ export async function deleteCrmTagebuchEintrag(input: {
     .from('position_eintraege')
     .delete()
     .eq('id', eintragId)
+  if (delErr) logDbError('app/auftraege/position-lebenszyklus-actions:position_eintraege', delErr)
   if (delErr) return { ok: false, message: migrationHint(delErr.message) }
 
   await writeAuditEvent({
@@ -869,6 +895,7 @@ export async function setWeitereArbeitAnerkennung(input: {
     .from('auftrag_positionen')
     .update(patch)
     .eq('id', input.positionId)
+  if (error) logDbError('app/auftraege/position-lebenszyklus-actions:auftrag_positionen', error)
 
   if (error) return { ok: false, message: migrationHint(error.message) }
 

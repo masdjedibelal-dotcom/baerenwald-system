@@ -1,0 +1,15 @@
+---
+description: Auftrag = Befund, ein Commit, Staging vor Prod; erledigt nur per audit-status
+alwaysApply: true
+---
+
+# Auftrag-Workflow
+
+1. **Befund zuerst**: betroffene Dateien + geplante Änderung nennen, dann umsetzen (bei freigegebenem Phasen-Durchlauf ohne Extra-Stopp).
+2. **Ein Auftrag ≈ ein Commit** mit sprechendem Text (`P0-2: ungenutzte CRM-Komponenten löschen`). Keine Riesen-Commits, keine GitHub-Web-Uploads. Belal versioniert über **GitHub Desktop** (keine Git-Befehle durch den Agenten).
+3. **Staging vor Prod**: Änderungen so bauen, dass Staging und Prod denselben Stand erreichen können (Merge staging → main). Keine Prod-Hotfixes am Staging vorbei. Keine Schreibzugriffe auf Supabase Prod.
+4. Variante ersetzen → alte Datei **löschen** → per Suche **0 Treffer** belegen → Guard von Warnung auf **Fehler**.
+5. Bugfix → Test, der den Fehler vorher rot und danach grün zeigt.
+6. **Erledigt nur per Messung:** Ein To-do ist erst „erledigt“, wenn `node scripts/audit-status.mjs` das Ziel meldet. Analyse-Dokumente allein zählen nicht.
+7. **Keine Entscheidungen im Namen von Belal.** Was nicht in den verbindlichen Entscheidungen (Mega-Auftrag E1–E8) steht → `docs/OFFENE-FRAGEN.md`, dann nächsten geregelten Punkt.
+8. Nach jedem Block: `npm run build` grün; Abschnitt in `docs/COMMIT-PLAN.md`.

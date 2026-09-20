@@ -1,5 +1,6 @@
 'use client'
 
+import { MockTabs } from '@/components/mock-ui'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
@@ -294,7 +295,7 @@ export function AuftragLeistungenTab({
           status: 'erledigt',
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
       }
@@ -312,7 +313,7 @@ export function AuftragLeistungenTab({
         positionIds: ids,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         throw new Error(r.message)
       }
       toast.success(
@@ -334,7 +335,7 @@ export function AuftragLeistungenTab({
         async () => {
           const r = await decideWeitereArbeitMitNotify({ positionId, status })
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
           toast.success(r.message ?? (status === 'anerkannt' ? 'Bestätigt.' : 'Abgelehnt.'))
@@ -346,32 +347,32 @@ export function AuftragLeistungenTab({
 
   return (
     <div className="space-y-4">
-      <div className="lt-view-seg" role="tablist" aria-label="Ansicht">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={leistungenView === 'leistungen'}
-          className={leistungenView === 'leistungen' ? 'on' : undefined}
-          onClick={() => setLeistungenView('leistungen')}
-        >
-          Leistungen
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={leistungenView === 'bautagebuch'}
-          className={leistungenView === 'bautagebuch' ? 'on' : undefined}
-          onClick={() => setLeistungenView('bautagebuch')}
-        >
-          Bautagebuch
-          {(() => {
-            const n = bautagebuchEintraege.filter(
-              (e) => String(e.typ).toLowerCase() !== 'weitere_arbeit'
-            ).length
-            return n > 0 ? <span className="lt-view-seg__count">{n}</span> : null
-          })()}
-        </button>
-      </div>
+      <MockTabs
+        items={[
+          { id: 'leistungen', label: 'Leistungen' },
+          {
+            id: 'bautagebuch',
+            label: (() => {
+              const n = bautagebuchEintraege.filter(
+                (e) => String(e.typ).toLowerCase() !== 'weitere_arbeit'
+              ).length
+              return (
+                <>
+                  Bautagebuch
+                  {n > 0 ? <span className="lt-view-seg__count">{n}</span> : null}
+                </>
+              )
+            })(),
+          },
+        ]}
+        value={leistungenView}
+        onChange={(id) => setLeistungenView(id as 'leistungen' | 'bautagebuch')}
+        aria-label="Ansicht"
+        className="lt-view-seg"
+        tabClassName=""
+        activeClassName="on"
+        showIcons={false}
+      />
 
       {leistungenView === 'leistungen' ? (
         <>
@@ -387,16 +388,16 @@ export function AuftragLeistungenTab({
               if (!hwId) continue
               if (String(p.handwerker_status ?? '').toLowerCase() !== 'erledigt') continue
               if (hwErledigt.some((z) => z.handwerker_id === hwId)) continue
-              const name = p.handwerker?.name?.trim() || 'Handwerker'
+              const name = p.handwerker?.name?.trim() || 'Partner'
               posErledigtHw.set(hwId, name)
             }
             if (!hwErledigt.length && !posErledigtHw.size) return null
             return (
-              <div className="flex flex-wrap gap-2" aria-label="Handwerker erledigt">
+              <div className="flex flex-wrap gap-2" aria-label="Partner erledigt">
                 {hwErledigt.map((z) => (
                   <span
                     key={z.id}
-                    className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-emerald-900"
+                    className="inline-flex items-center rounded-pill bg-status-order-bg px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-status-order-text"
                   >
                     HW erledigt
                     {z.handwerker?.name?.trim() || z.handwerker?.firma?.trim()
@@ -407,7 +408,7 @@ export function AuftragLeistungenTab({
                 {Array.from(posErledigtHw.entries()).map(([hwId, name]) => (
                   <span
                     key={hwId}
-                    className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-emerald-900"
+                    className="inline-flex items-center rounded-pill bg-status-order-bg px-2.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-status-order-text"
                   >
                     HW erledigt · {name}
                   </span>

@@ -173,6 +173,77 @@
         "needsAction": false,
         "actor": null
       }
+    },
+    {
+      "id": "7-hv-hm-erledigt",
+      "input": {
+        "lead": {
+          "id": "L-HM1",
+          "status": "neu",
+          "hv_meldung_status": "hm_erledigt",
+          "kanal": "hv_melder_link",
+          "created_at": "2026-08-01T10:00:00Z"
+        }
+      },
+      "expect": {
+        "phase": "anfrage",
+        "unterstatus": "hm_erledigt",
+        "needsAction": false,
+        "actor": null
+      }
+    },
+    {
+      "id": "8-wartet-freigabe-mieter",
+      "input": {
+        "lead": {
+          "id": "L-WF1",
+          "status": "neu",
+          "erfassung_von": "melder",
+          "anlass": "meldung",
+          "hv_meldung_status": "neu",
+          "kanal": "hv_melder_link",
+          "created_at": "2026-08-02T10:00:00Z"
+        }
+      },
+      "expect": {
+        "phase": "anfrage",
+        "unterstatus": "neu",
+        "needsAction": false,
+        "actor": null,
+        "wartet_freigabe": true
+      }
+    },
+    {
+      "id": "9-abschlag-gewinnt-nicht",
+      "input": {
+        "lead": {
+          "id": "L-AB1",
+          "status": "auftrag",
+          "kanal": "website",
+          "created_at": "2026-07-01T10:00:00Z"
+        },
+        "auftraege": [
+          {
+            "id": "AU-AB1",
+            "status": "in_arbeit",
+            "created_at": "2026-07-03T10:00:00Z"
+          }
+        ],
+        "rechnungen": [
+          {
+            "id": "RE-AB1",
+            "status": "gesendet",
+            "rechnung_art": "abschlag",
+            "created_at": "2026-07-05T10:00:00Z"
+          }
+        ]
+      },
+      "expect": {
+        "phase": "auftrag",
+        "unterstatus": "in_arbeit",
+        "needsAction": false,
+        "actor": null
+      }
     }
   ]
 }

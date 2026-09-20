@@ -1,4 +1,5 @@
 import type { AusfuehrungErgebnis } from '@/lib/ki/types'
+import { MockTable, MockEmpty } from '@/components/mock-ui'
 import { KiCardShell } from '@/components/ki/KiCardShell'
 import {
   KiEmptyCardBody,
@@ -6,25 +7,26 @@ import {
   type KiCardProps,
   formatEur,
 } from '@/components/ki/ki-card-shared'
+import { C } from '@/lib/tokens/colors'
 
 function EigenFremdDonut({ eigenPct }: { eigenPct: number }) {
   const clamped = Math.min(100, Math.max(0, eigenPct))
   return (
     <div className="flex items-center gap-4">
       <div
-        className="h-20 w-20 shrink-0 rounded-full border border-bw-border"
+        className="h-20 w-20 shrink-0 rounded-pill border border-bw-border"
         style={{
-          background: `conic-gradient(#2E7D52 0% ${clamped}%, #cbd5e1 ${clamped}% 100%)`,
+          background: `conic-gradient(${C.green} 0% ${clamped}%, ${C.slate300} ${clamped}% 100%)`,
         }}
         aria-hidden
       />
       <div className="text-xs text-muted">
         <p>
-          <span className="inline-block h-2 w-2 rounded-full bg-[#2E7D52] mr-1" />
+          <span className="inline-block h-2 w-2 rounded-pill bg-bw-primary mr-1" />
           Eigen {clamped}%
         </p>
         <p className="mt-1">
-          <span className="inline-block h-2 w-2 rounded-full bg-slate-300 mr-1" />
+          <span className="inline-block h-2 w-2 rounded-pill bg-status-done-bg mr-1" />
           Fremd {Math.round(100 - clamped)}%
         </p>
       </div>
@@ -48,13 +50,13 @@ export function KiAusfuehrungCard({ analyse, onGenerateKi, kiLoading }: KiCardPr
       </div>
     </div>
   ) : (
-    <p className="text-sm text-muted">Keine Ausführungsdaten</p>
+    <MockEmpty title="Keine Ausführungsdaten" />
   )
 
   const details = (
-    <table className="w-full text-left text-sm">
+    <MockTable className="w-full text-left text-sm">
       <thead>
-        <tr className="text-[11px] uppercase text-muted">
+        <tr className="text-fs-caption uppercase text-muted">
           <th className="pb-2 font-semibold">Gewerk</th>
           <th className="pb-2 text-right font-semibold">Eigen</th>
           <th className="pb-2 text-right font-semibold">Fremd</th>
@@ -71,7 +73,7 @@ export function KiAusfuehrungCard({ analyse, onGenerateKi, kiLoading }: KiCardPr
           </tr>
         ))}
       </tbody>
-    </table>
+    </MockTable>
   )
 
   return (
@@ -86,7 +88,7 @@ export function KiAusfuehrungCard({ analyse, onGenerateKi, kiLoading }: KiCardPr
       emptyBody={
         <KiEmptyCardBody
           title="Noch keine Ausführung"
-          hint="Auftragspositionen mit Handwerker-Zuweisung oder Eigenleistung werden hier ausgewertet."
+          hint="Auftragspositionen mit Partner-Zuweisung oder Eigenleistung werden hier ausgewertet."
         />
       }
     />

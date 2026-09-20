@@ -1,5 +1,6 @@
 /** Wann eine Rechnung wie korrigiert wird. */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import type { AngebotPosition, RechnungStatus } from '@/lib/types'
 

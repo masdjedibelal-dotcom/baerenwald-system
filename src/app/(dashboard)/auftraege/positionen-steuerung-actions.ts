@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
@@ -23,12 +29,13 @@ import {
   positionPatchBenoetigtVertragSync,
   syncProjektvertragStilleFireAndForget,
 } from '@/lib/vertraege/sync-projektvertrag-stille'
+import { C } from '@/lib/tokens/colors'
 
 /** Fortschritt auf Auftragsebene aus Leistungsstatus + Verkaufspreisen berechnen. */
 export async function syncAuftragFortschrittFromPositionen(
   auftragId: string
 ): Promise<{ ok: true; fortschritt: number } | { ok: false; message: string }> {
-  const gate = await assertAuftrag(auftragId)
+const gate = await assertAuftrag(auftragId)
   if (!gate.ok) return gate
 
   const supabase = createClient()
@@ -36,6 +43,7 @@ export async function syncAuftragFortschrittFromPositionen(
     .from('auftrag_positionen')
     .select('preis_fix, leistung_status')
     .eq('auftrag_id', auftragId)
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_positionen', error)
 
   if (error) {
     if (error.code === '42703' || error.message.includes('leistung_status')) {
@@ -43,6 +51,7 @@ export async function syncAuftragFortschrittFromPositionen(
         .from('auftrag_positionen')
         .select('preis_fix')
         .eq('auftrag_id', auftragId)
+      if (err2) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_positionen', err2)
       if (err2) return { ok: false, message: err2.message }
       const pct = gewichteterFortschrittProzent(
         (fallback ?? []).map((r) => ({ preis_fix: r.preis_fix, leistung_status: 'offen' } as AuftragPosition))
@@ -51,8 +60,9 @@ export async function syncAuftragFortschrittFromPositionen(
         .from('auftraege')
         .update({ fortschritt: pct, updated_at: new Date().toISOString() })
         .eq('id', auftragId)
+      if (upErr) logDbError('app/auftraege/positionen-steuerung-actions:auftraege', upErr)
       if (upErr) return { ok: false, message: upErr.message }
-      revalidatePath(`/auftraege/${auftragId}`)
+      revalidateAuftragDetail(auftragId)
       return { ok: true, fortschritt: pct }
     }
     return { ok: false, message: error.message }
@@ -63,9 +73,9 @@ export async function syncAuftragFortschrittFromPositionen(
     .from('auftraege')
     .update({ fortschritt: pct, updated_at: new Date().toISOString() })
     .eq('id', auftragId)
+  if (upErr) logDbError('app/auftraege/positionen-steuerung-actions:auftraege', upErr)
   if (upErr) return { ok: false, message: upErr.message }
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
   return { ok: true, fortschritt: pct }
 }
 
@@ -76,6 +86,7 @@ async function assertAuftrag(auftragId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet', userId: null }
   const { data, error } = await supabase.from('auftraege').select('id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden', userId: null }
   return { ok: true as const, userId: user.id }
 }
@@ -93,9 +104,10 @@ export async function reorderAuftragPositionen(
       .update({ sort_order: (i + 1) * 10 })
       .eq('id', orderedIds[i]!)
       .eq('auftrag_id', auftragId)
+    if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_positionen', error)
     if (error) return { ok: false, message: error.message }
   }
-  revalidatePath(`/auftraege/${auftragId}`)
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }
 
@@ -133,11 +145,12 @@ export async function updateAuftragPositionSteuerung(
   }
   if (!Object.keys(patch).length) return { ok: true }
 
-  const { data: currentRow } = await supabase
+  const { data: currentRow, error } = await supabase
     .from('auftrag_positionen')
     .select('handwerker_id, preis_partner, handwerker_status, aenderung_typ, leistung_name, beschreibung')
     .eq('id', posId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_positionen', error)
 
   const current = currentRow as {
     handwerker_id: string | null
@@ -174,8 +187,9 @@ export async function updateAuftragPositionSteuerung(
     vorherHandwerkerId = current?.handwerker_id ? String(current.handwerker_id) : null
   }
 
-  const { error } = await supabase.from('auftrag_positionen').update(patch).eq('id', posId)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('auftrag_positionen').update(patch).eq('id', posId)
+  if (error2) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_positionen', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   if (positionPatchBenoetigtVertragSync(patch)) {
     const nachherHandwerkerId =
@@ -194,7 +208,7 @@ export async function updateAuftragPositionSteuerung(
   if ('leistung_status' in patch || 'preis_fix' in patch) {
     await syncAuftragFortschrittFromPositionen(auftragId)
   } else {
-    revalidatePath(`/auftraege/${auftragId}`)
+    revalidateAuftragDetail(auftragId)
   }
   const partnerAenderung = Boolean(
     current?.handwerker_id &&
@@ -237,8 +251,9 @@ export async function updateAuftragGewerkBlockMeta(input: {
     .update(patch)
     .in('id', input.positionIds)
     .eq('auftrag_id', input.auftragId)
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_positionen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -260,8 +275,9 @@ export async function addAuftragPositionNotiz(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_position_notizen', error)
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true, id: data.id as string }
 }
 
@@ -276,8 +292,9 @@ export async function updateAuftragPositionNotiz(input: {
   if (input.datum !== undefined) patch.datum = input.datum.slice(0, 10)
   if (input.text !== undefined) patch.text = input.text.trim()
   const { error } = await supabase.from('auftrag_position_notizen').update(patch).eq('id', input.notizId)
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_position_notizen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -287,8 +304,9 @@ export async function deleteAuftragPositionNotiz(input: {
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const { error } = await supabase.from('auftrag_position_notizen').delete().eq('id', input.notizId)
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_position_notizen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -300,11 +318,12 @@ export type KundeInformierenScope =
 export async function getKundeInformierenMailDefaults(
   auftragId: string
 ): Promise<{ ok: true; defaultAnrede: MailAnrede } | { ok: false; message: string }> {
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, kunden(typ)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftraege', error)
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
   const typ = (auf.kunden as { typ?: string | null } | null)?.typ
   return { ok: true, defaultAnrede: 'sie' }
@@ -332,11 +351,12 @@ async function buildKundeInformierenMail(input: {
   | { ok: true; html: string; betreff: string; kundeEmail: string; kundeName: string }
   | { ok: false; message: string }
 > {
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, titel, kunden(name, email)')
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftraege', error)
   if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
   const kunde = auf.kunden as { name?: string; email?: string } | null
   const email = kunde?.email?.trim()
@@ -350,17 +370,17 @@ async function buildKundeInformierenMail(input: {
 
   let scopeLine = ''
   if (input.scope.type === 'phase') {
-    scopeLine = `<p style="font-size:13px;color:#6B7280;margin:0 0 12px;"><strong>Phase:</strong> ${escapeHtml(input.scope.label)}</p>`
+    scopeLine = `<p style="font-size:13px;color:${C.gray500};margin:0 0 12px;"><strong>Phase:</strong> ${escapeHtml(input.scope.label)}</p>`
   } else if (input.scope.type === 'gewerk') {
-    scopeLine = `<p style="font-size:13px;color:#6B7280;margin:0 0 12px;"><strong>Gewerk:</strong> ${escapeHtml(input.scope.gewerkName)}</p>`
+    scopeLine = `<p style="font-size:13px;color:${C.gray500};margin:0 0 12px;"><strong>Gewerk:</strong> ${escapeHtml(input.scope.gewerkName)}</p>`
   } else {
-    scopeLine = `<p style="font-size:13px;color:#6B7280;margin:0 0 12px;"><strong>Leistung:</strong> ${escapeHtml(input.scope.leistungName)}</p>`
+    scopeLine = `<p style="font-size:13px;color:${C.gray500};margin:0 0 12px;"><strong>Leistung:</strong> ${escapeHtml(input.scope.leistungName)}</p>`
   }
 
   const textHtml = escapeHtml(input.nachricht.trim()).replace(/\n/g, '<br/>')
   const branding = await getMailBranding(supabaseAdmin)
   const html = mailHtmlBase(
-    `${anrede}<br/><br/>${textHtml}${scopeLine}<p style="font-size:13px;color:#6B7280;margin:16px 0 0;">${mailText(
+    `${anrede}<br/><br/>${textHtml}${scopeLine}<p style="font-size:13px;color:${C.gray500};margin:16px 0 0;">${mailText(
       input.anrede,
       'Notizen und Fotos zu diesem Abschnitt findest du auf deiner Projekt-Statusseite.',
       'Notizen und Fotos zu diesem Abschnitt finden Sie auf Ihrer Projekt-Statusseite.'
@@ -411,7 +431,7 @@ export async function sendKundeInformierenMail(input: {
     betreff: built.betreff,
     html: built.html.replace(
       'Projekt-Statusseite.',
-      `<a href="${statusLink}" style="color:#2E7D52;">Projekt-Statusseite</a>.`
+      `<a href="${statusLink}" style="color:${C.green};">Projekt-Statusseite</a>.`
     ),
     auftragId: input.auftragId,
   })
@@ -436,17 +456,18 @@ export async function sendKundeInformierenMail(input: {
     email_log_id: sent.emailLogId ?? null,
   })
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
 export async function loadPositionNotizen(
   positionId: string
 ): Promise<AuftragPositionNotiz[]> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('auftrag_position_notizen')
     .select('*')
     .eq('position_id', positionId)
     .order('datum', { ascending: false })
+  if (error) logDbError('app/auftraege/positionen-steuerung-actions:auftrag_position_notizen', error)
   return (data ?? []) as AuftragPositionNotiz[]
 }

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { RechnungAbschlagLink } from '@/lib/rechnungen/zahlungsplan'
 
@@ -87,6 +88,7 @@ export async function loadGeschwisterRechnungenFuerMahnung(
     .select(MAHNUNG_GESCHWISTER_SELECT)
     .eq('auftrag_id', aid)
     .neq('status', 'storniert')
+  if (error) logDbError('lib/rechnungen/mahnung-betrag:rechnungen', error)
 
   if (error || !data?.length) return []
 
@@ -117,6 +119,7 @@ export async function loadGeschwisterMapFuerMahnung(
     .select(MAHNUNG_GESCHWISTER_SELECT)
     .in('auftrag_id', ids)
     .neq('status', 'storniert')
+  if (error) logDbError('lib/rechnungen/mahnung-betrag:rechnungen', error)
 
   if (error || !data?.length) return map
 

@@ -1,13 +1,17 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
-import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import {
@@ -16,6 +20,10 @@ import {
   sendKundeInformierenMail,
   type KundeInformierenScope,
 } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
+<<<<<<< Updated upstream
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
+=======
 
 function InformierenFooter({
   pending,
@@ -31,10 +39,10 @@ function InformierenFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="sheet-footer-actions ldr-cta">
-      <Button type="button" variant="secondary" onClick={() => requestClose?.()} disabled={pending}>
+      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()} disabled={pending}>
         Abbrechen
-      </Button>
-      <Button type="button" variant="secondary" loading={pending} onClick={onTogglePreview}>
+      </MockBtn>
+      <MockBtn type="button" kind="secondary" loading={pending} onClick={onTogglePreview}>
         {showPreview ? (
           <>
             <EyeOff className="mr-1.5 h-4 w-4" aria-hidden />
@@ -46,13 +54,14 @@ function InformierenFooter({
             Vorschau
           </>
         )}
-      </Button>
-      <Button type="button" variant="primary" loading={pending} onClick={onSend}>
+      </MockBtn>
+      <MockBtn type="button" kind="primary" loading={pending} onClick={onSend}>
         Senden
-      </Button>
+      </MockBtn>
     </div>
   )
 }
+>>>>>>> Stashed changes
 
 /** Kunde informieren — EditorSheet Split-over (Mock Surface B). */
 export function KundeInformierenModal({
@@ -72,6 +81,7 @@ export function KundeInformierenModal({
   defaultNachricht: string
   kundeName: string
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, setPending] = useState(false)
   const [anrede, setAnrede] = useState<'du' | 'sie'>('sie')
   const [betreff, setBetreff] = useState(defaultBetreff)
@@ -95,7 +105,7 @@ export function KundeInformierenModal({
   function loadPreview() {
     if (!scope || !betreff.trim() || !nachricht.trim() || pending) {
       if (!scope || !betreff.trim() || !nachricht.trim()) {
-        toast.error('Bitte Betreff und Nachricht ausfüllen.')
+        applyFieldErrors({ _form: TOAST.bitte_betreff_und_nachricht_ausfuellen })
       }
       return
     }
@@ -110,7 +120,7 @@ export function KundeInformierenModal({
           anrede,
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
         setPreviewHtml(r.html)
@@ -122,7 +132,7 @@ export function KundeInformierenModal({
   function senden() {
     if (!scope || !betreff.trim() || !nachricht.trim() || pending) {
       if (!scope || !betreff.trim() || !nachricht.trim()) {
-        toast.error('Bitte Betreff und Nachricht ausfüllen.')
+        applyFieldErrors({ _form: TOAST.bitte_betreff_und_nachricht_ausfuellen })
       }
       return
     }
@@ -137,10 +147,10 @@ export function KundeInformierenModal({
           anrede,
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('E-Mail an Kund:in gesendet')
+        toast.success(TOAST.e_mail_an_kund_in_gesendet)
         setDirty(false)
         onClose()
       })
@@ -169,16 +179,10 @@ export function KundeInformierenModal({
       composeLabel="Senden"
       onConfirm={senden}
       confirmBusy={pending}
-      footer={
-        <InformierenFooter
-          pending={pending}
-          showPreview={showPreview}
-          onTogglePreview={() => (showPreview ? setShowPreview(false) : void loadPreview())}
-          onSend={senden}
-        />
-      }
+      secondary={{ label: 'Abbrechen', disabled: pending }}
     >
-      <div className="space-y-4">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              <div className="space-y-4">
         <p className="m-0 text-[length:var(--fs-text)] text-bw-text-muted">
           Update an <strong>{kundeName}</strong>
           {scopeHint ? <> · {scopeHint}</> : null}. Notizen und Fotos des Abschnitts werden auf der
@@ -195,13 +199,10 @@ export function KundeInformierenModal({
           extraHint={`Kunde informieren · ${kundeName}`}
           multiline={false}
         >
-          <Input
-            value={betreff}
-            onChange={(e) => {
+          <MockInput value={betreff} onChange={(e) => {
               setBetreff(e.target.value)
               setDirty(true)
-            }}
-          />
+            }} />
         </KiAssistFieldLabel>
         <KiAssistFieldLabel
           label="Nachricht"
@@ -212,15 +213,28 @@ export function KundeInformierenModal({
           }}
           extraHint="Erscheint in Mail und auf der Kunden-Statusseite."
         >
-          <Textarea
-            rows={6}
-            value={nachricht}
-            onChange={(e) => {
-              setNachricht(e.target.value)
-              setDirty(true)
-            }}
-          />
+          <RichTextEditor value={typeof (nachricht) === 'string' ? (nachricht) : ''} onChange={(__v) => {setNachricht(__v)
+              setDirty(true)}} minHeight={144} />
         </KiAssistFieldLabel>
+
+        <MockBtn
+          type="button"
+          kind="secondary"
+          loading={pending}
+          onClick={() => (showPreview ? setShowPreview(false) : void loadPreview())}
+        >
+          {showPreview ? (
+            <>
+              <MockIcon n="eye" ctx="default" className="mr-1.5 h-4 w-4" aria-hidden />
+              Vorschau aus
+            </>
+          ) : (
+            <>
+              <MockIcon n="eye" ctx="default" className="mr-1.5 h-4 w-4" aria-hidden />
+              Vorschau
+            </>
+          )}
+        </MockBtn>
 
         {showPreview && previewHtml ? <CollapsibleMailPreview previewHtml={previewHtml} /> : null}
       </div>

@@ -1,7 +1,11 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { positionNettoZeile } from '@/lib/angebot-positionen'
 import { RichTextContent } from '@/components/ui/RichTextContent'
@@ -92,7 +96,7 @@ export function AngebotPositionDetailModal({
         </div>
         {hwName ? (
           <div>
-            <dt>Handwerker</dt>
+            <dt>Partner</dt>
             <dd>{hwName}</dd>
           </div>
         ) : null}
@@ -105,9 +109,13 @@ export function AngebotPositionDetailModal({
       </dl>
       {editable && onRemove ? (
         <div className="mt-4">
-          <Button type="button" variant="danger" onClick={onRemove} disabled={disabled}>
+          <MockBtn type="button" kind="danger" onClick={onRemove} disabled={disabled}>
+<<<<<<< Updated upstream
+            Löschen
+=======
             Entfernen
-          </Button>
+>>>>>>> Stashed changes
+          </MockBtn>
         </div>
       ) : null}
     </EditorSheet>

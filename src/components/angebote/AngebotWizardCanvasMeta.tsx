@@ -1,7 +1,8 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import type { ReactNode } from 'react'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
 
@@ -10,20 +11,28 @@ export function MetaCrowButton({
   value,
   onClick,
   className,
+  sectionId,
 }: {
   label: string
   value: string
   onClick: () => void
   className?: string
+  /** Sprungziel für DocumentCanvas-Prüfliste / Gliederung */
+  sectionId?: string
 }) {
   return (
-    <button type="button" className={cn('crow crow--tap', className)} onClick={onClick}>
+    <MockBtn
+      className={cn('crow crow--tap', className)}
+      type="button"
+      onClick={onClick}
+      data-doc-section={sectionId}
+    >
       <span className="crow-head">
         <span className="crow-lab">{label}</span>
         <span className="crow-val">{value || '—'}</span>
         <MockIcon ctx="default" n="chevron-right" size={14} className="crow-chv" />
       </span>
-    </button>
+    </MockBtn>
   )
 }
 

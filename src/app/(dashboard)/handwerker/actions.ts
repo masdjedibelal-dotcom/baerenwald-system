@@ -1,7 +1,13 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateHandwerkerDetail, revalidateHandwerkerList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
 import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -14,6 +20,7 @@ import {
 } from '@/lib/partnerDocUtils'
 import type { Handwerker, PartnerDokument } from '@/lib/types'
 import { authUserIsCrmTeam } from '@/lib/auth/is-crm-staff'
+import { planPartnerDokumentStatusWrite } from '@/lib/status/write-partner-dokument-status'
 
 /** Lange Auth-Sperre (gleiche Dauer wie bei Spam-Kunden / deaktivierten CRM-Mitarbeitern). */
 const AUTH_BAN_DURATION = '876600h'
@@ -85,9 +92,10 @@ export async function createHandwerker(
     })
     .select('id')
     .single()
+  if (error) logDbError('app/handwerker/actions:handwerker', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath('/handwerker')
+  revalidateHandwerkerList()
   return { ok: true, id: data.id as string }
 }
 
@@ -126,10 +134,10 @@ export async function updateHandwerker(
       notizen: input.notizen?.trim() || null,
     })
     .eq('id', id)
+  if (error) logDbError('app/handwerker/actions:handwerker', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/handwerker')
-  revalidatePath(`/handwerker/${id}`)
+  revalidateHandwerkerDetail(id)
   return { ok: true }
 }
 
@@ -142,8 +150,9 @@ export async function updateHandwerkerNotizen(
     .from('handwerker')
     .update({ notizen: notizen?.trim() || null })
     .eq('id', id)
+  if (error) logDbError('app/handwerker/actions:handwerker', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/handwerker/${id}`)
+  revalidateHandwerkerDetail(id)
   return { ok: true }
 }
 
@@ -161,6 +170,7 @@ export async function loadHandwerkerListe(): Promise<Handwerker[]> {
     )
     .order('subkategorie', { ascending: true, nullsFirst: false })
     .order('name')
+  if (error) logDbError('app/handwerker/actions:handwerker', error)
 
   if (error) {
     console.error(error)
@@ -169,7 +179,7 @@ export async function loadHandwerkerListe(): Promise<Handwerker[]> {
   return (data ?? []) as unknown as Handwerker[]
 }
 
-export type HandwerkerDetailBewertung = {
+export type PartnerDetailBewertung = {
   id: string
   note: number
   notiz: string | null
@@ -209,7 +219,7 @@ export type HandwerkerDetailPayload = {
     avgAuftrag: number
     offen: number
   }
-  bewertungen: HandwerkerDetailBewertung[]
+  bewertungen: PartnerDetailBewertung[]
 }
 
 const HANDWERKER_DETAIL_SELECT_BASE = `
@@ -245,7 +255,7 @@ const HANDWERKER_DETAIL_SELECT_MINIMAL = `
   adresse, partner_kategorie_id
 `
 
-function normalizeHandwerkerAdresse(row: Handwerker | null): Handwerker | null {
+function normalizePartnerAdresse(row: Handwerker | null): Handwerker | null {
   if (!row) return null
   const raw = row.adresse as unknown
   if (raw == null) return { ...row, adresse: null }
@@ -261,7 +271,7 @@ function normalizeHandwerkerAdresse(row: Handwerker | null): Handwerker | null {
   return { ...row, adresse: String(raw) }
 }
 
-async function fetchHandwerkerDetailRow(
+async function fetchPartnerDetailRow(
   _supabase: ReturnType<typeof createClient>,
   id: string
 ): Promise<{ data: Handwerker | null; error: { message: string } | null }> {
@@ -276,15 +286,16 @@ async function fetchHandwerkerDetailRow(
 
   let lastError: { message: string } | null = null
   for (const select of attempts) {
-    const res = await withCrmReadFallback(async (db) => {
-      const r = await db.from('handwerker').select(select).eq('id', id).maybeSingle()
+    const res = await (async () => {
+  const db = createClient()
+  const r = await db.from('handwerker').select(select).eq('id', id).maybeSingle()
       return {
         data: (r.data as Handwerker | null) ?? null,
         error: r.error ? { message: r.error.message } : null,
       }
-    })
+})()
     if (!res.error) {
-      return { data: normalizeHandwerkerAdresse(res.data), error: null }
+      return { data: normalizePartnerAdresse(res.data), error: null }
     }
     lastError = res.error
     console.warn('[loadHandwerkerDetail] Select-Fallback:', res.error.message)
@@ -298,7 +309,7 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   const supabase = createClient()
 
   const [hwRes, ahRes, angeboteRes, bewertungenRes] = await Promise.all([
-    fetchHandwerkerDetailRow(supabase, id),
+    fetchPartnerDetailRow(supabase, id),
     supabase
       .from('auftrag_handwerker')
       .select(
@@ -330,7 +341,7 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
       .limit(12),
   ])
 
-  // Wenn der volle Join scheitert, Handwerker-Zeile trotzdem laden (ohne Auftrags-Embed)
+  // Wenn der volle Join scheitert, Partner-Zeile trotzdem laden (ohne Auftrags-Embed)
   let h = hwRes.data
   let loadError = hwRes.error?.message
   if (!h && hwRes.error) {
@@ -340,7 +351,7 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
       .eq('id', id)
       .maybeSingle()
     if (!bare.error && bare.data) {
-      h = normalizeHandwerkerAdresse(bare.data as Handwerker)
+      h = normalizePartnerAdresse(bare.data as Handwerker)
       loadError = undefined
     }
   }
@@ -408,7 +419,7 @@ export async function loadHandwerkerDetail(id: string): Promise<HandwerkerDetail
   const angebote = angebotZuweisungen.length
   const angefragt = gesamt + angebote
 
-  const bewertungen: HandwerkerDetailBewertung[] = bewertungenRes.error
+  const bewertungen: PartnerDetailBewertung[] = bewertungenRes.error
     ? []
     : (bewertungenRes.data ?? []).map((row) => {
         const r = row as Record<string, unknown>
@@ -472,12 +483,11 @@ function isAuftragAbgeschlossenStatus(auftragStatus: string): boolean {
 }
 
 function revalidatePartnerDokumentPfade(handwerkerId: string, auftragId?: string | null) {
-  revalidatePath(`/handwerker/${handwerkerId}`)
-  revalidatePath('/handwerker')
-  if (auftragId) revalidatePath(`/auftraege/${auftragId}`)
+  revalidateHandwerkerDetail(handwerkerId)
+  if (auftragId) revalidateAuftragDetail(auftragId)
 }
 
-export async function loadPartnerDokumenteForAuftrag(
+export async function loadHandwerkerDokumenteForAuftrag(
   auftragId: string
 ): Promise<PartnerDokument[]> {
   const supabase = createClient()
@@ -488,8 +498,9 @@ export async function loadPartnerDokumenteForAuftrag(
     )
     .eq('auftrag_id', auftragId)
     .order('hochgeladen_am', { ascending: false })
+  if (error) logDbError('app/handwerker/actions:partner_dokumente', error)
   if (error) {
-    console.warn('loadPartnerDokumenteForAuftrag', error.message)
+    console.warn('loadHandwerkerDokumenteForAuftrag', error.message)
     return []
   }
   return (data ?? []) as PartnerDokument[]
@@ -521,13 +532,14 @@ export async function insertPartnerDokument(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/handwerker/actions:partner_dokumente', error)
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
   revalidatePartnerDokumentPfade(input.handwerker_id, input.auftrag_id)
   return { ok: true, id: data.id as string }
 }
 
 /** Ersetzt vorhandenes Dokument desselben Typs (ein Nachweis pro Typ/Kontext). */
-export async function replacePartnerDokumentForTyp(input: {
+export async function replaceHandwerkerDokumentForTyp(input: {
   handwerker_id: string
   auftrag_id?: string | null
   typ: string
@@ -570,7 +582,8 @@ export async function replacePartnerDokumentForTyp(input: {
     if (ref?.path) {
       await supabase.storage.from(ref.bucket).remove([ref.path])
     }
-    await supabase.from('partner_dokumente').delete().eq('id', (row as { id: string }).id)
+    const { error: __dbErr1 } = await supabase.from('partner_dokumente').delete().eq('id', (row as { id: string }).id)
+    if (__dbErr1) logDbError('app/handwerker/actions:partner_dokumente', __dbErr1)
   }
 
   return insertPartnerDokument({
@@ -600,12 +613,14 @@ export async function updatePartnerDokument(
   if (patch.notizen !== undefined) row.notizen = patch.notizen?.trim() || null
   if (Object.keys(row).length === 0) return { ok: true }
   const { error } = await supabase.from('partner_dokumente').update(row).eq('id', id)
+  if (error) logDbError('app/handwerker/actions:partner_dokumente', error)
   if (error) return { ok: false, message: error.message }
-  const { data: doc } = await supabase
+  const { data: doc, error: error2 } = await supabase
     .from('partner_dokumente')
     .select('auftrag_id')
     .eq('id', id)
     .maybeSingle()
+  if (error2) logDbError('app/handwerker/actions:partner_dokumente', error2)
   revalidatePartnerDokumentPfade(
     handwerker_id,
     (doc as { auftrag_id?: string | null } | null)?.auftrag_id
@@ -640,6 +655,7 @@ export async function signPartnerDokumentUrl(
       const { data, error } = await supabaseAdmin.storage
         .from(bucket)
         .createSignedUrl(ref.path, 3600)
+      if (error) logDbError('app/handwerker/actions:query', error)
 
       if (!error && data?.signedUrl) {
         return { ok: true, url: data.signedUrl }
@@ -674,11 +690,12 @@ export async function deletePartnerDokument(
   handwerker_id: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('partner_dokumente')
     .select('datei_url, auftrag_id')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/handwerker/actions:partner_dokumente', error)
   const ref = parseStoredDocumentRef((row as { datei_url?: string | null } | null)?.datei_url)
   if (ref?.path) {
     const { supabaseAdmin } = await import('@/lib/supabase-admin')
@@ -693,8 +710,9 @@ export async function deletePartnerDokument(
       }
     }
   }
-  const { error } = await supabase.from('partner_dokumente').delete().eq('id', id)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('partner_dokumente').delete().eq('id', id)
+  if (error2) logDbError('app/handwerker/actions:partner_dokumente', error2)
+  if (error2) return { ok: false, message: error2.message }
   revalidatePartnerDokumentPfade(
     handwerker_id,
     (row as { auftrag_id?: string | null } | null)?.auftrag_id
@@ -716,15 +734,17 @@ export async function freigebenPartnerDokument(
   const now = new Date().toISOString()
   const { data: doc, error } = await supabase
     .from('partner_dokumente')
-    .update({
-      status: 'freigegeben',
-      freigegeben_am: now,
-      ablehnung_grund: null,
-    })
+    .update(
+      planPartnerDokumentStatusWrite('freigegeben', {
+        freigegeben_am: now,
+        ablehnung_grund: null,
+      })
+    )
     .eq('id', id)
     .eq('handwerker_id', handwerkerId)
     .select('auftrag_id')
     .maybeSingle()
+  if (error) logDbError('app/handwerker/actions:partner_dokumente', error)
 
   if (error) return { ok: false, message: error.message }
   if (!doc) return { ok: false, message: 'Dokument nicht gefunden' }
@@ -750,15 +770,17 @@ export async function ablehnenPartnerDokument(
 
   const { data: doc, error } = await supabase
     .from('partner_dokumente')
-    .update({
-      status: 'abgelehnt',
-      ablehnung_grund: reason,
-      freigegeben_am: null,
-    })
+    .update(
+      planPartnerDokumentStatusWrite('abgelehnt', {
+        ablehnung_grund: reason,
+        freigegeben_am: null,
+      })
+    )
     .eq('id', id)
     .eq('handwerker_id', handwerkerId)
     .select('auftrag_id')
     .maybeSingle()
+  if (error) logDbError('app/handwerker/actions:partner_dokumente', error)
 
   if (error) return { ok: false, message: error.message }
   if (!doc) return { ok: false, message: 'Dokument nicht gefunden' }
@@ -779,6 +801,7 @@ export async function getPartnerPortalLoginHint(
     .select('auth_user_id')
     .eq('id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('app/handwerker/actions:handwerker', error)
 
   if (error) return { ok: false, message: error.message }
 
@@ -802,7 +825,12 @@ export async function duplicateHandwerker(
     .select('*')
     .eq('id', handwerkerId)
     .maybeSingle()
+  if (loadErr) logDbError('app/handwerker/actions:handwerker', loadErr)
+<<<<<<< Updated upstream
+  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Partner nicht gefunden.' }
+=======
   if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
+>>>>>>> Stashed changes
 
   const row = src as Record<string, unknown>
   const payload: Record<string, unknown> = { ...row }
@@ -820,9 +848,10 @@ export async function duplicateHandwerker(
     .insert(payload)
     .select('id')
     .single()
+  if (insErr) logDbError('app/handwerker/actions:handwerker', insErr)
 
   if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
-  revalidatePath('/handwerker')
+  revalidateHandwerkerList()
   return { ok: true, id: inserted.id as string }
 }
 
@@ -836,24 +865,20 @@ export async function setHandwerkerPortalGesperrt(
   gesperrt: boolean
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const id = handwerkerId?.trim()
-  if (!id) return { ok: false, message: 'Handwerker fehlt.' }
+  if (!id) return { ok: false, message: 'Partner fehlt.' }
 
-  const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('handwerker').select('id, auth_user_id, email').eq('id', id).maybeSingle()
-  )
+  const { data: row, error: loadErr } = await (() => { const db = createClient(); return db.from('handwerker').select('id, auth_user_id, email').eq('id', id).maybeSingle() })()
   if (loadErr || !row) {
-    return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
+    return { ok: false, message: loadErr?.message ?? 'Partner nicht gefunden.' }
   }
 
-  const { error: upErr } = await withCrmReadFallback(async (db) =>
-    db
+  const { error: upErr } = await (() => { const db = createClient(); return db
       .from('handwerker')
       .update({
         ist_portal_gesperrt: gesperrt,
         portal_gesperrt_am: gesperrt ? new Date().toISOString() : null,
       })
-      .eq('id', id)
-  )
+      .eq('id', id) })()
   if (upErr) {
     const msg = upErr.message ?? ''
     if (
@@ -878,6 +903,7 @@ export async function setHandwerkerPortalGesperrt(
       const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
         ban_duration: gesperrt ? AUTH_BAN_DURATION : 'none',
       })
+      if (banErr) logDbError('app/handwerker/actions:query', banErr)
       if (banErr) {
         console.error('[setHandwerkerPortalGesperrt] Auth-Ban fehlgeschlagen:', banErr.message)
       }
@@ -896,20 +922,19 @@ export async function setHandwerkerPortalGesperrt(
     }
   }
 
-  revalidatePath('/handwerker')
-  revalidatePath(`/handwerker/${id}`)
+  revalidateHandwerkerDetail(id)
   return { ok: true }
 }
 
 
 /**
- * Handwerker löschen — Verträge werden mitgelöscht; blockiert bei Einbehalten oder aktiven Zuweisungen.
+ * Partner löschen — Verträge werden mitgelöscht; blockiert bei Einbehalten oder aktiven Zuweisungen.
  */
 export async function deleteHandwerker(
   handwerkerId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const id = handwerkerId.trim()
-  if (!id) return { ok: false, message: 'Handwerker-ID fehlt.' }
+  if (!id) return { ok: false, message: 'Partner-ID fehlt.' }
 
   const supabase = createClient()
   const {
@@ -917,11 +942,9 @@ export async function deleteHandwerker(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet.' }
 
-  const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('handwerker').select('id, auth_user_id').eq('id', id).maybeSingle()
-  )
+  const { data: row, error: loadErr } = await (() => { const db = createClient(); return db.from('handwerker').select('id, auth_user_id').eq('id', id).maybeSingle() })()
   if (loadErr || !row) {
-    return { ok: false, message: loadErr?.message ?? 'Handwerker nicht gefunden.' }
+    return { ok: false, message: loadErr?.message ?? 'Partner nicht gefunden.' }
   }
 
   const [{ count: ahCount }, { count: posCount }] = await Promise.all([
@@ -934,11 +957,11 @@ export async function deleteHandwerker(
       .select('id', { count: 'exact', head: true })
       .eq('handwerker_id', id),
   ])
-
   const { count: einbehaltCount, error: einbehaltErr } = await supabase
     .from('einbehalte')
     .select('id', { count: 'exact', head: true })
     .eq('handwerker_id', id)
+  if (einbehaltErr) logDbError('app/handwerker/actions:einbehalte', einbehaltErr)
   const einbehalte =
     einbehaltErr && /does not exist|relation|schema cache/i.test(einbehaltErr.message)
       ? 0
@@ -947,14 +970,14 @@ export async function deleteHandwerker(
   if (einbehalte > 0) {
     return {
       ok: false,
-      message: 'Handwerker hat Einbehalte — Löschen nicht möglich.',
+      message: 'Partner hat Einbehalte — Löschen nicht möglich.',
     }
   }
   if ((ahCount ?? 0) > 0 || (posCount ?? 0) > 0) {
     return {
       ok: false,
       message:
-        'Handwerker ist noch Angeboten oder Auftragspositionen zugeordnet. Zuerst entfernen.',
+        'Partner ist noch Angeboten oder Auftragspositionen zugeordnet. Zuerst entfernen.',
     }
   }
 
@@ -966,17 +989,19 @@ export async function deleteHandwerker(
     'partner_positions_anfragen',
   ] as const) {
     const { error } = await supabase.from(table).delete().eq('handwerker_id', id)
+    if (error) logDbError('app/handwerker/actions:query', error)
     if (error && !/does not exist|relation|schema cache/i.test(error.message)) {
       return { ok: false, message: `${table}: ${error.message}` }
     }
   }
 
   const { error: delErr } = await supabase.from('handwerker').delete().eq('id', id)
+  if (delErr) logDbError('app/handwerker/actions:handwerker', delErr)
   if (delErr) return { ok: false, message: delErr.message }
 
   const authUserId = (row as { auth_user_id?: string | null }).auth_user_id?.trim()
   if (authUserId) {
-    // CRM-Team-Login (gleiche E-Mail wie Handwerker) nicht bannen — sonst CRM-Zugang weg.
+    // CRM-Team-Login (gleiche E-Mail wie Partner) nicht bannen — sonst CRM-Zugang weg.
     const isCrm = await authUserIsCrmTeam(authUserId)
     if (!isCrm) {
       try {
@@ -989,7 +1014,6 @@ export async function deleteHandwerker(
     }
   }
 
-  revalidatePath('/handwerker')
-  revalidatePath(`/handwerker/${id}`)
+  revalidateHandwerkerDetail(id)
   return { ok: true }
 }

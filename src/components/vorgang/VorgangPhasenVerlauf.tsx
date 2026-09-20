@@ -1,8 +1,9 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { ChevronRight } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { hideRouteBusy, showRouteBusy } from '@/components/ui/action-busy'
@@ -141,7 +142,7 @@ export function VorgangPhasenVerlauf({
     } catch (e) {
       setNavBusy(false)
       hideRouteBusy()
-      toast.error(e instanceof Error ? e.message : 'Navigation fehlgeschlagen.')
+      toast.systemError(e, 'ui', 'Navigation fehlgeschlagen.')
     }
   }
 
@@ -174,25 +175,14 @@ export function VorgangPhasenVerlauf({
             const clickable = row.state !== 'open'
             const onCurrent = fromRef?.kind === row.kind
             return (
-              <button
-                key={row.kind}
-                type="button"
-                role="row"
-                className={cn(
+              <MockBtn className={cn(
                   'vgp-table-row',
                   row.state,
                   onCurrent && 'vgp-table-row--here',
                   !clickable && 'vgp-table-row--static'
-                )}
-                disabled={!clickable || navBusy}
-                onClick={() => openRow(row)}
-                aria-current={row.state === 'current' ? 'step' : undefined}
-                aria-label={
-                  clickable
+                )} key={row.kind} type="button" role="row" disabled={!clickable || navBusy} onClick={() => openRow(row)} aria-current={row.state === 'current' ? 'step' : undefined} aria-label={clickable
                     ? `${row.label} Details: ${row.kopf}`
-                    : `${row.label}: ${row.kopf}`
-                }
-              >
+                    : `${row.label}: ${row.kopf}`}>
                 <span className="vgp-table-phase" role="cell">
                   <span className={cn('vgp-table-dot', row.state)} aria-hidden />
                   {row.label}
@@ -213,12 +203,12 @@ export function VorgangPhasenVerlauf({
                 </span>
                 <span className="vgp-table-go" role="cell">
                   {clickable && !onCurrent ? (
-                    <ChevronRight size={15} aria-hidden />
+                    <MockIcon n="chevron-right" ctx="default" size={15} aria-hidden />
                   ) : onCurrent ? (
                     <span className="vgp-table-here">hier</span>
                   ) : null}
                 </span>
-              </button>
+              </MockBtn>
             )
           })}
         </div>
@@ -233,14 +223,9 @@ export function VorgangPhasenVerlauf({
         manageHistory={false}
         headerEnd={
           canGoToPhase ? (
-            <button
-              type="button"
-              className="btn primary sm"
-              onClick={onZurPhase}
-              disabled={navBusy}
-            >
+            <MockBtn kind="primary" sm type="button" onClick={onZurPhase} disabled={navBusy}>
               {navBusy ? 'Laden…' : 'Zur Phase'}
-            </button>
+            </MockBtn>
           ) : null
         }
       >
@@ -492,7 +477,6 @@ function buildPhaseRows(
     },
   ]
 }
-
 
 /** @deprecated unused — kept for typecheck of optional children patterns */
 export type VorgangPhasenVerlaufSlot = ReactNode

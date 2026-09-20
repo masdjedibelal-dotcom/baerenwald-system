@@ -1,3 +1,5 @@
+import { formatEuro } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
 /* eslint-disable jsx-a11y/alt-text -- @react-pdf/renderer Image ohne alt */
 import React from 'react'
 import { Document, Page, Text, View, Image, StyleSheet, renderToBuffer } from '@react-pdf/renderer'
@@ -18,10 +20,10 @@ import {
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
 
-const GRUEN = '#1A3D2B'
-const TEXT_PRIMARY = '#111111'
-const TEXT_MUTED = '#333333'
-const TEXT_LABEL = '#6B7280'
+const GRUEN = C.greenDark
+const TEXT_PRIMARY = C.gray900
+const TEXT_MUTED = C.grayNeutral5
+const TEXT_LABEL = C.gray500
 
 const styles = StyleSheet.create({
   page: { padding: 40, paddingBottom: 80, fontSize: 9, fontFamily: 'Helvetica', color: TEXT_PRIMARY },
@@ -44,7 +46,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     padding: 8,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: C.gray300,
     borderRadius: 2,
   },
   bauvorhabenLabel: { fontSize: 8, fontWeight: 'bold', color: TEXT_LABEL, marginBottom: 4 },
@@ -67,7 +69,7 @@ const styles = StyleSheet.create({
   bullet: { fontSize: 9, marginLeft: 10, marginBottom: 3, lineHeight: 1.5 },
   signRow: { flexDirection: 'row', gap: 28, marginTop: 36 },
   signCol: { flex: 1 },
-  signLine: { borderBottomWidth: 1, borderBottomColor: '#9CA3AF', height: 32, marginBottom: 6 },
+  signLine: { borderBottomWidth: 1, borderBottomColor: C.gray400, height: 32, marginBottom: 6 },
   signLabel: { fontSize: 8, color: TEXT_MUTED, lineHeight: 1.45 },
   footer: {
     position: 'absolute',
@@ -75,7 +77,7 @@ const styles = StyleSheet.create({
     left: 40,
     right: 40,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: C.gray200,
     paddingTop: 6,
   },
   footerDataRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
@@ -118,7 +120,7 @@ function handwerkerAdresseZeilen(hw: VertragPdfPayload['handwerker']): string[] 
 function verguetungTextKomplett(payload: VertragPdfPayload): string {
   const base = payload.verguetung_text?.trim() || '—'
   if (payload.regiesatz_netto == null) return base
-  const regieStr = `${payload.regiesatz_netto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const regieStr = `${formatEuro(payload.regiesatz_netto, { suffix: false })}`
   if (base.includes(regieStr) || /regiesatz/i.test(base)) return base
   return `${base} Regiesatz ${regieStr} € netto pro Stunde.`
 }
@@ -269,7 +271,7 @@ function ParteienUndBauvorhabenBlock({ payload }: { payload: VertragPdfPayload }
 }
 
 function ParagraphBlock({ nr, title, body }: { nr: string; title: string; body: string }) {
-  const parts = body.split(/\n\n+/).filter((p) => p.trim())
+const parts = body.split(/\n\n+/).filter((p) => p.trim())
   return (
     <View>
       <Text style={styles.paraTitle}>

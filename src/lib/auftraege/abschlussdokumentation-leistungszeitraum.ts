@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { RechnungStatus } from '@/lib/types'
 
@@ -34,6 +35,7 @@ export async function loadLeistungszeitraumAusRechnung(
     .eq('auftrag_id', auftragId)
     .neq('status', 'storniert')
     .order('created_at', { ascending: false })
+  if (error) logDbError('lib/auftraege/abschlussdokumentation-leistungszeitraum:rechnungen', error)
 
   if (error) {
     console.warn('[loadLeistungszeitraumAusRechnung]', error.message)

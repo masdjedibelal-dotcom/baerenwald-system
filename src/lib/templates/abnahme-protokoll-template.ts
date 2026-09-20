@@ -11,18 +11,25 @@ import {
   type AbnahmeProtokollMeta,
 } from '@/lib/auftraege/abnahme-protokoll-meta'
 import {
-  ANGEBOT_PDF_BOTTOM_MARGIN_MM,
   buildAngebotPdfFooterTemplate,
   type AngebotHtmlInput,
 } from '@/lib/templates/angebot-template'
+import { formatDatum } from '@/lib/format/geld-datum'
+import {
+  pdfAbsenderFromReportFirm,
+  pdfKopfHtml,
+  pdfReportShell,
+  pdfTitelzeileHtml,
+} from '@/lib/pdf/chrome'
+import { C } from '@/lib/tokens/colors'
 
-const ACCENT = '#1A3D2B'
-const TEXT = '#111111'
-const MUTED = '#6B7280'
-const BORDER = '#D1D5DB'
-const SOFT = '#F3F4F6'
-const GREEN_SOFT = '#E8F5EE'
-const WARN_SOFT = '#FEF9C3'
+const ACCENT = C.greenDark
+const TEXT = C.gray900
+const MUTED = C.gray500
+const BORDER = C.gray300
+const SOFT = C.gray100
+const GREEN_SOFT = C.greenTint2
+const WARN_SOFT = C.amberBg2
 
 export type AbnahmeProtokollHtmlInput = {
   firmen_logo_url?: string | null
@@ -48,20 +55,9 @@ export type AbnahmeProtokollHtmlInput = {
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-/** Logo im Abnahme-PDF — etwas kleiner als Angebots-Briefkopf (80→56). */
-function abnahmeLogoKopfHtml(logoUrl?: string | null): string {
-  const src = logoUrl?.trim()
-  if (!src || /^file:/i.test(src)) return ''
-  if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
-  const safeSrc = src.replace(/"/g, '&quot;')
-  return `<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid ${ACCENT};">
-    <img src="${safeSrc}" alt="" role="presentation" style="height:56px;width:auto;max-width:220px;object-fit:contain;display:block;" />
-  </div>`
 }
 
 function footerInputFromAbnahme(p: AbnahmeProtokollHtmlInput): AngebotHtmlInput {
@@ -144,7 +140,7 @@ function fotosHtml(urls: string[], captions: string[] = []): string {
     .map((u, i) => {
       const cap = (captions[i] ?? '').trim()
       return `<div style="border:1px solid ${BORDER};border-radius:3px;overflow:hidden;page-break-inside:avoid;">
-          <div style="position:relative;width:100%;padding-bottom:100%;background:#f3f4f6;">
+          <div style="position:relative;width:100%;padding-bottom:100%;background:${C.gray100};">
             <img src="${esc(u)}" alt="" style="position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;" />
           </div>
           ${
@@ -165,7 +161,7 @@ function partiesRowHtml(p: AbnahmeProtokollHtmlInput): string {
   const an = partyBox('Auftragnehmer', [
     { label: 'Firma', value: p.firmenname },
     { label: 'Adresse', value: p.firmen_adresse.replace(/\n/g, ', ') },
-    { label: 'Handwerker vor Ort', value: p.meta.vertreter_an },
+    { label: 'Partner vor Ort', value: p.meta.vertreter_an },
     { label: 'Telefon', value: p.firmen_telefon ?? '' },
     { label: 'E-Mail', value: p.firmen_email ?? '' },
   ])
@@ -202,23 +198,15 @@ function bauvorhabenHtml(p: AbnahmeProtokollHtmlInput): string {
 
 function checkOkHtml(): string {
   // SVG statt Unicode ✓ — Chromium-PDF rendert Häkchen-Glyphen oft nicht.
-  return `<span style="display:inline-block;width:14px;height:14px;flex-shrink:0;margin-top:1px;line-height:0;vertical-align:top;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="${ACCENT}"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
+  return `<span style="display:inline-block;width:14px;height:14px;flex-shrink:0;margin-top:1px;line-height:0;vertical-align:top;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="${ACCENT}"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="${C.white}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
 }
 
-/** ISO / beliebig → TT.MM.JJJJ (ohne Locale — Node-ICU kann sonst en-US liefern). */
-function formatDatumDePdf(raw: string | null | undefined): string {
-  const s = (raw ?? '').trim()
+/** ISO / beliebig → TT.MM.JJJJ; leer bleibt leer (nicht „—“). */
+function formatDatumPdf(raw: string | null | undefined): string {
+  const s = raw?.trim()
   if (!s) return ''
-  const ymd = s.includes('T') ? s.slice(0, 10) : s.slice(0, 10)
-  const mIso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd)
-  if (mIso) return `${mIso[3]}.${mIso[2]}.${mIso[1]}`
-  const mUs = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s)
-  if (mUs) {
-    const dd = mUs[2]!.padStart(2, '0')
-    const mm = mUs[1]!.padStart(2, '0')
-    return `${dd}.${mm}.${mUs[3]}`
-  }
-  return s
+  const formatted = formatDatum(s)
+  return formatted === '—' ? s : formatted
 }
 
 /** „Ort, 2026-09-18“ / „Ort, 9/18/2026“ → deutsches Datum. */
@@ -288,8 +276,8 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
 
 function ergebnisHtml(ergebnis: AbnahmeErgebnis, datum: string): string {
   const label = ABNAHME_ERGEBNIS_LABEL[ergebnis]
-  const bg = ergebnis === 'verweigert' ? '#FEE2E2' : ergebnis === 'mit_vorbehalt' ? WARN_SOFT : GREEN_SOFT
-  const border = ergebnis === 'verweigert' ? '#DC2626' : ACCENT
+  const bg = ergebnis === 'verweigert' ? '${C.redBg}' : ergebnis === 'mit_vorbehalt' ? WARN_SOFT : GREEN_SOFT
+  const border = ergebnis === 'verweigert' ? '${C.redTx4}' : ACCENT
   return `${sectionHeading('3', 'Abnahmeergebnis')}
     <p style="margin:0 0 10px;font-size:9pt;line-height:1.5;color:${TEXT};">
       Die Leistungen wurden am ${esc(datum)} gemeinsam vor Ort besichtigt und geprüft.
@@ -317,7 +305,7 @@ function mangelFotosHtml(urls: string[] | undefined): string {
     ${list
       .map(
         (src) =>
-          `<div style="margin:0;aspect-ratio:1/1;max-width:110px;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:#F9FAFB;page-break-inside:avoid;break-inside:avoid;">
+          `<div style="margin:0;aspect-ratio:1/1;max-width:110px;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:${C.gray50};page-break-inside:avoid;break-inside:avoid;">
             <img src="${src}" alt="" style="display:block;width:100%;height:100%;object-fit:contain;object-position:center;" />
           </div>`
       )
@@ -345,7 +333,7 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
             return `<li style="margin:0 0 10px;page-break-inside:avoid;break-inside:avoid;">
               <div style="font-weight:700;color:${TEXT};">${esc(head)}${
                 m.frist
-                  ? ` <span style="font-weight:400;color:#991B1B;">(Beseitigung bis: ${esc(formatDatumDePdf(m.frist))})</span>`
+                  ? ` <span style="font-weight:400;color:${C.redTx};">(Beseitigung bis: ${esc(formatDatumPdf(m.frist))})</span>`
                   : ''
               }</div>
               ${
@@ -362,7 +350,7 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
       body += `<p style="margin:0 0 8px;font-size:9pt;color:${TEXT};">Es wurden keine Mängel festgestellt.</p>`
     }
     if (fristGlobal) {
-      body += `<p style="margin:0 0 8px;font-size:9pt;color:#991B1B;"><strong>Mängelbeseitigung:</strong> ${esc(fristGlobal)}</p>`
+      body += `<p style="margin:0 0 8px;font-size:9pt;color:${C.redTx};"><strong>Mängelbeseitigung:</strong> ${esc(fristGlobal)}</p>`
     }
     if (sonst) {
       body += `<div style="background:${SOFT};border-left:3px solid ${ACCENT};padding:8px 10px;margin:8px 0 0;font-size:8.5pt;line-height:1.45;color:${TEXT};white-space:pre-wrap;">${esc(sonst)}</div>`
@@ -438,38 +426,18 @@ function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
     </div>`
 }
 
-function firmKontaktKopf(p: AbnahmeProtokollHtmlInput): string {
-  const lines = [
-    p.firmenname,
-    p.firmen_adresse.replace(/\n/g, ', '),
-    [p.firmen_telefon, p.firmen_email, p.firmen_website].filter(Boolean).join(' · '),
-  ].filter(Boolean)
-  return `<div style="text-align:right;font-size:8pt;line-height:1.45;color:${MUTED};max-width:240px;">
-    ${lines.map((l) => `<div>${esc(l)}</div>`).join('')}
-  </div>`
-}
-
 export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string {
-  const footerProps = footerInputFromAbnahme(p)
-  return `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="utf-8"/>
-  <title>Abnahmeprotokoll</title>
-  <style>
-    @page { size: A4; margin: 12mm 12mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 12mm; }
-    body { margin: 0; font-family: Helvetica, Arial, sans-serif; color: ${TEXT}; }
-  </style>
-</head>
-<body>
-  <div style="max-width:100%;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:10px;">
-      <div style="flex:1;min-width:0;">
-        ${abnahmeLogoKopfHtml(p.firmen_logo_url)}
-        <h1 style="font-size:16pt;font-weight:700;color:${ACCENT};margin:8px 0 2px;letter-spacing:0.02em;">ABNAHMEPROTOKOLL</h1>
-      </div>
-      ${firmKontaktKopf(p)}
-    </div>
+  const body = `
+    ${pdfKopfHtml({
+      variant: 'bw-kunde',
+      absender: pdfAbsenderFromReportFirm(p),
+    })}
+    ${pdfTitelzeileHtml({
+      dokumentTyp: 'Abnahmeprotokoll',
+      objektOderAdresse: p.meta.projektbezeichnung || p.projektTitel,
+      datum: p.abnahmeDatum,
+      accent: ACCENT,
+    })}
     ${metaBarHtml(p)}
     ${partiesRowHtml(p)}
     ${bauvorhabenHtml(p)}
@@ -478,11 +446,12 @@ export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string 
     ${hinweiseHtml(p)}
     ${rechtHtml(p.meta.rechtshinweise)}
     ${unterschriftenHtml(p)}
-  </div>
-</body>
-</html>`
+  `
+  return pdfReportShell({ title: 'Abnahmeprotokoll', bodyHtml: body })
 }
 
 export function buildAbnahmeProtokollPdfFooterTemplate(p: AbnahmeProtokollHtmlInput): string {
-  return buildAngebotPdfFooterTemplate(footerInputFromAbnahme(p))
+  return buildAngebotPdfFooterTemplate(footerInputFromAbnahme(p), {
+    seitenZusatz: 'Abnahmeprotokoll',
+  })
 }

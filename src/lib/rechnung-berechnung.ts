@@ -1,5 +1,6 @@
 import { ZEILE_SLUG_FREITEXT, ZEILE_SLUG_GESAMTRABATT, istPreisPosition } from '@/lib/dokument-zeilen'
 import type { AngebotPosition } from '@/lib/types'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type MwstAufschluesselungZeile = {
   satz: number
@@ -228,29 +229,22 @@ export function resolveRechnungHinweis35a(
   return rechnungZeigtHinweis35a(kundeTyp, lohnNettoAusgewiesen, kleinunternehmer)
 }
 
-function formatEurDe(n: number): string {
-  return n.toLocaleString('de-DE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
 export function formatHinweis35aRechnung(
   lohnNetto: number,
   opts?: { materialNetto?: number | null }
 ): string {
-  const betrag = formatEurDe(lohnNetto)
+  const betrag = formatEuro(lohnNetto)
   const mat = Number(opts?.materialNetto) || 0
   if (mat > 0) {
     return (
-      `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} € ` +
-      `(Rechnungsnetto abzüglich ausgewiesener Materialkosten von ${formatEurDe(mat)} €; ` +
+      `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} ` +
+      `(Rechnungsnetto abzüglich ausgewiesener Materialkosten von ${formatEuro(mat)}; ` +
       `inkl. Anfahrt und Maschinenkosten, soweit enthalten) ` +
       `kann bei der Einkommensteuer geltend gemacht werden.`
     )
   }
   return (
-    `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} € ` +
+    `Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von ${betrag} ` +
     `(inkl. USt sowie Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten) ` +
     `kann bei der Einkommensteuer geltend gemacht werden.`
   )

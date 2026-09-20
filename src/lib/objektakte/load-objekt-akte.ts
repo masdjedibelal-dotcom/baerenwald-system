@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { listOrgHausmeister, loadHausmeisterForObjekt } from '@/lib/org/org-hausmeister'
 import type {
@@ -24,6 +25,7 @@ export async function loadKundenObjektForAkte(
     .eq('id', objektId)
     .eq('kunde_id', kundeId)
     .maybeSingle()
+  if (error) logDbError('lib/objektakte/load-objekt-akte:kunden_objekte', error)
 
   if (error || !data) return null
   return data as KundenObjekt
@@ -42,6 +44,7 @@ async function fetchObjektAnlagenRows(
     .eq('kunde_objekt_id', objektId)
     .order('sort_order', { ascending: true })
     .order('bezeichnung', { ascending: true })
+  if (error) logDbError('lib/objektakte/load-objekt-akte:objekt_anlagen', error)
   return {
     data: (data ?? null) as ObjektAnlage[] | null,
     error: error ? { message: error.message } : null,
@@ -91,6 +94,7 @@ async function loadObjektAnlagen(
     .from('leads')
     .select('objekt_anlage_id')
     .in('objekt_anlage_id', ids)
+  if (countErr) logDbError('lib/objektakte/load-objekt-akte:leads', countErr)
 
   if (countErr) {
     console.warn('loadObjektAnlagen counts:', countErr.message)
@@ -236,6 +240,7 @@ export async function loadObjektAkteDetail(
       .eq('aktiv', true)
       .is('anonymisiert_am', null)
       .order('created_at', { ascending: true })
+    if (bewohnerErr) logDbError('lib/objektakte/load-objekt-akte:einheit_bewohner', bewohnerErr)
 
     if (bewohnerErr) {
       // etage-Embed optional (ältere DBs ohne Spalte)

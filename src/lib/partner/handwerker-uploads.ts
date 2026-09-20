@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { PARTNER_UPLOAD_BUCKET, storagePathFromHwPdfStored } from '@/lib/partner/handwerker-einreichung'
 
@@ -35,6 +36,7 @@ export async function signedHandwerkerUploadUrl(
   const { data, error } = await supabaseAdmin.storage
     .from(PARTNER_UPLOAD_BUCKET)
     .createSignedUrl(path, expiresIn)
+  if (error) logDbError('lib/partner/handwerker-uploads:query', error)
   if (error || !data?.signedUrl) return null
   return data.signedUrl
 }

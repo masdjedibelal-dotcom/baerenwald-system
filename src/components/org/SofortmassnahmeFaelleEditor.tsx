@@ -1,9 +1,9 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
 import { useMemo, useState } from 'react'
-import { MockModal } from '@/components/mock-ui/MockModal'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   akutFallLabel,
   SOFORTMASSNAHME_FAELLE_FOOTNOTE,
@@ -58,14 +58,9 @@ export function SofortmassnahmeFaelleEditor({
             <li key={id} className="sofortmassnahme-faelle__item">
               <span className="sofortmassnahme-faelle__item-label">{akutFallLabel(id)}</span>
               {!disabled ? (
-                <button
-                  type="button"
-                  className="sofortmassnahme-faelle__remove"
-                  aria-label="Fall entfernen"
-                  onClick={() => remove(id)}
-                >
+                <MockBtn className="sofortmassnahme-faelle__remove" type="button" aria-label="Fall löschen" onClick={() => remove(id)}>
                   <MockIcon ctx="btn" n="x" size={14} />
-                </button>
+                </MockBtn>
               ) : null}
             </li>
           ))}
@@ -86,10 +81,9 @@ export function SofortmassnahmeFaelleEditor({
 
       <p className="sofortmassnahme-faelle__footnote">{SOFORTMASSNAHME_FAELLE_FOOTNOTE}</p>
 
-      <MockModal
+      <EditorSheet
         open={katalogOpen}
         onClose={() => setKatalogOpen(false)}
-        icon="plus"
         title={SOFORTMASSNAHME_FAELLE_POPUP_TITLE}
         size="md"
       >
@@ -103,14 +97,10 @@ export function SofortmassnahmeFaelleEditor({
                 <ul className="sofortmassnahme-faelle__katalog-list">
                   {openFaelle.map((f) => (
                     <li key={f.id}>
-                      <button
-                        type="button"
-                        className="sofortmassnahme-faelle__katalog-btn"
-                        onClick={() => add(f.id)}
-                      >
+                      <MockBtn className="sofortmassnahme-faelle__katalog-btn" type="button" onClick={() => add(f.id)}>
                         <MockIcon ctx="btn" n="plus" size={14} />
                         <span>{f.label}</span>
-                      </button>
+                      </MockBtn>
                     </li>
                   ))}
                 </ul>
@@ -118,7 +108,7 @@ export function SofortmassnahmeFaelleEditor({
             )
           })}
         </div>
-      </MockModal>
+      </EditorSheet>
     </div>
   )
 }

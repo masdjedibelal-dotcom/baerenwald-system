@@ -1,6 +1,6 @@
 'use client'
 
-import { Mail } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 export function AngebotWizardVersandEmpfaengerCard({
@@ -20,7 +20,7 @@ export function AngebotWizardVersandEmpfaengerCard({
     <Card
       title={
         <>
-          <Mail className="h-3.5 w-3.5 shrink-0 text-bw-text-muted" aria-hidden />
+          <MockIcon n="mail" ctx="default" className="h-3.5 w-3.5 shrink-0 text-bw-text-muted" aria-hidden />
           E-Mail-Empfänger
         </>
       }

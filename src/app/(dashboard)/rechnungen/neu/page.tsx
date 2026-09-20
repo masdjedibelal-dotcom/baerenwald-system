@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase-server'
-import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import { loadWizardContext } from '@/lib/wizard-context'
 import { RechnungNeuPageClient } from '@/components/rechnungen/RechnungNeuPageClient'
 import { RechnungNeuKundeGate } from '@/components/rechnungen/RechnungNeuKundeGate'
 import {
@@ -9,7 +8,6 @@ import {
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { buildStandaloneRechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-bootstrap-helpers'
 import { defaultRechnungWizardMeta } from '@/lib/rechnungen/rechnung-wizard-types'
-import type { Gewerk, Preisliste } from '@/lib/types'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 
 /**
@@ -36,13 +34,7 @@ export default async function RechnungNeuPage({
     return <RechnungNeuKundeGate initialError={searchParams.err} />
   }
 
-  const supabase = createClient()
-  const [firm, { data: gewerke }, { data: preisRaw }] = await Promise.all([
-    fetchFirmenEinstellungen(supabase),
-    supabase.from('gewerke').select('id, name, slug, aktiv').eq('aktiv', true).order('name'),
-    supabase.from('preislisten').select('*').eq('aktiv', true),
-  ])
-
+  const { gewerke, preislisten, firm } = await loadWizardContext()
   let bootstrap: RechnungWizardBootstrap = buildStandaloneRechnungWizardBootstrap(firm)
 
   if (auftragId && forceNeu) {
@@ -69,8 +61,8 @@ export default async function RechnungNeuPage({
 
   return (
     <RechnungNeuPageClient
-      gewerke={(gewerke ?? []) as Gewerk[]}
-      preislisten={(preisRaw ?? []) as Preisliste[]}
+      gewerke={gewerke}
+      preislisten={preislisten}
       firm={firm}
       bootstrap={bootstrap}
     />

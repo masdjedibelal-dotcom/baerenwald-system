@@ -1,9 +1,10 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
-import { Modal } from '@/components/ui/Modal'
-import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { toast } from '@/components/ui/app-toast'
 import { korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
 import {
@@ -12,6 +13,7 @@ import {
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 /**
  * Mobil: Bottom-Sheet öffnet genau unter dem Sticky-CTA.
@@ -60,7 +62,7 @@ export function RechnungKorrekturWahlModal({
       const korr = await korrigiereRechnung(rechnungId)
       if (!korr.ok) {
         setMode(null)
-        toast.error(korr.message)
+        toast.systemError(korr)
         return
       }
 
@@ -70,7 +72,7 @@ export function RechnungKorrekturWahlModal({
         : await loadRechnungWizardBootstrapStandalone(targetId)
       setMode(null)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       if (korr.mode === 'storno_neu') {
@@ -80,7 +82,7 @@ export function RechnungKorrekturWahlModal({
           neuId: korr.neuId,
           originalStatus: korr.originalStatus,
         }
-        toast.success('Korrektur-Entwurf angelegt — bitte prüfen und erst dann versenden')
+        toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ers)
       }
       onClose()
       onKorrigieren(res.bootstrap)
@@ -96,41 +98,34 @@ export function RechnungKorrekturWahlModal({
   }
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={() => !pending && onClose()}
       title="Rechnung korrigieren"
       subtitle="Was möchtest du tun?"
       size="md"
-      footer={
-        <div className="kunde-create-footer" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <MockBtn kind="ghost" onClick={onClose} disabled={pending}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn
-            kind="primary"
-            disabled={!interactReady || pending || !mode}
-            onClick={() => {
-              if (mode === 'korrigieren') starteKorrigieren()
-              else if (mode === 'neu') starteNeu()
-            }}
-          >
-            {pending
-              ? mode === 'korrigieren'
-                ? 'Storno + Entwurf…'
-                : 'Lädt…'
-              : mode === 'korrigieren'
-                ? 'Korrektur anlegen'
-                : mode === 'neu'
-                  ? 'Neue Rechnung anlegen'
-                  : 'Bitte wählen'}
-          </MockBtn>
-        </div>
-      }
+      secondary={{ label: 'Abbrechen', onClick: onClose, disabled: pending, kind: 'ghost' }}
+      primary={{
+        label: pending
+          ? mode === 'korrigieren'
+            ? 'Storno + Entwurf…'
+            : 'Lädt…'
+          : mode === 'korrigieren'
+            ? 'Korrektur anlegen'
+            : mode === 'neu'
+              ? 'Neue Rechnung anlegen'
+              : 'Bitte wählen',
+        disabled: !interactReady || pending || !mode,
+        busy: pending,
+        onClick: () => {
+          if (mode === 'korrigieren') starteKorrigieren()
+          else if (mode === 'neu') starteNeu()
+        },
+      }}
     >
       <p
         className="text-[length:var(--fs-meta)]"
-        style={{ color: 'var(--text-3)', margin: '0 0 14px', lineHeight: 1.45 }}
+        style={{ color: 'var(--text-3)', margin: '0 0 0.8750remrem', lineHeight: 1.45 }}
       >
         <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>{nr}</strong> ist bereits
         versendet. Eine Korrektur legt Storno-Gutschrift und neuen Entwurf an — das Original bleibt
@@ -143,15 +138,10 @@ export function RechnungKorrekturWahlModal({
         style={!interactReady ? { pointerEvents: 'none', opacity: 0.72 } : undefined}
         aria-busy={!interactReady || undefined}
       >
-        <button
-          type="button"
-          className={cn(
+        <MockBtn className={cn(
             'doctype-radio-opt doctype-radio-opt--block',
             mode === 'korrigieren' && 'on'
-          )}
-          disabled={pending || !interactReady}
-          onClick={() => setMode('korrigieren')}
-        >
+          )} type="button" disabled={pending || !interactReady} onClick={() => setMode('korrigieren')}>
           <span className="dot" />
           <span className="doctype-radio-opt__copy">
             <span className="lbl" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -162,17 +152,12 @@ export function RechnungKorrekturWahlModal({
               Entwurf. Versand erst nach Bestätigung im Wizard.
             </span>
           </span>
-        </button>
+        </MockBtn>
 
-        <button
-          type="button"
-          className={cn(
+        <MockBtn className={cn(
             'doctype-radio-opt doctype-radio-opt--block',
             mode === 'neu' && 'on'
-          )}
-          disabled={pending || !interactReady}
-          onClick={() => setMode('neu')}
-        >
+          )} type="button" disabled={pending || !interactReady} onClick={() => setMode('neu')}>
           <span className="dot" />
           <span className="doctype-radio-opt__copy">
             <span className="lbl" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -184,8 +169,8 @@ export function RechnungKorrekturWahlModal({
               unverändert.
             </span>
           </span>
-        </button>
+        </MockBtn>
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

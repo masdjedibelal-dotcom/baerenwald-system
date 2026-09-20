@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import type { GewerkOption, HandwerkerZeile } from '@/components/handwerker/HandwerkerListeClient'
 
@@ -34,8 +35,7 @@ export type HandwerkerListeData = {
 export async function loadHandwerkerListe(): Promise<HandwerkerListeData> {
   const supabase = createClient()
 
-  const [{ data: gewData }, { data: hwData, error }, { data: docRows }, { data: zu }] =
-    await Promise.all([
+  const [{ data: gewData }, { data: hwData, error }, { data: docRows }, { data: zu }] = await Promise.all([
       supabase.from('gewerke').select('slug, name').eq('aktiv', true).order('sort_order').order('name'),
       supabase
         .from('handwerker')
@@ -50,9 +50,9 @@ export async function loadHandwerkerListe(): Promise<HandwerkerListeData> {
         .select('handwerker_id')
         .in('status', ['zugewiesen', 'in_arbeit']),
     ])
-
+  if (error) logDbError('lib/handwerker/load-handwerker-liste:handwerker', error)
   if (error) {
-    throw new Error(error.message ?? 'Handwerker konnten nicht geladen werden')
+    throw new Error(error.message ?? 'Partner konnten nicht geladen werden')
   }
 
   const einsatzIds = new Set(

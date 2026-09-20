@@ -1,8 +1,13 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotList, revalidateAuftragList, revalidateKundeDetail, revalidateLeadDetail, revalidateLeadList, revalidateRechnungList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { berechneKundeGesamtumsatz } from '@/lib/kunden/kunde-umsatz'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -107,9 +112,7 @@ export async function saveKunde(
     if (istKundeHausverwaltungTyp(data.typ) && typeof payload.name === 'string') {
       const newName = payload.name.trim()
       if (newName) {
-        const { data: prev } = await withCrmReadFallback(async (db) =>
-          db.from('kunden').select('name, org_anzeigename').eq('id', kundeId).maybeSingle()
-        )
+        const { data: prev } = await (() => { const db = createClient(); return db.from('kunden').select('name, org_anzeigename').eq('id', kundeId).maybeSingle() })()
         const prevName = String((prev as { name?: string } | null)?.name ?? '').trim()
         const prevOrg = String(
           (prev as { org_anzeigename?: string | null } | null)?.org_anzeigename ?? ''
@@ -119,41 +122,30 @@ export async function saveKunde(
         }
       }
     }
-    const { error } = await withCrmReadFallback(async (db) =>
-      db.from('kunden').update(payload).eq('id', kundeId)
-    )
+    const { error } = await (() => { const db = createClient(); return db.from('kunden').update(payload).eq('id', kundeId) })()
     if (error) return { ok: false, message: error.message }
     // Kundentyp an verknüpfte Anfragen nachziehen (Filter/Angebot-Logik)
     const typ = String(data.typ ?? '').trim()
     if (typ) {
-      await withCrmReadFallback(async (db) =>
-        db
+      await (() => { const db = createClient(); return db
           .from('leads')
           .update({ kundentyp: typ, updated_at: new Date().toISOString() })
           .or(`kunde_id.eq.${kundeId},auftraggeber_kunde_id.eq.${kundeId}`)
-          .in('status', ['neu', 'kontaktiert', 'termin', 'angebot'])
-      )
+          .in('status', ['neu', 'kontaktiert', 'termin', 'angebot']) })()
     }
-    revalidatePath('/kunden')
-    revalidatePath(`/kunden/${kundeId}`)
-    revalidatePath('/vorgaenge')
+    revalidateKundeDetail(kundeId)
     for (const lid of options?.revalidateAnfrageIds ?? []) {
-      revalidatePath(`/anfragen/${lid}`)
-      revalidatePath('/anfragen')
+      revalidateLeadDetail(lid)
     }
     return { ok: true, id: kundeId }
   }
 
-  const { data: row, error } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').insert(payload).select('id').single()
-  )
+  const { data: row, error } = await (() => { const db = createClient(); return db.from('kunden').insert(payload).select('id').single() })()
   if (error || !row) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
   const id = (row as { id: string }).id
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${id}`)
+  revalidateKundeDetail(id)
   for (const lid of options?.revalidateAnfrageIds ?? []) {
-    revalidatePath(`/anfragen/${lid}`)
-    revalidatePath('/anfragen')
+    revalidateLeadDetail(lid)
   }
   return { ok: true, id }
 }
@@ -175,14 +167,12 @@ export async function addKundenNotiz(
     inhalt: text,
     erstellt_von: user?.id ?? null,
   })
+  if (error) logDbError('app/actions/kunden:kunden_notizen', error)
   if (error) return { ok: false, message: error.message }
 
-  await withCrmReadFallback(async (db) =>
-    db.from('kunden').update({ letzte_aktivitaet: new Date().toISOString() }).eq('id', kundeId)
-  )
+  await (() => { const db = createClient(); return db.from('kunden').update({ letzte_aktivitaet: new Date().toISOString() }).eq('id', kundeId) })()
 
-  revalidatePath(`/kunden/${kundeId}`)
-  revalidatePath('/kunden')
+  revalidateKundeDetail(kundeId)
   return { ok: true }
 }
 
@@ -202,6 +192,7 @@ export async function deleteKundenNotiz(
     .eq('id', notizId)
     .eq('kunde_id', kundeId)
     .maybeSingle()
+  if (loadErr) logDbError('app/actions/kunden:kunden_notizen', loadErr)
   if (loadErr) return { ok: false, message: loadErr.message }
   if (!notiz) return { ok: false, message: 'Notiz nicht gefunden.' }
 
@@ -212,9 +203,14 @@ export async function deleteKundenNotiz(
     return { ok: false, message: 'Keine Berechtigung zum Löschen dieser Notiz.' }
   }
 
-  const { error } = await supabase.from('kunden_notizen').delete().eq('id', notizId)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('kunden_notizen').delete().eq('id', notizId)
+  if (error2) logDbError('app/actions/kunden:kunden_notizen', error2)
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateKundeDetail(kundeId)
+=======
   revalidatePath(`/kunden/${kundeId}`)
+>>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -245,13 +241,10 @@ export async function updateGesamtUmsatz(
 
   const summe = berechneKundeGesamtumsatz(aufRes.data ?? [], reRes.data ?? [])
 
-  const { error: uErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').update({ gesamt_umsatz: summe }).eq('id', kundeId)
-  )
+  const { error: uErr } = await (() => { const db = createClient(); return db.from('kunden').update({ gesamt_umsatz: summe }).eq('id', kundeId) })()
 
   if (uErr) return { ok: false, message: uErr.message }
-  revalidatePath(`/kunden/${kundeId}`)
-  revalidatePath('/kunden')
+  revalidateKundeDetail(kundeId)
   return { ok: true }
 }
 
@@ -262,7 +255,7 @@ export async function saveKundeCustomFieldValue(
 ) {
   const res = await persistCustomFieldValue(definitionId, objektId, wert)
   if (res.ok) {
-    revalidatePath(`/kunden/${objektId}`)
+    revalidateKundeDetail(objektId)
   }
   return res
 }
@@ -298,22 +291,18 @@ export async function setKundeSpam(
   const id = kundeId?.trim()
   if (!id) return { ok: false, message: 'Kunde fehlt.' }
 
-  const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('id, auth_user_id, email').eq('id', id).maybeSingle()
-  )
+  const { data: row, error: loadErr } = await (() => { const db = createClient(); return db.from('kunden').select('id, auth_user_id, email').eq('id', id).maybeSingle() })()
   if (loadErr || !row) {
     return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
   }
 
-  const { error: upErr } = await withCrmReadFallback(async (db) =>
-    db
+  const { error: upErr } = await (() => { const db = createClient(); return db
       .from('kunden')
       .update({
         ist_spam: istSpam,
         spam_markiert_am: istSpam ? new Date().toISOString() : null,
       })
-      .eq('id', id)
-  )
+      .eq('id', id) })()
   if (upErr) {
     const msg = upErr.message ?? ''
     if (msg.includes('ist_spam') || msg.includes('does not exist') || msg.includes('schema cache')) {
@@ -330,6 +319,7 @@ export async function setKundeSpam(
     const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
       ban_duration: istSpam ? AUTH_BAN_DURATION : 'none',
     })
+    if (banErr) logDbError('app/actions/kunden:query', banErr)
     if (banErr) {
       console.error('[setKundeSpam] Auth-Ban fehlgeschlagen:', banErr.message)
     }
@@ -347,8 +337,7 @@ export async function setKundeSpam(
     }
   }
 
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${id}`)
+  revalidateKundeDetail(id)
   return { ok: true }
 }
 
@@ -359,9 +348,7 @@ export async function getPortalLoginHint(
   | { ok: true; loginLink: string; hasAuthAccount: boolean }
   | { ok: false; message: string }
 > {
-  const { data: row, error } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('auth_user_id').eq('id', kundeId).maybeSingle()
-  )
+  const { data: row, error } = await (() => { const db = createClient(); return db.from('kunden').select('auth_user_id').eq('id', kundeId).maybeSingle() })()
 
   if (error) return { ok: false, message: error.message }
 
@@ -389,13 +376,11 @@ export async function searchKundenGlobal(
   const { istHvPortalRollenKunde } = await import('@/lib/kunde-stammdaten')
 
   for (const column of ['name', 'email', 'org_anzeigename'] as const) {
-    const { data } = await withCrmReadFallback(async (db) =>
-      db
+    const { data } = await (() => { const db = createClient(); return db
         .from('kunden')
         .select('id, name, vorname, nachname, typ, email, portal_modus, org_anzeigename')
         .ilike(column, pct)
-        .limit(8)
-    )
+        .limit(8) })()
     for (const row of data ?? []) {
       if (!row?.id) continue
       if (istHvPortalRollenKunde((row as { portal_modus?: string | null }).portal_modus)) {
@@ -432,6 +417,7 @@ async function repointKundeFk(
   survivorId: string
 ): Promise<string | null> {
   const { error } = await db.from(table).update({ [column]: survivorId }).eq(column, mergeId)
+  if (error) logDbError('app/actions/kunden:query', error)
   if (!error) return null
   if (isMissingTableError(error.message)) return null
   return `${table}.${column}: ${error.message}`
@@ -443,6 +429,7 @@ async function repointKundenObjekte(
   survivorId: string
 ): Promise<void> {
   const { data, error } = await db.from('kunden_objekte').select('id').eq('kunde_id', mergeId)
+  if (error) logDbError('app/actions/kunden:kunden_objekte', error)
   if (error) {
     if (!isMissingTableError(error.message)) {
       console.warn('[mergeKunden] kunden_objekte laden:', error.message)
@@ -455,6 +442,7 @@ async function repointKundenObjekte(
       .from('kunden_objekte')
       .update({ kunde_id: survivorId })
       .eq('id', id)
+    if (upErr) logDbError('app/actions/kunden:kunden_objekte', upErr)
     if (upErr) {
       console.warn('[mergeKunden] kunden_objekt übersprungen', id, upErr.message)
     }
@@ -467,6 +455,7 @@ async function repointKundenMitglieder(
   survivorId: string
 ): Promise<void> {
   const { data, error } = await db.from('kunden_mitglieder').select('id').eq('kunde_id', mergeId)
+  if (error) logDbError('app/actions/kunden:kunden_mitglieder', error)
   if (error) {
     if (!isMissingTableError(error.message)) {
       console.warn('[mergeKunden] kunden_mitglieder laden:', error.message)
@@ -479,6 +468,7 @@ async function repointKundenMitglieder(
       .from('kunden_mitglieder')
       .update({ kunde_id: survivorId })
       .eq('id', id)
+    if (upErr) logDbError('app/actions/kunden:kunden_mitglieder', upErr)
     if (upErr) {
       console.warn('[mergeKunden] kunden_mitglied übersprungen', id, upErr.message)
     }
@@ -511,9 +501,7 @@ export async function mergeKunden(
     return { ok: false, message: 'Nicht angemeldet.' }
   }
 
-  const { data: rows, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('*').in('id', [survivor, merge])
-  )
+  const { data: rows, error: loadErr } = await (() => { const db = createClient(); return db.from('kunden').select('*').in('id', [survivor, merge]) })()
   if (loadErr) return { ok: false, message: loadErr.message }
   const list = (rows ?? []) as Record<string, unknown>[]
   const survRow = list.find((r) => r.id === survivor)
@@ -531,41 +519,47 @@ export async function mergeKunden(
   ]
 
   for (const step of fkSteps) {
-    const { data: fkErr } = await withCrmReadFallback(async (db) => {
-      const msg = await repointKundeFk(db, step.table, step.column, merge, survivor)
+    const { data: fkErr } = await (async () => {
+  const db = createClient()
+  const msg = await repointKundeFk(db, step.table, step.column, merge, survivor)
       return { data: msg, error: null }
-    })
+})()
     if (fkErr) return { ok: false, message: fkErr }
   }
 
-  await withCrmReadFallback(async (db) => {
-    await repointKundenObjekte(db, merge, survivor)
+  await (async () => {
+  const db = createClient()
+  await repointKundenObjekte(db, merge, survivor)
     return { data: null, error: null }
-  })
+})()
   for (const opt of [
     { table: 'kunden_notizen', column: 'kunde_id' },
     { table: 'kunden_dokumente', column: 'kunde_id' },
     { table: 'email_logs', column: 'kunde_id' },
   ] as const) {
-    const { data: fkErr } = await withCrmReadFallback(async (db) => {
-      const msg = await repointKundeFk(db, opt.table, opt.column, merge, survivor)
+    const { data: fkErr } = await (async () => {
+  const db = createClient()
+  const msg = await repointKundeFk(db, opt.table, opt.column, merge, survivor)
       return { data: msg, error: null }
-    })
+})()
     if (fkErr) return { ok: false, message: fkErr }
   }
-  await withCrmReadFallback(async (db) => {
-    await repointKundenMitglieder(db, merge, survivor)
+  await (async () => {
+  const db = createClient()
+  await repointKundenMitglieder(db, merge, survivor)
     return { data: null, error: null }
-  })
+})()
 
   // Ansprechpartner des Merge-Kunden zum Survivor umhängen
-  await withCrmReadFallback(async (db) => {
-    await db
+  await (async () => {
+  const db = createClient()
+  const { error: __dbErr1 } = await db
       .from('kunden_ansprechpartner')
       .update({ kunde_id: survivor })
       .eq('kunde_id', merge)
+    if (__dbErr1) logDbError('app/actions/kunden:kunden_ansprechpartner', __dbErr1)
     return { data: null, error: null }
-  })
+})()
 
   // Kontaktdaten des aufgelösten Kunden als Ansprechpartner am Survivor anlegen
   {
@@ -585,28 +579,24 @@ export async function mergeKunden(
     if (!sameAsSurvivorMail && (mergeEmail || mergeTel || mergeName !== 'Ehemaliger Kontakt')) {
       let existingApId: string | null = null
       if (mergeEmail) {
-        const { data: existingAp } = await withCrmReadFallback(async (db) =>
-          db
+        const { data: existingAp } = await (() => { const db = createClient(); return db
             .from('kunden_ansprechpartner')
             .select('id')
             .eq('kunde_id', survivor)
             .ilike('email', mergeEmail)
             .limit(1)
-            .maybeSingle()
-        )
+            .maybeSingle() })()
         existingApId = (existingAp as { id: string } | null)?.id ?? null
       }
       if (!existingApId) {
-        await withCrmReadFallback(async (db) =>
-          db.from('kunden_ansprechpartner').insert({
+        await (() => { const db = createClient(); return db.from('kunden_ansprechpartner').insert({
             kunde_id: survivor,
             name: mergeName,
             email: mergeEmail,
             telefon: mergeTel,
             rolle: 'Zusammengeführt',
             ist_primaer: false,
-          })
-        )
+          }) })()
       }
     }
   }
@@ -647,15 +637,11 @@ export async function mergeKunden(
   }
 
   if (Object.keys(patch).length > 0) {
-    const { error: patchErr } = await withCrmReadFallback(async (db) =>
-      db.from('kunden').update(patch).eq('id', survivor)
-    )
+    const { error: patchErr } = await (() => { const db = createClient(); return db.from('kunden').update(patch).eq('id', survivor) })()
     if (patchErr) return { ok: false, message: patchErr.message }
   }
 
-  const { error: delErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').delete().eq('id', merge)
-  )
+  const { error: delErr } = await (() => { const db = createClient(); return db.from('kunden').delete().eq('id', merge) })()
   if (delErr) {
     return {
       ok: false,
@@ -667,13 +653,8 @@ export async function mergeKunden(
 
   await updateGesamtUmsatz(survivor)
 
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${survivor}`)
-  revalidatePath('/vorgaenge')
-  revalidatePath('/anfragen')
-  revalidatePath('/angebote')
-  revalidatePath('/auftraege')
-  revalidatePath('/rechnungen')
+  revalidateKundeDetail(survivor)
+  revalidateLeadList()
 
   return {
     ok: true,
@@ -685,9 +666,7 @@ export async function mergeKunden(
 export async function duplicateKunde(
   kundeId: string
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const { data: src, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('*').eq('id', kundeId).maybeSingle()
-  )
+  const { data: src, error: loadErr } = await (() => { const db = createClient(); return db.from('kunden').select('*').eq('id', kundeId).maybeSingle() })()
   if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
 
   const row = src as Record<string, unknown>
@@ -704,14 +683,11 @@ export async function duplicateKunde(
   payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
   if (payload.email) payload.email = null
 
-  const { data: inserted, error: insErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').insert(payload).select('id').single()
-  )
+  const { data: inserted, error: insErr } = await (() => { const db = createClient(); return db.from('kunden').insert(payload).select('id').single() })()
   if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
 
   const id = (inserted as { id: string }).id
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${id}`)
+  revalidateKundeDetail(id)
   return { ok: true, id }
 }
 
@@ -742,13 +718,11 @@ export async function getKundeDeletePreview(
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, message: 'Nicht angemeldet.' }
 
-  const { data: kunde, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db
+  const { data: kunde, error: loadErr } = await (() => { const db = createClient(); return db
       .from('kunden')
       .select('id, name, vorname, nachname')
       .eq('id', id)
-      .maybeSingle()
-  )
+      .maybeSingle() })()
   if (loadErr || !kunde) {
     return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
   }
@@ -782,13 +756,13 @@ export async function getKundeDeletePreview(
     supabaseAdmin.from('auftraege').select('id, status').eq('kunde_id', id),
     supabaseAdmin.from('rechnungen').select('id, rechnungsnummer').eq('kunde_id', id),
   ])
-
   let auftraegeExtra: { id: string; status: string | null }[] = []
   if (leadIds.length) {
-    const { data: viaLeads } = await supabaseAdmin
+    const { data: viaLeads, error } = await supabaseAdmin
       .from('auftraege')
       .select('id, status')
       .in('lead_id', leadIds)
+    if (error) logDbError('app/actions/kunden:auftraege', error)
     auftraegeExtra = (viaLeads ?? []) as { id: string; status: string | null }[]
   }
 
@@ -865,9 +839,7 @@ export async function deleteKunde(
     }
   }
 
-  const { data: row, error: loadErr } = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select('id, auth_user_id, email').eq('id', id).maybeSingle()
-  )
+  const { data: row, error: loadErr } = await (() => { const db = createClient(); return db.from('kunden').select('id, auth_user_id, email').eq('id', id).maybeSingle() })()
   if (loadErr || !row) {
     return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
   }
@@ -906,13 +878,11 @@ export async function deleteKunde(
     }
   }
 
-  const [{ data: restAuftraege }, { data: restAngebote }, { data: restRechnungen }] =
-    await Promise.all([
+  const [{ data: restAuftraege }, { data: restAngebote }, { data: restRechnungen }] = await Promise.all([
       supabaseAdmin.from('auftraege').select('id').eq('kunde_id', id),
       supabaseAdmin.from('angebote').select('id').eq('kunde_id', id),
       supabaseAdmin.from('rechnungen').select('id').eq('kunde_id', id),
     ])
-
   const restAuftragIds = (restAuftraege ?? []).map((a) => String(a.id))
   const restAngebotIds = (restAngebote ?? []).map((a) => String(a.id))
   const restRechnungIds = (restRechnungen ?? []).map((r) => String(r.id))
@@ -922,6 +892,7 @@ export async function deleteKunde(
       .from('rechnungen')
       .delete()
       .in('id', restRechnungIds)
+    if (error) logDbError('app/actions/kunden:rechnungen', error)
     if (error) return { ok: false, message: `rechnungen: ${error.message}` }
   }
 
@@ -934,6 +905,7 @@ export async function deleteKunde(
       .from('angebote')
       .delete()
       .in('id', restAngebotIds)
+    if (error) logDbError('app/actions/kunden:angebote', error)
     if (error) return { ok: false, message: `angebote: ${error.message}` }
   }
 
@@ -946,6 +918,7 @@ export async function deleteKunde(
       .from('auftraege')
       .delete()
       .in('id', restAuftragIds)
+    if (error) logDbError('app/actions/kunden:auftraege', error)
     if (error) return { ok: false, message: `auftraege: ${error.message}` }
   }
 
@@ -961,6 +934,7 @@ export async function deleteKunde(
       table === 'org_hausmeister' ? 'org_kunde_id' : 'kunde_id',
       id
     )
+    if (error) logDbError('app/actions/kunden:query', error)
     if (error && !/does not exist|relation|schema cache/i.test(error.message)) {
       return { ok: false, message: `${table}: ${error.message}` }
     }
@@ -982,10 +956,11 @@ export async function deleteKunde(
     try {
       let page = 1
       while (page <= 10) {
-        const { data: list } = await supabaseAdmin.auth.admin.listUsers({
+        const { data: list, error } = await supabaseAdmin.auth.admin.listUsers({
           page,
           perPage: 200,
         })
+        if (error) logDbError('app/actions/kunden:query', error)
         const users = list?.users ?? []
         const found = users.find(
           (u) => (u.email ?? '').toLowerCase() === kundeEmail && !u.deleted_at
@@ -1004,8 +979,7 @@ export async function deleteKunde(
 
   for (const uid of authIdsToDelete) {
     // Nicht löschen, wenn derselbe Auth noch an anderem Stamm hängt
-    const [{ data: otherKunde }, { data: otherHw }, { data: otherMitglied }] =
-      await Promise.all([
+    const [{ data: otherKunde }, { data: otherHw }, { data: otherMitglied }] = await Promise.all([
         supabaseAdmin
           .from('kunden')
           .select('id')
@@ -1039,17 +1013,16 @@ export async function deleteKunde(
   await supabaseAdmin.from('hv_notifications').delete().eq('kunde_id', id)
 
   const { error: delErr } = await supabaseAdmin.from('kunden').delete().eq('id', id)
+  if (delErr) logDbError('app/actions/kunden:kunden', delErr)
   if (delErr) return { ok: false, message: delErr.message }
 
   // Portal-Stubs (Hausmeister/Mieter/Eigentümer) + deren Auth-User
   await cleanupOrphanHvPortalKunden(supabaseAdmin, portalStubIds)
 
-  revalidatePath('/kunden')
-  revalidatePath(`/kunden/${id}`)
-  revalidatePath('/vorgaenge')
-  revalidatePath('/anfragen')
-  revalidatePath('/angebote')
-  revalidatePath('/auftraege')
-  revalidatePath('/rechnungen')
+  revalidateKundeDetail(id)
+  revalidateLeadList()
+  revalidateAngebotList()
+  revalidateAuftragList()
+  revalidateRechnungList()
   return { ok: true }
 }

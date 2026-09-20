@@ -1,3 +1,4 @@
+import { formatEuro } from '@/lib/format/geld-datum'
 /**
  * Anfrage: Akut-Erkennung + Schwellen-/Freigabe-Hinweise (client-sicher).
  */
@@ -178,8 +179,8 @@ export function buildAnfrageSchwellenHinweis(input: {
         istMieterMeldung,
         headline:
           status === 'beschluss_ausstehend'
-            ? `Unter Schwelle (${formatEur(preis)} ≤ ${formatEur(schwelle)}) — wartet auf Eigentümerbeschluss`
-            : `Unter Schwelle (${formatEur(preis)} ≤ ${formatEur(schwelle)}) — HV-Freigabe ausstehend`,
+            ? `Unter Schwelle (${formatEuro(preis)} ≤ ${formatEuro(schwelle)}) — wartet auf Eigentümerbeschluss`
+            : `Unter Schwelle (${formatEuro(preis)} ≤ ${formatEuro(schwelle)}) — HV-Freigabe ausstehend`,
         detail:
           status === 'beschluss_ausstehend'
             ? 'Parkzustand Beschluss — Freigabe im HV-Portal nach Beschluss abschließen.'
@@ -196,7 +197,7 @@ export function buildAnfrageSchwellenHinweis(input: {
         notfallDirektErlaubt,
         istAkut,
         istMieterMeldung,
-        headline: `Unter Schwelle (${formatEur(preis)} ≤ ${formatEur(schwelle)}) — Freigabe nicht blockierend`,
+        headline: `Unter Schwelle (${formatEuro(preis)} ≤ ${formatEuro(schwelle)}) — Freigabe nicht blockierend`,
         detail:
           status === 'freigegeben'
             ? 'HV hat freigegeben. Angebot erstellen; Auto-Auftrag-Pfad möglich.'
@@ -229,7 +230,7 @@ export function buildAnfrageSchwellenHinweis(input: {
       notfallDirektErlaubt,
       istAkut,
       istMieterMeldung,
-      headline: `Über Schwelle (${formatEur(preis)} > ${formatEur(schwelle)}) — HV-Freigabe nötig`,
+      headline: `Über Schwelle (${formatEuro(preis)} > ${formatEuro(schwelle)}) — HV-Freigabe nötig`,
       detail:
         freigabeStatus === 'ausstehend' || freigabeStatus === 'beschluss_ausstehend'
           ? freigabeStatus === 'beschluss_ausstehend'
@@ -249,7 +250,7 @@ export function buildAnfrageSchwellenHinweis(input: {
       notfallDirektErlaubt,
       istAkut,
       istMieterMeldung,
-      headline: `Freigabe-Schwelle ${formatEur(schwelle)} — Schwelle gilt erst nach Angebot`,
+      headline: `Freigabe-Schwelle ${formatEuro(schwelle)} — Schwelle gilt erst nach Angebot`,
       detail:
         'Angebot erstellen, dann wird der Betrag mit der Schwelle abgeglichen. Bei Akut trotzdem direkt beauftragen möglich.',
     }
@@ -265,7 +266,7 @@ export function buildAnfrageSchwellenHinweis(input: {
       notfallDirektErlaubt,
       istAkut,
       istMieterMeldung,
-      headline: `Freigabe-Schwelle ${formatEur(schwelle)} — noch keine Preisindikation`,
+      headline: `Freigabe-Schwelle ${formatEuro(schwelle)} — noch keine Preisindikation`,
       detail:
         'Preisindikation setzen, um Schwellen-Abgleich zu sehen. Bei Akut trotzdem direkt beauftragen möglich.',
     }
@@ -285,11 +286,6 @@ export function buildAnfrageSchwellenHinweis(input: {
       ? 'Bei Dringlichkeit „Als akut markieren“ und direkt beauftragen — sonst Angebot erstellen.'
       : 'Optional als Akut markieren für Direktbeauftragung ohne Angebot.',
   }
-}
-
-function formatEur(n: number | null): string {
-  if (n == null) return '—'
-  return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €`
 }
 
 /**

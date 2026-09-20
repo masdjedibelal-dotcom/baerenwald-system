@@ -1,3 +1,6 @@
+import { formatEuro } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
+
 /** Kurz-Hinweis unter dem Betrag in Kunden-Mails (Rechnung / Angebot). */
 export function mailBetragMwstHinweis(opts: {
   reverseCharge?: boolean
@@ -12,8 +15,6 @@ export function mailBetragPriceHtml(
   betragEur: number,
   opts?: { reverseCharge?: boolean; kleinunternehmer?: boolean }
 ): string {
-  const formatEur = (n: number) =>
-    n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const hint = mailBetragMwstHinweis(opts ?? {})
-  return `<p style="font-size:16px;font-weight:700;color:#2E7D52;margin:0;">${formatEur(betragEur)} € <span style="font-size:12px;font-weight:400;color:#6B7280;">${hint}</span></p>`
+  return `<p style="font-size:16px;font-weight:700;color:${C.green};margin:0;">${formatEuro(betragEur)} <span style="font-size:12px;font-weight:400;color:${C.gray500};">${hint}</span></p>`
 }

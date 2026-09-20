@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import type { KiAssistScopeId } from '@/lib/copilot/ki-assist-scopes'
@@ -33,12 +34,7 @@ export function KiAssistIconButton({
   const label = title ?? `KI: ${meta.label}`
 
   return (
-    <button
-      type="button"
-      className={cn('ki-assist-icon-btn', className)}
-      title={label}
-      aria-label={label}
-      onClick={() => {
+    <MockBtn className={cn('ki-assist-icon-btn', className)} type="button" title={label} aria-label={label} onClick={() => {
         onBeforeOpen?.()
         openScoped({
           scopeId: scope,
@@ -46,9 +42,8 @@ export function KiAssistIconButton({
           draftInput: draftInput ?? null,
           layer: overSheet ? 'over-sheet' : 'default',
         })
-      }}
-    >
+      }}>
       <MockIcon ctx="btn" n="sparkles" size={16} />
-    </button>
+    </MockBtn>
   )
 }

@@ -1,7 +1,14 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateEinstellungenPath, revalidatePreislistenList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
+import { revalidateWizardContext } from '@/lib/wizard-context'
 import {
   normalizeGewerkAusfuehrung,
   type GewerkAusfuehrung,
@@ -25,11 +32,13 @@ export async function loadGewerkeEinstellungen(): Promise<GewerkMitCount[]> {
     .select('id, name, slug, aktiv, sort_order, ausfuehrung, fachbetrieb_hinweis')
     .order('sort_order', { ascending: true })
     .order('name', { ascending: true })
+  if (error) logDbError('app/einstellungen/gewerke/actions:gewerke', error)
   if (error) {
     console.warn('loadGewerkeEinstellungen', error.message)
     return []
   }
-  const { data: pl } = await supabase.from('preislisten').select('gewerk_id')
+  const { data: pl, error: error2 } = await supabase.from('preislisten').select('gewerk_id')
+  if (error2) logDbError('app/einstellungen/gewerke/actions:preislisten', error2)
   const counts = new Map<string, number>()
   for (const row of pl ?? []) {
     const gid = (row as { gewerk_id: string }).gewerk_id
@@ -67,12 +76,10 @@ export async function updateGewerkAusfuehrung(
     .from('gewerke')
     .update({ ausfuehrung, fachbetrieb_hinweis: hinweis })
     .eq('id', id)
+  if (error) logDbError('app/einstellungen/gewerke/actions:gewerke', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/gewerke')
-  revalidatePath('/einstellungen/preise')
-  revalidatePath('/preislisten')
-  revalidatePath('/anfragen')
-  revalidatePath('/angebote')
+  revalidateEinstellungenPath('/einstellungen/gewerke')
+  revalidateWizardContext()
   return { ok: true }
 }
 
@@ -83,10 +90,12 @@ export async function reorderGewerke(orderedIds: string[]): Promise<{ ok: true }
       .from('gewerke')
       .update({ sort_order: i * 10 })
       .eq('id', orderedIds[i])
+    if (error) logDbError('app/einstellungen/gewerke/actions:gewerke', error)
     if (error) return { ok: false, message: error.message }
   }
-  revalidatePath('/einstellungen/gewerke')
-  revalidatePath('/preislisten')
+  revalidateEinstellungenPath('/einstellungen/gewerke')
+  revalidatePreislistenList()
+  revalidateWizardContext()
   return { ok: true }
 }
 
@@ -98,13 +107,21 @@ export async function deleteGewerkIfEmpty(
     .from('preislisten')
     .select('id', { count: 'exact', head: true })
     .eq('gewerk_id', id)
+  if (cErr) logDbError('app/einstellungen/gewerke/actions:preislisten', cErr)
   if (cErr) return { ok: false, message: cErr.message }
   if ((count ?? 0) > 0) {
     return { ok: false, message: 'Gewerk hat noch Leistungen in der Preisliste.' }
   }
-  const { error } = await supabase.from('gewerke').delete().eq('id', id)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('gewerke').delete().eq('id', id)
+  if (error2) logDbError('app/einstellungen/gewerke/actions:gewerke', error2)
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateEinstellungenPath('/einstellungen/gewerke')
+  revalidatePreislistenList()
+  revalidateWizardContext()
+=======
   revalidatePath('/einstellungen/gewerke')
   revalidatePath('/preislisten')
+>>>>>>> Stashed changes
   return { ok: true }
 }

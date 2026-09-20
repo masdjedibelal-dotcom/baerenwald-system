@@ -1,19 +1,12 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
-
-import { useEffect, useMemo, useState } from 'react'
-import {
-  ChevronDown,
-  Circle,
-  CircleCheck,
-  Clock,
-  FileText,
-  Pencil,
-  Plus,
-  Trash2,
-  UserPlus } from 'lucide-react'
-import { resolveMockIcon } from '@/lib/mock-icons'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockField } from '@/components/mock-ui/MockForm'
+import { useTransition } from '@/components/ui/action-busy'
+import { Combobox } from '@/components/ui/Combobox'
+import { useEffect, useMemo, useState } from 'react'
+import { resolveMockIcon } from '@/lib/mock-icons'
 import { HandwerkerDetailsModal } from '@/components/auftraege/HandwerkerDetailsModal'
 import {
   HandwerkerZuweisenModal,
@@ -22,8 +15,11 @@ import {
 import {
   HandwerkerZuweisungMailModal,
   type HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Select } from '@/components/ui/Select'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { updateAuftragPositionHandwerkerStatus } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import {
@@ -40,6 +36,7 @@ import { nettoZuBrutto } from '@/lib/angebot-einfach'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import type { AuftragHandwerkerRow, AuftragPosition, AuftragStatus } from '@/lib/types'
 import { cn, formatPreis } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 type PosVisualState = 'done' | 'wait' | 'open'
 
@@ -65,9 +62,9 @@ function PosIcon({ state }: { state: PosVisualState }) {
     state === 'wait' && 'pos-icon-wait',
     state === 'open' && 'pos-icon-open'
   )
-  if (state === 'done') return <CircleCheck className={cls} aria-hidden />
-  if (state === 'wait') return <Clock className={cls} aria-hidden />
-  return <Circle className={cls} aria-hidden />
+  if (state === 'done') return <MockIcon n="circle-check-filled" ctx="default" className={cls} aria-hidden />
+  if (state === 'wait') return <MockIcon n="clock" ctx="default" className={cls} aria-hidden />
+  return <MockIcon n="circle" ctx="default" className={cls} aria-hidden />
 }
 function posQtyLabel(p: AuftragPosition): string {
   if (p.einheit && p.einheit !== 'pauschal') return `${p.menge ?? 1} ${p.einheit}`
@@ -152,7 +149,7 @@ export function AuftragPositionenGewerkView({
 
   function openGewerkModal(block: (typeof blocks)[0]) {
     if (!block.gewerkId) {
-      toast.error('Gewerk nicht in Stammdaten')
+      toast.error(TOAST.gewerk_nicht_in_stammdaten)
       return
     }
     const z = zuweisungForBlock(block)
@@ -190,7 +187,7 @@ export function AuftragPositionenGewerkView({
 
   function openPositionModal(block: (typeof blocks)[0], position: AuftragPosition) {
     if (!block.gewerkId) {
-      toast.error('Gewerk nicht in Stammdaten.')
+      toast.error(TOAST.gewerk_nicht_in_stammdaten_2)
       return
     }
     const z = zuweisungForBlock(block)
@@ -224,9 +221,9 @@ export function AuftragPositionenGewerkView({
   function changePositionStatus(positionId: string, status: AuftragHandwerkerZuweisungStatus) {
     startTransition(async () => {
       const r = await updateAuftragPositionHandwerkerStatus({ auftragId, positionId, status })
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Status aktualisiert')
+        toast.success(TOAST.statusAktualisiert)
         onChanged()
       }
     })
@@ -239,9 +236,9 @@ export function AuftragPositionenGewerkView({
         title="Keine Leistungen"
         hint="Lege Gewerke und Leistungen an — gruppiert wie im Angebots-Wizard."
         action={
-          <button type="button" className="btn primary sm" onClick={() => onAddLeistung('')}>
+          <MockBtn kind="primary" sm type="button" onClick={() => onAddLeistung('')}>
             + Leistung
-          </button>
+          </MockBtn>
         }
       />
     )
@@ -274,8 +271,8 @@ export function AuftragPositionenGewerkView({
           const slugForAdd = block.gewerkSlug ?? gewerke.find((g) => g.id === block.gewerkId)?.slug ?? ''
 
           return (
-            <div key={block.key} className="pos-gewerk-section overflow-hidden rounded-lg border border-bw-border">
-              <div className="flex items-stretch bg-bw-card">
+            <div key={block.key} className="pos-gewerk-section overflow-hidden rounded-card border border-bw-border">
+              <div className="flex items-stretch bg-surface">
                 <div className="flex min-h-[48px] min-w-0 flex-1 items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[length:var(--fs-text)] font-semibold text-bw-text">{block.gewerkName}</p>
@@ -285,7 +282,7 @@ export function AuftragPositionenGewerkView({
                         {zuweisung?.status ? (
                           <span
                             className={cn(
-                              'ml-1.5 inline rounded px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                              'ml-1.5 inline rounded-card px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium',
                               auftragHwStatusBadgeClass(zuweisung.status)
                             )}
                           >
@@ -298,24 +295,15 @@ export function AuftragPositionenGewerkView({
                       {posCount} Leistung{posCount === 1 ? '' : 'en'}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="flex shrink-0 items-center gap-3 rounded-md px-2 py-1 transition-colors hover:bg-bw-hover"
-                    onClick={() => toggleSection(block.key)}
-                    aria-expanded={open}
-                    aria-label={open ? 'Gewerk einklappen' : 'Gewerk aufklappen'}
-                  >
+                  <MockBtn className="flex shrink-0 items-center gap-3 rounded-button px-2 py-1 transition-colors hover:bg-bw-hover" type="button" onClick={() => toggleSection(block.key)} aria-expanded={open} aria-label={open ? 'Gewerk einklappen' : 'Gewerk aufklappen'}>
                     <span className="text-[length:var(--fs-text)] font-semibold tabular-nums text-bw-text">
                       {formatEurBetrag(netto)}
                     </span>
-                    <ChevronDown
-                      className={cn(
+                    <MockIcon n="chevron-down" ctx="default" className={cn(
                         'h-4 w-4 shrink-0 text-bw-text-muted transition-transform',
                         open && 'rotate-180'
-                      )}
-                      aria-hidden
-                    />
-                  </button>
+                      )} aria-hidden />
+                  </MockBtn>
                 </div>
               </div>
 
@@ -352,13 +340,13 @@ export function AuftragPositionenGewerkView({
                             ) : null}
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               {eigenleistung ? (
-                                <span className="inline rounded-full bg-bw-green-bg px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-bw-primary">
+                                <span className="inline rounded-pill bg-bw-green-bg px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-bw-primary">
                                   Eigenleistung
                                 </span>
                               ) : (
                                 <span
                                   className={cn(
-                                    'inline rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                                    'inline rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                                     auftragHwStatusBadgeClass(posStatus)
                                   )}
                                 >
@@ -380,30 +368,36 @@ export function AuftragPositionenGewerkView({
                               ) : null}
                             </div>
                             <div className="mt-2 flex flex-wrap gap-1.5">
-                              <Button
+                              <MockBtn
                                 type="button"
-                                variant="ghost"
-                                size="sm"
+                                kind="ghost" sm
                                 className="h-7 px-2 text-[length:var(--fs-meta)]"
                                 disabled={!block.gewerkId || pending}
                                 onClick={() => openPositionModal(block, pos)}
                               >
+<<<<<<< Updated upstream
+                                <MockIcon n="user" ctx="default" className="mr-1 h-3 w-3" aria-hidden />
+                                {pos.handwerker_id ? 'Partner bearbeiten' : 'HW zuweisen'}
+=======
                                 <UserPlus className="mr-1 h-3 w-3" aria-hidden />
                                 {pos.handwerker_id ? 'Handwerker bearbeiten' : 'HW zuweisen'}
-                              </Button>
+>>>>>>> Stashed changes
+                              </MockBtn>
                               {pos.handwerker_id ? (
                                 <>
-                                  <Button
+                                  <MockBtn
                                     type="button"
-                                    variant="ghost"
-                                    size="sm"
+                                    kind="ghost" sm
                                     className="h-7 px-2 text-[length:var(--fs-meta)]"
                                     disabled={pending}
                                     onClick={() => setDetailsOpen({ mode: 'position', position: pos })}
                                   >
-                                    <FileText className="mr-1 h-3 w-3" aria-hidden />
+                                    <MockIcon n="file-text" ctx="default" className="mr-1 h-3 w-3" aria-hidden />
                                     Details
-                                  </Button>
+                                  </MockBtn>
+<<<<<<< Updated upstream
+                                  <Combobox id={`hw-status-${pos.id}`} name={`hw-status-${pos.id}`} disabled={pending} options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
+=======
                                   <Select
                                     name={`hw-status-${pos.id}`}
                                     value={(posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend'}
@@ -414,34 +408,33 @@ export function AuftragPositionenGewerkView({
                                       )
                                     }
                                     options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({
+>>>>>>> Stashed changes
                                       value: o.value,
-                                      label: o.label }))}
-                                    className="!h-7 !min-w-[130px] !py-0 text-[length:var(--fs-meta)]"
-                                    disabled={pending}
-                                  />
+                                      label: o.label }))} value={(posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend' == null ? '' : String((posStatus as AuftragHandwerkerZuweisungStatus) || 'ausstehend')} placeholder="Auswählen…" onChange={(next) => { changePositionStatus(
+                                        pos.id,
+                                        next as AuftragHandwerkerZuweisungStatus
+                                      ); }} className="!h-7 !min-w-[130px] !py-0 text-[length:var(--fs-meta)]" />
                                 </>
                               ) : null}
-                              <Button
+                              <MockBtn
                                 type="button"
-                                variant="ghost"
-                                size="sm"
+                                kind="ghost" sm
                                 className="h-7 px-2 text-[length:var(--fs-meta)]"
                                 onClick={() => onEditPosition(pos)}
                               >
-                                <Pencil className="mr-1 h-3 w-3" aria-hidden />
+                                <MockIcon n="pencil" ctx="default" className="mr-1 h-3 w-3" aria-hidden />
                                 Bearbeiten
-                              </Button>
-                              <Button
+                              </MockBtn>
+                              <MockBtn
                                 type="button"
-                                variant="ghost"
-                                size="sm"
+                                kind="ghost" sm
                                 className="h-7 px-2 text-[length:var(--fs-meta)] text-status-cancel-text hover:text-status-cancel-text"
                                 disabled={pending}
                                 onClick={() => onDeletePosition(pos.id)}
                               >
-                                <Trash2 className="mr-1 h-3 w-3" aria-hidden />
+                                <MockIcon n="trash" ctx="default" className="mr-1 h-3 w-3" aria-hidden />
                                 Löschen
-                              </Button>
+                              </MockBtn>
                             </div>
                           </div>
                           <span className="pos-price font-semibold tabular-nums text-bw-text">
@@ -453,25 +446,16 @@ export function AuftragPositionenGewerkView({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 border-t border-bw-border px-3 py-2.5">
-                    <button
-                      type="button"
-                      className="btn ghost sm gap-1"
-                      onClick={() => onAddLeistung(slugForAdd)}
-                    >
-                      <Plus className="h-3.5 w-3.5" aria-hidden />
+                    <MockBtn kind="ghost" sm className="gap-1" type="button" onClick={() => onAddLeistung(slugForAdd)}>
+                      <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                       Leistung
-                    </button>
-                    <button
-                      type="button"
-                      className="btn ghost sm gap-1"
-                      disabled={!block.gewerkId || pending}
-                      onClick={() => openGewerkModal(block)}
-                    >
+                    </MockBtn>
+                    <MockBtn kind="ghost" sm className="gap-1" type="button" disabled={!block.gewerkId || pending} onClick={() => openGewerkModal(block)}>
                       <ToolIcon className="h-3.5 w-3.5" aria-hidden />
                       {zuweisungForBlock(block)?.handwerker_id
-                        ? 'Handwerker bearbeiten'
-                        : 'Handwerker fürs Gewerk'}
-                    </button>
+                        ? 'Partner bearbeiten'
+                        : 'Partner fürs Gewerk'}
+                    </MockBtn>
                   </div>
                 </div>
               ) : null}
@@ -481,10 +465,10 @@ export function AuftragPositionenGewerkView({
       </div>
 
       <div className="mt-4 flex justify-end">
-        <button type="button" className="btn primary sm gap-1" onClick={() => onAddLeistung('')}>
-          <Plus className="h-3.5 w-3.5" aria-hidden />
+        <MockBtn kind="primary" sm className="gap-1" type="button" onClick={() => onAddLeistung('')}>
+          <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" aria-hidden />
           Leistung hinzufügen
-        </button>
+        </MockBtn>
       </div>
 
       <HandwerkerZuweisenModal

@@ -4,11 +4,24 @@
 
 import type { AuftragTimelineEvent, LeadTimelineRow } from '@/lib/types'
 import { formatRelativeDate, formatTimelineStamp } from '@/lib/utils'
-import type { TimelineItem } from '@/components/ui/timeline'
 import {
   buildRechnungMahnverlauf,
   type RechnungMahnKontext,
 } from '@/lib/rechnungen/mahnverlauf'
+
+/** Basis-Zeile für Verlauf/Timeline (früher ui/timeline). */
+export type TimelineItem = {
+  id?: string
+  text: string
+  time: string
+  /** offen = grauer Punkt, sonst erledigt */
+  state?: 'open' | 'done' | 'active'
+  linkLabel?: string
+  onLinkClick?: () => void
+  /** Zeile öffnet Inspect-Pop-up */
+  inspectable?: boolean
+  onClick?: () => void
+}
 
 export type RechnungMahnMailZeile = {
   id: string

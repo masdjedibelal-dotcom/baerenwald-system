@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import type { ExportField } from '@/hooks/useExport'
 
 export function CsvExportModal({
@@ -86,17 +86,17 @@ export function CsvExportModal({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-bw-border pt-4">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <MockBtn type="button" kind="secondary" onClick={onClose}>
             Abbrechen
-          </Button>
-          <Button
+          </MockBtn>
+          <MockBtn
             type="button"
-            variant="primary"
+            kind="primary"
             onClick={handleDownload}
             disabled={!fields.some((f) => selected[f.key])}
           >
             CSV herunterladen
-          </Button>
+          </MockBtn>
         </div>
       </div>
     </Modal>

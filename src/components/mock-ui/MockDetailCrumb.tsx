@@ -1,9 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-
 export function MockDetailCrumb({
   backHref,
   backLabel,
@@ -43,7 +42,7 @@ export function MockDetailCrumb({
         {backLabel}
       </Link>
       <span style={{ color: 'var(--text-3)', minWidth: 0 }}>
-        <span style={{ margin: '0 8px', color: 'var(--text-4)' }}>·</span>
+        <span style={{ margin: '0 0.5rem', color: 'var(--text-4)' }}>·</span>
         <Link href={backHref} className="link" style={{ cursor: 'pointer' }}>
           {sectionLabel}
         </Link>{' '}

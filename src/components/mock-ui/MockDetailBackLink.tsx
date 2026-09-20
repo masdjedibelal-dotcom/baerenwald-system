@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
 /** Nur Zurück-Link — ohne Brotkrumen-Pfad. */

@@ -1,3 +1,8 @@
+<<<<<<< Updated upstream
+import { formatMonatNummerJahr } from '@/lib/utils'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { loadObjektHistorie } from '@/lib/objektakte/load-objekt-historie'
 import { loadKundenObjektForAkte } from '@/lib/objektakte/load-objekt-akte'
 import { summeObjektVorgangKosten } from '@/lib/objektakte/resolve-objekt-vorgang-kosten'
@@ -88,7 +93,7 @@ function fmtMonatJahr(iso: string | null | undefined): string | null {
   if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null
   const dt = new Date(d)
   if (Number.isNaN(dt.getTime())) return null
-  return dt.toLocaleDateString('de-DE', { month: '2-digit', year: 'numeric' })
+  return formatMonatNummerJahr(dt)
 }
 
 function garantieStatusLabel(iso: string | null | undefined): string | null {
@@ -162,6 +167,7 @@ async function fetchAnlagenBerichtRows(
     .eq('kunde_objekt_id', oid)
     .neq('status', 'stillgelegt')
     .order('bezeichnung', { ascending: true })
+  if (error) logDbError('lib/objektakte/load-versammlungsbericht-data:objekt_anlagen', error)
   return {
     data: (data ?? null) as AnlageDbRow[] | null,
     error: error ? { message: error.message } : null,

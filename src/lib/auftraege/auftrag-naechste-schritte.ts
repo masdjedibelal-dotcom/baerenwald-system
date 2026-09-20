@@ -44,7 +44,7 @@ export function buildAuftragNaechsteSchritte(
     },
     {
       id: 'handwerker',
-      label: 'Handwerker zuweisen',
+      label: 'Partner zuweisen',
       dateLabel: hwDone ? 'Erledigt' : 'Offen',
       done: hwDone,
       onClick: hwDone ? undefined : opts.onHandwerkerZuweisen,

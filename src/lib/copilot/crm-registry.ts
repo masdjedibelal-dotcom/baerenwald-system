@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import {
   acceptAngebotAndCreateAuftrag,
   markAngebotAbgelehntEinfach,
@@ -50,6 +51,8 @@ import {
 } from '@/lib/copilot/wizard-copilot'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AuftragStatus, LeadStatus } from '@/lib/types'
+import { writeLeadStatus } from '@/lib/status/write-lead-status'
+import { writeAngebotStatus } from '@/lib/status/write-angebot-status'
 
 export type CrmActionMeta = {
   id: string
@@ -97,7 +100,7 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'save_angebot_wizard',
       kategorie: 'angebote',
-      beschreibung: 'Vollständigen Wizard-Entwurf speichern (Positionen, Meta, Handwerker, Projekt)',
+      beschreibung: 'Vollständigen Wizard-Entwurf speichern (Positionen, Meta, Partner, Projekt)',
       params: [
         'lead_id',
         'positionen[]',
@@ -120,7 +123,7 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'list_handwerker_gewerk',
       kategorie: 'angebote',
-      beschreibung: 'Handwerker für ein Gewerk (slug oder id)',
+      beschreibung: 'Partner für ein Gewerk (slug oder id)',
       params: ['gewerk_slug oder gewerk_id'],
     },
     handler: (p) =>
@@ -139,18 +142,19 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'send_angebot_handwerker',
       kategorie: 'angebote',
-      beschreibung: 'Angebot an zugewiesene Handwerker senden',
+      beschreibung: 'Angebot an zugewiesene Partner senden',
       params: ['angebot_id oder suche'],
       bestaetigung: true,
     },
     preview: async (p) => {
       const id = await resolveAngebotParam(p)
       if (typeof id !== 'string') return id
-      const { data } = await supabaseAdmin
+      const { data, error } = await supabaseAdmin
         .from('angebote')
         .select('angebotsnr, leistungsumfang, angebot_handwerker(handwerker(name))')
         .eq('id', id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-registry:angebote', error)
       return {
         vorschau: true,
         aktion: 'send_angebot_handwerker',
@@ -208,17 +212,13 @@ export const CRM_ACTION_REGISTRY: Record<
       if (!sent.ok) return sent
       const now = new Date().toISOString()
       const gueltig = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
-      await supabaseAdmin
-        .from('angebote')
-        .update({
-          status_einfach: 'gesendet',
-          status: 'gesendet_kunde',
-          gesendet_am: now,
-          gesendet_kunde_at: now,
-          gueltig_bis: gueltig,
-          updated_at: now,
-        })
-        .eq('id', id)
+      const { error: __dbErr1 } = await writeAngebotStatus(supabaseAdmin, id, 'gesendet_kunde', {
+        status_einfach: 'gesendet',
+        gesendet_am: now,
+        gesendet_kunde_at: now,
+        gueltig_bis: gueltig,
+      })
+      if (__dbErr1) logDbError('lib/copilot/crm-registry:angebote', __dbErr1)
       return { ok: true, angebot_id: id }
     },
   },
@@ -324,7 +324,7 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'bestaetige_handwerker_einreichung',
       kategorie: 'angebote',
-      beschreibung: 'Handwerker-Einreichung übernehmen und bestätigen',
+      beschreibung: 'Partner-Einreichung übernehmen und bestätigen',
       params: ['angebot_id', 'zuweisung_id'],
       bestaetigung: true,
     },
@@ -408,23 +408,33 @@ export const CRM_ACTION_REGISTRY: Record<
     handler: async (p) => {
       const leadId = str(p, 'lead_id')
       const status = str(p, 'status') as LeadStatus
-      const { data: lead } = await supabaseAdmin
+      const { data: lead, error } = await supabaseAdmin
         .from('leads')
         .select('status')
         .eq('id', leadId)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-registry:leads', error)
       if (!lead) return { error: 'Lead nicht gefunden' }
-      const { error } = await supabaseAdmin
+<<<<<<< Updated upstream
+      const { error: error2 } = await writeLeadStatus(supabaseAdmin, leadId, status)
+      if (error2) logDbError('lib/copilot/crm-registry:leads', error2)
+      if (error2) return { error: error2.message }
+      const { error: __dbErr2 } = await supabaseAdmin.from('leads_status_history').insert({
+=======
+      const { error: error2 } = await supabaseAdmin
         .from('leads')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', leadId)
-      if (error) return { error: error.message }
+      if (error2) logDbError('lib/copilot/crm-registry:leads', error2)
+      if (error2) return { error: error2.message }
       await supabaseAdmin.from('leads_status_history').insert({
+>>>>>>> Stashed changes
         lead_id: leadId,
         status_alt: lead.status,
         status_neu: status,
         user_id: null,
       })
+      if (__dbErr2) logDbError('lib/copilot/crm-registry:leads_status_history', __dbErr2)
       return { ok: true }
     },
   },
@@ -466,6 +476,7 @@ export const CRM_ACTION_REGISTRY: Record<
             updated_at: new Date().toISOString(),
           })
           .eq('id', kundeId)
+        if (error) logDbError('lib/copilot/crm-registry:kunden', error)
         if (error) return { error: error.message }
         return { ok: true, id: kundeId }
       }
@@ -525,22 +536,24 @@ export const CRM_ACTION_REGISTRY: Record<
     },
     handler: async (p) => {
       const auftragId = str(p, 'auftrag_id')
-      const { data: auftrag } = await supabaseAdmin
+      const { data: auftrag, error } = await supabaseAdmin
         .from('auftraege')
         .select('id, kunde_id, angebot_id')
         .eq('id', auftragId)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-registry:auftraege', error)
       if (!auftrag?.kunde_id) return { error: 'Auftrag/Kunde nicht gefunden' }
 
       let positionen = Array.isArray(p.positionen) ? p.positionen : null
       if (!positionen?.length) {
-        const { data: posRows } = await supabaseAdmin
+        const { data: posRows, error } = await supabaseAdmin
           .from('auftrag_positionen')
           .select(
             'id, leistung_name, beschreibung, menge, einheit, preis_kunde, gewerk_name, gewerk_slug, sort_order'
           )
           .eq('auftrag_id', auftragId)
           .order('sort_order', { ascending: true })
+        if (error) logDbError('lib/copilot/crm-registry:auftrag_positionen', error)
         positionen = (posRows ?? []).map((row) => ({
           id: row.id,
           name: row.leistung_name,
@@ -576,21 +589,23 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'assign_auftrag_handwerker_gewerk',
       kategorie: 'auftraege',
-      beschreibung: 'Handwerker einem Gewerk am Auftrag zuweisen',
+      beschreibung: 'Partner einem Gewerk am Auftrag zuweisen',
       params: ['auftrag_id', 'gewerk_id', 'handwerker_id', 'position_ids?'],
       bestaetigung: true,
     },
     preview: async (p) => {
-      const { data: hw } = await supabaseAdmin
+      const { data: hw, error } = await supabaseAdmin
         .from('handwerker')
         .select('name, firma')
         .eq('id', str(p, 'handwerker_id'))
         .maybeSingle()
-      const { data: gw } = await supabaseAdmin
+      if (error) logDbError('lib/copilot/crm-registry:handwerker', error)
+      const { data: gw, error: error2 } = await supabaseAdmin
         .from('gewerke')
         .select('name')
         .eq('id', str(p, 'gewerk_id'))
         .maybeSingle()
+      if (error2) logDbError('lib/copilot/crm-registry:gewerke', error2)
       return {
         vorschau: true,
         auftrag_id: str(p, 'auftrag_id'),
@@ -614,7 +629,7 @@ export const CRM_ACTION_REGISTRY: Record<
     meta: {
       id: 'assign_auftrag_handwerker_position',
       kategorie: 'auftraege',
-      beschreibung: 'Handwerker einer einzelnen Auftragsposition zuweisen',
+      beschreibung: 'Partner einer einzelnen Auftragsposition zuweisen',
       params: ['auftrag_id', 'position_id', 'handwerker_id'],
       bestaetigung: true,
     },
@@ -648,11 +663,12 @@ export const CRM_ACTION_REGISTRY: Record<
     },
     handler: async (p) => {
       const rechnungId = str(p, 'rechnung_id')
-      const { data: rec } = await supabaseAdmin
+      const { data: rec, error } = await supabaseAdmin
         .from('rechnungen')
         .select('kunden(email)')
         .eq('id', rechnungId)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-registry:rechnungen', error)
       const kunde = Array.isArray(rec?.kunden) ? rec?.kunden[0] : rec?.kunden
       const email = (kunde as { email?: string } | null)?.email?.trim()
       if (!email) return { error: 'Keine Kunden-E-Mail' }
@@ -698,6 +714,7 @@ export const CRM_ACTION_REGISTRY: Record<
       const existingId = optionalStr(p, 'id')
       if (existingId) {
         const { error } = await supabaseAdmin.from('kalender_termine').update(payload).eq('id', existingId)
+        if (error) logDbError('lib/copilot/crm-registry:kalender_termine', error)
         if (error) return { error: error.message }
         return { ok: true, id: existingId }
       }
@@ -706,6 +723,7 @@ export const CRM_ACTION_REGISTRY: Record<
         .insert(payload)
         .select('id')
         .single()
+      if (error) logDbError('lib/copilot/crm-registry:kalender_termine', error)
       if (error) return { error: error.message }
       return { ok: true, id: data.id }
     },
@@ -721,6 +739,7 @@ export const CRM_ACTION_REGISTRY: Record<
     handler: async (p) => {
       const id = str(p, 'id')
       const { error } = await supabaseAdmin.from('kalender_termine').delete().eq('id', id)
+      if (error) logDbError('lib/copilot/crm-registry:kalender_termine', error)
       if (error) return { error: error.message }
       return { ok: true }
     },
@@ -736,6 +755,7 @@ export const CRM_ACTION_REGISTRY: Record<
       const id = str(p, 'id')
       const erledigt = p.erledigt === true || p.erledigt === 'true'
       const { error } = await supabaseAdmin.from('kalender_termine').update({ erledigt }).eq('id', id)
+      if (error) logDbError('lib/copilot/crm-registry:kalender_termine', error)
       if (error) return { error: error.message }
       return { ok: true }
     },

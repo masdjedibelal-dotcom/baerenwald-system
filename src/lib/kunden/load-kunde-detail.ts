@@ -1,5 +1,5 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { normalizeAkutFallIds } from '@/lib/org/sofortmassnahme-faelle'
 import { kundeAuftraggeberLeadsEmbed, kundeLeadsEmbed } from '@/lib/supabase/lead-kunde-embed'
 import type { Kunde, KundenDokumentRow, KundenNotizRow, Lead, AuftragStatus } from '@/lib/types'
@@ -187,9 +187,7 @@ function isMissingKundeColumnError(error: { code?: string; message?: string } | 
 async function fetchKundeDetailRow(
   id: string
 ): Promise<{ data: KundeDetailPayload | null; error: { message: string } | null }> {
-  const full = await withCrmReadFallback(async (db) =>
-    db.from('kunden').select(KUNDE_DETAIL_SELECT).eq('id', id).maybeSingle()
-  )
+  const full = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_DETAIL_SELECT).eq('id', id).maybeSingle() })()
   if (!full.error) {
     return { data: (full.data as KundeDetailPayload | null) ?? null, error: null }
   }
@@ -208,9 +206,7 @@ async function fetchKundeDetailRow(
       if (msg.includes('akut_fall_ids')) {
         withoutOptional = withoutOptional.replace(/,?\s*akut_fall_ids/g, '')
       }
-      const midHm = await withCrmReadFallback(async (db) =>
-        db.from('kunden').select(withoutOptional).eq('id', id).maybeSingle()
-      )
+      const midHm = await (() => { const db = createClient(); return db.from('kunden').select(withoutOptional).eq('id', id).maybeSingle() })()
       if (!midHm.error) {
         return { data: (midHm.data as KundeDetailPayload | null) ?? null, error: null }
       }
@@ -220,9 +216,7 @@ async function fetchKundeDetailRow(
         '[loadKundeDetail] Spalte kleinreparaturen_ohne_angebot fehlt — Fallback ohne Flag:',
         full.error.message
       )
-      const mid = await withCrmReadFallback(async (db) =>
-        db.from('kunden').select(KUNDE_DETAIL_SELECT_WITHOUT_KLEINREPARATUREN).eq('id', id).maybeSingle()
-      )
+      const mid = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_DETAIL_SELECT_WITHOUT_KLEINREPARATUREN).eq('id', id).maybeSingle() })()
       if (!mid.error) {
         return { data: (mid.data as KundeDetailPayload | null) ?? null, error: null }
       }
@@ -235,9 +229,7 @@ async function fetchKundeDetailRow(
       '[loadKundeDetail] Optionale Spalten fehlen — Fallback ohne Org-Portal-Felder:',
       full.error.message
     )
-    const fallback = await withCrmReadFallback(async (db) =>
-      db.from('kunden').select(KUNDE_DETAIL_SELECT_BASE).eq('id', id).maybeSingle()
-    )
+    const fallback = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_DETAIL_SELECT_BASE).eq('id', id).maybeSingle() })()
     return {
       data: (fallback.data as KundeDetailPayload | null) ?? null,
       error: fallback.error ? { message: fallback.error.message } : null,
@@ -285,6 +277,7 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
         'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url, leistungsumfang, notizen'
       )
       .in('lead_id', leadIds)
+    if (eAng) logDbError('lib/kunden/load-kunde-detail:angebote', eAng)
     if (!eAng && angs) {
       for (const raw of angs as AngebotKurz[]) {
         if (raw.lead_id) {
@@ -412,10 +405,11 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
   )
   let notizen = notizenRaw
   if (notizUserIds.length > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles, error } = await supabase
       .from('user_profiles')
       .select('id, name')
       .in('id', notizUserIds)
+    if (error) logDbError('lib/kunden/load-kunde-detail:user_profiles', error)
     const nameById = new Map((profiles ?? []).map((p) => [p.id as string, (p.name as string) ?? '']))
     notizen = notizenRaw.map((n) => ({
       ...n,

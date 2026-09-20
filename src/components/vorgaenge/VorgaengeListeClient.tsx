@@ -1,18 +1,16 @@
 'use client'
+import { EMPTY } from '@/lib/crm-labels'
+import { C } from '@/lib/tokens/colors'
+
+import { ListBulkBar, MockBadge, MockBtn, MockChip, MockEmpty, MockIcon, MockInput, MockPager, MockSortHead } from '@/components/mock-ui'
+import { MockEntityRowMenu, MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import {
-  MockBadge,
-  MockBtn,
-  MockChip,
-  MockEmpty,
-  MockIcon,
-  MockModal,
-  MockPager,
-  MockSortHead,
-  ListBulkBar,
-} from '@/components/mock-ui'
+import { buildListReturnUrl } from '@/lib/list-return-url'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
@@ -38,14 +36,13 @@ import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
+import type { VorgaengeListePagination } from '@/lib/vorgang/load-vorgaenge-liste'
 import {
   berechneVorgaengeListenSumme,
   parseVorgangWertLabelEuro,
@@ -62,6 +59,8 @@ import {
   type HwEingangsrechnungListeRow,
   type HwRechnungStatus,
 } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
+import { formatEuro, formatNumber } from '@/lib/format/geld-datum'
+import { TOAST } from '@/lib/copy'
 
 /** Spec §3/§14: Alle · Anfrage · Angebot · Auftrag · Rechnung · Wartung & Pflege */
 const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung', 'bestand'] as const
@@ -96,7 +95,7 @@ function vorgaengeEmptyHint(opts: {
     if (phase === 'auftrag') {
       return 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
     }
-    if (phase === 'rechnung') return 'Keine Rechnungen in diesem Filter.'
+    if (phase === 'rechnung') return EMPTY.rechnungenFilter
     return 'Filter zurücksetzen oder anderen Phasen-Chip wählen.'
   }
   if (lifecycle === 'erledigt') return 'Filter zurücksetzen oder zu „Offen“ wechseln'
@@ -104,7 +103,7 @@ function vorgaengeEmptyHint(opts: {
     return 'Kein Vorgang in Phase Auftrag — nach Rechnungsstellung liegt der Vorgang unter Filter Rechnung.'
   }
   if (phase === 'rechnung') {
-    return 'Keine offenen Rechnungen — abgeschlossene Aufträge ohne Rechnung erscheinen hier automatisch.'
+    return EMPTY.rechnungenOffen
   }
   return 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
 }
@@ -267,6 +266,11 @@ export function VorgaengeListeClient({
   restrictHandwerkerId,
   restrictKundeId,
   restrictLeadIds,
+<<<<<<< Updated upstream
+  serverPagination = null,
+=======
+  listeTruncated = null,
+>>>>>>> Stashed changes
 }: {
   rows: VorgangListeRow[]
   /** Partner-Eingangsrechnungen (angebot_handwerker mit PDF) */
@@ -279,6 +283,13 @@ export function VorgaengeListeClient({
   restrictKundeId?: string
   /** Alternative: auf Lead-IDs einschränken (z. B. Melder + Auftraggeber). */
   restrictLeadIds?: string[]
+<<<<<<< Updated upstream
+  /** P3-3: echte DB-Seiten über crm_vorgaenge_lead_page (?seite=) */
+  serverPagination?: VorgaengeListePagination | null
+=======
+  /** P4-5: Hard-Limit-Hinweis wenn Liste abgeschnitten */
+  listeTruncated?: { shown: number; total: number } | null
+>>>>>>> Stashed changes
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -429,6 +440,9 @@ export function VorgaengeListeClient({
     } else {
       setLifecycle('offen')
     }
+    // N6 / Bugfix: /vorgaenge?q= aus URL lesen
+    const qParam = searchParams.get('q')
+    if (qParam !== null) setQuery(qParam)
   }, [embedded, searchParams])
 
   // Deep-Link alte Notification ?hw=<zuweisungId> → Rechnungs-Vorgang
@@ -527,7 +541,7 @@ export function VorgaengeListeClient({
         wertLabel:
           hw.betragBrutto == null
             ? null
-            : `${Math.round(hw.betragBrutto).toLocaleString('de-DE')} €`,
+            : `${formatEuro(hw.betragBrutto, { rounded: true, decimals: 0 })}`,
         listenSummeEuro:
           hw.betragBrutto == null ? null : Math.round(hw.betragBrutto),
         listeSummeZaehlen: true,
@@ -792,8 +806,8 @@ export function VorgaengeListeClient({
     setBulkDeleteOpen(false)
 
     if (!r.ok) {
-      toast.error(r.message, { id: loadingId })
-      router.refresh()
+      toast.dismiss(loadingId); toast.systemError(r)
+      afterServerActionRefresh()
       return
     }
 
@@ -820,20 +834,21 @@ export function VorgaengeListeClient({
                 const restored = snapshot.filter((s) => !keys.has(rowKey(s)))
                 return [...restored, ...prev]
               })
-              toast.success('Löschen rückgängig gemacht')
+              toast.success(TOAST.loeschen_rueckgaengig_gemacht)
             },
           },
         }
       )
-      router.refresh()
+      afterServerActionRefresh()
       return
     }
 
     toast.error(`${r.okCount} gelöscht, ${r.failCount} fehlgeschlagen`, { id: loadingId })
-    router.refresh()
+    afterServerActionRefresh()
   }, [bulkDeleteTargets, router, selectedRows])
 
   const paginationResetKey = `${lifecycle}|${filter}|${statusFilter.join(',')}|${query}|${sortCol}|${sortDir}`
+  const clientPageSize = serverPagination ? Math.max(filtered.length, 1) : 12
   const {
     pageItems,
     infiniteItems,
@@ -845,26 +860,64 @@ export function VorgaengeListeClient({
     total,
     pageSize,
     setPageIndex,
-  } = useListPage(filtered, 12, paginationResetKey)
+  } = useListPage(filtered, clientPageSize, paginationResetKey)
+
+  const serverPageIndex = serverPagination ? Math.max(0, serverPagination.page - 1) : pageIndex
+  const serverTotalPages = serverPagination?.totalPages ?? totalPages
+  const serverTotal = serverPagination?.totalLeads ?? total
+  const serverPageSize = serverPagination?.pageSize ?? pageSize
+
+  function goToServerPage(nextPage1Based: number) {
+    if (!serverPagination) {
+      setPageIndex(nextPage1Based - 1)
+      return
+    }
+    const params = new URLSearchParams(searchParams.toString())
+    if (nextPage1Based <= 1) params.delete('seite')
+    else params.set('seite', String(nextPage1Based))
+    const q = params.toString()
+    router.push(q ? `/vorgaenge?${q}` : '/vorgaenge')
+  }
 
   function openDetail(v: VorgangListeRow | string) {
+    const listReturn = (() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (query.trim()) params.set('q', query.trim())
+      else params.delete('q')
+      const qs = params.toString()
+      return qs ? `/vorgaenge?${qs}` : '/vorgaenge'
+    })()
     if (typeof v === 'string') {
       const href = v.trim()
       if (!href) {
-        toast.error('Kein Detail-Link vorhanden.')
+        toast.error(TOAST.kein_detail_link_vorhanden)
         return
       }
-      router.push(href)
+      router.push(buildListReturnUrl(listReturn, href))
       return
     }
     const href = v.detailHref?.trim()
     if (!href) {
-      toast.error('Kein Detail-Link vorhanden.')
+      toast.error(TOAST.kein_detail_link_vorhanden)
       return
     }
-    // Eingangsrechnung: detailHref ist /rechnungen/{id} oder Ensure-Deep-Link (?hw=)
-    router.push(href)
+    router.push(buildListReturnUrl(listReturn, href))
   }
+
+  // N6: q in URL spiegeln (nicht localStorage)
+  useEffect(() => {
+    if (embedded) return
+    const current = searchParams.get('q') ?? ''
+    if (current === query) return
+    const t = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (query.trim()) params.set('q', query.trim())
+      else params.delete('q')
+      const qs = params.toString()
+      router.replace(qs ? `/vorgaenge?${qs}` : '/vorgaenge', { scroll: false })
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [query, embedded, router, searchParams])
 
   const isMobile = useIsMobile()
   const displayItems = isMobile ? infiniteItems : pageItems
@@ -907,6 +960,16 @@ export function VorgaengeListeClient({
 
   const filterResultCount = filtered.length
 
+  const filterSecondary = {
+    label: 'Zurücksetzen',
+    onClick: resetFilters,
+    kind: 'ghost' as const,
+  }
+  const filterPrimary = {
+    label: `Anwenden (${filterResultCount})`,
+    onClick: () => setFilterOpen(false),
+  }
+
   const filterFooter = (
     <div className="sheet-footer-actions">
       <MockBtn kind="ghost" onClick={resetFilters}>
@@ -923,36 +986,18 @@ export function VorgaengeListeClient({
       <div className="form-section-h">Suche</div>
       <div className="input" style={{ marginBottom: 16 }}>
         <MockIcon ctx="default" n="search" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={
-            showHwEingang
+        <MockInput type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={showHwEingang
               ? 'Partner, Auftrag, IBAN …'
-              : 'Kunde, Vorgang, Ort, Nummer…'
-          }
-          autoFocus={!isMobile}
-        />
+              : 'Kunde, Vorgang, Ort, Nummer…'} autoFocus={!isMobile} />
       </div>
       <div className="form-grid" style={{ marginBottom: 16 }}>
         <label className="field">
           <span className="field-lbl">{showHwEingang ? 'Partner / Kunde' : 'Kunde'}</span>
-          <input
-            className="txt"
-            value={fKunde}
-            onChange={(e) => setFKunde(e.target.value)}
-            placeholder="Name enthält…"
-          />
+          <MockInput className="txt" value={fKunde} onChange={(e) => setFKunde(e.target.value)} placeholder="Name enthält…" />
         </label>
         <label className="field">
           <span className="field-lbl">{showHwEingang ? 'Auftrag' : 'Vorgang'}</span>
-          <input
-            className="txt"
-            value={fTitel}
-            onChange={(e) => setFTitel(e.target.value)}
-            placeholder="Titel enthält…"
-          />
+          <MockInput className="txt" value={fTitel} onChange={(e) => setFTitel(e.target.value)} placeholder="Titel enthält…" />
         </label>
       </div>
       <div className="form-section-h">Phase</div>
@@ -994,24 +1039,10 @@ export function VorgaengeListeClient({
       <FilterRangeRow
         title="Wert (€)"
         von={
-          <input
-            className="txt"
-            type="number"
-            value={fWertVon}
-            onChange={(e) => setFWertVon(e.target.value)}
-            placeholder="0"
-            inputMode="decimal"
-          />
+          <MockInput className="txt" type="number" value={fWertVon} onChange={(e) => setFWertVon(e.target.value)} placeholder="0" inputMode="decimal" />
         }
         bis={
-          <input
-            className="txt"
-            type="number"
-            value={fWertBis}
-            onChange={(e) => setFWertBis(e.target.value)}
-            placeholder="—"
-            inputMode="decimal"
-          />
+          <MockInput className="txt" type="number" value={fWertBis} onChange={(e) => setFWertBis(e.target.value)} placeholder="—" inputMode="decimal" />
         }
       />
       <FilterRangeRow
@@ -1043,28 +1074,20 @@ export function VorgaengeListeClient({
       role="group"
       aria-label="Lebenszyklus"
     >
-      <button
-        type="button"
-        className={cn(
+      <MockBtn className={cn(
           'segment-toggle-btn',
           lifecycle === 'offen' && 'segment-toggle-btn--active'
-        )}
-        onClick={() => setLifecycleFilter('offen')}
-      >
+        )} type="button" onClick={() => setLifecycleFilter('offen')}>
         Offen{' '}
         <span className="segment-toggle-count">{effectiveLifecycleCounts.offen}</span>
-      </button>
-      <button
-        type="button"
-        className={cn(
+      </MockBtn>
+      <MockBtn className={cn(
           'segment-toggle-btn',
           lifecycle === 'erledigt' && 'segment-toggle-btn--active'
-        )}
-        onClick={() => setLifecycleFilter('erledigt')}
-      >
+        )} type="button" onClick={() => setLifecycleFilter('erledigt')}>
         Erledigt{' '}
         <span className="segment-toggle-count">{effectiveLifecycleCounts.erledigt}</span>
-      </button>
+      </MockBtn>
     </div>
   )
 
@@ -1115,7 +1138,7 @@ export function VorgaengeListeClient({
               </>
             ) : null}
           </div>
-          <ListbarActionsMenu
+          <MockListbarChrome
             title="Listen-Aktionen"
             activeHint={activeFilterCount}
             directOpen={() => setFilterOpen(true)}
@@ -1176,6 +1199,19 @@ export function VorgaengeListeClient({
         ) : null}
       </div>
 
+<<<<<<< Updated upstream
+      {serverPagination && serverPagination.totalLeads > 0 ? (
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
+          Seite {serverPagination.page} von {serverPagination.totalPages}:{' '}
+          {filtered.length} von {serverPagination.totalLeads} Vorgängen angezeigt
+=======
+      {listeTruncated && listeTruncated.total > listeTruncated.shown ? (
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
+          {listeTruncated.shown} von {listeTruncated.total} Vorgängen angezeigt
+>>>>>>> Stashed changes
+        </p>
+      ) : null}
+
       {isMobile ? (
         <MobileListFilterSheet
           open={filterOpen}
@@ -1186,16 +1222,16 @@ export function VorgaengeListeClient({
           {filterFields}
         </MobileListFilterSheet>
       ) : (
-        <MockModal
+        <EditorSheet
           open={filterOpen}
           onClose={() => setFilterOpen(false)}
-          icon="filter"
           title="Filter & Suchen"
-          sub="Vorgänge eingrenzen"
-          footer={filterFooter}
+          subtitle="Vorgänge eingrenzen"
+          secondary={filterSecondary}
+          primary={filterPrimary}
         >
           {filterFields}
-        </MockModal>
+        </EditorSheet>
       )}
 
       {selectedCount > 0 ? (
@@ -1213,36 +1249,25 @@ export function VorgaengeListeClient({
         />
       ) : null}
 
-      <MockModal
+      <ConfirmPopup
         open={bulkDeleteOpen}
         onClose={() => {
           if (!bulkDeletePending) setBulkDeleteOpen(false)
         }}
-        icon="trash"
         title={
           selectedRows.length === 1
             ? 'Vorgang löschen?'
             : `${selectedRows.length} Vorgänge löschen?`
         }
-        sub="Dauerhaft entfernen — Kunde bleibt erhalten."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending || selectedRows.length === 0}
-              onClick={() => void runBulkDelete()}
-            >
-              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={bulkDeletePending}
+        confirmLabel={bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+        confirmDisabled={selectedRows.length === 0}
+        onConfirm={() => void runBulkDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Dauerhaft entfernen — Kunde bleibt erhalten.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {bulkDeletePending ? (
             'Bitte warten…'
@@ -1276,9 +1301,9 @@ export function VorgaengeListeClient({
             </>
           )}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
-      <PullToRefresh onRefresh={() => router.refresh()}>
+      <PullToRefresh onRefresh={() => afterServerActionRefresh()}>
       <div
         className="listcard listcard--cols vg-selectmode"
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
@@ -1419,7 +1444,7 @@ export function VorgaengeListeClient({
               else if (v.phase === 'auftrag' || v.entityType === 'auftrag') {
                 runDuplicateAuftrag(v.entityId, router)
               } else if (v.phase === 'rechnung') runDuplicateRechnung(v.entityId, router)
-              else toast.info('Kopieren für diesen Typ noch nicht verfügbar')
+              else toast.info(TOAST.kopieren_fuer_diesen_typ_noch_nicht_verfuegbar)
             }
             const edit = () => openDetail(v)
             const rowMenu: EntityMenuItem[] = [
@@ -1464,25 +1489,19 @@ export function VorgaengeListeClient({
                     style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
                   >
                     {hasKette ? (
-                      <button
-                        type="button"
-                        className="vg-kette-toggle"
-                        aria-expanded={open}
-                        aria-label={open ? 'Kette zuklappen' : 'Kette aufklappen'}
-                        onClick={(e) => {
+                      <MockBtn className="vg-kette-toggle" type="button" aria-expanded={open} aria-label={open ? 'Kette zuklappen' : 'Kette aufklappen'} onClick={(e) => {
                           e.stopPropagation()
                           setKetteOpen((prev) => ({
                             ...prev,
                             [group.rootId]: !open,
                           }))
-                        }}
-                      >
+                        }}>
                         <MockIcon
                           ctx="default"
                           n={open ? 'chevron-down' : 'chevron-right'}
                           size={14}
                         />
-                      </button>
+                      </MockBtn>
                     ) : null}
                     <div className={cn('t', ersetzt && 'vg-title--ersetzt')} title={v.titel}>
                       {hasKette && group.pending ? group.label : v.titel}
@@ -1537,7 +1556,7 @@ export function VorgaengeListeClient({
                           width: 8,
                           height: 8,
                           borderRadius: 999,
-                          background: 'var(--danger, #c0392b)',
+                          background: `var(--danger, ${C.redTx3})`,
                           display: 'inline-block',
                           flexShrink: 0,
                         }}
@@ -1677,11 +1696,7 @@ export function VorgaengeListeClient({
             <div className="vg-aggregate__sum">
               <span>Summe</span>
               <b>
-                {berechneVorgaengeListenSumme(filtered).toLocaleString('de-DE', {
-                  style: 'currency',
-                  currency: 'EUR',
-                  maximumFractionDigits: 0,
-                })}
+                {formatNumber(berechneVorgaengeListenSumme(filtered), { decimals: 0 })}
               </b>
             </div>
             {selectedCount > 0 ? (
@@ -1694,20 +1709,23 @@ export function VorgaengeListeClient({
 
       {isMobile ? (
         <ListInfiniteSentinel
-          hasMore={hasMore}
-          onLoadMore={loadMore}
-          shown={visibleCount}
-          total={total}
+          hasMore={serverPagination ? serverPageIndex + 1 < serverTotalPages : hasMore}
+          onLoadMore={() => {
+            if (serverPagination) goToServerPage(serverPagination.page + 1)
+            else loadMore()
+          }}
+          shown={serverPagination ? Math.min((serverPageIndex + 1) * serverPageSize, serverTotal) : visibleCount}
+          total={serverTotal}
           unit="Vorgänge"
         />
       ) : (
         <MockPager
-          pageIndex={pageIndex}
-          totalPages={totalPages}
-          total={total}
-          pageSize={pageSize}
+          pageIndex={serverPageIndex}
+          totalPages={serverTotalPages}
+          total={serverTotal}
+          pageSize={serverPageSize}
           unit="Vorgänge"
-          onPageChange={(p) => setPageIndex(p - 1)}
+          onPageChange={(p) => goToServerPage(p)}
         />
       )}
     </div>

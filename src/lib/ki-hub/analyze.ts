@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import type Anthropic from '@anthropic-ai/sdk'
 import {
   createAnthropicClient,
@@ -283,6 +284,7 @@ export async function runKiHubAnalyze(
     }))
 
     const { error } = await supabaseAdmin.from('ki_empfehlungen').insert(rows)
+    if (error) logDbError('lib/ki-hub/analyze:ki_empfehlungen', error)
     if (error) return { ok: false, message: error.message }
 
     const empfehlungen = await loadEmpfehlungenFuerLauf(analyseLauf)

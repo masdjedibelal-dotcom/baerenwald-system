@@ -1,6 +1,6 @@
+import { revalidateLeadDetail } from '@/lib/crm-revalidate'
 import 'server-only'
 
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
@@ -35,5 +35,5 @@ export async function logLeadEmailTimelineEvent(input: {
   if (!tl.ok) {
     console.warn('[logLeadEmailTimelineEvent]', tl.message)
   }
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
 }

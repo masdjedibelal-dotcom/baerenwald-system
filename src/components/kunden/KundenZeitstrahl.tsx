@@ -4,13 +4,7 @@ import Link from 'next/link'
 import { useMemo } from 'react'
 import { LinkChevron } from '@/components/ui/LinkChevron'
 import { ZeitstrahlTypIcon } from '@/components/ui/ZeitstrahlTypIcon'
-import {
-  ANGEBOT_STATUS_LABELS,
-  AUFTRAG_STATUS_LABELS,
-  STATUS_LABELS,
-  formatDatum,
-  formatPreis,
-} from '@/lib/utils'
+import { ANGEBOT_STATUS_LABELS, AUFTRAG_STATUS_LABELS, STATUS_LABELS, formatDatum, formatMonatJahr, formatPreis } from '@/lib/utils'
 import { sortByDateFieldAsc } from '@/lib/timeline-sort'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 
@@ -112,7 +106,7 @@ export function KundenZeitstrahl({ kunde }: { kunde: KundeDetailPayload }) {
   const gruppen = useMemo(() => {
     const acc: Record<string, ZeitstrahlEintrag[]> = {}
     for (const e of eintraege) {
-      const key = new Date(e.datum).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+      const key = formatMonatJahr(e.datum)
       if (!acc[key]) acc[key] = []
       acc[key].push(e)
     }

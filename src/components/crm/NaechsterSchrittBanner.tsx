@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
 import type { NaechsterSchrittHint } from '@/lib/crm/naechster-schritt'
 import { cn } from '@/lib/utils'
@@ -23,12 +24,12 @@ export function NextStepBar({
     <div className={cn('next-step-bar', className)} role="status">
       {step ? (
         onStepClick ? (
-          <button type="button" className="next-step-bar__main next-step-bar__main--btn" onClick={onStepClick}>
+          <MockBtn className="next-step-bar__main next-step-bar__main--btn" type="button" onClick={onStepClick}>
             <span className="next-step-bar__label">{step.label}</span>
             {step.hint?.trim() ? (
               <span className="next-step-bar__hint">{step.hint}</span>
             ) : null}
-          </button>
+          </MockBtn>
         ) : (
           <div className="next-step-bar__main">
             <span className="next-step-bar__label">{step.label}</span>

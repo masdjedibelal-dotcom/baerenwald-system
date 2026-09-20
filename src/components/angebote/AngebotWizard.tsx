@@ -1,7 +1,11 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
+import { MockSegment } from '@/components/mock-ui/MockSegment'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMailPreview'
 import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
@@ -18,13 +22,7 @@ import {
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
-import { MockField } from '@/components/mock-ui/MockForm'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
-import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
-import { Check, FileText, Send } from 'lucide-react'
-import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KundeModal } from '@/components/kunden/KundeModal'
@@ -39,7 +37,6 @@ import {
   versandFolgtKontakt,
 } from '@/components/crm/KundenVersandEmailField'
 import { DateInput } from '@/components/ui/DateInput'
-import { Modal } from '@/components/ui/Modal'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
 import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
@@ -125,6 +122,7 @@ import {
   isDefaultAngebotEinleitung,
   parseAngebotMailFullTextFromEditor,
 } from '@/lib/templates/angebot-mail'
+import { buildSubject } from '@/lib/mail/build-subject'
 import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
 import type {
@@ -137,8 +135,11 @@ import type {
   LeadDetail,
   Preisliste,
 } from '@/lib/types'
-import { BEREICH_LABELS, cn, formatDatum } from '@/lib/utils'
-import type { ZahlfristSeg } from '@/lib/zahlfrist'
+import { BEREICH_LABELS, formatDatum } from '@/lib/utils'
+import { ZAHLFRIST_SEG_OPTIONS, type ZahlfristSeg } from '@/lib/zahlfrist'
+import { COPY_BUTTON, TOAST } from '@/lib/copy'
+import type { DocCanvasGap, DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function kundenName(lead: LeadDetail) {
   return leadKontaktAnzeigeName(lead)
@@ -181,9 +182,9 @@ function projektLabel(lead: LeadDetail) {
 }
 
 /**
- * Angebots-Wizard — DocumentCanvas 1:1 Mock:
+ * Angebots-Wizard — DocumentCanvas:
  * links Positionen + Summen, rechts Meta-Crows → Sheets (Kunde/Dokument/Zahlung/Versand),
- * Header: Vorschau · ✓ (Popover Speichern/Senden); X schließt (kein Footer-DocBar).
+ * Header: nur Vorschau; Footer: Entwurf speichern + Angebot senden (Prüfliste/Gliederung).
  */
 export function AngebotWizard({
   lead,
@@ -225,8 +226,8 @@ export function AngebotWizard({
   onSaved?: (angebotId: string) => void
 }) {
   void _handwerker
-  const router = useRouter()
   const firm = firmProp ?? defaultFirmenEinstellungen()
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [leadState, setLeadState] = useState(lead)
 
   const name = kundenName(leadState)
@@ -399,7 +400,7 @@ export function AngebotWizard({
   const wizardTitel = istNachtrag ? 'Nachtrag' : 'Angebot'
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
-  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
   const savedSnapshotRef = useRef<string | null>(null)
   const draftSnapshotRef = useRef('')
   /** Lead, der in dieser Direkt-Angebot-Session angelegt wurde (für Abbruch-Cleanup). */
@@ -582,11 +583,16 @@ export function AngebotWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional open sync
   }, [sheet])
 
-  const defaultMailBetreff = `Ihr Angebot — ${meta.titel.trim() || projekt}`
+  const defaultMailBetreff = buildSubject({
+    objekt: meta.titel.trim() || projekt,
+    ereignis: 'Angebot bereit',
+  })
   useEffect(() => {
     setMailBetreff((prev) => {
       if (!prev.trim()) return defaultMailBetreff
-      if (prev.startsWith('Ihr Angebot — ')) return defaultMailBetreff
+      if (prev.startsWith('Ihr Angebot — ') || prev.includes(' – Angebot bereit')) {
+        return defaultMailBetreff
+      }
       return prev
     })
   }, [defaultMailBetreff])
@@ -763,12 +769,12 @@ export function AngebotWizard({
     const existing = leadState.id?.trim()
     if (existing) return existing
     if (!deferredLeadCreate) {
-      toast.error('Keine Anfrage verknüpft.')
+      toast.error(TOAST.keine_anfrage_verknuepft_2)
       return null
     }
     const kid = leadVertragsKundeId(leadState)?.trim()
     if (!kid) {
-      toast.error('Kein Kunde verknüpft — Anfrage kann nicht angelegt werden.')
+      toast.error(TOAST.kein_kunde_verknuepft_anfrage_kann_nicht_angeleg)
       return null
     }
     const r = await createAnfrageFuerKunde(kid, {
@@ -825,22 +831,22 @@ export function AngebotWizard({
   const persistDraft = useCallback(
     async (opts?: { notify?: boolean; manageBusy?: boolean }): Promise<string | null> => {
       if (!kundeId) {
-        toast.error('Kein Kunde verknüpft — Angebot kann nicht gespeichert werden.')
+        toast.error(TOAST.kein_kunde_verknuepft_angebot_kann_nicht_gespeic)
         return null
       }
       const titelOk =
         meta.titel.trim() || meta.leistungsumfang.trim() || projekt.trim()
       if (!titelOk) {
-        toast.error('Bitte einen Angebotstitel angeben.')
+        applyFieldErrors({ _form: TOAST.bitte_einen_angebotstitel_angeben })
         return null
       }
       const artikelA = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikelA.length) {
-        toast.error('Mindestens eine Artikel-Position erforderlich.')
+        toast.error(TOAST.mindestens_eine_artikel_position_erforderlich)
         return null
       }
       if (artikelA.some((z) => !z.bezeichnung.trim())) {
-        toast.error('Bitte bei allen Artikel-Positionen eine Bezeichnung eintragen.')
+        applyFieldErrors({ _form: TOAST.bitte_bei_allen_artikel_positionen_eine_bezeichn })
         return null
       }
 
@@ -891,7 +897,10 @@ export function AngebotWizard({
           )
           // Speichern fehlgeschlagen → frisch angelegten Träger wieder entfernen
           if (deferredLeadCreate && sessionCreatedLeadRef.current === leadId && !angebotId) {
-            await discardOrphanDirektAngebotLead(leadId).catch(() => undefined)
+            await discardOrphanDirektAngebotLead(leadId).catch((err) => {
+              console.error('[AngebotWizard] discardOrphanDirektAngebotLead (save fail)', err)
+              return undefined
+            })
             sessionCreatedLeadRef.current = null
             setLeadState((prev) => ({ ...prev, id: '' }))
           }
@@ -930,6 +939,7 @@ export function AngebotWizard({
         setMeta(metaPersist)
         savedSnapshotRef.current = draftSnapshotRef.current
         setDraftDirty(false)
+        setLastSavedAt(Date.now())
         onSaved?.(res.angebotId)
         if (opts?.notify) {
           const bereitsGesendet = Boolean(bootstrap?.bereitsGesendet)
@@ -949,14 +959,17 @@ export function AngebotWizard({
         }
         return res.angebotId
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+        toast.systemError(e, 'ui', 'Speichern fehlgeschlagen.')
         if (
           deferredLeadCreate &&
           sessionCreatedLeadRef.current &&
           !angebotId
         ) {
           const orphan = sessionCreatedLeadRef.current
-          await discardOrphanDirektAngebotLead(orphan).catch(() => undefined)
+          await discardOrphanDirektAngebotLead(orphan).catch((err) => {
+            console.error('[AngebotWizard] discardOrphanDirektAngebotLead (abort)', err)
+            return undefined
+          })
           sessionCreatedLeadRef.current = null
           setLeadState((prev) => ({ ...prev, id: '' }))
         }
@@ -1011,7 +1024,7 @@ export function AngebotWizard({
   async function openVorschauSheet() {
     const id = await ensureDraftForPreview()
     if (!id) {
-      toast.error('Entwurf prüfen')
+      toast.error(TOAST.entwurf_pruefen)
     }
     setSheet('vorschau')
   }
@@ -1046,7 +1059,6 @@ export function AngebotWizard({
   }
 
   async function closeWizardClean() {
-    setCloseConfirmOpen(false)
     setKundeEditOpen(false)
     setFotoLightboxUrl(null)
     setSheet(null)
@@ -1058,7 +1070,6 @@ export function AngebotWizard({
     if (saving) return
     const id = await persistDraft({ notify: true })
     if (!id) return
-    setCloseConfirmOpen(false)
     setKundeEditOpen(false)
     setFotoLightboxUrl(null)
     setSheet(null)
@@ -1067,16 +1078,6 @@ export function AngebotWizard({
       auftragKorrektur: istAuftragKorrektur || undefined,
     })
     onClose()
-    router.refresh()
-  }
-
-  function handleRequestClose() {
-    if (saving) return
-    if (!draftDirty) {
-      void closeWizardClean()
-      return
-    }
-    setCloseConfirmOpen(true)
   }
 
   async function handleFinishSpeichern() {
@@ -1090,7 +1091,6 @@ export function AngebotWizard({
       auftragKorrektur: istAuftragKorrektur || undefined,
     })
     onClose()
-    router.refresh()
   }
 
   async function handleFinishVersenden() {
@@ -1101,7 +1101,7 @@ export function AngebotWizard({
           ? [sheetEmail]
           : []
     if (!recipients.length) {
-      toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
+      toast.error(TOAST.keine_kunden_e_mail_bitte_unter_versand_ergaenze)
       setSheet('versand')
       return
     }
@@ -1144,9 +1144,8 @@ export function AngebotWizard({
         auftragKorrektur: istAuftragKorrektur || undefined,
       })
       onClose()
-      router.refresh()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Versand fehlgeschlagen.')
+      toast.systemError(e, 'ui', 'Versand fehlgeschlagen.')
     } finally {
       setSaving(false)
     }
@@ -1170,7 +1169,6 @@ export function AngebotWizard({
     })
     setProjektbeschreibung((prev) => syncProjektTitelInBeschreibung(prev, oldTitel, v))
   }
-
 
   if (!mounted) return null
 
@@ -1207,42 +1205,44 @@ export function AngebotWizard({
         : undefined
 
   const headerEnd = (
-    <>
-      <button
-        type="button"
-        className="editor-sheet__icon-btn"
-        disabled={saving}
-        onClick={() => void openVorschauSheet()}
-        aria-label="Vorschau"
-        title="Vorschau"
-      >
-        <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-      </button>
-      <button
-        type="button"
-        className="editor-sheet__icon-btn"
-        disabled={saving}
-        onClick={() => void handleFinishVersenden()}
-        aria-label="E-Mail senden"
-        title="E-Mail senden"
-      >
-        <Send className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-      </button>
-      <button
-        type="button"
-        className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-        disabled={saving}
-        onClick={() => {
-          if (saving) return
-          void handleFinishSpeichern()
-        }}
-        aria-label={saving ? 'Speichern…' : 'Als Entwurf speichern'}
-        title={saving ? 'Speichern…' : 'Als Entwurf speichern'}
-      >
-        <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-      </button>
-    </>
+    <MockBtn
+      className="editor-sheet__icon-btn"
+      type="button"
+      disabled={saving}
+      onClick={() => void openVorschauSheet()}
+      aria-label="Vorschau"
+      title="Vorschau"
+    >
+      <MockIcon n="file-text" ctx="row" className="h-5 w-5" aria-hidden />
+    </MockBtn>
   )
+
+  const hatLeistungszeile = zeilen.some(
+    (z) => z.typ === 'artikel' && z.bezeichnung.trim()
+  )
+  const kundeComplete = Boolean(kundeId?.trim()) || Boolean(crowKundeValue?.trim())
+  const zahlungComplete =
+    zahlfristSeg !== 'datum' || Boolean(zahlfristDatum.trim())
+  const versandComplete =
+    mailTo.some((e) => isValidEmail(e)) || Boolean(sheetEmail && isValidEmail(sheetEmail))
+
+  const canvasSections: DocCanvasSection[] = [
+    { id: 'kunde', label: 'Kunde', complete: kundeComplete },
+    { id: 'positionen', label: 'Positionen', complete: hatLeistungszeile },
+    { id: 'zahlung', label: 'Zahlung', complete: zahlungComplete },
+    { id: 'versand', label: 'Versand', complete: versandComplete },
+  ]
+
+  function getAngebotSendGaps(): DocCanvasGap[] {
+    const gaps: DocCanvasGap[] = []
+    if (!kundeId?.trim()) gaps.push({ id: 'kunde', label: 'Kunde' })
+    if (!hatLeistungszeile) gaps.push({ id: 'positionen', label: 'mindestens 1 Position' })
+    if (zahlfristSeg === 'datum' && !zahlfristDatum.trim()) {
+      gaps.push({ id: 'zahlung', label: 'Zahlungsziel' })
+    }
+    if (!versandComplete) gaps.push({ id: 'versand', label: 'E-Mail' })
+    return gaps
+  }
 
   const documentColumn = (
     <div className="dc-doc flex flex-col gap-4">
@@ -1254,26 +1254,28 @@ export function AngebotWizard({
           />
         </div>
       ) : null}
-      <PosBoard
-        title={angebotTitel || 'Angebot'}
-        positionen={posBoardLines}
-        onChange={onPosBoardChange}
-        showUst
-        showTotals={false}
-        gewerke={gewerkNamen}
-        preislisten={preislisten}
-        hideAddGewerk={dokumentTyp === 'einfach'}
-        suggestContext={istAuftragKorrektur ? null : posSuggestContext}
-        badgeOf={(p) =>
-          p.regieSchein
-            ? { kind: 'warn', icon: 'paperclip', label: 'nach Aufwand' }
-            : p.kind === 'freitext'
-              ? { kind: 'neutral', icon: 'align-left', label: 'Freitext' }
-              : p.kind === 'nachlass'
-                ? { kind: 'warn', icon: 'percent', label: 'Nachlass' }
-                : null
-        }
-      />
+      <div data-doc-section="positionen">
+        <PosBoard
+          title={angebotTitel || 'Angebot'}
+          positionen={posBoardLines}
+          onChange={onPosBoardChange}
+          showUst
+          showTotals={false}
+          gewerke={gewerkNamen}
+          preislisten={preislisten}
+          hideAddGewerk={dokumentTyp === 'einfach'}
+          suggestContext={istAuftragKorrektur ? null : posSuggestContext}
+          badgeOf={(p) =>
+            p.regieSchein
+              ? { kind: 'warn', icon: 'paperclip', label: 'nach Aufwand' }
+              : p.kind === 'freitext'
+                ? { kind: 'neutral', icon: 'align-left', label: 'Freitext' }
+                : p.kind === 'nachlass'
+                  ? { kind: 'warn', icon: 'percent', label: 'Nachlass' }
+                  : null
+          }
+        />
+      </div>
 
       <TotBand
         className="totband--green"
@@ -1292,20 +1294,28 @@ export function AngebotWizard({
 
   const metaColumn = (
     <div className="dc-meta-stack">
-      <MetaCrowButton label="Kunde" value={crowKundeValue} onClick={() => setSheet('kunde')} />
+      <MetaCrowButton
+        label="Kunde"
+        value={crowKundeValue}
+        sectionId="kunde"
+        onClick={() => setSheet('kunde')}
+      />
       <MetaCrowButton
         label="Dokument"
         value={dokumentCrowValue}
+        sectionId="dokument"
         onClick={() => setSheet('dokument')}
       />
       <MetaCrowButton
         label="Zahlung"
         value={zahlungCrowValue}
+        sectionId="zahlung"
         onClick={() => setSheet('zahlung')}
       />
       <MetaCrowButton
         label="Versand"
         value={versandCrowValue}
+        sectionId="versand"
         onClick={() => setSheet('versand')}
       />
     </div>
@@ -1322,7 +1332,12 @@ export function AngebotWizard({
       <DocumentCanvas
         title={wizardTitel}
         subtitle={wizardSubtitle}
-        onClose={handleRequestClose}
+        onClose={() => {
+          void closeWizardClean()
+        }}
+        onSaveDraftClose={() => {
+          void handleSaveDraftAndClose()
+        }}
         headerEnd={headerEnd}
         busy={saving}
         busyLabel="Bitte warten…"
@@ -1331,6 +1346,24 @@ export function AngebotWizard({
         className="wizard-flow"
         manageHistory={false}
         draftDirty={draftDirty}
+        lastSavedAt={lastSavedAt}
+        sections={canvasSections}
+        draftAction={{
+          onClick: () => {
+            if (saving) return
+            void handleFinishSpeichern()
+          },
+          busy: saving,
+        }}
+        primaryAction={{
+          label: COPY_BUTTON.angebotSenden,
+          onClick: () => {
+            if (saving) return
+            void handleFinishVersenden()
+          },
+          busy: saving,
+          getGaps: getAngebotSendGaps,
+        }}
       />
 
       <EditorSheet
@@ -1343,17 +1376,13 @@ export function AngebotWizard({
         }
         headerEnd={
           kundeZumBearbeiten ? (
-            <button
-              type="button"
-              className="editor-sheet__confirm-text"
-              onClick={() => setKundeEditOpen(true)}
-            >
+            <MockBtn className="editor-sheet__confirm-text" type="button" onClick={() => setKundeEditOpen(true)}>
               Bearbeiten
-            </button>
+            </MockBtn>
           ) : null
         }
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="gfc">
           <div className="gfc-row">
@@ -1367,10 +1396,7 @@ export function AngebotWizard({
             </div>
           ) : null}
           <MockField label="Ansprechpartner" full>
-            <select
-              className="sel sel--choice"
-              value={ansprechpartnerId ?? ''}
-              onChange={(e) => {
+            <MockSelect className="sel sel--choice" value={ansprechpartnerId ?? ''} onChange={(e) => {
                 const next = e.target.value.trim() || null
                 const prevKontakt = sheetEmail
                 setMeta((m) => ({ ...m, ansprechpartner_id: next }))
@@ -1389,9 +1415,7 @@ export function AngebotWizard({
                   return []
                 })
                 setDraftDirty(true)
-              }}
-              disabled={!(hvKundeId || kundeId)}
-            >
+              }} disabled={!(hvKundeId || kundeId)}>
               <option value="">Hauptansprechpartner</option>
               {apRows.map((ap) => (
                 <option key={ap.id} value={ap.id}>
@@ -1401,7 +1425,7 @@ export function AngebotWizard({
                   {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </MockField>
           <KundenVersandEmailField
             apRows={apRows}
@@ -1494,9 +1518,11 @@ export function AngebotWizard({
         title="Dokument"
         context="canvas"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="form-grid form-grid--sheet">
+        {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+        
           <SheetEditableField
             label="Projekt-Titel"
             value={meta.leistungsumfang}
@@ -1524,40 +1550,24 @@ export function AngebotWizard({
               <div className="wizard-dok-fotos__grid">
                 {projektFotos.map((f) => (
                   <div key={f.url} className="wizard-dok-fotos__item">
-                    <button
-                      type="button"
-                      className="wizard-dok-fotos__thumb"
-                      onClick={() => setFotoLightboxUrl(f.url)}
-                      aria-label="Foto vergrößern"
-                    >
+                    <MockBtn className="wizard-dok-fotos__thumb" type="button" onClick={() => setFotoLightboxUrl(f.url)} aria-label="Foto vergrößern">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={f.url} alt="" />
-                    </button>
-                    <button
-                      type="button"
-                      className="wizard-dok-fotos__remove"
-                      title="Entfernen"
-                      aria-label="Foto entfernen"
-                      onClick={() => {
+                    </MockBtn>
+                    <MockBtn className="wizard-dok-fotos__remove" type="button" title="Löschen" aria-label="Foto löschen" onClick={() => {
                         setProjektFotos((prev) => prev.filter((x) => x.url !== f.url))
                         if (fotoLightboxUrl === f.url) setFotoLightboxUrl(null)
-                      }}
-                    >
+                      }}>
                       <MockIcon ctx="default" n="trash" size={12} />
-                    </button>
+                    </MockBtn>
                   </div>
                 ))}
               </div>
             ) : null}
-            <button
-              type="button"
-              className="wizard-dok-fotos__upload"
-              disabled={projektUploading || saving}
-              onClick={() => fotoInputRef.current?.click()}
-            >
+            <MockBtn className="wizard-dok-fotos__upload" type="button" disabled={projektUploading || saving} onClick={() => fotoInputRef.current?.click()}>
               <MockIcon ctx="default" n="plus" size={16} />
               <span>{projektUploading ? 'Wird hochgeladen…' : 'Fotos hinzufügen'}</span>
-            </button>
+            </MockBtn>
             <input
               ref={fotoInputRef}
               type="file"
@@ -1571,11 +1581,11 @@ export function AngebotWizard({
               }}
             />
           </div>
-          <Modal
+          <EditorSheet
             open={Boolean(fotoLightboxUrl)}
             onClose={() => setFotoLightboxUrl(null)}
             title="Foto"
-            size="xl"
+            size="lg"
           >
             {fotoLightboxUrl ? (
               <div className="wizard-dok-fotos__lightbox">
@@ -1583,27 +1593,18 @@ export function AngebotWizard({
                 <img src={fotoLightboxUrl} alt="Foto" />
                 <label className="wizard-dok-fotos__lightbox-cap">
                   <span>Beschreibung (optional)</span>
-                  <textarea
-                    className="input ta"
-                    rows={3}
-                    placeholder="z. B. Istzustand…"
-                    value={
-                      projektFotos.find((x) => x.url === fotoLightboxUrl)?.beschreibung ?? ''
-                    }
-                    onChange={(e) =>
+                  <MockTextarea className="ta" rows={3} placeholder="z. B. Istzustand…" value={projektFotos.find((x) => x.url === fotoLightboxUrl)?.beschreibung ?? ''} onChange={(e) =>
                       setProjektFotos((prev) =>
                         prev.map((x) =>
                           x.url === fotoLightboxUrl
                             ? { ...x, beschreibung: e.target.value }
                             : x
                         )
-                      )
-                    }
-                  />
+                      )} />
                 </label>
               </div>
             ) : null}
-          </Modal>
+          </EditorSheet>
         </div>
       </EditorSheet>
 
@@ -1613,7 +1614,7 @@ export function AngebotWizard({
         title="Zahlung"
         context="canvas"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="form-grid form-grid--sheet">
           {istAuftragKorrektur && hatGestellteAbschlaege ? (
@@ -1647,7 +1648,12 @@ export function AngebotWizard({
           </div>
           <MockField label="Zahlfrist" full>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <MockZahlfristSeg value={zahlfristSeg} onChange={(v) => applyZahlfrist(v)} />
+              <MockSegment
+                value={zahlfristSeg}
+                onChange={(v) => applyZahlfrist(v)}
+                options={ZAHLFRIST_SEG_OPTIONS}
+                aria-label="Zahlfrist"
+              />
               {zahlfristSeg === 'datum' ? (
                 <div style={{ width: 160 }}>
                   <DateInput
@@ -1675,7 +1681,7 @@ export function AngebotWizard({
         context="canvas"
         size="lg"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <AngebotWizardPdfPreview
           angebotId={angebotId}
@@ -1691,7 +1697,7 @@ export function AngebotWizard({
         context="canvas"
         size="lg"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="form-grid form-grid--sheet form-grid--sheet-versand">
           <EmailPillsField
@@ -1762,23 +1768,6 @@ export function AngebotWizard({
         </div>
       </EditorSheet>
 
-      <ConfirmPopup
-        open={closeConfirmOpen}
-        onClose={() => setCloseConfirmOpen(false)}
-        title="Änderungen speichern?"
-        cancelLabel="Weiter bearbeiten"
-        discardLabel="Beenden ohne Speichern"
-        saveDraftLabel="Als Entwurf speichern"
-        danger
-        onConfirm={() => {
-          void closeWizardClean()
-        }}
-        onSaveDraft={() => {
-          void handleSaveDraftAndClose()
-        }}
-      >
-        Ungespeicherte Eingaben gehen sonst verloren.
-      </ConfirmPopup>
     </>
   )
 
@@ -1786,7 +1775,10 @@ export function AngebotWizard({
     !typConfirmed ? (
       <EditorSheet
         open
-        onClose={handleRequestClose}
+        dirty={draftDirty}
+        onClose={() => {
+          void closeWizardClean()
+        }}
         title={typGateStep === 'layout' ? 'Angebotslayout' : 'Art der Leistung'}
         context="canvas"
         manageHistory={false}
@@ -1795,7 +1787,7 @@ export function AngebotWizard({
           <>
             <p
               style={{
-                margin: '0 0 14px',
+                margin: '0 0 0.8750remrem',
                 fontSize: 'var(--fs-meta)',
                 color: 'var(--text-3)',
                 lineHeight: 1.45,
@@ -1805,72 +1797,52 @@ export function AngebotWizard({
               Winterdienst oder Hausmeisterservice.
             </p>
             <div className="doctype-row doctype-row--stack">
-              <button
-                type="button"
-                className="doctype-radio-opt doctype-radio-opt--block"
-                onClick={() => {
+              <MockBtn className="doctype-radio-opt doctype-radio-opt--block" type="button" onClick={() => {
                   setWiederkehr({ ist_wiederkehrend: false, wiederkehr_turnus: null })
                   setTypGateStep('layout')
-                }}
-              >
+                }}>
                 <span className="dot" />
                 <span className="doctype-radio-opt__copy">
                   <span className="lbl">Einmalig</span>
                   <span className="hint">Projekt oder einmaliger Auftrag</span>
                 </span>
-              </button>
-              <button
-                type="button"
-                className={
-                  wiederkehr.ist_wiederkehrend
+              </MockBtn>
+              <MockBtn className={wiederkehr.ist_wiederkehrend
                     ? 'doctype-radio-opt doctype-radio-opt--block on'
-                    : 'doctype-radio-opt doctype-radio-opt--block'
-                }
-                onClick={() =>
+                    : 'doctype-radio-opt doctype-radio-opt--block'} type="button" onClick={() =>
                   setWiederkehr({
                     ist_wiederkehrend: true,
                     wiederkehr_turnus: wiederkehr.wiederkehr_turnus ?? 'monatlich',
-                  })
-                }
-              >
+                  })}>
                 <span className="dot" />
                 <span className="doctype-radio-opt__copy">
                   <span className="lbl">Wiederkehrend</span>
                   <span className="hint">Wartung, Winterdienst, Pflege — Bestand</span>
                 </span>
-              </button>
+              </MockBtn>
             </div>
             {wiederkehr.ist_wiederkehrend ? (
               <div style={{ marginTop: 14, display: 'grid', gap: 12 }}>
                 <label className="field">
                   <span className="field-label">Zeitintervall</span>
-                  <select
-                    className="sel"
-                    value={wiederkehr.wiederkehr_turnus ?? 'monatlich'}
-                    onChange={(e) =>
+                  <MockSelect className="sel" value={wiederkehr.wiederkehr_turnus ?? 'monatlich'} onChange={(e) =>
                       setWiederkehr({
                         ist_wiederkehrend: true,
                         wiederkehr_turnus: e.target.value as WiederkehrTurnus,
-                      })
-                    }
-                  >
+                      })}>
                     {WIEDERKEHR_TURNUS_VALUES.map((v) => (
                       <option key={v} value={v}>
                         {WIEDERKEHR_TURNUS_LABELS[v]}
                       </option>
                     ))}
-                  </select>
+                  </MockSelect>
                 </label>
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={() => {
+                <MockBtn kind="primary" type="button" onClick={() => {
                     setDokumentTyp('einfach')
                     setTypGateStep(null)
-                  }}
-                >
+                  }}>
                   Weiter
-                </button>
+                </MockBtn>
               </div>
             ) : null}
           </>
@@ -1878,7 +1850,7 @@ export function AngebotWizard({
           <>
             <p
               style={{
-                margin: '0 0 14px',
+                margin: '0 0 0.8750remrem',
                 fontSize: 'var(--fs-meta)',
                 color: 'var(--text-3)',
                 lineHeight: 1.45,
@@ -1888,43 +1860,30 @@ export function AngebotWizard({
               einmaligen Projekten relevant.
             </p>
             <div className="doctype-row doctype-row--stack">
-              <button
-                type="button"
-                className="doctype-radio-opt doctype-radio-opt--block"
-                onClick={() => {
+              <MockBtn className="doctype-radio-opt doctype-radio-opt--block" type="button" onClick={() => {
                   setDokumentTyp('einfach')
                   setTypGateStep(null)
-                }}
-              >
+                }}>
                 <span className="dot" />
                 <span className="doctype-radio-opt__copy">
                   <span className="lbl">Einfach</span>
                   <span className="hint">Nur Positionen — ohne Gewerk-Abschnitte</span>
                 </span>
-              </button>
-              <button
-                type="button"
-                className="doctype-radio-opt doctype-radio-opt--block"
-                onClick={() => {
+              </MockBtn>
+              <MockBtn className="doctype-radio-opt doctype-radio-opt--block" type="button" onClick={() => {
                   setDokumentTyp('projekt')
                   setTypGateStep(null)
-                }}
-              >
+                }}>
                 <span className="dot" />
                 <span className="doctype-radio-opt__copy">
                   <span className="lbl">Komplex</span>
                   <span className="hint">Mit Gewerken — z. B. Sanitär, Elektro, Maler</span>
                 </span>
-              </button>
+              </MockBtn>
             </div>
-            <button
-              type="button"
-              className="btn ghost"
-              style={{ marginTop: 12 }}
-              onClick={() => setTypGateStep('art')}
-            >
+            <MockBtn kind="ghost" type="button" style={{ marginTop: 12 }} onClick={() => setTypGateStep('art')}>
               Zurück
-            </button>
+            </MockBtn>
           </>
         )}
       </EditorSheet>
@@ -1934,7 +1893,6 @@ export function AngebotWizard({
     document.body
   )
 }
-
 
 function zahlfristAnzeigeFromLocal(seg: ZahlfristSeg, datum: string): string {
   return angebotZahlfristText({

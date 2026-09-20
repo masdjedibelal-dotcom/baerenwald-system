@@ -10,7 +10,7 @@ export default async function ProjektOeffentlichPage({ params }: { params: { tok
   const tel = telefonFuerKundenMail(process.env.EMAIL_FIRMEN_TEL ?? process.env.NEXT_PUBLIC_EMAIL_TEL)
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F7F6F3]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-bw-bg-soft" />}>
       <ProjektStatusClient initial={data} tel={tel} />
     </Suspense>
   )

@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { gewerkSlugsSuggerierenBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import type { GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
@@ -19,6 +20,7 @@ export async function syncAuftragIstBauprojekt(
     .select('ist_bauprojekt')
     .eq('id', id)
     .maybeSingle()
+  if (aErr) logDbError('lib/auftraege/sync-auftrag-ist-bauprojekt:auftraege', aErr)
 
   if (aErr) return { ok: false, message: aErr.message }
   if (!auftrag) return { ok: false, message: 'Auftrag nicht gefunden' }
@@ -32,6 +34,7 @@ export async function syncAuftragIstBauprojekt(
     .from('auftrag_positionen')
     .select('gewerk_slug')
     .eq('auftrag_id', id)
+  if (pErr) logDbError('lib/auftraege/sync-auftrag-ist-bauprojekt:auftrag_positionen', pErr)
 
   if (pErr) return { ok: false, message: pErr.message }
 
@@ -42,6 +45,7 @@ export async function syncAuftragIstBauprojekt(
   const { data: gewerkeRows, error: gErr } = await supabaseAdmin
     .from('gewerke')
     .select('slug, ist_bauleistung')
+  if (gErr) logDbError('lib/auftraege/sync-auftrag-ist-bauprojekt:gewerke', gErr)
 
   if (gErr) return { ok: false, message: gErr.message }
 
@@ -54,6 +58,7 @@ export async function syncAuftragIstBauprojekt(
     .from('auftraege')
     .update({ ist_bauprojekt: hatBau, updated_at: new Date().toISOString() })
     .eq('id', id)
+  if (upErr) logDbError('lib/auftraege/sync-auftrag-ist-bauprojekt:auftraege', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 

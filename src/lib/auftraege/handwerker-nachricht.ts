@@ -1,4 +1,5 @@
 import { formatDatum } from '@/lib/utils'
+import { buildPartnerSubject } from '@/lib/mail/build-subject'
 
 export type HandwerkerNachrichtInput = {
   handwerkerName: string
@@ -31,7 +32,7 @@ function zeitraumZeile(start?: string | null, end?: string | null): string {
   return 'nach Absprache'
 }
 
-/** Kurze WhatsApp-/Mail-Nachricht an bekannte Handwerker-Partner */
+/** Kurze WhatsApp-/Mail-Nachricht an bekannte Partner */
 export function buildHandwerkerAuftragNachricht(input: HandwerkerNachrichtInput): string {
   const vn = vorname(input.handwerkerName)
   const gruss = vn ? `Hallo ${vn},` : 'Hallo,'
@@ -70,15 +71,26 @@ export function buildHandwerkerAuftragNachricht(input: HandwerkerNachrichtInput)
 /** Betreff für Zuweisungs-Mail / WhatsApp nach Leistungs-Zuweisung */
 export function handwerkerZuweisungMailSubject(
   leistungName: string,
-  count = 1
+  count = 1,
+  ort?: string | null
 ): string {
-  if (count > 1) return `Leistungsanfrage: ${count} Positionen — Bärenwald Partner`
-  const l = leistungName.trim()
-  return l ? `Leistungsanfrage: ${l} — Bärenwald Partner` : 'Leistungsanfrage — Bärenwald Partner'
+  const gewerk =
+    count > 1 ? `${count} Positionen` : leistungName.trim() || null
+  return buildPartnerSubject({
+    gewerk,
+    ort,
+    ereignis: 'Leistungsanfrage',
+  })
 }
 
-/** Betreffzeile für E-Mail an Handwerker */
-export function handwerkerAnfrageMailSubject(gewerkName: string): string {
-  const g = gewerkName.trim()
-  return g ? `Neue Anfrage — ${g}` : 'Neue Anfrage'
+/** Betreffzeile für E-Mail an Partner */
+export function handwerkerAnfrageMailSubject(
+  gewerkName: string,
+  ort?: string | null
+): string {
+  return buildPartnerSubject({
+    gewerk: gewerkName.trim() || null,
+    ort,
+    ereignis: 'Neue Anfrage',
+  })
 }

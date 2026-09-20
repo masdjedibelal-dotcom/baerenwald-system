@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import type { Components } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -15,13 +16,9 @@ export function AssistentMarkdown({ content, onNavigate }: Props) {
       const url = href?.trim() || ''
       if (url.startsWith('/') && onNavigate) {
         return (
-          <button
-            type="button"
-            className="assistent-md__link assistent-md__link--btn"
-            onClick={() => onNavigate(url)}
-          >
+          <MockBtn className="assistent-md__link assistent-md__link--btn" type="button" onClick={() => onNavigate(url)}>
             {children}
-          </button>
+          </MockBtn>
         )
       }
       return (

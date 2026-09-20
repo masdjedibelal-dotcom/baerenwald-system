@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import {
@@ -56,6 +57,7 @@ export async function GET(req: NextRequest) {
     .from('copilot_messages')
     .select('id')
     .limit(1)
+  if (sbError) logDbError('app/api/copilot/health/route:copilot_messages', sbError)
 
   if (sbError) {
     checks.supabase_copilot_messages = { ok: false, error: `${sbError.code}: ${sbError.message}` }

@@ -1,4 +1,10 @@
+<<<<<<< Updated upstream
+import { revalidateRechnungDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { Kunde, Rechnung } from '@/lib/types'
@@ -28,11 +34,12 @@ export async function buildRechnungPdfBuffer(
 
   let bezugNr: string | null = null
   if (row.bezug_rechnung_id) {
-    const { data: bezug } = await supabase
+    const { data: bezug, error } = await supabase
       .from('rechnungen')
       .select('rechnungsnummer')
       .eq('id', row.bezug_rechnung_id)
       .maybeSingle()
+    if (error) logDbError('lib/rechnungen/persist-pdf:rechnungen', error)
     bezugNr = bezug?.rechnungsnummer ?? null
   }
 
@@ -103,11 +110,12 @@ export async function persistPdfForRechnung(
   rechnungId: string,
   options?: { allocateNummer?: boolean }
 ): Promise<{ ok: true; buffer: Buffer; publicUrl: string } | { ok: false; message: string }> {
-  const { data: recMeta } = await supabaseAdmin
+  const { data: recMeta, error } = await supabaseAdmin
     .from('rechnungen')
     .select('rechnungsnummer, beleg_typ, richtung, status')
     .eq('id', rechnungId)
     .maybeSingle()
+  if (error) logDbError('lib/rechnungen/persist-pdf:rechnungen', error)
 
   const isEingehend = String(recMeta?.richtung ?? '') === 'eingehend'
   const isEntwurf =
@@ -135,6 +143,7 @@ export async function persistPdfForRechnung(
   const { error: upErr } = await supabaseAdmin.storage
     .from('rechnungen-pdfs')
     .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
+  if (upErr) logDbError('lib/rechnungen/persist-pdf:rechnungen-pdfs', upErr)
 
   if (upErr) {
     const raw = upErr.message ?? ''
@@ -148,11 +157,12 @@ export async function persistPdfForRechnung(
   const { data: pub } = supabaseAdmin.storage.from('rechnungen-pdfs').getPublicUrl(path)
   const publicUrl = pub.publicUrl
 
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('rechnungen')
     .update({ pdf_url: publicUrl, updated_at: new Date().toISOString() })
     .eq('id', rechnungId)
+  if (__dbErr1) logDbError('lib/rechnungen/persist-pdf:rechnungen', __dbErr1)
 
-  revalidatePath(`/rechnungen/${rechnungId}`)
+  revalidateRechnungDetail(rechnungId)
   return { ok: true, buffer, publicUrl }
 }

@@ -24,14 +24,14 @@ export function KiHubGelerntSection({ items }: Props) {
           return (
             <div
               key={item.id}
-              className="rounded-xl border border-bw-border bg-bw-card px-4 py-3"
+              className="rounded-sheet border border-bw-border bg-surface px-4 py-3"
             >
               <p className="text-sm font-medium text-bw-text">{item.titel}</p>
               {item.beschreibung ? (
                 <p className="mt-1 text-sm text-muted">{item.beschreibung}</p>
               ) : null}
               {konf ? (
-                <p className="mt-2 text-xs text-[#2E7D52]">Konfidenz: {konf}</p>
+                <p className="mt-2 text-xs text-bw-primary">Konfidenz: {konf}</p>
               ) : null}
             </div>
           )

@@ -1,7 +1,8 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockFormSection, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { AnlageTeilPicker } from '@/components/crm/AnlageTeilPicker'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import type { Gewerk, KundenObjekt } from '@/lib/types'
 
@@ -51,32 +52,21 @@ export function MelderLeistungsortFields({
     <>
       <MockFormSection title="Leistungsort" icon="map-pin">
         <MockField label="Objekt" full>
-          <select
-            className="sel sel--choice"
-            value={draft.kunde_objekt_id ?? ''}
-            disabled={disabled}
-            onChange={(e) =>
-              patchLeistungsort({ kunde_objekt_id: e.target.value.trim() || null })
-            }
-          >
+          <MockSelect className="sel sel--choice" value={draft.kunde_objekt_id ?? ''} disabled={disabled} onChange={(e) =>
+              patchLeistungsort({ kunde_objekt_id: e.target.value.trim() || null })}>
             <option value="">Kein Objekt gewählt</option>
             {objekte.map((o) => (
               <option key={o.id} value={o.id}>
                 {kundenObjektKurzlabel(o)}
               </option>
             ))}
-          </select>
+          </MockSelect>
         </MockField>
         {onNeuObjekt ? (
           <div style={{ gridColumn: '1 / -1' }}>
-            <button
-              type="button"
-              className="btn ghost sm"
-              disabled={disabled}
-              onClick={onNeuObjekt}
-            >
+            <MockBtn kind="ghost" sm type="button" disabled={disabled} onClick={onNeuObjekt}>
               Objekt anlegen
-            </button>
+            </MockBtn>
           </div>
         ) : null}
         <AnlageTeilPicker
@@ -92,40 +82,16 @@ export function MelderLeistungsortFields({
       {hideMelder ? null : (
       <MockFormSection title="Melder" icon="user">
         <MockField label="Name" full>
-          <input
-            className="txt"
-            value={draft.melder_name}
-            disabled={disabled}
-            placeholder="Vor- und Nachname"
-            onChange={(e) => onChange({ melder_name: e.target.value })}
-          />
+          <MockInput className="txt" value={draft.melder_name} disabled={disabled} placeholder="Vor- und Nachname" onChange={(e) => onChange({ melder_name: e.target.value })} />
         </MockField>
         <MockField label="Telefon">
-          <input
-            className="txt"
-            value={draft.melder_telefon}
-            disabled={disabled}
-            inputMode="tel"
-            onChange={(e) => onChange({ melder_telefon: e.target.value })}
-          />
+          <MockInput className="txt" value={draft.melder_telefon} disabled={disabled} inputMode="tel" onChange={(e) => onChange({ melder_telefon: e.target.value })} />
         </MockField>
         <MockField label="E-Mail">
-          <input
-            className="txt"
-            type="email"
-            value={draft.melder_email}
-            disabled={disabled}
-            onChange={(e) => onChange({ melder_email: e.target.value })}
-          />
+          <MockInput className="txt" type="email" value={draft.melder_email} disabled={disabled} onChange={(e) => onChange({ melder_email: e.target.value })} />
         </MockField>
         <MockField label="Einheit" hint="Wohnung / Stockwerk / Tür">
-          <input
-            className="txt"
-            value={draft.melder_einheit}
-            disabled={disabled}
-            placeholder="z. B. EG links"
-            onChange={(e) => onChange({ melder_einheit: e.target.value })}
-          />
+          <MockInput className="txt" value={draft.melder_einheit} disabled={disabled} placeholder="z. B. EG links" onChange={(e) => onChange({ melder_einheit: e.target.value })} />
         </MockField>
       </MockFormSection>
       )}

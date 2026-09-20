@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 
@@ -14,11 +15,12 @@ export async function resolveVertragsKundeIdForLead(
   const id = leadId?.trim()
   if (!id) return fallback
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('leads')
     .select('kunde_id, auftraggeber_kunde_id')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/leads/resolve-vertrags-kunde:leads', error)
 
   if (!data) return fallback
   return leadVertragsKundeId(data) ?? fallback

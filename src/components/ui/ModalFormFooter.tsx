@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { SheetFooterActions } from '@/components/ui/SheetFooterActions'
 
 /** Abbrechen/Zurücksetzen + Primary — kanonisches Paar für Modals/Sheets. */
@@ -25,18 +25,18 @@ export function ModalFormFooter({
   return (
     <SheetFooterActions className="modal-form-footer">
       {extra ? <div className="mr-auto w-full md:w-auto">{extra}</div> : null}
-      <Button type="button" variant="secondary" onClick={onCancel}>
+      <MockBtn type="button" kind="secondary" onClick={onCancel}>
         {cancelLabel}
-      </Button>
-      <Button
+      </MockBtn>
+      <MockBtn
         type="button"
-        variant="primary"
+        kind="primary"
         loading={loading}
         disabled={submitDisabled}
         onClick={onSubmit}
       >
         {submitLabel}
-      </Button>
+      </MockBtn>
     </SheetFooterActions>
   )
 }

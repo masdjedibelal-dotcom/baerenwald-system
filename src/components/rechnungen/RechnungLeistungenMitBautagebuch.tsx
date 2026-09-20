@@ -1,5 +1,6 @@
 'use client'
 
+import { MockTabs } from '@/components/mock-ui'
 import { useEffect, useMemo, useState } from 'react'
 import {
   AuftragBautagebuchSection,
@@ -122,29 +123,29 @@ export function RechnungLeistungenMitBautagebuch({
   return (
     <div className="space-y-4">
       {hasAuftrag ? (
-        <div className="lt-view-seg" role="tablist" aria-label="Ansicht">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === 'leistungen'}
-            className={view === 'leistungen' ? 'on' : undefined}
-            onClick={() => setView('leistungen')}
-          >
-            Leistungen
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={view === 'bautagebuch'}
-            className={view === 'bautagebuch' ? 'on' : undefined}
-            onClick={() => setView('bautagebuch')}
-          >
-            Bautagebuch
-            {bautagebuchEintraege.length > 0 ? (
-              <span className="lt-view-seg__count">{bautagebuchEintraege.length}</span>
-            ) : null}
-          </button>
-        </div>
+        <MockTabs
+          items={[
+            { id: 'leistungen', label: 'Leistungen' },
+            {
+              id: 'bautagebuch',
+              label: (
+                <>
+                  Bautagebuch
+                  {bautagebuchEintraege.length > 0 ? (
+                    <span className="lt-view-seg__count">{bautagebuchEintraege.length}</span>
+                  ) : null}
+                </>
+              ),
+            },
+          ]}
+          value={view}
+          onChange={(id) => setView(id as 'leistungen' | 'bautagebuch')}
+          aria-label="Ansicht"
+          className="lt-view-seg"
+          tabClassName=""
+          activeClassName="on"
+          showIcons={false}
+        />
       ) : null}
 
       {view === 'bautagebuch' && hasAuftrag ? (

@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
@@ -77,17 +79,11 @@ export function PositionModal({
         : p.name || 'Position'
 
   return (
-    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose} confirmLabel="Übernehmen">
+    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose} confirmLabel="Speichern">
       {kind === 'nachlass' ? (
         <div className="form-grid">
           <Field label="Bezeichnung" full required>
-            <input
-              className="txt"
-              value={p.name}
-              onChange={(e) => onChange({ name: e.target.value })}
-              placeholder="Nachlass"
-              autoFocus
-            />
+            <MockInput className="txt" value={p.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Nachlass" autoFocus />
           </Field>
           <NachlassModusFields
             modus={(p.nachlassModus ?? 'prozent') as GesamtrabattModus}
@@ -107,28 +103,18 @@ export function PositionModal({
       ) : isFreitext ? (
         <div className="form-grid">
           <Field label="Gewerk">
-            <select
-              className="sel"
-              value={p.gewerk || ''}
-              onChange={(e) => onChange({ gewerk: e.target.value })}
-            >
+            <MockSelect className="sel" value={p.gewerk || ''} onChange={(e) => onChange({ gewerk: e.target.value })}>
               <option value="">Gewerk wählen…</option>
               {gewerkOptions.map((g) => (
                 <option key={g} value={g}>
                   {g}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </Field>
           <div />
           <Field label="Überschrift" full>
-            <input
-              className="txt"
-              value={p.name}
-              onChange={(e) => onChange({ name: e.target.value })}
-              placeholder="z. B. Wichtiger Hinweis"
-              autoFocus={!p.name}
-            />
+            <MockInput className="txt" value={p.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="z. B. Wichtiger Hinweis" autoFocus={!p.name} />
           </Field>
           <SheetEditableField
             label="Text"
@@ -143,28 +129,18 @@ export function PositionModal({
       ) : (
         <div className="form-grid">
           <Field label="Gewerk">
-            <select
-              className="sel"
-              value={p.gewerk || ''}
-              onChange={(e) => onChange({ gewerk: e.target.value })}
-            >
+            <MockSelect className="sel" value={p.gewerk || ''} onChange={(e) => onChange({ gewerk: e.target.value })}>
               <option value="">Gewerk wählen…</option>
               {gewerkOptions.map((g) => (
                 <option key={g} value={g}>
                   {g}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </Field>
           <div />
           <Field label="Bezeichnung" full required>
-            <input
-              className="txt"
-              value={p.name}
-              onChange={(e) => onChange({ name: e.target.value })}
-              placeholder="z.B. Wandfliesen verlegen"
-              autoFocus={!p.name}
-            />
+            <MockInput className="txt" value={p.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="z.B. Wandfliesen verlegen" autoFocus={!p.name} />
           </Field>
           <SheetEditableField
             label="Beschreibung"
@@ -180,14 +156,9 @@ export function PositionModal({
               {KOSTENART_OPTIONS.map((opt) => {
                 const active = (p.kostenverteilung ?? 'allgemein') === opt.value
                 return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    className={active ? 'on' : undefined}
-                    onClick={() => onChange({ kostenverteilung: opt.value })}
-                  >
+                  <MockBtn className={active ? 'on' : undefined} key={opt.value} type="button" onClick={() => onChange({ kostenverteilung: opt.value })}>
                     {opt.label}
-                  </button>
+                  </MockBtn>
                 )
               })}
             </div>
@@ -219,19 +190,13 @@ export function PositionModal({
                 onValueChange={(menge) => onChange({ menge })}
                 style={{ flex: 1 }}
               />
-              <select
-                className="sel"
-                value={p.einheit}
-                onChange={(e) => onChange({ einheit: e.target.value })}
-                style={{ width: 100 }}
-                disabled={Boolean(p.regieSchein)}
-              >
+              <MockSelect className="sel" value={p.einheit} onChange={(e) => onChange({ einheit: e.target.value })} style={{ width: 100 }} disabled={Boolean(p.regieSchein)}>
                 {POSITION_MENGE_EINHEITEN.map((u) => (
                   <option key={u} value={u}>
                     {u}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </div>
           </Field>
           <div className="field pos-add-preis-ust">
@@ -248,16 +213,11 @@ export function PositionModal({
                 />
               </div>
               {showUst ? (
-                <select
-                  className="sel"
-                  value={String(p.ust ?? 19)}
-                  onChange={(e) => onChange({ ust: Number(e.target.value) })}
-                  aria-label="USt %"
-                >
+                <MockSelect className="sel" value={String(p.ust ?? 19)} onChange={(e) => onChange({ ust: Number(e.target.value) })} aria-label="USt %">
                   <option value="19">19 %</option>
                   <option value="7">7 %</option>
                   <option value="0">0 %</option>
-                </select>
+                </MockSelect>
               ) : null}
             </div>
           </div>

@@ -1,18 +1,18 @@
 'use client'
 
+import { MockBadge, MockBtn, MockChip, MockEmpty, MockPager, MockSortHead } from '@/components/mock-ui'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+
 import { useLocalTransition } from '@/components/ui/action-busy'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import {
-  MockBadge,
-  MockBtn,
-  MockEmpty,
-  MockPager,
-} from '@/components/mock-ui'
 import { useListPage } from '@/hooks/useListPage'
+<<<<<<< Updated upstream
+=======
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { getHandwerkerEinreichungPdfUrl } from '@/app/(dashboard)/angebote/actions'
 import {
@@ -25,6 +25,8 @@ import {
   type HwRechnungStatus,
 } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
 import { formatDatum } from '@/lib/utils'
+import { formatEuro } from '@/lib/format/geld-datum'
+import { TOAST } from '@/lib/copy'
 
 function statusKind(status: HwRechnungStatus): 'done' | 'offer' | 'cancel' | 'order' {
   if (status === 'bezahlt') return 'done'
@@ -32,16 +34,14 @@ function statusKind(status: HwRechnungStatus): 'done' | 'offer' | 'cancel' | 'or
   return 'offer'
 }
 
-function formatEur(n: number | null): string {
-  if (n == null || !Number.isFinite(n)) return '—'
-  return `${Math.round(n).toLocaleString('de-DE')} €`
-}
-
 function formatIban(iban: string | null): string {
   if (!iban) return '—'
   const clean = iban.replace(/\s+/g, '').toUpperCase()
   return clean.replace(/(.{4})/g, '$1 ').trim()
 }
+
+type SortCol = 'partner' | 'auftrag' | 'betrag' | 'eingang' | 'status'
+type StatusFilter = 'alle' | HwRechnungStatus
 
 /** Liste ohne eigene Filter-UI — Filter kommt vom globalen Vorgänge-Filter. */
 export function HwEingangsrechnungenListe({
@@ -57,12 +57,53 @@ export function HwEingangsrechnungenListe({
   const [pending, startTransition] = useLocalTransition()
   const [active, setActive] = useState<HwEingangsrechnungListeRow | null>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('alle')
+  const [sortCol, setSortCol] = useState<SortCol>('eingang')
+  const [sortDir, setSortDir] = useState<1 | -1>(-1)
+
+  const statusCounts = useMemo(() => {
+    const c: Record<StatusFilter, number> = {
+      alle: rows.length,
+      eingereicht: 0,
+      bezahlt: 0,
+      abgelehnt: 0,
+    }
+    for (const r of rows) {
+      c[r.status] = (c[r.status] ?? 0) + 1
+    }
+    return c
+  }, [rows])
+
+  const filtered = useMemo(() => {
+    const base = statusFilter === 'alle' ? rows : rows.filter((r) => r.status === statusFilter)
+    const sorted = [...base]
+    sorted.sort((a, b) => {
+      let cmp = 0
+      if (sortCol === 'partner') cmp = a.handwerkerName.localeCompare(b.handwerkerName, 'de')
+      else if (sortCol === 'auftrag')
+        cmp = (a.auftragTitel || '').localeCompare(b.auftragTitel || '', 'de')
+      else if (sortCol === 'betrag') cmp = (a.betragBrutto ?? 0) - (b.betragBrutto ?? 0)
+      else if (sortCol === 'eingang')
+        cmp = (a.eingereichtAt || '').localeCompare(b.eingereichtAt || '')
+      else cmp = a.status.localeCompare(b.status)
+      return cmp * sortDir
+    })
+    return sorted
+  }, [rows, statusFilter, sortCol, sortDir])
 
   const { pageItems, pageIndex, totalPages, total, pageSize, setPageIndex } = useListPage(
-    rows,
+    filtered,
     40,
-    filterKey
+    `${filterKey}|${statusFilter}|${sortCol}|${sortDir}`
   )
+
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) setSortDir((d) => (d === 1 ? -1 : 1))
+    else {
+      setSortCol(col)
+      setSortDir(col === 'eingang' || col === 'betrag' ? -1 : 1)
+    }
+  }
 
   // Notification-Deep-Link: ?hw=<zuweisungId>
   useEffect(() => {
@@ -89,7 +130,7 @@ export function HwEingangsrechnungenListe({
     startTransition(async () => {
       const r = await setHwEingangsrechnungStatus(id, status)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       toast.success(
@@ -104,7 +145,7 @@ export function HwEingangsrechnungenListe({
           ? { ...prev, status, bezahltAt: status === 'bezahlt' ? new Date().toISOString() : null }
           : prev
       )
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -113,7 +154,7 @@ export function HwEingangsrechnungenListe({
     try {
       const r = await getHandwerkerEinreichungPdfUrl(row.zuweisungId, 'rechnung')
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       window.open(r.url, '_blank', 'noopener,noreferrer')
@@ -124,34 +165,64 @@ export function HwEingangsrechnungenListe({
 
   async function copyIban(iban: string | null) {
     if (!iban) {
-      toast.error('Keine IBAN hinterlegt')
+      toast.error(TOAST.keine_iban_hinterlegt)
       return
     }
     try {
       await navigator.clipboard.writeText(iban.replace(/\s+/g, ''))
-      toast.success('IBAN kopiert')
+      toast.success(TOAST.iban_kopiert)
     } catch {
-      toast.error('Kopieren fehlgeschlagen')
+      toast.error(TOAST.kopieren_fehlgeschlagen)
     }
   }
 
   return (
     <div className="space-y-3">
+      <div className="chiprow flex flex-wrap gap-2">
+        {(
+          [
+            { key: 'alle' as const, label: 'Alle' },
+            { key: 'eingereicht' as const, label: 'Offen' },
+            { key: 'bezahlt' as const, label: 'Bezahlt' },
+            { key: 'abgelehnt' as const, label: 'Abgelehnt' },
+          ] as const
+        ).map(({ key, label }) => (
+          <MockChip
+            key={key}
+            active={statusFilter === key}
+            count={statusCounts[key]}
+            onClick={() => setStatusFilter(key)}
+          >
+            {label}
+          </MockChip>
+        ))}
+      </div>
+
       <div
         className="listcard listcard--cols"
         style={{
           ['--list-cols' as string]:
-            'minmax(140px, 1.2fr) minmax(180px, 1.6fr) minmax(72px, 0.7fr) minmax(88px, 0.8fr) minmax(80px, 0.7fr) minmax(72px, 0.6fr)',
+            'minmax(8.75rem, 1.2fr) minmax(11.25rem, 1.6fr) minmax(4.5rem, 0.7fr) minmax(5.5rem, 0.8fr) minmax(5rem, 0.7fr) minmax(4.5rem, 0.6fr)',
         }}
         role="table"
-        aria-label="Eingangsrechnungen Handwerker"
+        aria-label="Eingangsrechnungen Partner"
       >
         <div className="vg-row head" role="row">
-          <div>Partner</div>
-          <div>Auftrag / Kunde</div>
-          <div className="text-right">Betrag</div>
-          <div>Eingang</div>
-          <div>Status</div>
+          <MockSortHead col="partner" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Partner
+          </MockSortHead>
+          <MockSortHead col="auftrag" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Auftrag / Kunde
+          </MockSortHead>
+          <MockSortHead col="betrag" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)} right>
+            Betrag
+          </MockSortHead>
+          <MockSortHead col="eingang" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Eingang
+          </MockSortHead>
+          <MockSortHead col="status" sortCol={sortCol} sortDir={sortDir} onSort={(c) => toggleSort(c as SortCol)}>
+            Status
+          </MockSortHead>
           <div />
         </div>
 
@@ -159,7 +230,11 @@ export function HwEingangsrechnungenListe({
           <MockEmpty
             icon="receipt"
             title="Keine Eingangsrechnungen"
-            hint="Filter zurücksetzen oder Partner-Upload abwarten."
+            hint={
+              statusFilter !== 'alle'
+                ? 'Anderen Status-Filter wählen oder Filter zurücksetzen.'
+                : 'Filter zurücksetzen oder Partner-Upload abwarten.'
+            }
           />
         ) : (
           pageItems.map((r) => (
@@ -188,7 +263,7 @@ export function HwEingangsrechnungenListe({
               </div>
               <div className="vg-vorgang">
                 <div className="t" title={r.auftragTitel ?? undefined}>
-                  {r.auftragTitel || 'Handwerker · Rechnung'}
+                  {r.auftragTitel || 'Partner · Rechnung'}
                 </div>
                 <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
                   {[r.kundeName, r.angebotsnr ? `Angebot ${r.angebotsnr}` : null]
@@ -196,7 +271,7 @@ export function HwEingangsrechnungenListe({
                     .join(' · ') || '—'}
                 </span>
               </div>
-              <div className="vg-wert text-right font-medium">{formatEur(r.betragBrutto)}</div>
+              <div className="vg-wert text-right font-medium">{formatEuro(r.betragBrutto, { rounded: true, decimals: 0 })}</div>
               <div className="vg-datum text-bw-text-muted">
                 {r.eingereichtAt ? formatDatum(r.eingereichtAt) : '—'}
               </div>
@@ -230,7 +305,7 @@ export function HwEingangsrechnungenListe({
         />
       ) : null}
 
-      <Modal
+      <EditorSheet
         open={active != null}
         onClose={closeDetail}
         title="Eingangsrechnung · Partner"
@@ -265,36 +340,36 @@ export function HwEingangsrechnungenListe({
               </div>
               <div>
                 <div className="text-[length:var(--fs-meta)] text-bw-text-muted">Betrag</div>
-                <div className="font-medium">{formatEur(active.betragBrutto)}</div>
+                <div className="font-medium">{formatEuro(active.betragBrutto, { rounded: true, decimals: 0 })}</div>
               </div>
               <div className="sm:col-span-2">
                 <div className="text-[length:var(--fs-meta)] text-bw-text-muted">IBAN</div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono">{formatIban(active.iban)}</span>
                   {active.iban ? (
-                    <Button type="button" variant="secondary" size="sm" onClick={() => void copyIban(active.iban)}>
+                    <MockBtn type="button" kind="secondary" sm onClick={() => void copyIban(active.iban)}>
                       Kopieren
-                    </Button>
+                    </MockBtn>
                   ) : null}
                 </div>
               </div>
             </div>
 
-            <div className="rounded-lg border border-bw-border bg-bw-surface-2/40 px-3 py-3">
+            <div className="rounded-card border border-bw-border bg-bw-surface-2/40 px-3 py-3">
               <div className="text-[length:var(--fs-meta)] text-bw-text-muted">Dokument</div>
-              <div className="mt-1 font-medium">Rechnung vom Handwerker</div>
+              <div className="mt-1 font-medium">Rechnung vom Partner</div>
               <p className="mt-0.5 text-[length:var(--fs-meta)] text-bw-text-muted">
                 PDF wie vom Partner eingereicht — auch unter Auftrag → Dokumente.
               </p>
               <div className="mt-3">
-                <Button
+                <MockBtn
                   type="button"
-                  variant="primary"
+                  kind="primary"
                   disabled={pdfBusy}
                   onClick={() => void openPdf(active)}
                 >
                   {pdfBusy ? 'Lädt…' : 'Rechnung öffnen'}
-                </Button>
+                </MockBtn>
               </div>
             </div>
 
@@ -306,60 +381,60 @@ export function HwEingangsrechnungenListe({
               ) : null}
               {active.status === 'eingereicht' ? (
                 <>
-                  <Button
+                  <MockBtn
                     type="button"
-                    variant="primary"
+                    kind="primary"
                     disabled={pending}
                     onClick={() => runStatus(active.zuweisungId, 'bezahlt')}
                   >
                     Als überwiesen
-                  </Button>
-                  <Button
+                  </MockBtn>
+                  <MockBtn
                     type="button"
-                    variant="secondary"
+                    kind="secondary"
                     disabled={pending}
                     onClick={() => runStatus(active.zuweisungId, 'abgelehnt')}
                   >
                     Ablehnen
-                  </Button>
+                  </MockBtn>
                 </>
               ) : null}
               {active.status === 'bezahlt' ? (
-                <Button
+                <MockBtn
                   type="button"
-                  variant="secondary"
+                  kind="secondary"
                   disabled={pending}
                   onClick={() =>
                     void markHwEingangsrechnungBezahlt(active.zuweisungId, false).then((r) => {
                       if (!r.ok) {
-                        toast.error(r.message)
+                        toast.systemError(r)
                         return
                       }
-                      toast.success('Wieder auf offen gesetzt')
+                      toast.success(TOAST.wieder_auf_offen_gesetzt)
                       setActive((prev) =>
                         prev ? { ...prev, status: 'eingereicht', bezahltAt: null } : prev
                       )
-                      router.refresh()
+                      afterServerActionRefresh()
                     })
                   }
                 >
                   Zurück auf offen
-                </Button>
+                </MockBtn>
               ) : null}
               {active.status === 'abgelehnt' ? (
-                <Button
+                <MockBtn
                   type="button"
-                  variant="secondary"
+                  kind="secondary"
                   disabled={pending}
                   onClick={() => runStatus(active.zuweisungId, 'eingereicht')}
                 >
                   Wieder öffnen
-                </Button>
+                </MockBtn>
               ) : null}
             </div>
           </div>
         ) : null}
-      </Modal>
+      </EditorSheet>
     </div>
   )
 }

@@ -1,15 +1,16 @@
 'use client'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 
 import { Card } from '@/components/ui/Card'
 import { ProgressBar } from '@/components/ui/ProgressBar'
-import { DetailVisual } from '@/components/layout/DetailHead'
+import { DetailVisual } from '@/components/layout/EntityDetailLayout'
 import type { TeamAuslastungEintrag } from '@/lib/kalender-auslastung'
 
 export function KalenderTeamAuslastung({ members }: { members: TeamAuslastungEintrag[] }) {
   if (!members.length) {
     return (
       <Card title="Diese Woche · Auslastung">
-        <p className="text-sm text-bw-text-muted">Keine Teamdaten verfügbar.</p>
+        <MockEmpty title="Keine Teamdaten verfügbar." />
       </Card>
     )
   }
@@ -28,10 +29,10 @@ export function KalenderTeamAuslastung({ members }: { members: TeamAuslastungEin
             <li
               key={m.id}
               className="grid items-center gap-3"
-              style={{ gridTemplateColumns: '36px 1fr minmax(0, 1fr) 44px' }}
+              style={{ gridTemplateColumns: '2.25rem 1fr minmax(0, 1fr) 2.75rem' }}
             >
               <DetailVisual tone={m.load > 85 ? 'gold' : 'green'} initials={initials} />
-              <span className="truncate text-[13px] text-bw-text">{m.name}</span>
+              <span className="truncate text-fs-text text-bw-text">{m.name}</span>
               <ProgressBar value={m.load} color={m.load > 85 ? 'orange' : 'green'} />
               <span className="text-right text-xs font-medium tabular-nums text-bw-text">{m.load}%</span>
             </li>

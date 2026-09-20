@@ -1,5 +1,8 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   useEffect,
   useLayoutEffect,
@@ -8,7 +11,6 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useSpeechDictation } from '@/hooks/useSpeechDictation'
 import { cn } from '@/lib/utils'
 
@@ -223,15 +225,10 @@ export function KiChatComposer({
           <p className="ki-chat-composer__voice-meta">
             Max. {VOICE_MAX_SEC}s · {livePreview.length}/{maxChars} Zeichen
           </p>
-          <button
-            type="button"
-            className="btn primary sm ki-chat-composer__voice-stop"
-            onClick={stopVoice}
-            aria-label="Aufnahme stoppen"
-          >
+          <MockBtn kind="primary" sm className="ki-chat-composer__voice-stop" type="button" onClick={stopVoice} aria-label="Aufnahme stoppen">
             <MockIcon ctx="btn" n="player-stop" size={14} />
             Stopp
-          </button>
+          </MockBtn>
         </div>
         {speech.error ? (
           <p className="ki-chat-composer__error">{speech.error}</p>
@@ -243,48 +240,20 @@ export function KiChatComposer({
   return (
     <form className="ki-chat-composer" onSubmit={handleSubmit}>
       <div className="ki-chat-composer__bar">
-        <button
-          type="button"
-          className="ki-chat-composer__icon-btn"
-          disabled={disabled || !speech.supported}
-          title={
-            speech.supported
+        <MockBtn className="ki-chat-composer__icon-btn" type="button" disabled={disabled || !speech.supported} title={speech.supported
               ? `Sprachnotiz aufnehmen (max. ${VOICE_MAX_SEC}s)`
-              : 'Spracheingabe auf diesem Gerät nicht verfügbar'
-          }
-          aria-label="Sprachnotiz aufnehmen"
-          onClick={startVoice}
-        >
+              : 'Spracheingabe auf diesem Gerät nicht verfügbar'} aria-label="Sprachnotiz aufnehmen" onClick={startVoice}>
           <MockIcon ctx="default" n="microphone" size={18} />
-        </button>
+        </MockBtn>
 
-        <textarea
-          ref={taRef as React.RefObject<HTMLTextAreaElement>}
-          className="ki-chat-composer__input"
-          rows={1}
-          maxLength={maxChars}
-          placeholder={
-            voicePhase === 'review' ? 'Text prüfen und senden…' : placeholder
-          }
-          value={value}
-          onChange={(e) => {
+        <MockTextarea ref={taRef as React.RefObject<HTMLTextAreaElement>} className="ki-chat-composer__input" rows={1} maxLength={maxChars} placeholder={voicePhase === 'review' ? 'Text prüfen und senden…' : placeholder} value={value} onChange={(e) => {
             setClamped(e.target.value)
             if (voicePhase === 'review' && !e.target.value.trim()) setVoicePhase('idle')
-          }}
-          onKeyDown={onKeyDown}
-          disabled={disabled}
-          enterKeyHint="send"
-        />
+          }} onKeyDown={onKeyDown} disabled={disabled} enterKeyHint="send" />
 
-        <button
-          type="submit"
-          className="ki-chat-composer__send"
-          disabled={disabled || !value.trim()}
-          aria-label="Senden"
-          title="Senden"
-        >
+        <MockBtn className="ki-chat-composer__send" type="submit" disabled={disabled || !value.trim()} aria-label="Senden" title="Senden">
           <MockIcon ctx="btn" n="send" size={16} />
-        </button>
+        </MockBtn>
       </div>
       {nearLimit || voicePhase === 'review' ? (
         <p

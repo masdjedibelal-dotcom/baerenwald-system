@@ -1,14 +1,15 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
-import { Check, Circle, Flag } from 'lucide-react'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { DateInput } from '@/components/ui/DateInput'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Combobox } from '@/components/ui/Combobox'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { loadCrmTeamFuerTermin } from '@/app/(dashboard)/anfragen/actions'
 import { listKundenFuerCombobox } from '@/app/(dashboard)/kunden/kunde-combobox-actions'
 import { listHandwerkerAuswahlFuerGewerk } from '@/app/(dashboard)/auftraege/handwerker-actions'
@@ -20,7 +21,8 @@ import {
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { CrmTodo, TodoPrioritaet } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, formatTagMonatLang } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 const PRIO: { value: TodoPrioritaet; label: string }[] = [
   { value: 'niedrig', label: 'Niedrig' },
@@ -41,11 +43,7 @@ function formatFristLabel(iso: string | null | undefined): string {
   if (!raw) return '—'
   const d = new Date(`${raw}T12:00:00`)
   if (Number.isNaN(d.getTime())) return raw
-  return d.toLocaleDateString('de-DE', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  return formatTagMonatLang(d)
 }
 
 function isFristOverdue(iso: string | null | undefined, erledigt: boolean): boolean {
@@ -215,7 +213,7 @@ export function TodoEditorSheet({
         handwerker_id: handwerkerId || null,
       })
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       toast.success(isNew ? 'To-do angelegt' : 'To-do gespeichert')
@@ -226,13 +224,13 @@ export function TodoEditorSheet({
 
   function remove() {
     if (!todo) return
-    confirmDelete('To-do löschen?', async () => {
+    openDeleteConfirm('To-do löschen?', async () => {
       const res = await deleteTodo(todo.id)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         throw new Error(res.message)
       }
-      toast.success('To-do gelöscht')
+      toast.success(TOAST.to_do_geloescht)
       onClose()
       onSaved()
     })
@@ -245,29 +243,32 @@ export function TodoEditorSheet({
       open={open}
       onClose={onClose}
       title={sheetTitle}
-      confirmBusy={pending}
-      onConfirm={isView ? undefined : save}
-      confirmDisabled={pending || !titel.trim()}
       manageHistory={false}
       headerEnd={
         isView ? (
-          <button
-            type="button"
-            className="btn ghost sm"
-            onClick={() => setMode('edit')}
-          >
+          <MockBtn kind="ghost" sm type="button" onClick={() => setMode('edit')}>
             Bearbeiten
-          </button>
+          </MockBtn>
         ) : undefined
       }
-      footer={
-        !isNew && !isView ? (
-          <div className="flex w-full items-center justify-start gap-2">
-            <button type="button" className="btn ghost danger" disabled={pending} onClick={remove}>
-              Löschen
-            </button>
-          </div>
-        ) : undefined
+      primary={
+        isView
+          ? null
+          : {
+              label: 'Speichern',
+              onClick: save,
+              disabled: pending || !titel.trim(),
+              busy: pending,
+            }
+      }
+      danger={
+        !isNew && !isView
+          ? {
+              label: 'Löschen',
+              onClick: remove,
+              disabled: pending,
+            }
+          : null
       }
     >
       {isView ? (
@@ -310,7 +311,7 @@ export function TodoEditorSheet({
                 <>
                   <Prop label="Kunde">{kundeLabel}</Prop>
                   <Prop label="Vorgang">{vorgangLabel}</Prop>
-                  <Prop label="Handwerker">{handwerkerLabel}</Prop>
+                  <Prop label="Partner">{handwerkerLabel}</Prop>
                 </>
               )}
             </div>
@@ -318,52 +319,24 @@ export function TodoEditorSheet({
         </div>
       ) : (
         <div className="todo-editor space-y-4">
-          <Input
-            label="Titel"
-            value={titel}
-            onChange={(e) => setTitel(e.target.value)}
-            placeholder="Was ist zu tun?"
-            required
-            autoFocus
-          />
-          <Textarea
-            label="Beschreibung"
-            value={beschreibung}
-            onChange={(e) => setBeschreibung(e.target.value)}
-            rows={4}
-            placeholder="Details, Notizen…"
-          />
+          <MockField label="Titel" required><MockInput value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="Was ist zu tun?" required autoFocus /></MockField>
+          <MockField label="Beschreibung"><RichTextEditor value={typeof (beschreibung) === 'string' ? (beschreibung) : ''} onChange={(__v) => setBeschreibung(__v)} placeholder="Details, Notizen…" minHeight={120} aria-label="Beschreibung" /></MockField>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              type="date"
-              label="Frist"
-              value={faelligAm}
-              onChange={(e) => setFaelligAm(e.target.value)}
-            />
+            <MockField label="Frist"><DateInput value={faelligAm} onChange={(e) => setFaelligAm(e.target.value)} /></MockField>
             <div>
               <div className="mb-1 text-[length:var(--fs-text)] font-medium text-[var(--text-3)]">
                 Priorität
               </div>
               <div className="seg">
                 {PRIO.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    className={cn(prioritaet === p.value && 'on')}
-                    onClick={() => setPrioritaet(p.value)}
-                  >
+                  <MockBtn className={cn(prioritaet === p.value && 'on')} key={p.value} type="button" onClick={() => setPrioritaet(p.value)}>
                     {p.label}
-                  </button>
+                  </MockBtn>
                 ))}
               </div>
             </div>
           </div>
-          <Select
-            label="Zuweisen"
-            value={zugewiesenAn}
-            options={teamOptions}
-            onChange={(e) => setZugewiesenAn(e.target.value)}
-          />
+          <Combobox label="Zuweisen" options={teamOptions} value={zugewiesenAn == null ? '' : String(zugewiesenAn)} placeholder="Auswählen…" onChange={(next) => { setZugewiesenAn(next); }} />
 
           {linksLocked ? (
             lockedLinks?.label ? (
@@ -391,7 +364,7 @@ export function TodoEditorSheet({
                 placeholder="Anfrage / Auftrag…"
               />
               <Combobox
-                label="Handwerker"
+                label="Partner"
                 options={[{ value: '', label: '— keiner —' }, ...hwOpts]}
                 value={handwerkerId}
                 onChange={setHandwerkerId}
@@ -415,30 +388,21 @@ export function TodoCheckButton({
   onToggle: () => void
 }) {
   return (
-    <button
-      type="button"
-      className={cn('todo-check', erledigt && 'todo-check--done')}
-      aria-label={erledigt ? 'Als offen markieren' : 'Abhaken'}
-      disabled={busy}
-      onClick={(e) => {
+    <MockBtn className={cn('todo-check', erledigt && 'todo-check--done')} type="button" aria-label={erledigt ? 'Als offen markieren' : 'Abhaken'} disabled={busy} onClick={(e) => {
         e.stopPropagation()
         onToggle()
-      }}
-    >
-      {erledigt ? <Check className="h-4 w-4" aria-hidden /> : <Circle className="h-4 w-4" aria-hidden />}
-    </button>
+      }}>
+      {erledigt ? <MockIcon n="check" ctx="default" className="h-4 w-4" aria-hidden /> : <MockIcon n="circle" ctx="default" className="h-4 w-4" aria-hidden />}
+    </MockBtn>
   )
 }
 
 export function TodoPrioFlag({ prioritaet }: { prioritaet: TodoPrioritaet }) {
   if (prioritaet === 'normal') return null
   return (
-    <Flag
-      className={cn(
+    <MockIcon n="tag" ctx="default" className={cn(
         'h-3.5 w-3.5 shrink-0',
         prioritaet === 'hoch' ? 'text-[var(--red-tx)]' : 'text-[var(--text-4)]'
-      )}
-      aria-label={prioritaet === 'hoch' ? 'Hohe Priorität' : 'Niedrige Priorität'}
-    />
+      )} aria-label={prioritaet === 'hoch' ? 'Hohe Priorität' : 'Niedrige Priorität'} />
   )
 }

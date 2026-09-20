@@ -1,9 +1,9 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useMemo } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { HwKonditionenPruefungTable } from '@/components/angebote/HwKonditionenPruefungTable'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import type { AnfragePartnerEinholungRow } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
 import { getHandwerkerEinreichungPdfUrl } from '@/app/(dashboard)/angebote/actions'
@@ -57,7 +57,7 @@ export function LvAnfrageDetailSheet({
   const name =
     (z?.handwerker as { firma?: string | null } | null)?.firma?.trim() ||
     z?.handwerker?.name?.trim() ||
-    'Handwerker'
+    'Partner'
 
   const vorgabe = useMemo(() => {
     if (!z?.angebot_positionen) return []
@@ -78,7 +78,7 @@ export function LvAnfrageDetailSheet({
     if (!z) return
     const res = await getHandwerkerEinreichungPdfUrl(z.id, 'angebot', index)
     if (!res.ok) {
-      toast.error(res.message)
+      toast.systemError(res)
       return
     }
     window.open(res.url, '_blank', 'noopener,noreferrer')
@@ -116,7 +116,7 @@ export function LvAnfrageDetailSheet({
               {vorgabe.map((p) => (
                 <li
                   key={p.id}
-                  className="rounded-lg border border-[var(--border)] px-3 py-2.5"
+                  className="rounded-card border border-[var(--border)] px-3 py-2.5"
                 >
                   <div className="font-semibold text-[var(--text)]">
                     {p.leistung?.trim() || p.leistung_name?.trim() || 'Position'}
@@ -152,7 +152,7 @@ export function LvAnfrageDetailSheet({
                   {antwort.map((p, i) => (
                     <li
                       key={`${p.leistung}-${i}`}
-                      className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border)] px-3 py-2.5"
+                      className="flex items-start justify-between gap-3 rounded-card border border-[var(--border)] px-3 py-2.5"
                     >
                       <div className="min-w-0">
                         <div className="font-semibold text-[var(--text)]">{p.leistung}</div>

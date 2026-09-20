@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAngebotNeu, revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromProjektWasZeilen } from '@/lib/preislisten/sync-neue-leistungen'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
@@ -27,6 +33,7 @@ import {
   kundeAdresseDbFelder,
 } from '@/lib/anfrage-adresse'
 import { ensureLeadVertriebsAnalyse as ensureLeadVertriebsAnalyseAction } from './lead-vertriebs-analyse-action'
+import { formatDatumZeit } from '@/lib/format/geld-datum'
 
 export async function updateLeadStatus(
   leadId: string,
@@ -43,6 +50,7 @@ export async function updateLeadStatus(
     .select('status')
     .eq('id', leadId)
     .maybeSingle()
+  if (fetchErr) logDbError('app/anfragen/actions:leads', fetchErr)
 
   if (fetchErr) {
     return { ok: false, message: fetchErr.message }
@@ -67,6 +75,7 @@ export async function updateLeadStatus(
     .from('leads')
     .update(patch)
     .eq('id', leadId)
+  if (updErr) logDbError('app/anfragen/actions:leads', updErr)
 
   if (updErr) {
     return { ok: false, message: updErr.message }
@@ -79,6 +88,7 @@ export async function updateLeadStatus(
     user_id: user.id,
     notiz: notiz ?? null,
   })
+  if (histErr) logDbError('app/anfragen/actions:leads_status_history', histErr)
 
   if (histErr) {
     return { ok: false, message: histErr.message }
@@ -92,12 +102,12 @@ export async function updateLeadStatus(
     beschreibung: notiz ?? null,
     erstellt_von: user.id,
   })
+  if (tlErr) logDbError('app/anfragen/actions:lead_timeline', tlErr)
   if (tlErr) {
     console.warn('lead_timeline:', tlErr.message)
   }
 
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -112,6 +122,7 @@ export async function markLeadKontaktiertWennNeu(
     .select('status')
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
   if (!lead) return { ok: false, message: 'Anfrage nicht gefunden.' }
@@ -131,9 +142,10 @@ export async function updateLeadNotizen(
     .from('leads')
     .update({ notizen, updated_at: new Date().toISOString() })
     .eq('id', leadId)
+  if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -150,11 +162,10 @@ export async function updateLeadBeschreibung(
       updated_at: new Date().toISOString(),
     })
     .eq('id', leadId)
+  if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -174,11 +185,12 @@ async function kalenderBeschreibungFuerLead(
   }
 ): Promise<string | null> {
   const supabase = createClient()
-  const { data: lead } = await supabase
+  const { data: lead, error } = await supabase
     .from('leads')
     .select('kontakt_name, kontakt_telefon, kontakt_email')
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/actions:leads', error)
   const zugewiesenAn = input.zugewiesen_an?.trim() || null
   let mitarbeiterName: string | null = null
   let mitarbeiterTelefon: string | null = null
@@ -238,6 +250,7 @@ export async function insertKalenderTermin(input: {
     erledigt: false,
     auftrag_id: null,
   })
+  if (error) logDbError('app/anfragen/actions:kalender_termine', error)
 
   if (error) return { ok: false, message: error.message }
 
@@ -248,10 +261,11 @@ export async function insertKalenderTermin(input: {
     beschreibung: input.beschreibung,
     erstellt_von: user?.id ?? null,
   })
+  if (tlErr) logDbError('app/anfragen/actions:lead_timeline', tlErr)
   if (tlErr) console.warn('lead_timeline termin:', tlErr.message)
 
-  revalidatePath(`/anfragen/${input.lead_id}`)
-  revalidatePath('/kalender')
+  revalidateLeadDetail(input.lead_id)
+  revalidateKalender()
   return { ok: true }
 }
 
@@ -346,7 +360,6 @@ export async function searchMieterFuerHv(
       .limit(10),
     supabase.from('kunden_objekte').select('id').eq('kunde_id', hv).limit(80),
   ])
-
   const out: MieterSuchTreffer[] = []
   const seen = new Set<string>()
 
@@ -373,14 +386,15 @@ export async function searchMieterFuerHv(
 
   const objektIds = (objekte ?? []).map((o) => o.id as string).filter(Boolean)
   if (objektIds.length) {
-    const { data: einheiten } = await supabase
+    const { data: einheiten, error } = await supabase
       .from('objekt_einheiten')
       .select('id')
       .in('kunde_objekt_id', objektIds)
       .eq('aktiv', true)
+    if (error) logDbError('app/anfragen/actions:objekt_einheiten', error)
     const einheitIds = (einheiten ?? []).map((e) => e.id as string).filter(Boolean)
     if (einheitIds.length) {
-      const { data: bewohner } = await supabase
+      const { data: bewohner, error } = await supabase
         .from('einheit_bewohner')
         .select('id, name, email, telefon')
         .eq('kunde_id', hv)
@@ -389,6 +403,7 @@ export async function searchMieterFuerHv(
         .is('anonymisiert_am', null)
         .ilike('name', pattern)
         .limit(10)
+      if (error) logDbError('app/anfragen/actions:einheit_bewohner', error)
       for (const b of bewohner ?? []) {
         const key = `bew:${b.id}`
         if (seen.has(key)) continue
@@ -452,6 +467,7 @@ export async function createAnfrage(
       .select('id')
       .eq('id', kundeId)
       .maybeSingle()
+    if (kundeLookupErr) logDbError('app/anfragen/actions:kunden', kundeLookupErr)
     if (kundeLookupErr || !existingKunde?.id) {
       return { ok: false, message: kundeLookupErr?.message ?? 'Kunde nicht gefunden.' }
     }
@@ -468,11 +484,12 @@ export async function createAnfrage(
       kundeId = hit.kundeId
       ansprechpartnerId = hit.ansprechpartnerId
     } else {
-      const { data: existing } = await supabase
+      const { data: existing, error } = await supabase
         .from('kunden')
         .select('id')
         .eq('email', email)
         .maybeSingle()
+      if (error) logDbError('app/anfragen/actions:kunden', error)
       if (existing?.id) {
         kundeId = existing.id
       }
@@ -542,6 +559,7 @@ export async function createAnfrage(
       })
       .select('id')
       .single()
+    if (kundeErr) logDbError('app/anfragen/actions:kunden', kundeErr)
 
     if (kundeErr || !kundeRow) {
       return { ok: false, message: kundeErr?.message ?? 'Kunde konnte nicht angelegt werden.' }
@@ -562,6 +580,7 @@ export async function createAnfrage(
         updated_at: new Date().toISOString(),
       })
       .eq('id', kundeId)
+    if (kUpdErr) logDbError('app/anfragen/actions:kunden', kUpdErr)
     if (kUpdErr) return { ok: false, message: kUpdErr.message }
   }
 
@@ -575,19 +594,21 @@ export async function createAnfrage(
   // HV + Mieter: Mieter als Lead-Kunde (wie Melder-Meldung), HV als Auftraggeber
   if (istHausverwaltung && hvAuftraggeberId && (melderName || melderKundeId)) {
     if (melderKundeId) {
-      const { data: mk } = await supabase
+      const { data: mk, error } = await supabase
         .from('kunden')
         .select('id')
         .eq('id', melderKundeId)
         .maybeSingle()
+      if (error) logDbError('app/anfragen/actions:kunden', error)
       if (!mk?.id) melderKundeId = null
     }
     if (!melderKundeId && melderEmail) {
-      const { data: byMail } = await supabase
+      const { data: byMail, error } = await supabase
         .from('kunden')
         .select('id')
         .eq('email', melderEmail)
         .maybeSingle()
+      if (error) logDbError('app/anfragen/actions:kunden', error)
       if (byMail?.id) melderKundeId = byMail.id
     }
     if (!melderKundeId && melderName) {
@@ -612,6 +633,7 @@ export async function createAnfrage(
         })
         .select('id')
         .single()
+      if (neuErr) logDbError('app/anfragen/actions:kunden', neuErr)
       if (neuErr || !neu?.id) {
         return { ok: false, message: neuErr?.message ?? 'Mieter konnte nicht angelegt werden.' }
       }
@@ -623,7 +645,8 @@ export async function createAnfrage(
         const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
         if (melderEmail) patch.email = melderEmail
         if (melderTelefon) patch.telefon = melderTelefon
-        await supabase.from('kunden').update(patch).eq('id', melderKundeId)
+        const { error: __dbErr1 } = await supabase.from('kunden').update(patch).eq('id', melderKundeId)
+        if (__dbErr1) logDbError('app/anfragen/actions:kunden', __dbErr1)
       }
     }
   }
@@ -699,6 +722,7 @@ export async function createAnfrage(
     })
     .select('id')
     .single()
+  if (leadErr) logDbError('app/anfragen/actions:leads', leadErr)
 
   if (leadErr || !leadRow) {
     return { ok: false, message: leadErr?.message ?? 'Lead konnte nicht gespeichert werden.' }
@@ -724,6 +748,7 @@ export async function createAnfrage(
     beschreibung: null,
     erstellt_von: actor?.id ?? null,
   })
+  if (tlErr) logDbError('app/anfragen/actions:lead_timeline', tlErr)
   if (tlErr) console.warn('lead_timeline created:', tlErr.message)
 
   if (email && payload.bestaetigungsmail_senden === true) {
@@ -734,8 +759,7 @@ export async function createAnfrage(
     }
   }
 
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
   return { ok: true, id: leadId }
 }
 
@@ -776,6 +800,7 @@ export async function updateAnfrageAusNeuForm(
     .select('id, kunde_id, funnel_daten')
     .eq('id', leadId)
     .maybeSingle()
+  if (fetchErr) logDbError('app/anfragen/actions:leads', fetchErr)
 
   if (fetchErr || !row) {
     return { ok: false, message: fetchErr?.message ?? 'Anfrage nicht gefunden.' }
@@ -844,6 +869,7 @@ export async function updateAnfrageAusNeuForm(
       kundePatch.plz = plzFinal
     }
     const { error: kErr } = await supabase.from('kunden').update(kundePatch).eq('id', kundeId)
+    if (kErr) logDbError('app/anfragen/actions:kunden', kErr)
     if (kErr) return { ok: false, message: kErr.message }
   }
 
@@ -882,6 +908,7 @@ export async function updateAnfrageAusNeuForm(
   if (payload.zeitraum_bis !== undefined) patch.zeitraum_bis = payload.zeitraum_bis?.trim() || null
 
   const { error: updErr } = await supabase.from('leads').update(patch).eq('id', leadId)
+  if (updErr) logDbError('app/anfragen/actions:leads', updErr)
   if (updErr) return { ok: false, message: updErr.message }
 
   const {
@@ -894,12 +921,12 @@ export async function updateAnfrageAusNeuForm(
     beschreibung: null,
     erstellt_von: actor?.id ?? null,
   })
+  if (tlErr) logDbError('app/anfragen/actions:lead_timeline', tlErr)
   if (tlErr && process.env.NODE_ENV === 'development') {
     console.warn('lead_timeline update:', tlErr.message)
   }
 
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -917,11 +944,11 @@ export async function updateLeadPreisindikation(
       updated_at: new Date().toISOString(),
     })
     .eq('id', leadId)
+  if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/angebote/neu')
+  revalidateLeadDetail(leadId)
+  revalidateAngebotNeu()
   return { ok: true }
 }
 
@@ -945,6 +972,7 @@ export async function setLeadAlsAkut(
     .select('id, situation, funnel_daten, freigabe_bypass_grund')
     .eq('id', id)
     .maybeSingle()
+  if (fetchErr) logDbError('app/anfragen/actions:leads', fetchErr)
   if (fetchErr || !lead) return { ok: false, message: fetchErr?.message ?? 'Anfrage nicht gefunden.' }
 
   const fdRaw =
@@ -966,6 +994,7 @@ export async function setLeadAlsAkut(
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+    if (error) logDbError('app/anfragen/actions:leads', error)
     if (error) return { ok: false, message: error.message }
   } else {
     const prevSit =
@@ -985,12 +1014,11 @@ export async function setLeadAlsAkut(
       patch.freigabe_bypass_grund = null
     }
     const { error } = await supabase.from('leads').update(patch).eq('id', id)
+    if (error) logDbError('app/anfragen/actions:leads', error)
     if (error) return { ok: false, message: error.message }
   }
 
-  revalidatePath(`/anfragen/${id}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
+  revalidateLeadDetail(id)
   return { ok: true }
 }
 
@@ -1030,11 +1058,10 @@ export async function updateLeadKontakt(
   if (data.kanal !== undefined) patch.kanal = data.kanal
 
   const { error } = await supabase.from('leads').update(patch).eq('id', leadId)
+  if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/vorgaenge')
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -1080,17 +1107,19 @@ export async function updateLeadMelderUndLeistungsort(
   if (anlageId !== undefined) patch.objekt_anlage_id = anlageId
 
   // HV-Pipeline sicherstellen, falls Lead aus CRM-FAB ohne Auftraggeber kam
-  const { data: leadRow } = await supabase
+  const { data: leadRow, error } = await supabase
     .from('leads')
     .select('kunde_id, auftraggeber_kunde_id, kundentyp, anlass, funnel_daten')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/actions:leads', error)
   if (!leadRow) return { ok: false, message: 'Anfrage nicht gefunden.' }
 
   const kundeId = (leadRow.kunde_id as string | null)?.trim() || null
   const agId = (leadRow.auftraggeber_kunde_id as string | null)?.trim() || null
   if (!agId && kundeId) {
-    const { data: k } = await supabase.from('kunden').select('typ').eq('id', kundeId).maybeSingle()
+    const { data: k, error } = await supabase.from('kunden').select('typ').eq('id', kundeId).maybeSingle()
+    if (error) logDbError('app/anfragen/actions:kunden', error)
     if (istKundeHausverwaltungTyp(k?.typ as string | null)) {
       patch.auftraggeber_kunde_id = kundeId
       if (!(leadRow.anlass as string | null)?.trim()) patch.anlass = 'meldung'
@@ -1099,11 +1128,12 @@ export async function updateLeadMelderUndLeistungsort(
 
   /* Wie Portal-Melde: Lead-Adresse = Objekt-Leistungsort. */
   if (objektId) {
-    const { data: obj } = await supabase
+    const { data: obj, error } = await supabase
       .from('kunden_objekte')
       .select('strasse, hausnummer, plz, ort')
       .eq('id', objektId)
       .maybeSingle()
+    if (error) logDbError('app/anfragen/actions:kunden_objekte', error)
     if (obj) {
       const strasse = (obj.strasse as string | null)?.trim() || null
       const hausnummer = (obj.hausnummer as string | null)?.trim() || null
@@ -1132,8 +1162,9 @@ export async function updateLeadMelderUndLeistungsort(
     }
   }
 
-  const { error } = await supabase.from('leads').update(patch).eq('id', id)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('leads').update(patch).eq('id', id)
+  if (error2) logDbError('app/anfragen/actions:leads', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   const angebotId = data.angebotId?.trim()
   const angebotPatch: Record<string, unknown> = {
@@ -1149,13 +1180,12 @@ export async function updateLeadMelderUndLeistungsort(
     syncAngebot = true
   }
   if (angebotId && syncAngebot) {
-    await supabase.from('angebote').update(angebotPatch).eq('id', angebotId)
-    revalidatePath(`/angebote/${angebotId}`)
+    const { error: __dbErr2 } = await supabase.from('angebote').update(angebotPatch).eq('id', angebotId)
+    if (__dbErr2) logDbError('app/anfragen/actions:angebote', __dbErr2)
+    revalidateAngebotDetail(angebotId)
   }
 
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${id}`)
-  revalidatePath('/vorgaenge')
+  revalidateLeadDetail(id)
   return { ok: true }
 }
 
@@ -1169,21 +1199,27 @@ export async function saveLeadFunnelPositionen(
     .select('funnel_daten')
     .eq('id', leadId)
     .maybeSingle()
+  if (loadErr) logDbError('app/anfragen/actions:leads', loadErr)
 
   if (loadErr || !row) return { ok: false, message: 'Anfrage nicht gefunden.' }
 
   const funnel = parseLeadFunnelDaten(row.funnel_daten)
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('leads')
     .update({
       funnel_daten: { ...funnel, positionen },
       updated_at: new Date().toISOString(),
     })
     .eq('id', leadId)
+  if (error2) logDbError('app/anfragen/actions:leads', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateLeadDetail(leadId)
+=======
   revalidatePath('/anfragen')
   revalidatePath(`/anfragen/${leadId}`)
+>>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -1197,23 +1233,29 @@ export async function saveLeadProjektWasZeilen(
     .select('funnel_daten')
     .eq('id', leadId)
     .maybeSingle()
+  if (loadErr) logDbError('app/anfragen/actions:leads', loadErr)
 
   if (loadErr || !row) return { ok: false, message: 'Anfrage nicht gefunden.' }
 
   await syncNeueLeistungenToPreisliste(syncInputsFromProjektWasZeilen(zeilen))
 
   const funnel = parseLeadFunnelDaten(row.funnel_daten)
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('leads')
     .update({
       funnel_daten: persistWasZeilenInFunnel(funnel, zeilen),
       updated_at: new Date().toISOString(),
     })
     .eq('id', leadId)
+  if (error2) logDbError('app/anfragen/actions:leads', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateLeadDetail(leadId)
+=======
   revalidatePath('/anfragen')
   revalidatePath(`/anfragen/${leadId}`)
+>>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -1244,6 +1286,7 @@ export async function updateLeadProjekt(
           .select('bereiche')
           .eq('id', leadId)
           .maybeSingle()
+        if (fetchErr) logDbError('app/anfragen/actions:leads', fetchErr)
         if (fetchErr) return { ok: false, message: fetchErr.message }
         const ber = bereicheMitLegacyGewerbeSituation([...((row?.bereiche as string[] | null) ?? [])], 'gewerbe')
         patch.bereiche = ber.length ? ber : null
@@ -1259,10 +1302,10 @@ export async function updateLeadProjekt(
   if (data.zeitraum_bis !== undefined) patch.zeitraum_bis = data.zeitraum_bis
 
   const { error } = await supabase.from('leads').update(patch).eq('id', leadId)
+  if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -1275,9 +1318,10 @@ export async function updateLeadVorOrtNotizen(
     .from('leads')
     .update({ vor_ort_notizen: vor_ort_notizen.trim() || null, updated_at: new Date().toISOString() })
     .eq('id', leadId)
+  if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -1310,12 +1354,13 @@ export async function addLeadNotizRow(
   if (!text && allUrls.length === 0) return { ok: false, message: 'Text oder Foto erforderlich.' }
 
   if (terminId) {
-    const { data: termin } = await supabase
+    const { data: termin, error } = await supabase
       .from('kalender_termine')
       .select('id')
       .eq('id', terminId)
       .eq('lead_id', leadId)
       .maybeSingle()
+    if (error) logDbError('app/anfragen/actions:kalender_termine', error)
     if (!termin) return { ok: false, message: 'Termin nicht gefunden.' }
   }
 
@@ -1332,6 +1377,7 @@ export async function addLeadNotizRow(
     })
     .select('id')
     .single()
+  if (error) logDbError('app/anfragen/actions:lead_notizen', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen.' }
 
@@ -1347,13 +1393,13 @@ export async function addLeadNotizRow(
       erstellt_von: user?.id ?? null,
     })
     if (!sync.ok) {
-      await supabase.from('lead_notizen').delete().eq('id', data.id)
+      const { error: __dbErr3 } = await supabase.from('lead_notizen').delete().eq('id', data.id)
+      if (__dbErr3) logDbError('app/anfragen/actions:lead_notizen', __dbErr3)
       return { ok: false, message: sync.message }
     }
   }
 
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
+  revalidateLeadDetail(leadId)
   return { ok: true, id: data.id as string }
 }
 
@@ -1383,21 +1429,23 @@ export async function updateLeadNotizRow(
   }
 
   const supabase = createClient()
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('lead_notizen')
     .select('kalender_termin_id, datei_url, datei_urls')
     .eq('id', notizId)
     .eq('lead_id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/actions:lead_notizen', error)
 
   if (!row) return { ok: false, message: 'Notiz nicht gefunden.' }
 
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('lead_notizen')
     .update(patch)
     .eq('id', notizId)
     .eq('lead_id', leadId)
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/anfragen/actions:lead_notizen', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   const terminId = (row as { kalender_termin_id?: string | null }).kalender_termin_id?.trim()
   if (terminId) {
@@ -1419,8 +1467,7 @@ export async function updateLeadNotizRow(
     if (!sync.ok) return { ok: false, message: sync.message }
   }
 
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -1429,21 +1476,27 @@ export async function deleteLeadNotizRow(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('lead_notizen')
     .select('id, quelle_notiz_id, kalender_termin_id')
     .eq('id', notizId)
     .eq('lead_id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/actions:lead_notizen', error)
 
   if (!row) return { ok: false, message: 'Notiz nicht gefunden.' }
 
   const quelleId = (row as { quelle_notiz_id?: string | null }).quelle_notiz_id?.trim()
   const deleteId = quelleId || notizId
 
-  const { error } = await supabase.from('lead_notizen').delete().eq('id', deleteId).eq('lead_id', leadId)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('lead_notizen').delete().eq('id', deleteId).eq('lead_id', leadId)
+  if (error2) logDbError('app/anfragen/actions:lead_notizen', error2)
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateLeadDetail(leadId)
+=======
   revalidatePath(`/anfragen/${leadId}`)
+>>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -1464,6 +1517,7 @@ async function insertLeadTimelineEntry(
     beschreibung,
     erstellt_von: user?.id ?? null,
   })
+  if (error) logDbError('app/anfragen/actions:lead_timeline', error)
   if (error) console.warn('lead_timeline:', error.message)
 }
 
@@ -1492,11 +1546,12 @@ export async function saveLeadTerminVereinbart(input: {
   let adresse = (input.adresse ?? '').trim()
   if (!adresse) {
     const supabase = createClient()
-    const { data: lead } = await supabase
+    const { data: lead, error } = await supabase
       .from('leads')
       .select('plz, funnel_daten, kunden!kunde_id(adresse, plz, ort)')
       .eq('id', input.leadId)
       .maybeSingle()
+    if (error) logDbError('app/anfragen/actions:leads', error)
     if (lead) {
       const row = lead as {
         plz?: string | null
@@ -1522,7 +1577,7 @@ export async function saveLeadTerminVereinbart(input: {
     zugewiesen_an: zugewiesenAn,
   })
 
-  const { data: existingBesichtigung } = await supabase
+  const { data: existingBesichtigung, error } = await supabase
     .from('kalender_termine')
     .select('id')
     .eq('lead_id', input.leadId)
@@ -1531,6 +1586,7 @@ export async function saveLeadTerminVereinbart(input: {
     .order('datum', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/actions:kalender_termine', error)
 
   if (existingBesichtigung?.id) {
     const { error } = await supabase
@@ -1545,9 +1601,10 @@ export async function saveLeadTerminVereinbart(input: {
         zugewiesen_an: zugewiesenAn,
       })
       .eq('id', existingBesichtigung.id as string)
+    if (error) logDbError('app/anfragen/actions:kalender_termine', error)
     if (error) return { ok: false, message: error.message }
-    revalidatePath('/kalender')
-    revalidatePath(`/anfragen/${input.leadId}`)
+    revalidateKalender()
+    revalidateLeadDetail(input.leadId)
   } else {
     const kal = await insertKalenderTermin({
       lead_id: input.leadId,
@@ -1622,8 +1679,7 @@ export async function saveLeadRueckfrage(input: {
   if (!markRes.ok) return markRes
 
   if (!markRes.geaendert) {
-    revalidatePath(`/anfragen/${input.leadId}`)
-    revalidatePath('/anfragen')
+    revalidateLeadDetail(input.leadId)
   }
   return { ok: true }
 }
@@ -1639,13 +1695,7 @@ export async function saveLeadNichtErreichbar(input: {
   | { ok: false; message: string }
 > {
   const supabase = createClient()
-  const stamp = new Date().toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const stamp = formatDatumZeit(new Date().toISOString())
   const name = input.kontaktName.trim() || 'Kunde'
   const extra = [name ? `Kontakt: ${name}` : null, input.notiz?.trim() || null]
     .filter(Boolean)
@@ -1664,6 +1714,7 @@ export async function saveLeadNichtErreichbar(input: {
     .eq('lead_id', input.leadId)
     .eq('typ', 'kontakt')
     .ilike('titel', 'Nicht erreichbar%')
+  if (error) logDbError('app/anfragen/actions:lead_timeline', error)
 
   if (error) {
     console.warn('kontaktversuche count:', error.message)
@@ -1672,9 +1723,8 @@ export async function saveLeadNichtErreichbar(input: {
   const versuche = typeof count === 'number' ? count : 1
   const vorschlagVerloren = versuche >= 3
 
-  revalidatePath(`/anfragen/${input.leadId}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/kalender')
+  revalidateLeadDetail(input.leadId)
+  revalidateKalender()
   return { ok: true, versuche, vorschlagVerloren }
 }
 
@@ -1714,9 +1764,7 @@ export async function softDeleteAnfrage(
   const r = await softDeleteLeadForPortal({ leadId: id })
   if (!r.ok) return r
   await insertLeadTimelineEntry(id, 'system', 'Anfrage als gelöscht markiert', null)
-  revalidatePath(`/anfragen/${id}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
+  revalidateLeadDetail(id)
   return { ok: true }
 }
 
@@ -1739,11 +1787,10 @@ export async function restoreAnfrage(
     .from('leads')
     .update({ geloescht_am: null, updated_at: new Date().toISOString() })
     .eq('id', leadId)
+  if (error) logDbError('app/anfragen/actions:leads', error)
   if (error) return { ok: false, message: error.message }
   await insertLeadTimelineEntry(leadId, 'system', 'Löschen rückgängig', null)
-  revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -1752,7 +1799,7 @@ export async function undoLeadTerminVereinbart(
   leadId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: hist } = await supabase
+  const { data: hist, error } = await supabase
     .from('leads_status_history')
     .select('status_alt')
     .eq('lead_id', leadId)
@@ -1760,19 +1807,21 @@ export async function undoLeadTerminVereinbart(
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/actions:leads_status_history', error)
 
   const prev = (hist?.status_alt as LeadStatus | null) || 'kontaktiert'
   const statusRes = await updateLeadStatus(leadId, prev, 'Termin rückgängig')
   if (!statusRes.ok) return statusRes
 
-  await supabase
+  const { error: __dbErr4 } = await supabase
     .from('kalender_termine')
     .update({ erledigt: true })
     .eq('lead_id', leadId)
     .eq('typ', 'besichtigung')
     .eq('erledigt', false)
+  if (__dbErr4) logDbError('app/anfragen/actions:kalender_termine', __dbErr4)
 
-  revalidatePath('/kalender')
+  revalidateKalender()
   return { ok: true }
 }
 
@@ -1784,8 +1833,9 @@ export async function dismissDuplikatBand(
     .from('leads')
     .update({ duplikat_band_dismissed: true, updated_at: new Date().toISOString() })
     .eq('id', leadId)
+  if (error) logDbError('app/anfragen/actions:leads', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
@@ -1793,12 +1843,13 @@ export async function countNichtErreichbarVersuche(
   leadId: string
 ): Promise<number> {
   const supabase = createClient()
-  const { count } = await supabase
+  const {count, error } = await supabase
     .from('lead_timeline')
     .select('id', { count: 'exact', head: true })
     .eq('lead_id', leadId)
     .eq('typ', 'kontakt')
     .ilike('titel', 'Nicht erreichbar%')
+  if (error) logDbError('app/anfragen/actions:lead_timeline', error)
   return typeof count === 'number' ? count : 0
 }
 
@@ -1838,6 +1889,7 @@ export async function weiterfuehrenAlsProjekt(
     )
     .eq('id', quellLeadId.trim())
     .maybeSingle()
+  if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error || !src) return { ok: false, message: error?.message ?? 'Anfrage nicht gefunden.' }
 
@@ -1874,19 +1926,20 @@ export async function weiterfuehrenAlsProjekt(
     })
     .select('id')
     .single()
+  if (insErr) logDbError('app/anfragen/actions:leads', insErr)
 
   if (insErr || !neu) return { ok: false, message: insErr?.message ?? 'Projekt-Anfrage konnte nicht angelegt werden.' }
 
   const newId = (neu as { id: string }).id
-  await supabase.from('leads_status_history').insert({
+  const { error: __dbErr5 } = await supabase.from('leads_status_history').insert({
     lead_id: newId,
     status_neu: 'neu',
     user_id: user?.id ?? null,
     notiz: `Aus Meldung ${quellLeadId} weitergeführt`,
   })
+  if (__dbErr5) logDbError('app/anfragen/actions:leads_status_history', __dbErr5)
 
-  revalidatePath('/anfragen')
-  revalidatePath(`/anfragen/${quellLeadId}`)
-  revalidatePath(`/anfragen/${newId}`)
+  revalidateLeadDetail(quellLeadId)
+  revalidateLeadDetail(newId)
   return { ok: true, id: newId }
 }

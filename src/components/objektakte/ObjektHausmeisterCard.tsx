@@ -1,15 +1,16 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
-import { useEffect, useState } from 'react'
-import { useTransition } from '@/components/ui/action-busy'
+import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { useEffect, useState } from 'react'
+import { Combobox } from '@/components/ui/Combobox'
+import { useTransition } from '@/components/ui/action-busy'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { toast } from '@/components/ui/app-toast'
 import {
   activateObjektHausmeisterPortal,
@@ -27,6 +28,7 @@ import { LIST } from '@/lib/crm-labels'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
+import { TOAST } from '@/lib/copy'
 
 const HM_LIST_COLS = 'minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.2fr) auto'
 
@@ -40,7 +42,7 @@ type Props = {
 
 /**
  * Hausmeister am Objekt — gleiche Listen-Card wie Kontakte/Ansprechpartner
- * (ap-list + ⋯-Menü für Bearbeiten/Entfernen).
+ * (ap-list + ⋯-Menü für Bearbeiten/Löschen).
  */
 export function ObjektHausmeisterCard({
   kundeId,
@@ -167,7 +169,7 @@ export function ObjektHausmeisterCard({
       })
       if (!r.ok) {
         setErr(r.message)
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       const staffMail = isBaerenwaldPrimaryStaffEmail(
@@ -194,11 +196,11 @@ export function ObjektHausmeisterCard({
     try {
       const r = await removeObjektHausmeister(kundeId, objektId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       setRemoveOpen(false)
-      toast.success('Zuordnung entfernt')
+      toast.success(TOAST.zuordnung_entfernt)
       onChanged()
     } finally {
       setRemovePending(false)
@@ -211,7 +213,7 @@ export function ObjektHausmeisterCard({
       if (primaryStaff || !portalKundeId) {
         const r = await activateObjektHausmeisterPortal(kundeId, objektId, amObjekt.id)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           return
         }
         toast.success(
@@ -232,16 +234,16 @@ export function ObjektHausmeisterCard({
       }
       const r = await inviteObjektHausmeister(kundeId, objektId, amObjekt.id)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Einladungslink erzeugt')
+      toast.success(TOAST.einladungslink_erzeugt)
       if (r.inviteMailto) {
         window.location.href = r.inviteMailto
       } else if (r.inviteUrl) {
         try {
           await navigator.clipboard.writeText(r.inviteUrl)
-          toast.success('Link in Zwischenablage')
+          toast.success(TOAST.link_in_zwischenablage)
         } catch {
           toast.message(r.inviteUrl)
         }
@@ -258,14 +260,14 @@ export function ObjektHausmeisterCard({
       const r = await openPortalAsKunde(portalKundeId)
       if (!r.ok) {
         popup?.close()
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       if (popup) popup.location.href = r.url
       else window.location.assign(r.url)
     } catch {
       popup?.close()
-      toast.error('Portal konnte nicht geöffnet werden.')
+      toast.error(TOAST.portal_konnte_nicht_geoeffnet_werden)
     } finally {
       setLoginBusy(false)
     }
@@ -324,7 +326,7 @@ export function ObjektHausmeisterCard({
     if (!amObjekt.isLegacy) {
       items.push('sep', {
         icon: 'trash',
-        label: 'Entfernen',
+        label: 'Löschen',
         danger: true,
         onClick: () => setRemoveOpen(true),
       })
@@ -340,11 +342,7 @@ export function ObjektHausmeisterCard({
         className={isMobile ? 'ap-mobile-card ap-mobile-card--row' : 'ap-list__row'}
         style={isMobile ? undefined : { gridTemplateColumns: HM_LIST_COLS }}
       >
-        <button
-          type="button"
-          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
-          onClick={openSheet}
-        >
+        <MockBtn className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'} type="button" onClick={openSheet}>
           {isMobile ? (
             <>
               <div className="ap-mobile-card__top">
@@ -375,7 +373,7 @@ export function ObjektHausmeisterCard({
               <span className="ap-list__dim">{kontakt}</span>
             </>
           )}
-        </button>
+        </MockBtn>
         <div
           className="row-actions always"
           onClick={(e) => e.stopPropagation()}
@@ -431,74 +429,55 @@ export function ObjektHausmeisterCard({
         )}
       </MockCard>
 
-      <MockModal
+      <ConfirmPopup
         open={removeOpen}
         onClose={() => {
           if (!removePending) setRemoveOpen(false)
         }}
-        icon="trash"
-        title="Hausmeister entfernen?"
-        sub="Zuordnung am Objekt aufheben."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={removePending} onClick={() => setRemoveOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={removePending ? undefined : 'trash'}
-              disabled={removePending}
-              onClick={() => void runEntfernen()}
-            >
-              {removePending ? 'Wird entfernt…' : 'Entfernen'}
-            </MockBtn>
-          </>
-        }
+        title="Hausmeister löschen?"
+        danger
+        busy={removePending}
+        confirmLabel={removePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runEntfernen()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Zuordnung am Objekt aufheben.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {removePending
             ? 'Bitte warten…'
             : `„${amObjekt?.name ?? 'Hausmeister'}“ wird vom Objekt entfernt.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
       <EditorSheet
         open={sheetOpen}
         onClose={() => !pending && setSheetOpen(false)}
         title={mode === 'new' ? 'Hausmeister anlegen' : 'Hausmeister zuweisen'}
-        footer={
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <MockBtn sm kind="ghost" disabled={pending} onClick={() => setSheetOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <MockBtn sm kind="primary" disabled={pending} onClick={speichern}>
-              Speichern
-            </MockBtn>
-          </div>
-        }
+        secondary={{ label: 'Abbrechen', disabled: pending }}
+        primary={{
+          label: 'Speichern',
+          onClick: speichern,
+          disabled: pending,
+          busy: pending,
+        }}
       >
         <div className="space-y-3">
           {liste.length > 0 ? (
-            <Select
-              label="Auswahl"
-              value={mode === 'new' ? '__new__' : hmId}
-              options={selectOptions}
-              onChange={(e) => onSelectChange(e.target.value)}
-            />
+            <MockField label="Auswahl">
+              <MockSelect value={mode === 'new' ? '__new__' : hmId} onChange={(e) => onSelectChange(e.target.value)}>
+                {selectOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </MockSelect>
+            </MockField>
           ) : null}
 
           {mode === 'new' ? (
             <>
-              <Input
-                label="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Max Mustermann"
-                autoComplete="name"
-                required
-              />
+              <MockField label="Name" required><MockInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Max Mustermann" autoComplete="name" required /></MockField>
               <label
                 style={{
                   display: 'flex',
@@ -508,8 +487,7 @@ export function ObjektHausmeisterCard({
                   color: 'var(--text-2)',
                 }}
               >
-                <input
-                  type="checkbox"
+                <MockCheckbox
                   checked={portalZugang}
                   onChange={(e) => setPortalZugang(e.target.checked)}
                   style={{ marginTop: 2 }}
@@ -521,25 +499,12 @@ export function ObjektHausmeisterCard({
                 </span>
               </label>
               {portalZugang ? (
-                <Input
-                  label="E-Mail"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@firma.de"
-                  autoComplete="email"
-                  required
-                />
+                <MockField label="E-Mail" required><MockInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@firma.de" autoComplete="email" required /></MockField>
               ) : null}
             </>
           ) : (
             <>
-              <Input
-                label="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-              />
+              <MockField label="Name"><MockInput value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></MockField>
               <label
                 style={{
                   display: 'flex',
@@ -549,23 +514,14 @@ export function ObjektHausmeisterCard({
                   color: 'var(--text-2)',
                 }}
               >
-                <input
-                  type="checkbox"
+                <MockCheckbox
                   checked={portalZugang}
                   onChange={(e) => setPortalZugang(e.target.checked)}
                   style={{ marginTop: 2 }}
                 />
                 <span>Portal-Zugang</span>
               </label>
-              <Input
-                label="E-Mail"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@firma.de"
-                autoComplete="email"
-                disabled={!portalZugang}
-              />
+              <MockField label="E-Mail"><MockInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@firma.de" autoComplete="email" disabled={!portalZugang} /></MockField>
             </>
           )}
 

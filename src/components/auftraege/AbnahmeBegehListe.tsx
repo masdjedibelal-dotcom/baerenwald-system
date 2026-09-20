@@ -1,16 +1,16 @@
 'use client'
+import { EMPTY } from '@/lib/crm-labels'
 
-import { useMemo, useState } from 'react'
-import { Check, X } from 'lucide-react'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
-import { Input } from '@/components/ui/Input'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { useMemo, useState } from 'react'
+import { Combobox } from '@/components/ui/Combobox'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
@@ -34,6 +34,7 @@ import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
 import type { KiAssistDraft } from '@/lib/copilot/ki-assist-scopes'
+import { TOAST } from '@/lib/copy'
 
 const MAX_MANGEL_FOTOS = 4
 
@@ -154,38 +155,20 @@ function BegehItem({
 
   return (
     <li className={cn('abnahme-inline__item', status === 'ok' && 'is-done')}>
-      <button
-        type="button"
-        className={cn('abnahme-inline__check', status === 'ok' && 'is-ok')}
-        aria-label={status === 'ok' ? 'Erledigt — tippen für offen' : 'Offen — tippen für erledigt'}
-        aria-pressed={status === 'ok'}
-        onClick={onToggle}
-      >
-        {status === 'ok' ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : null}
-      </button>
+      <MockBtn className={cn('abnahme-inline__check', status === 'ok' && 'is-ok')} type="button" aria-label={status === 'ok' ? 'Erledigt — tippen für offen' : 'Offen — tippen für erledigt'} aria-pressed={status === 'ok'} onClick={onToggle}>
+        {status === 'ok' ? <MockIcon n="check" ctx="default" className="h-3.5 w-3.5" aria-hidden /> : null}
+      </MockBtn>
       <div className="abnahme-inline__item-body">
         <p className="abnahme-inline__item-title">{leistungTitel(leistung)}</p>
         {notiz ? <p className="abnahme-inline__item-sub">{notiz}</p> : null}
       </div>
       <div className="abnahme-inline__item-actions">
-        <button
-          type="button"
-          className="abnahme-inline__icon-btn"
-          title="Titel & Notiz bearbeiten"
-          aria-label="Titel & Notiz bearbeiten"
-          onClick={onEdit}
-        >
+        <MockBtn className="abnahme-inline__icon-btn" type="button" title="Titel & Notiz bearbeiten" aria-label="Titel & Notiz bearbeiten" onClick={onEdit}>
           <MockIcon ctx="btn" n="pencil" size={15} />
-        </button>
-        <button
-          type="button"
-          className="abnahme-inline__icon-btn"
-          title="Entfernen"
-          aria-label="Leistung entfernen"
-          onClick={onRemove}
-        >
+        </MockBtn>
+        <MockBtn className="abnahme-inline__icon-btn" type="button" title="Löschen" aria-label="Leistung löschen" onClick={onRemove}>
           <MockIcon ctx="btn" n="trash" size={15} />
-        </button>
+        </MockBtn>
       </div>
     </li>
   )
@@ -297,10 +280,11 @@ export function AbnahmeBegehListe({
   return (
     <div className="abnahme-begeh">
       {flatLeistungen.length === 0 ? (
-        <p className="abnahme-begeh__empty">
-          Noch keine Leistungen — per Dropdown aus dem Auftrag wählen oder frei als erbrachte
-          Leistung erfassen.
-        </p>
+        <MockEmpty
+          icon="clipboard-list"
+          title="Noch keine Leistungen"
+          hint="Per Dropdown aus dem Auftrag wählen oder frei als erbrachte Leistung erfassen."
+        />
       ) : (
         <ul className="abnahme-inline__items">
           {flatLeistungen.map(({ gewerk, leistung }) => (
@@ -318,10 +302,10 @@ export function AbnahmeBegehListe({
         </ul>
       )}
 
-      <button type="button" className="abnahme-begeh__add" onClick={openAdd}>
+      <MockBtn className="abnahme-begeh__add" type="button" onClick={openAdd}>
         <MockIcon ctx="btn" n="plus" size={16} />
         <span>Leistung hinzufügen</span>
-      </button>
+      </MockBtn>
 
       <EditorSheet
         open={addOpen}
@@ -339,54 +323,41 @@ export function AbnahmeBegehListe({
               draftInput={[draftTitel.trim(), draftNotiz.trim()].filter(Boolean).join('\n') || null}
               onBeforeOpen={() => setAddMode('frei')}
             />
-            <button
-              type="button"
-              className="editor-sheet__confirm"
-              disabled={
-                addMode === 'katalog' ? !pickId : !draftTitel.trim() && !draftNotiz.trim()
-              }
-              onClick={confirmAdd}
-              aria-label="Speichern"
-              title="Speichern"
-            >
-              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-            </button>
+            <MockBtn className="editor-sheet__confirm" type="button" disabled={addMode === 'katalog' ? !pickId : !draftTitel.trim() && !draftNotiz.trim()} onClick={confirmAdd} aria-label="Speichern" title="Speichern">
+              <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
+            </MockBtn>
           </div>
         }
       >
         <div className="form-grid form-grid--sheet">
           {katalogOpts.length > 0 ? (
             <div className="abnahme-begeh__seg" role="group" aria-label="Art">
-              <button
-                type="button"
-                className={cn('abnahme-begeh__seg-btn', addMode === 'katalog' && 'is-active')}
-                onClick={() => setAddMode('katalog')}
-              >
+              <MockBtn className={cn('abnahme-begeh__seg-btn', addMode === 'katalog' && 'is-active')} type="button" onClick={() => setAddMode('katalog')}>
                 Aus Auftrag
-              </button>
-              <button
-                type="button"
-                className={cn('abnahme-begeh__seg-btn', addMode === 'frei' && 'is-active')}
-                onClick={() => setAddMode('frei')}
-              >
+              </MockBtn>
+              <MockBtn className={cn('abnahme-begeh__seg-btn', addMode === 'frei' && 'is-active')} type="button" onClick={() => setAddMode('frei')}>
                 Freitext
-              </button>
+              </MockBtn>
             </div>
           ) : null}
 
           {addMode === 'katalog' && katalogOpts.length > 0 ? (
-            <Select
-              label="Leistung"
-              value={pickId}
-              onChange={(e) => {
-                setPickId(e.target.value)
-                const pos = katalogPositionen.find((p) => p.id === e.target.value)
-                if (pos && !draftTitel.trim()) {
-                  setDraftTitel((pos.leistung_name ?? '').trim())
-                }
-              }}
-              options={[{ value: '', label: 'Leistung wählen…' }, ...katalogOpts]}
-            />
+            <MockField label="Leistung">
+              <MockSelect value={pickId} onChange={(e) => {
+                  setPickId(e.target.value)
+                  const pos = katalogPositionen.find((p) => p.id === e.target.value)
+                  if (pos && !draftTitel.trim()) {
+                    setDraftTitel((pos.leistung_name ?? '').trim())
+                  }
+                }}>
+                <option value="">Leistung wählen…</option>
+                {katalogOpts.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </MockSelect>
+            </MockField>
           ) : null}
 
           <KiAssistFieldLabel
@@ -395,13 +366,7 @@ export function AbnahmeBegehListe({
             onApply={setDraftTitel}
             extraHint="Kurztitel der erbrachten Leistung im Abnahmeprotokoll."
           >
-            <Input
-              value={draftTitel}
-              onChange={(e) => setDraftTitel(e.target.value)}
-              placeholder={
-                addMode === 'katalog' ? 'Wie im Auftrag — oder umbenennen' : 'z. B. Heizkörper getauscht'
-              }
-            />
+            <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder={addMode === 'katalog' ? 'Wie im Auftrag — oder umbenennen' : 'z. B. Heizkörper getauscht'} />
           </KiAssistFieldLabel>
           <KiAssistFieldLabel
             label="Notiz (optional)"
@@ -409,13 +374,7 @@ export function AbnahmeBegehListe({
             onApply={setDraftNotiz}
             extraHint="Kurzbeschreibung unter dem Titel im PDF."
           >
-            <Textarea
-              long
-              plain
-              value={draftNotiz}
-              onChange={(e) => setDraftNotiz(e.target.value)}
-              placeholder="Kurzbeschreibung fürs Protokoll…"
-            />
+            <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} placeholder="Kurzbeschreibung fürs Protokoll…" rows={14} className="resize-y py-2 ta--long" />
           </KiAssistFieldLabel>
         </div>
       </EditorSheet>
@@ -435,16 +394,9 @@ export function AbnahmeBegehListe({
               extraHint={leistungKiHint}
               draftInput={[editTitel.trim(), editNotiz.trim()].filter(Boolean).join('\n') || null}
             />
-            <button
-              type="button"
-              className="editor-sheet__confirm"
-              disabled={!editTitel.trim()}
-              onClick={confirmEdit}
-              aria-label="Speichern"
-              title="Speichern"
-            >
-              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-            </button>
+            <MockBtn className="editor-sheet__confirm" type="button" disabled={!editTitel.trim()} onClick={confirmEdit} aria-label="Speichern" title="Speichern">
+              <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
+            </MockBtn>
           </div>
         }
       >
@@ -456,11 +408,7 @@ export function AbnahmeBegehListe({
             required
             extraHint="Kurztitel der erbrachten Leistung im Abnahmeprotokoll."
           >
-            <Input
-              value={editTitel}
-              onChange={(e) => setEditTitel(e.target.value)}
-              required
-            />
+            <MockField required><MockInput value={editTitel} onChange={(e) => setEditTitel(e.target.value)} required /></MockField>
           </KiAssistFieldLabel>
           <KiAssistFieldLabel
             label="Notiz (optional)"
@@ -468,13 +416,7 @@ export function AbnahmeBegehListe({
             onApply={setEditNotiz}
             extraHint="Beschreibung unter dem Titel im PDF."
           >
-            <Textarea
-              long
-              plain
-              value={editNotiz}
-              onChange={(e) => setEditNotiz(e.target.value)}
-              placeholder="Beschreibung unter dem Titel im PDF…"
-            />
+            <MockTextarea value={editNotiz} onChange={(e) => setEditNotiz(e.target.value)} placeholder="Beschreibung unter dem Titel im PDF…" rows={14} className="resize-y py-2 ta--long" />
           </KiAssistFieldLabel>
         </div>
       </EditorSheet>
@@ -494,7 +436,7 @@ export function AbnahmeProgressBar({
       <MockIcon ctx="default" n="clock" size={16} />
       <span>
         {total === 0
-          ? 'Keine Leistungen erfasst'
+          ? EMPTY.leistungenErfasst
           : `${done}/${total} Leistungen abgenommen`}
       </span>
     </div>
@@ -562,7 +504,7 @@ export function AbnahmeMaengelCheckliste({
 
   async function uploadFotos(files: File[]) {
     if (!auftragId) {
-      toast.error('Auftrag fehlt — Fotos können nicht hochgeladen werden.')
+      toast.error(TOAST.auftrag_fehlt_fotos_koennen_nicht_hochgeladen_we)
       return
     }
     if (!files.length || uploading) return
@@ -637,7 +579,11 @@ export function AbnahmeMaengelCheckliste({
   return (
     <div className="abnahme-begeh">
       {items.length === 0 ? (
-        <p className="abnahme-begeh__empty">Keine Mängel — optional Punkte hinzufügen.</p>
+        <MockEmpty
+          icon="alert-triangle"
+          title="Keine Mängel"
+          hint="Optional Punkte hinzufügen."
+        />
       ) : (
         <ul className="abnahme-inline__items">
           {items.map((item, i) => {
@@ -645,7 +591,7 @@ export function AbnahmeMaengelCheckliste({
             return (
               <li key={item.id} className="abnahme-inline__item abnahme-inline__item--mangel">
                 <span className="abnahme-inline__check is-mangel" aria-hidden>
-                  <span className="text-[11px] font-bold text-amber-800">!</span>
+                  <span className="text-fs-caption font-bold text-status-contact-text">!</span>
                 </span>
                 <div className="abnahme-inline__item-body">
                   <p className="abnahme-inline__item-title">{item.titel.trim() || 'Mangel'}</p>
@@ -660,7 +606,7 @@ export function AbnahmeMaengelCheckliste({
                           key={`${url}-${fi}`}
                           src={url}
                           alt=""
-                          className="h-10 w-10 rounded border border-bw-border object-cover"
+                          className="h-10 w-10 rounded-card border border-bw-border object-cover"
                         />
                       ))}
                     </div>
@@ -687,7 +633,7 @@ export function AbnahmeMaengelCheckliste({
                                 .filter(Boolean)
                                 .join('\n')
                                 .slice(0, 240) || 'Mangel'
-                            confirmDelete(
+                            openDeleteConfirm(
                               'Mangel löschen?',
                               () => onChange(items.filter((_, j) => j !== i)),
                               { body: preview }
@@ -704,10 +650,10 @@ export function AbnahmeMaengelCheckliste({
         </ul>
       )}
 
-      <button type="button" className="abnahme-begeh__add" onClick={openNew}>
+      <MockBtn className="abnahme-begeh__add" type="button" onClick={openNew}>
         <MockIcon ctx="btn" n="plus" size={16} />
         <span>Mangel hinzufügen</span>
-      </button>
+      </MockBtn>
 
       <EditorSheet
         open={editIdx != null}
@@ -724,19 +670,10 @@ export function AbnahmeMaengelCheckliste({
               extraHint="Abnahmeprotokoll: Mängel klar und prüfbar (Ort + Mangel). Ein Punkt oder Liste."
               draftInput={[draftTitel.trim(), draftNotiz.trim()].filter(Boolean).join('\n') || null}
             />
-            <button
-              type="button"
-              className="editor-sheet__confirm"
-              disabled={
-                uploading ||
-                (!draftTitel.trim() && !draftNotiz.trim() && !draftFotos.length)
-              }
-              onClick={confirm}
-              aria-label="Speichern"
-              title="Speichern"
-            >
-              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-            </button>
+            <MockBtn className="editor-sheet__confirm" type="button" disabled={uploading ||
+                (!draftTitel.trim() && !draftNotiz.trim() && !draftFotos.length)} onClick={confirm} aria-label="Speichern" title="Speichern">
+              <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
+            </MockBtn>
           </div>
         }
       >
@@ -747,11 +684,7 @@ export function AbnahmeMaengelCheckliste({
             onApply={setDraftTitel}
             extraHint="Kurzer Mangel-Titel fürs Abnahmeprotokoll."
           >
-            <Input
-              value={draftTitel}
-              onChange={(e) => setDraftTitel(e.target.value)}
-              placeholder="z. B. Dichtung nachziehen"
-            />
+            <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder="z. B. Dichtung nachziehen" />
           </KiAssistFieldLabel>
           <KiAssistFieldLabel
             label="Notiz (optional)"
@@ -759,13 +692,7 @@ export function AbnahmeMaengelCheckliste({
             onApply={setDraftNotiz}
             extraHint="Details zur Nacharbeit im Protokoll."
           >
-            <Textarea
-              long
-              plain
-              value={draftNotiz}
-              onChange={(e) => setDraftNotiz(e.target.value)}
-              placeholder="Details zur Nacharbeit…"
-            />
+            <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} placeholder="Details zur Nacharbeit…" rows={14} className="resize-y py-2 ta--long" />
           </KiAssistFieldLabel>
           <div>
             <span className="lt-field-lbl">Fotos (optional)</span>
@@ -794,19 +721,12 @@ export function AbnahmeMaengelCheckliste({
                     <img
                       src={url}
                       alt={`Mangel-Foto ${i + 1}`}
-                      className="h-full w-full rounded-md border border-bw-border object-cover"
+                      className="h-full w-full rounded-field border border-bw-border object-cover"
                     />
-                    <button
-                      type="button"
-                      className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
-                      disabled={uploading}
-                      onClick={() =>
-                        setDraftFotos((prev) => prev.filter((_, j) => j !== i))
-                      }
-                      aria-label={`Foto ${i + 1} entfernen`}
-                    >
-                      <X className="h-3.5 w-3.5" aria-hidden />
-                    </button>
+                    <MockBtn className="absolute right-1 top-1 rounded-pill bg-black/55 p-1 text-white" type="button" disabled={uploading} onClick={() =>
+                        setDraftFotos((prev) => prev.filter((_, j) => j !== i))} aria-label={`Foto ${i + 1} löschen`}>
+                      <MockIcon n="x" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+                    </MockBtn>
                   </div>
                 ))}
               </div>

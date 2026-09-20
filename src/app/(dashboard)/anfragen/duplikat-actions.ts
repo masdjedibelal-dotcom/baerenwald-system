@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -25,9 +31,10 @@ export async function zusammenfuehrenLeadDuplikat(input: {
     .select('id')
     .eq('id', ziel)
     .maybeSingle()
+  if (zErr) logDbError('app/anfragen/duplikat-actions:leads', zErr)
   if (zErr || !zielRow) return { ok: false, message: 'Ziel-Anfrage nicht gefunden.' }
 
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('leads')
     .update({
       zusammengefuehrt_in: ziel,
@@ -35,12 +42,12 @@ export async function zusammenfuehrenLeadDuplikat(input: {
       updated_at: new Date().toISOString(),
     })
     .eq('id', doppel)
+  if (error2) logDbError('app/anfragen/duplikat-actions:leads', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
 
-  revalidatePath(`/anfragen/${doppel}`)
-  revalidatePath(`/anfragen/${ziel}`)
-  revalidatePath('/vorgaenge')
+  revalidateLeadDetail(doppel)
+  revalidateLeadDetail(ziel)
   return { ok: true }
 }
 
@@ -60,13 +67,14 @@ export async function listDuplikatKandidaten(leadId: string): Promise<
     )
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/duplikat-actions:leads', error)
   if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden' }
 
   const since = new Date()
   since.setDate(since.getDate() - 30)
   const sinceIso = since.toISOString()
 
-  const { data: rows } = await supabase
+  const { data: rows, error: error2 } = await supabase
     .from('leads')
     .select('id, situation, telefon, email, melder_telefon, melder_email, objekt_id, kunde_id, created_at')
     .neq('id', id)
@@ -74,6 +82,7 @@ export async function listDuplikatKandidaten(leadId: string): Promise<
     .is('zusammengefuehrt_in', null)
     .order('created_at', { ascending: false })
     .limit(80)
+  if (error2) logDbError('app/anfragen/duplikat-actions:leads', error2)
 
   const tel = String(lead.telefon || lead.melder_telefon || '')
     .replace(/\D/g, '')

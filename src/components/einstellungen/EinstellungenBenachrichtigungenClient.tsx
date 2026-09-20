@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
@@ -28,6 +29,8 @@ import {
   type CrmPushPrefKey,
   type CrmPushPrefs,
 } from '@/lib/push/prefs'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function Sec({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -76,6 +79,7 @@ function statusCopy(status: PushCapabilityStatus, hasSub: boolean): {
 export function EinstellungenBenachrichtigungenClient() {
   const [prefs, setPrefs] = useState<CrmPushPrefs>({ ...CRM_PUSH_PREF_DEFAULTS })
   const [vapid, setVapid] = useState<string | null>(null)
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [hasSub, setHasSub] = useState(false)
   const [cap, setCap] = useState<PushCapabilityStatus>('unsupported')
   const [pending, startTransition] = useTransition()
@@ -105,42 +109,42 @@ export function EinstellungenBenachrichtigungenClient() {
     startTransition(async () => {
       if (nextOn) {
         if (!isCrmPwaStandalone()) {
-          toast.error('Bitte die App zuerst zum Home-Bildschirm hinzufügen.')
+          applyFieldErrors({ _form: TOAST.bitte_die_app_zuerst_zum_home_bildschirm_hinzufu })
           refreshCap()
           return
         }
         if (!pushSupportedInBrowser()) {
-          toast.error('Push wird von diesem Browser nicht unterstützt.')
+          toast.error(TOAST.push_wird_von_diesem_browser_nicht_unterstuetzt)
           return
         }
         if (!vapid) {
-          toast.error('Push ist serverseitig noch nicht konfiguriert (VAPID).')
+          toast.error(TOAST.push_ist_serverseitig_noch_nicht_konfiguriert_va)
           return
         }
         try {
           const perm = await Notification.requestPermission()
           refreshCap()
           if (perm !== 'granted') {
-            toast.error('Berechtigung nicht erteilt.')
+            toast.error(TOAST.berechtigung_nicht_erteilt)
             return
           }
           const sub = await subscribeCrmPush(vapid)
           const serialized = serializePushSubscription(sub)
           const saved = await saveCrmPushSubscription(serialized)
           if (!saved.ok) {
-            toast.error(saved.message)
+            toast.systemError(saved)
             return
           }
           const prefRes = await setCrmPushPrefSwitch('push_enabled', true)
           if (!prefRes.ok) {
-            toast.error(prefRes.message)
+            toast.systemError(prefRes)
             return
           }
           applyPrefs(prefRes.prefs)
           setHasSub(true)
-          toast.success('Push aktiviert')
+          toast.success(TOAST.push_aktiviert)
         } catch (e) {
-          toast.error(e instanceof Error ? e.message : 'Aktivierung fehlgeschlagen')
+          toast.systemError(e, 'ui', 'Aktivierung fehlgeschlagen')
         }
         return
       }
@@ -152,17 +156,17 @@ export function EinstellungenBenachrichtigungenClient() {
       }
       const removed = await removeCrmPushSubscription()
       if (!removed.ok) {
-        toast.error(removed.message)
+        toast.systemError(removed)
         return
       }
       const prefRes = await setCrmPushPrefSwitch('push_enabled', false)
       if (!prefRes.ok) {
-        toast.error(prefRes.message)
+        toast.systemError(prefRes)
         return
       }
       applyPrefs(prefRes.prefs)
       setHasSub(false)
-      toast.success('Push deaktiviert')
+      toast.success(TOAST.push_deaktiviert)
     })
   }
 
@@ -170,7 +174,7 @@ export function EinstellungenBenachrichtigungenClient() {
     startTransition(async () => {
       const res = await setCrmPushPrefSwitch(key, nextOn)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       applyPrefs(res.prefs)
@@ -182,9 +186,9 @@ export function EinstellungenBenachrichtigungenClient() {
     startTransition(async () => {
       try {
         await showLocalTestNotification()
-        toast.success('Test-Banner gesendet')
+        toast.success(TOAST.test_banner_gesendet)
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Test fehlgeschlagen')
+        toast.systemError(e, 'ui', 'Test fehlgeschlagen')
       }
     })
   }
@@ -204,13 +208,7 @@ export function EinstellungenBenachrichtigungenClient() {
               Auf dem Home-Bildschirm, auch wenn die App zu ist. Tip ohne Login → Login-Screen.
             </div>
           </div>
-          <button
-            type="button"
-            className={`switch${masterOn ? ' on' : ''}`}
-            aria-pressed={masterOn}
-            disabled={pending || cap === 'unsupported'}
-            onClick={() => toggleMaster(!masterOn)}
-          />
+          <MockBtn className={`switch${masterOn ? ' on' : ''}`} type="button" aria-pressed={masterOn} disabled={pending || cap === 'unsupported'} onClick={() => toggleMaster(!masterOn)} />
         </div>
         {showStatus ? (
           <p className="mt-3 text-[length:var(--fs-text)] text-[var(--text-3)]">
@@ -225,9 +223,9 @@ export function EinstellungenBenachrichtigungenClient() {
         ) : null}
         {typeof Notification !== 'undefined' && Notification.permission === 'granted' ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="btn primary sm" disabled={pending} onClick={onTest}>
+            <MockBtn kind="primary" sm type="button" disabled={pending} onClick={onTest}>
               Test-Benachrichtigung
-            </button>
+            </MockBtn>
           </div>
         ) : null}
       </Sec>
@@ -241,13 +239,7 @@ export function EinstellungenBenachrichtigungenClient() {
                 <div className="lbl">{sw.label}</div>
                 <div className="sub">{sw.desc}</div>
               </div>
-              <button
-                type="button"
-                className={`switch${on ? ' on' : ''}`}
-                aria-pressed={on}
-                disabled={eventsDisabled}
-                onClick={() => toggleEvent(sw.key, !on)}
-              />
+              <MockBtn className={`switch${on ? ' on' : ''}`} type="button" aria-pressed={on} disabled={eventsDisabled} onClick={() => toggleEvent(sw.key, !on)} />
             </div>
           )
         })}

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-
+import { useEffect, useState } from 'react'
+import { C } from '@/lib/tokens/colors'
 /** Step „Vorschau“: Angebots-PDF wie beim Versand (HTML-Template = PDF-Layout). */
 export function AngebotWizardPdfPreview({
   angebotId,
@@ -29,30 +30,25 @@ export function AngebotWizardPdfPreview({
   return (
     <>
       <div
-        className="section-h"
         style={{
-          marginBottom: 12,
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: 12,
-          textTransform: 'none',
-          letterSpacing: 0,
-          fontSize: 'var(--fs-text)',
-          fontWeight: 600,
+          marginBottom: 12,
+          flexWrap: 'wrap',
         }}
       >
-        <span>Angebots-PDF</span>
-        <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 'var(--fs-meta)' }}>
+        <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
           {kundeName
-            ? `So erhält ${kundeName} das Angebot`
-            : 'Vorschau wie beim Kundenversand'}
+            ? `So sieht ${kundeName} das Angebot`
+            : 'So sieht der Empfänger das Angebot'}
         </span>
       </div>
 
       {loading || !previewSrc ? (
-        <div
-          className="card"
+        <MockCard
+          flush
           style={{
             padding: 48,
             textAlign: 'center',
@@ -62,10 +58,10 @@ export function AngebotWizardPdfPreview({
         >
           <MockIcon ctx="default" n="hourglass" size={22} />
           <div style={{ marginTop: 10 }}>Vorschau wird vorbereitet…</div>
-        </div>
+        </MockCard>
       ) : failed ? (
-        <div
-          className="card"
+        <MockCard
+          flush
           style={{
             padding: 32,
             textAlign: 'center',
@@ -88,16 +84,16 @@ export function AngebotWizardPdfPreview({
               PDF öffnen
             </MockBtn>
           ) : null}
-        </div>
+        </MockCard>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <MockCard flush style={{ padding: 0, overflow: 'hidden' }}>
           <div
             style={{
               display: 'flex',
               justifyContent: 'flex-end',
               gap: 8,
-              padding: '8px 12px',
-              borderBottom: '0.5px solid var(--border)',
+              padding: '0.5rem 0.75rem',
+              borderBottom: '0.0.3125remrem solid var(--border)',
               background: 'var(--bg-soft)',
             }}
           >
@@ -119,13 +115,13 @@ export function AngebotWizardPdfPreview({
             onError={() => setFailed(true)}
             style={{
               width: '100%',
-              height: 'min(72vh, 820px)',
+              height: 'min(72vh, 51.25rem)',
               border: 0,
-              background: '#fff',
+              background: C.white,
               display: 'block',
             }}
           />
-        </div>
+        </MockCard>
       )}
     </>
   )

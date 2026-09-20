@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateKundeDetail, revalidateKundeObjekt, revalidateLeadDetail, revalidateLeadList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { kundeHatOrgKennung } from '@/app/actions/kunden-organisation'
 import { leadVertragsKundeId, resolveLeadKunde } from '@/lib/lead-display-helpers'
@@ -45,6 +51,7 @@ export async function fetchKundenObjekte(kundeId: string): Promise<KundenObjekt[
     .select('*')
     .eq('kunde_id', id)
     .order('titel', { ascending: true })
+  if (error) logDbError('app/actions/kunden-objekte:kunden_objekte', error)
 
   if (error) {
     console.warn('fetchKundenObjekte:', error.message)
@@ -70,30 +77,33 @@ export async function fetchKundenObjektListenStats(
   if (!kid || ids.length === 0) return {}
 
   const supabase = createClient()
-  const { data: owned } = await supabase
+  const { data: owned, error } = await supabase
     .from('kunden_objekte')
     .select('id')
     .eq('kunde_id', kid)
     .in('id', ids)
+  if (error) logDbError('app/actions/kunden-objekte:kunden_objekte', error)
   const allowed = new Set((owned ?? []).map((r) => r.id as string))
   if (allowed.size === 0) return {}
 
-  const { data: einheiten } = await supabase
+  const { data: einheiten, error: error2 } = await supabase
     .from('objekt_einheiten')
     .select('id, kunde_objekt_id')
     .in('kunde_objekt_id', Array.from(allowed))
     .eq('aktiv', true)
+  if (error2) logDbError('app/actions/kunden-objekte:objekt_einheiten', error2)
 
   const units = einheiten ?? []
   const einheitIds = units.map((e) => e.id as string)
   const bewohnerByEinheit = new Map<string, number>()
   if (einheitIds.length > 0) {
-    const { data: bewohner } = await supabase
+    const { data: bewohner, error } = await supabase
       .from('einheit_bewohner')
       .select('objekt_einheit_id')
       .in('objekt_einheit_id', einheitIds)
       .eq('aktiv', true)
       .is('anonymisiert_am', null)
+    if (error) logDbError('app/actions/kunden-objekte:einheit_bewohner', error)
     for (const b of bewohner ?? []) {
       const eid = b.objekt_einheit_id as string
       if (!eid) continue
@@ -148,11 +158,12 @@ export async function createKundenObjekt(
     })
     .select('*')
     .single()
+  if (error) logDbError('app/actions/kunden-objekte:kunden_objekte', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Objekt konnte nicht angelegt werden.' }
 
-  revalidatePath(`/kunden/${kundeId}`)
-  revalidatePath('/anfragen')
+  revalidateKundeDetail(kundeId)
+  revalidateLeadList()
   return { ok: true, objekt: data as KundenObjekt }
 }
 
@@ -185,11 +196,12 @@ export async function updateKundenObjektFreigabe(
     .update(payload)
     .eq('id', oid)
     .eq('kunde_id', kid)
+  if (error) logDbError('app/actions/kunden-objekte:kunden_objekte', error)
 
   if (error) return { ok: false, message: error.message }
 
-  revalidatePath(`/kunden/${kid}`)
-  revalidatePath(`/kunden/${kid}/objekte/${oid}`)
+  revalidateKundeDetail(kid)
+  revalidateKundeObjekt(kid, oid)
   return { ok: true }
 }
 
@@ -210,11 +222,12 @@ export async function updateKundenObjekt(
     })
     .eq('id', objektId)
     .eq('kunde_id', kundeId)
+  if (error) logDbError('app/actions/kunden-objekte:kunden_objekte', error)
 
   if (error) return { ok: false, message: error.message }
 
-  revalidatePath(`/kunden/${kundeId}`)
-  revalidatePath('/anfragen')
+  revalidateKundeDetail(kundeId)
+  revalidateLeadList()
   return { ok: true }
 }
 
@@ -236,14 +249,14 @@ export async function deleteKundenObjekt(
     .delete()
     .eq('id', objektId)
     .eq('kunde_id', kundeId)
+  if (error) logDbError('app/actions/kunden-objekte:kunden_objekte', error)
 
   if (error) return { ok: false, message: error.message }
 
   await cleanupOrphanHvPortalKunden(supabase, portalKundeIds)
 
-  revalidatePath(`/kunden/${kundeId}`)
-  revalidatePath('/anfragen')
-  revalidatePath('/kunden')
+  revalidateKundeDetail(kundeId)
+  revalidateLeadList()
   return { ok: true }
 }
 
@@ -261,6 +274,7 @@ export async function setLeadKundeObjekt(
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (leadErr) logDbError('app/actions/kunden-objekte:leads', leadErr)
 
   if (leadErr || !lead) {
     return { ok: false, message: leadErr?.message ?? 'Anfrage nicht gefunden.' }
@@ -285,6 +299,7 @@ export async function setLeadKundeObjekt(
       .select('id, kunde_id')
       .eq('id', objektId)
       .maybeSingle()
+    if (objErr) logDbError('app/actions/kunden-objekte:kunden_objekte', objErr)
 
     if (objErr || !objekt) {
       return { ok: false, message: objErr?.message ?? 'Objekt nicht gefunden.' }
@@ -297,15 +312,20 @@ export async function setLeadKundeObjekt(
     }
   }
 
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('leads')
     .update({
       kunde_objekt_id: objektId,
       updated_at: new Date().toISOString(),
     })
     .eq('id', leadId)
+  if (error2) logDbError('app/actions/kunden-objekte:leads', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateLeadDetail(leadId)
+=======
   revalidatePath(`/anfragen/${leadId}`)
+>>>>>>> Stashed changes
   return { ok: true }
 }

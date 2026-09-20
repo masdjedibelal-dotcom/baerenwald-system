@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragList, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { ensureAngebotsnummerFuerVersand } from '@/lib/angebot-utils'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -83,11 +89,12 @@ async function persistAngebotPdfNachEntwurfSpeichern(
   opts?: { asSystem?: boolean }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   // Bereits versendet: PDF + Portal-Snapshot bleiben bis erneut „Versenden“
-  const { data: stRow } = await supabaseAdmin
+  const { data: stRow, error } = await supabaseAdmin
     .from('angebote')
     .select('gesendet_kunde_at, gesendet_am, status, status_einfach')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/wizard-actions:angebote', error)
   const alreadySent = Boolean(
     String(
       (stRow as { gesendet_kunde_at?: string | null } | null)?.gesendet_kunde_at ??
@@ -97,11 +104,9 @@ async function persistAngebotPdfNachEntwurfSpeichern(
   )
   if (alreadySent) {
     if (!opts?.asSystem) {
-      revalidatePath('/angebote')
-      revalidatePath(`/angebote/${angebotId}`)
+      revalidateAngebotDetail(angebotId)
       if (leadId) {
-        revalidatePath(`/anfragen/${leadId}`)
-        revalidatePath('/anfragen')
+        revalidateLeadDetail(leadId)
       }
     }
     return { ok: true }
@@ -109,11 +114,9 @@ async function persistAngebotPdfNachEntwurfSpeichern(
 
   const pdf = await persistPdfForAngebot(angebotId, { skipRevalidate: true })
   if (!opts?.asSystem) {
-    revalidatePath('/angebote')
-    revalidatePath(`/angebote/${angebotId}`)
+    revalidateAngebotDetail(angebotId)
     if (leadId) {
-      revalidatePath(`/anfragen/${leadId}`)
-      revalidatePath('/anfragen')
+      revalidateLeadDetail(leadId)
     }
   }
   if (!pdf.ok) {
@@ -127,11 +130,12 @@ async function persistAngebotPdfNachEntwurfSpeichern(
 export async function finalizeAngebotWizardWithoutMail(
   angebotId: string
 ): Promise<{ ok: true; angebotsnr: string | null } | { ok: false; message: string }> {
-  const { data: before } = await supabaseAdmin
+  const { data: before, error } = await supabaseAdmin
     .from('angebote')
     .select('angebotsnr')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/wizard-actions:angebote', error)
 
   const nrRes = await ensureAngebotsnummerFuerVersand(
     angebotId,
@@ -142,18 +146,17 @@ export async function finalizeAngebotWizardWithoutMail(
   const pdf = await persistPdfForAngebot(angebotId)
   if (!pdf.ok) return pdf
 
-  const { data: row } = await supabaseAdmin
+  const { data: row, error: error2 } = await supabaseAdmin
     .from('angebote')
     .select('angebotsnr, lead_id')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error2) logDbError('app/angebote/wizard-actions:angebote', error2)
 
-  revalidatePath('/angebote')
-  revalidatePath(`/angebote/${angebotId}`)
+  revalidateAngebotDetail(angebotId)
   const leadId = (row as { lead_id?: string | null } | null)?.lead_id
   if (leadId) {
-    revalidatePath(`/anfragen/${leadId}`)
-    revalidatePath('/anfragen')
+    revalidateLeadDetail(leadId)
   }
 
   return {
@@ -312,11 +315,12 @@ async function saveAngebotWizardDraftInner(
     )
     if (!upd.ok) return upd
     const db = opts?.asSystem ? supabaseAdmin : createClient()
-    const { data: nrRow } = await db
+    const { data: nrRow, error } = await db
       .from('angebote')
       .select('angebotsnr')
       .eq('id', input.angebotId)
       .maybeSingle()
+    if (error) logDbError('app/angebote/wizard-actions:angebote', error)
     await persistAngebotPdfNachEntwurfSpeichern(input.angebotId, input.lead_id, opts)
     if (input.auftragKorrekturId?.trim()) {
       const sync = await syncAuftragAusAngebotKorrektur({
@@ -372,11 +376,12 @@ async function saveAngebotWizardDraftInner(
   }, { asSystem: opts?.asSystem })
   if (!created.ok) return created
   const db = opts?.asSystem ? supabaseAdmin : createClient()
-  const { data: nrRow } = await db
+  const { data: nrRow, error } = await db
     .from('angebote')
     .select('angebotsnr')
     .eq('id', created.id)
     .maybeSingle()
+  if (error) logDbError('app/angebote/wizard-actions:angebote', error)
   await persistAngebotPdfNachEntwurfSpeichern(created.id, input.lead_id, opts)
   if (input.nachtragZuAuftragId?.trim()) {
     const n = await upsertNachtragEntwurfFromAngebotWizard({
@@ -418,12 +423,10 @@ export async function sendAngebotWizard(input: {
       }
     }
     if (input.auftragKorrektur) {
-      revalidatePath(`/auftraege`)
+      revalidateAuftragList()
     }
-    revalidatePath(`/anfragen/${input.lead_id}`)
-    revalidatePath('/anfragen')
-    revalidatePath('/angebote')
-    revalidatePath(`/angebote/${input.angebotId}`)
+    revalidateLeadDetail(input.lead_id)
+    revalidateAngebotDetail(input.angebotId)
     return { ok: true }
   } catch (e) {
     console.error('[sendAngebotWizard]', e)
@@ -491,6 +494,7 @@ export async function loadAngebotWizardBootstrap(
     )
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/wizard-actions:angebote', error)
 
   if (error || !row) {
     return { ok: false, message: error?.message ?? 'Angebot nicht gefunden' }
@@ -655,6 +659,7 @@ export async function loadAngebotWizardBootstrapKopie(
     )
     .eq('id', quelleAngebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/wizard-actions:angebote', error)
 
   if (error || !row) {
     return { ok: false, message: error?.message ?? 'Angebot nicht gefunden' }

@@ -1,7 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
-import { Plus } from 'lucide-react'
 import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { cn } from '@/lib/utils'
 
@@ -40,15 +41,9 @@ export function PickerSheet({
   manageHistory = true,
 }: PickerSheetProps) {
   const headerEnd = onNeu ? (
-    <button
-      type="button"
-      className="editor-sheet__confirm"
-      onClick={onNeu}
-      aria-label="Neu"
-      title="Neu"
-    >
-      <Plus className="h-5 w-5" aria-hidden />
-    </button>
+    <MockBtn className="editor-sheet__confirm" type="button" onClick={onNeu} aria-label="Neu" title="Neu">
+      <MockIcon n="plus" ctx="default" className="h-5 w-5" aria-hidden />
+    </MockBtn>
   ) : undefined
 
   return (
@@ -65,14 +60,9 @@ export function PickerSheet({
       {sourceChips && sourceChips.length > 0 ? (
         <div className="picker-sheet__chips" role="group" aria-label="Quelle">
           {sourceChips.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className={cn('picker-sheet__chip', c.active && 'is-active')}
-              onClick={c.onClick}
-            >
+            <MockBtn className={cn('picker-sheet__chip', c.active && 'is-active')} key={c.id} type="button" onClick={c.onClick}>
               {c.label}
-            </button>
+            </MockBtn>
           ))}
         </div>
       ) : null}

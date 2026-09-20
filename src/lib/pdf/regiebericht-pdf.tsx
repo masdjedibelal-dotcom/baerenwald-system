@@ -1,3 +1,5 @@
+import { formatEuro } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
 /* eslint-disable jsx-a11y/alt-text -- @react-pdf/renderer Image ohne alt */
 import React from 'react'
 import {
@@ -15,23 +17,25 @@ const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica' },
   h1: { fontSize: 16, marginBottom: 4 },
   h2: { fontSize: 12, marginTop: 10, marginBottom: 4 },
-  muted: { color: '#444', marginBottom: 2 },
+  muted: { color: C.grayNeutral6, marginBottom: 2 },
   row: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: C.gray200b,
     paddingVertical: 4,
   },
   cell: { flex: 1, paddingRight: 4 },
   signRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
   signBox: { width: '42%' },
-  signLine: { borderBottomWidth: 1, borderBottomColor: '#333', minHeight: 28, marginBottom: 4 },
+  signLine: { borderBottomWidth: 1, borderBottomColor: C.grayNeutral5, minHeight: 28, marginBottom: 4 },
   imgRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 },
   img: { width: 200, height: 120, objectFit: 'cover', margin: 4 },
-  hint: { fontSize: 8, color: '#333', marginTop: 16, lineHeight: 1.4 },
+  hint: { fontSize: 8, color: C.grayNeutral5, marginTop: 16, lineHeight: 1.4 },
 })
 
 export type RegieberichtPdfInput = {
+  /** Absender / Briefkopf — Firmendaten, kein Hardcode. */
+  firmenname?: string | null
   auftragIdShort: string
   datumFormular: string
   kundeBaustelle: Kunde
@@ -61,6 +65,7 @@ function isDataUrl(s: string) {
 
 export function RegieberichtPdfDocument(props: RegieberichtPdfInput) {
   const {
+    firmenname,
     auftragIdShort,
     datumFormular,
     kundeBaustelle,
@@ -85,13 +90,13 @@ export function RegieberichtPdfDocument(props: RegieberichtPdfInput) {
   } = props
 
   const betragZeile = stunden * stundensatz
-  const fmt = (n: number) =>
-    n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmt = (n: number) => formatEuro(n, { suffix: false })
+  const absender = (firmenname ?? '').trim() || 'Bärenwald München'
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Text style={styles.h1}>Bärenwald München</Text>
+        <Text style={styles.h1}>{absender}</Text>
         <Text style={styles.muted}>REGIEBERICHT</Text>
         <Text style={styles.muted}>Datum: {datumFormular}</Text>
         <Text style={styles.muted}>Auftragsnummer: {auftragIdShort}</Text>
@@ -100,7 +105,7 @@ export function RegieberichtPdfDocument(props: RegieberichtPdfInput) {
         <Text>{auftraggeberName}</Text>
         <Text style={styles.muted}>{auftraggeberAdresse}</Text>
 
-        <Text style={styles.h2}>Ausführender Handwerker</Text>
+        <Text style={styles.h2}>Ausführender Partner</Text>
         <Text>
           {handwerkerName}
           {handwerkerFirma ? ` · ${handwerkerFirma}` : ''}

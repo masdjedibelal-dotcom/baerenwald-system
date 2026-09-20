@@ -1,8 +1,9 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
-import { X } from 'lucide-react'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { cn } from '@/lib/utils'
 
@@ -48,13 +49,13 @@ export function MobileListFilterSheet({
       aria-modal="true"
       aria-label={title}
     >
-      <button type="button" className="mobile-filter-sheet__backdrop" aria-label="Schließen" onClick={onClose} />
+      <MockBtn className="mobile-filter-sheet__backdrop" type="button" aria-label="Schließen" onClick={onClose} />
       <div className="mobile-filter-sheet__panel">
         <div className="sheet-grabber" aria-hidden />
         <header className="mobile-filter-sheet__header">
-          <button type="button" onClick={onClose} className="mobile-filter-sheet__close" aria-label="Schließen">
-            <X className="h-5 w-5" aria-hidden />
-          </button>
+          <MockBtn className="mobile-filter-sheet__close" type="button" onClick={onClose} aria-label="Schließen">
+            <MockIcon n="x" ctx="default" className="h-5 w-5" aria-hidden />
+          </MockBtn>
           <h2 className="mobile-filter-sheet__title">{title}</h2>
           {headerEnd ? <div className="mobile-filter-sheet__header-end">{headerEnd}</div> : null}
         </header>

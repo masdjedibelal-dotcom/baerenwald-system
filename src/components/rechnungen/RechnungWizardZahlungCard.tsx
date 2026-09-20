@@ -1,8 +1,9 @@
 'use client'
 
+import { MockField } from '@/components/mock-ui/MockForm'
 import { Card } from '@/components/ui/Card'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { ZahlungsplanEditor } from '@/components/rechnungen/ZahlungsplanEditor'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -52,16 +53,12 @@ export function RechnungWizardZahlungCard({
     <div className="space-y-4">
       <label className="field">
         <span className="field-l">Zahlungsweise</span>
-        <Select
-          value={meta.zahlungsart}
-          onChange={(e) => setZahlungsart(e.target.value as RechnungWizardZahlungsart)}
-          options={[
+        <Combobox options={[
             { value: 'standard', label: `Zahlbar innerhalb von ${zahlungszielTage} Tagen` },
             ...(allowAbschlag
               ? [{ value: 'abschlaege' as const, label: 'Zahlung in Abschlägen' }]
               : []),
-          ]}
-        />
+          ]} value={meta.zahlungsart == null ? '' : String(meta.zahlungsart)} placeholder="Auswählen…" onChange={(next) => { setZahlungsart(next as RechnungWizardZahlungsart); }} />
       </label>
 
       {meta.zahlungsart === 'abschlaege' ? (
@@ -84,12 +81,7 @@ export function RechnungWizardZahlungCard({
 
       <label className="field">
         <span className="field-l">Zahlungsbedingungen / Beschreibung (auf der Rechnung)</span>
-        <Textarea
-          rows={meta.zahlungsart === 'abschlaege' ? 6 : 2}
-          value={meta.zahlungsbedingungen}
-          onChange={(e) => onMetaChange({ zahlungsbedingungen: e.target.value })}
-          placeholder="Beschreibung der Leistung und Zahlungsmodalitäten…"
-        />
+        <RichTextEditor value={typeof (meta.zahlungsbedingungen) === 'string' ? (meta.zahlungsbedingungen) : ''} onChange={(__v) => onMetaChange({ zahlungsbedingungen: __v })} placeholder="Beschreibung der Leistung und Zahlungsmodalitäten…" minHeight={Math.max((meta.zahlungsart === 'abschlaege' ? 6 : 2) * 24, 120)} aria-label="Beschreibung der Leistung und Zahlungsmodalitäten…" />
       </label>
     </div>
   )
@@ -143,17 +135,13 @@ export function RechnungWizardVersandAuswahlCard({
     <Card title="Rechnung zum Versand">
       <label className="field">
         <span className="field-l">Diese Rechnung wird jetzt verschickt</span>
-        <Select
-          value={versandRechnungId ?? ''}
-          onChange={(e) => onVersandRechnungChange(e.target.value)}
-          options={rechnungen.map((r) => ({
+        <Combobox options={rechnungen.map((r) => ({
             value: r.id,
             label:
               r.rechnungArt === 'schluss'
                 ? `Schlussrechnung — ${r.titel} (${formatEurBetrag(r.brutto)} brutto)`
                 : `Abschlagsrechnung ${r.index} — ${r.titel} (${formatEurBetrag(r.brutto)} brutto)`,
-          }))}
-        />
+          }))} value={versandRechnungId ?? '' == null ? '' : String(versandRechnungId ?? '')} placeholder="Auswählen…" onChange={(next) => { onVersandRechnungChange(next); }} />
       </label>
     </Card>
   )

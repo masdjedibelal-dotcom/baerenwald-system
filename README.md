@@ -18,7 +18,7 @@ Optional ohne Login: `npm run dev:skip-auth` (Port 3001).
 npm run build
 ```
 
-Vor dem Build werden veraltete Root-Duplikate und abgelöste Dateien per `scripts/remove-deploy-blockers.mjs` entfernt.
+Optional Dead-File-Scan: `npm run knip` (siehe `knip.json`).
 
 ## Netlify
 

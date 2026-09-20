@@ -3,10 +3,12 @@
  * Kein Größen-Toast — große iPhone-Bilder werden still verkleinert.
  */
 
-const DEFAULT_MAX_EDGE = 2048
+/** Lange Kante — Phase-B Mobile: max 2000px. */
+const DEFAULT_MAX_EDGE = 2000
 /** Zielgröße nach Optimierung — schnell genug für Function-/Storage-Upload. */
 const DEFAULT_MAX_BYTES = 2.5 * 1024 * 1024
-const QUALITIES = [0.82, 0.72, 0.62, 0.52] as const
+/** JPEG-Qualität ~0.8, dann stufenweise stärker. */
+const QUALITIES = [0.8, 0.72, 0.62, 0.52] as const
 
 function isProbablyImage(file: File): boolean {
   const t = (file.type || '').toLowerCase()

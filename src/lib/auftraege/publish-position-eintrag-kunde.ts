@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -33,11 +34,12 @@ export async function publishPositionEintragFuerKunde(input: {
     input.titel?.trim() ? null : leistungLabel,
   ].filter(Boolean)
 
-  const { data: fotos } = await supabaseAdmin
+  const { data: fotos, error } = await supabaseAdmin
     .from('eintrag_fotos')
     .select('storage_path')
     .eq('eintrag_id', input.eintragId)
     .limit(12)
+  if (error) logDbError('lib/auftraege/publish-position-eintrag-kunde:eintrag_fotos', error)
 
   const fotoUrls: string[] = []
   const paths = (fotos ?? [])

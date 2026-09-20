@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
@@ -23,6 +29,7 @@ async function assertAuftrag(auftragId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet' }
   const { data, error } = await supabase.from('auftraege').select('id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/kunden-update-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden' }
   return { ok: true as const, userId: user.id }
 }
@@ -47,6 +54,7 @@ export async function updateAuftragProjektSteuerung(input: {
   }
 
   const { error } = await supabase.from('auftraege').update(patch).eq('id', input.auftragId)
+  if (error) logDbError('app/auftraege/kunden-update-actions:auftraege', error)
   if (error) return { ok: false, message: error.message }
 
   if (input.status === 'abgeschlossen' || input.status === 'storniert') {
@@ -60,7 +68,7 @@ export async function updateAuftragProjektSteuerung(input: {
     })
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -96,6 +104,7 @@ export async function createKundenUpdateAndSend(input: {
     )
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (loadErr) logDbError('app/auftraege/kunden-update-actions:auftraege', loadErr)
 
   if (loadErr || !auf) return { ok: false, message: 'Auftrag nicht gefunden' }
 
@@ -168,10 +177,11 @@ export async function createKundenUpdateAndSend(input: {
         if (!sent.success) {
           mailWarning = sent.error ?? 'Update gespeichert — Mail fehlgeschlagen.'
         } else if (timelineId && sent.emailLogId) {
-          await supabaseAdmin
+          const { error: __dbErr1 } = await supabaseAdmin
             .from('auftrag_timeline')
             .update({ email_log_id: sent.emailLogId })
             .eq('id', timelineId)
+          if (__dbErr1) logDbError('app/auftraege/kunden-update-actions:auftrag_timeline', __dbErr1)
         }
       }
     }
@@ -189,7 +199,7 @@ export async function createKundenUpdateAndSend(input: {
     console.warn('[createKundenUpdateAndSend] Portal-Notify:', e)
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return {
     ok: true,
     timelineId,

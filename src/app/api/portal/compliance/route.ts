@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/actions'
@@ -19,11 +20,12 @@ async function portalHandwerkerId(supabase: ReturnType<typeof createClient>) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
-  const { data } = await supabase
+  const {data, error} = await supabase
     .from('handwerker')
     .select('id, name, gewerke')
     .eq('auth_user_id', user.id)
     .maybeSingle()
+  if (error) logDbError('app/api/portal/compliance/route:handwerker', error)
   return data as { id: string; name: string; gewerke: string[] | null } | null
 }
 
@@ -73,10 +75,11 @@ export async function GET() {
 
   let positionenByAuftrag = new Map<string, string[]>()
   if (auftragIds.length) {
-    const { data: posData } = await supabase
+    const {data: posData, error} = await supabase
       .from('auftrag_positionen')
       .select('auftrag_id, gewerk_slug')
       .in('auftrag_id', auftragIds)
+    if (error) logDbError('app/api/portal/compliance/route:auftrag_positionen', error)
     for (const row of posData ?? []) {
       const aid = row.auftrag_id as string
       const slug = (row.gewerk_slug as string | null)?.trim()

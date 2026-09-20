@@ -15,6 +15,7 @@ import { buildAushangHtml } from '@/lib/templates/aushang-template'
 import { buildBerichtDatenquelle } from '@/lib/auftraege/bericht-datenquelle'
 import { buildRegieberichtLebenszyklusHtml } from '@/lib/templates/regiebericht-lebenszyklus-template'
 import { buildBautagebuchLebenszyklusHtml } from '@/lib/templates/bautagebuch-lebenszyklus-template'
+import { C } from '@/lib/tokens/colors'
 
 export type DokumentPdfMusterId =
   | 'angebot'
@@ -431,7 +432,7 @@ export function buildDokumentPdfMusterListe(
       html: buildAushangHtml({
         orgName: 'Verwaltung Mustermann',
         orgSub: 'Verwaltung',
-        primaryColor: '#363B41',
+        primaryColor: C.grayNeutral7,
         objektTitel: 'WEG Musterstraße 12',
         objektAdresse: 'Musterstraße 12 · 80331 München',
         meldeUrl: 'https://baerenwaldmuenchen.de/melden/musterverwaltung/musterstrasse-12',

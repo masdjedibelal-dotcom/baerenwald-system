@@ -1,9 +1,13 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   decidePartnerPositionsAnfrageAblehnen,
@@ -14,7 +18,7 @@ import {
   type PartnerPositionsAnfrageRow,
   type WeitereArbeitInPruefungRow,
 } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
-import { formatDatumZeit } from '@/lib/utils'
+import { formatEuro, formatDatumZeit } from '@/lib/format/geld-datum'
 
 type PruefItem =
   | { kind: 'anfrage'; row: PartnerPositionsAnfrageRow }
@@ -28,10 +32,7 @@ function schaetzungAnfrage(row: PartnerPositionsAnfrageRow): string | null {
   const parts: string[] = []
   if (row.schaetzung_eur != null && Number.isFinite(row.schaetzung_eur)) {
     parts.push(
-      row.schaetzung_eur.toLocaleString('de-DE', {
-        style: 'currency',
-        currency: 'EUR',
-      })
+      formatEuro(row.schaetzung_eur, { style: 'currency' })
     )
   }
   if (row.schaetzung_minuten != null && row.schaetzung_minuten > 0) {
@@ -50,10 +51,7 @@ function schaetzungRegie(row: WeitereArbeitInPruefungRow): string | null {
         : null
   if (satz != null) {
     parts.push(
-      `${satz.toLocaleString('de-DE', {
-        style: 'currency',
-        currency: 'EUR',
-      })}/h`
+      `${formatEuro(satz, { style: 'currency' })}/h`
     )
   }
   if (row.menge != null && row.menge > 0) {
@@ -68,7 +66,7 @@ function itemTitle(item: PruefItem): string {
 }
 
 /**
- * Flacher Hinweis: Nacharbeit vom Handwerker — Annehmen / Ablehnen erst nach Bestätigung im Sheet.
+ * Flacher Hinweis: Nacharbeit vom Partner — Annehmen / Ablehnen erst nach Bestätigung im Sheet.
  * Abbrechen ohne Bestätigung lässt den Banner stehen.
  */
 export function AuftragPartnerPositionsPruefungPanel({
@@ -142,7 +140,7 @@ export function AuftragPartnerPositionsPruefungPanel({
                 status: decision === 'annehmen' ? 'anerkannt' : 'abgelehnt',
               })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
         toast.success(r.message ?? 'Gespeichert')
@@ -157,7 +155,7 @@ export function AuftragPartnerPositionsPruefungPanel({
     <>
       <div className="hw-pruef-banner" role="region" aria-label="Nacharbeit zur Prüfung">
         <p className="hw-pruef-banner__lead">
-          Weitere Nacharbeiten / Regiearbeiten vom Handwerker eingereicht
+          Weitere Nacharbeiten / Regiearbeiten vom Partner eingereicht
         </p>
 
         <ul className="hw-pruef-banner__list">
@@ -184,22 +182,20 @@ export function AuftragPartnerPositionsPruefungPanel({
                   </div>
                   {!disabled ? (
                     <div className="hw-pruef-banner__actions">
-                      <Button
-                        variant="primary"
-                        size="sm"
+                      <MockBtn
+                        kind="primary" sm
                         disabled={pending}
                         onClick={() => setAction({ item, decision: 'annehmen' })}
                       >
                         Annehmen
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
+                      </MockBtn>
+                      <MockBtn
+                        kind="secondary" sm
                         disabled={pending}
                         onClick={() => setAction({ item, decision: 'ablehnen' })}
                       >
                         Ablehnen
-                      </Button>
+                      </MockBtn>
                     </div>
                   ) : null}
                 </li>
@@ -235,38 +231,30 @@ export function AuftragPartnerPositionsPruefungPanel({
                   {fotos.length > 0 ? (
                     <div className="hw-pruef-banner__fotos" aria-label="Fotos">
                       {fotos.map((url) => (
-                        <button
-                          key={url}
-                          type="button"
-                          className="hw-pruef-banner__foto"
-                          onClick={() => setLightboxUrl(url)}
-                          aria-label="Foto vergrößern"
-                        >
+                        <MockBtn className="hw-pruef-banner__foto" key={url} type="button" onClick={() => setLightboxUrl(url)} aria-label="Foto vergrößern">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={url} alt="" />
-                        </button>
+                        </MockBtn>
                       ))}
                     </div>
                   ) : null}
                 </div>
                 {!disabled ? (
                   <div className="hw-pruef-banner__actions">
-                    <Button
-                      variant="primary"
-                      size="sm"
+                    <MockBtn
+                      kind="primary" sm
                       disabled={pending}
                       onClick={() => setAction({ item, decision: 'annehmen' })}
                     >
                       Annehmen
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
+                    </MockBtn>
+                    <MockBtn
+                      kind="secondary" sm
                       disabled={pending}
                       onClick={() => setAction({ item, decision: 'ablehnen' })}
                     >
                       Ablehnen
-                    </Button>
+                    </MockBtn>
                   </div>
                 ) : null}
               </li>
@@ -315,13 +303,9 @@ export function AuftragPartnerPositionsPruefungPanel({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="bt-foto-lightbox__img" src={lightboxUrl} alt="" />
-          <button
-            type="button"
-            className="bt-foto-lightbox__close"
-            onClick={() => setLightboxUrl(null)}
-          >
-            Schließen
-          </button>
+          <MockBtn className="bt-foto-lightbox__close" type="button" onClick={() => setLightboxUrl(null)}>
+            Abbrechen
+          </MockBtn>
         </div>
       ) : null}
     </>

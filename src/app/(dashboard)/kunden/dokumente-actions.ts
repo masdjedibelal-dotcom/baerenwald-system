@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateKundeDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -17,6 +23,7 @@ async function assertKunde(kundeId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet' }
   const { data, error } = await supabase.from('kunden').select('id').eq('id', kundeId).maybeSingle()
+  if (error) logDbError('app/kunden/dokumente-actions:kunden', error)
   if (error || !data) return { ok: false as const, message: 'Kunde nicht gefunden' }
   return { ok: true as const, userId: user.id }
 }
@@ -49,10 +56,10 @@ export async function insertKundeDokument(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/kunden/dokumente-actions:kunden_dokumente', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath(`/kunden/${input.kundeId}`)
-  revalidatePath('/kunden')
+  revalidateKundeDetail(input.kundeId)
   return { ok: true, id: data.id as string }
 }
 
@@ -64,26 +71,32 @@ export async function deleteKundeDokument(
   if (!gate.ok) return gate
 
   const supabase = createClient()
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('kunden_dokumente')
     .select('datei_url')
     .eq('id', dokumentId)
     .eq('kunde_id', kundeId)
     .maybeSingle()
+  if (error) logDbError('app/kunden/dokumente-actions:kunden_dokumente', error)
 
   const path = kundenDokumentStoragePath((row as { datei_url?: string | null } | null)?.datei_url)
   if (path) {
     await supabaseAdmin.storage.from(BUCKET).remove([path])
   }
 
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('kunden_dokumente')
     .delete()
     .eq('id', dokumentId)
     .eq('kunde_id', kundeId)
+  if (error2) logDbError('app/kunden/dokumente-actions:kunden_dokumente', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateKundeDetail(kundeId)
+=======
   revalidatePath(`/kunden/${kundeId}`)
   revalidatePath('/kunden')
+>>>>>>> Stashed changes
   return { ok: true }
 }

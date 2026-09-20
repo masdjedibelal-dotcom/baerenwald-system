@@ -1,4 +1,10 @@
+<<<<<<< Updated upstream
+import { revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import type { KalenderTermin } from '@/lib/types'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -76,13 +82,13 @@ export async function insertInternesTodo(input: {
     beschreibung: input.beschreibung?.trim() || null,
     erledigt: false,
   })
+  if (error) logDbError('lib/kalender-auto-termine:kalender_termine', error)
   if (error) {
     console.warn('[internes-todo]', error.message)
     return
   }
-  revalidatePath('/kalender')
-  revalidatePath('/')
-  if (input.lead_id) revalidatePath(`/anfragen/${input.lead_id}`)
+  revalidateKalender()
+  if (input.lead_id) revalidateLeadDetail(input.lead_id)
 }
 
 export async function erledigeInterneNachfassTodos(
@@ -107,9 +113,8 @@ export async function erledigeInterneNachfassTodos(
     console.warn('[internes-todo erledigen]', error.message)
     return
   }
-  revalidatePath('/kalender')
-  revalidatePath('/')
-  revalidatePath(`/anfragen/${leadId}`)
+  revalidateKalender()
+  revalidateLeadDetail(leadId)
 }
 
 /** Offenes Nachfass-To-do auf neues Datum legen (z. B. nach Gültigkeits-Verlängerung). */

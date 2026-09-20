@@ -1,22 +1,23 @@
-"use client";
+'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react';
-import { useRouter } from "next/navigation";
 import { addLeadNotizRow, deleteLeadNotizRow } from "@/app/(dashboard)/anfragen/actions";
 import { leadNotizFotoUrls } from "@/lib/anfragen/lead-notiz-fotos";
 import { toast } from "@/components/ui/app-toast";
-import { confirmDelete } from "@/components/ui/confirm-delete";
 import type { LeadNotizRow } from "@/lib/types";
 import type { EntityMenuItem } from "@/lib/entity-menu";
 import { richTextToPlain } from "@/lib/rich-text";
 import { formatTimelineStamp } from "@/lib/utils";
-import { MockCard } from "@/components/mock-ui/MockCard";
-import { MockNotizComposer } from "@/components/mock-ui/MockDetailCards";
-import { MockBtn } from "@/components/mock-ui/MockPrimitives";
-import { MockEntityRowMenu } from "@/components/mock-ui/MockEntityRowMenu";
-import { MockModal } from "@/components/mock-ui/MockModal";
+import { deleteWithUndo } from '@/lib/ui/delete-with-undo'
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { TOAST } from '@/lib/copy'
 
 function leadNotizErstellerLabel(n: LeadNotizRow): string {
   const name = n.user_profiles?.name?.trim();
@@ -40,15 +41,18 @@ export function AnfrageNotizenTab({
   notizen: LeadNotizRow[];
   onReload: () => void;
 }) {
-  const router = useRouter();
   const [val, setVal] = useState("");
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
   const isMobile = useIsMobile();
   const [pending, startTransition] = useTransition();
 
   const allgemeineNotizen = useMemo(
-    () => notizen.filter((n) => !n.kalender_termin_id?.trim()),
-    [notizen],
+    () =>
+      notizen.filter(
+        (n) => !n.kalender_termin_id?.trim() && !hiddenIds.has(n.id)
+      ),
+    [notizen, hiddenIds],
   );
 
   function speichern() {
@@ -57,31 +61,42 @@ export function AnfrageNotizenTab({
     startTransition(async () => {
       const r = await addLeadNotizRow(leadId, text);
       if (!r.ok) {
-        toast.error(r.message);
+        toast.systemError(r);
         return;
       }
-      toast.success("Notiz hinzugefügt");
+      toast.success(TOAST.notizHinzugefuegt);
       setVal("");
       onReload();
-      router.refresh();
+      // revalidatePath in addLeadNotizRow — onReload reicht für Client-State
     });
   }
 
-  function loeschen(id: string, preview?: string) {
-    confirmDelete(
-      "Notiz löschen?",
-      async () => {
-        const r = await deleteLeadNotizRow(id, leadId);
+  function loeschen(id: string, _preview?: string) {
+    deleteWithUndo({
+      key: `lead-notiz:${id}`,
+      removeOptimistic: () =>
+        setHiddenIds((prev) => new Set(prev).add(id)),
+      restoreOptimistic: () =>
+        setHiddenIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        }),
+      commit: async () => {
+        const r = await deleteLeadNotizRow(id, leadId)
         if (!r.ok) {
-          toast.error(r.message);
-          throw new Error(r.message);
+          toast.systemError(r)
+          setHiddenIds((prev) => {
+            const next = new Set(prev)
+            next.delete(id)
+            return next
+          })
+          return
         }
-        toast.success("Notiz gelöscht");
-        onReload();
-        router.refresh();
+        onReload()
       },
-      { body: preview?.trim() || undefined }
-    );
+      message: TOAST.geloescht,
+    })
   }
 
   return (
@@ -96,7 +111,7 @@ export function AnfrageNotizenTab({
           }}
         >
           {allgemeineNotizen.length === 0 ? (
-            <div style={{ fontSize: 'var(--fs-meta)', color: "var(--text-4)", padding: "4px 0" }}>
+            <div style={{ fontSize: 'var(--fs-meta)', color: "var(--text-4)", padding: "0.25rem 0" }}>
               {isMobile
                 ? "Noch keine Notizen. Über „Notiz“ oben hinzufügen."
                 : "Noch keine Notizen — schreibe die erste unten."}
@@ -149,28 +164,23 @@ export function AnfrageNotizenTab({
                       }}
                     >
                       {fotos.map((url) => (
-                        <button
-                          key={url}
-                          type="button"
-                          onClick={() => setLightboxUrl(url)}
-                          style={{
+                        <MockBtn key={url} type="button" onClick={() => setLightboxUrl(url)} style={{
                             width: 72,
                             height: 54,
                             borderRadius: 8,
                             overflow: "hidden",
-                            border: "0.5px solid var(--border)",
+                            border: "0.0.3125remrem solid var(--border)",
                             padding: 0,
                             background: "var(--bg)",
                             cursor: "pointer",
-                          }}
-                        >
+                          }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={url}
                             alt=""
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
                           />
-                        </button>
+                        </MockBtn>
                       ))}
                     </div>
                   ) : n.datei_url && !istBildAnhangUrl(n.datei_url) ? (
@@ -201,16 +211,11 @@ export function AnfrageNotizenTab({
         ) : null}
       </MockCard>
 
-      <MockModal
+      <EditorSheet
         open={!!lightboxUrl}
         onClose={() => setLightboxUrl(null)}
-        icon="photo"
         title="Foto"
-        footer={
-          <MockBtn sm kind="primary" icon="x" onClick={() => setLightboxUrl(null)}>
-            Schließen
-          </MockBtn>
-        }
+        secondary={{ label: 'Schließen', onClick: () => setLightboxUrl(null) }}
       >
         {lightboxUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -220,7 +225,7 @@ export function AnfrageNotizenTab({
             style={{ width: "100%", borderRadius: 8, display: "block" }}
           />
         ) : null}
-      </MockModal>
+      </EditorSheet>
     </>
   );
 }

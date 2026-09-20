@@ -1,9 +1,10 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useEffect, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { toast } from '@/components/ui/app-toast'
 import { useTransition } from '@/components/ui/action-busy'
 import { mergeKunden } from '@/app/actions/kunden'
@@ -43,13 +44,13 @@ export function KundenMergeAssistentSheet({
     startTransition(async () => {
       const r = await mergeKunden(survivorId, mergeId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       toast.success(r.message)
       setRows((prev) => prev.filter((x) => x.a.id !== mergeId && x.b.id !== mergeId))
       onMerged?.()
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -67,23 +68,23 @@ export function KundenMergeAssistentSheet({
       ) : (
         <ul className="ap-merge-list">
           {rows.map((v) => (
-            <li key={`${v.a.id}-${v.b.id}`} className="ap-merge-card">
-              <div className="ap-merge-card__grund">{v.grund}</div>
-              <div className="ap-merge-card__pair">
+            <li key={`${v.a.id}-${v.b.id}`} className="ap-merge-row">
+              <div className="ap-merge-row__grund">{v.grund}</div>
+              <div className="ap-merge-row__pair">
                 <div>
-                  <div className="ap-merge-card__name">{v.a.name}</div>
-                  <div className="ap-merge-card__meta">
+                  <div className="ap-merge-row__name">{v.a.name}</div>
+                  <div className="ap-merge-row__meta">
                     {[v.a.email, v.a.telefon].filter(Boolean).join(' · ') || '—'}
                   </div>
                 </div>
                 <div>
-                  <div className="ap-merge-card__name">{v.b.name}</div>
-                  <div className="ap-merge-card__meta">
+                  <div className="ap-merge-row__name">{v.b.name}</div>
+                  <div className="ap-merge-row__meta">
                     {[v.b.email, v.b.telefon].filter(Boolean).join(' · ') || '—'}
                   </div>
                 </div>
               </div>
-              <div className="ap-merge-card__actions">
+              <div className="ap-merge-row__actions">
                 <MockBtn
                   sm
                   kind="secondary"

@@ -1,93 +1,33 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import {
+  SearchResultsGrouped,
+} from '@/components/search/SearchResultsGrouped'
+import { useAppSearch } from '@/hooks/useAppSearch'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
-import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
-const RECENT_KEY = 'bw-crm-recent-search'
-
-type SearchHit = {
-  id: string
-  icon: string
-  label: string
-  sub?: string
-  href: string
-}
-
-const NAV_HITS: SearchHit[] = [
-  { id: 'nav-dash', icon: 'layout-dashboard', label: 'Dashboard', sub: 'Navigation', href: '/' },
-  { id: 'nav-vg', icon: 'folders', label: 'Vorgänge', sub: 'Navigation', href: '/vorgaenge' },
-  { id: 'nav-k', icon: 'users', label: 'Kunden', sub: 'Navigation', href: '/kunden' },
-  { id: 'nav-hw', icon: 'tool', label: 'Handwerker', sub: 'Navigation', href: '/handwerker' },
-  { id: 'nav-kal', icon: 'calendar', label: 'Kalender', sub: 'Navigation', href: '/kalender' },
-  { id: 'nav-ki', icon: 'sparkles', label: 'KI Analytics', sub: 'Navigation', href: '/ki-analytics' },
-  { id: 'nav-set', icon: 'settings', label: 'Einstellungen', sub: 'Navigation', href: '/einstellungen' },
-]
-
+/** ⌘K — eine Suchlogik mit TopBarSearch via useAppSearch. */
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   useOverlayChromeLock(open)
   const router = useRouter()
-  const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
-  const [recent, setRecent] = useState<string[]>([])
-  const [hits, setHits] = useState<SearchHit[]>([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(RECENT_KEY)
-      if (raw) setRecent(JSON.parse(raw) as string[])
-    } catch {
-      /* ignore */
-    }
-  }, [open])
+  const { q, setQ, groups, hits, loading, recent, addRecent } = useAppSearch({
+    minChars: 1,
+    debounceMs: 180,
+    includeNav: true,
+    maxHits: 12,
+  })
 
   useEffect(() => {
     if (!open) return
     setQ('')
     setSel(0)
-  }, [open])
-
-  const addRecent = useCallback((term: string) => {
-    const t = term.trim()
-    if (!t) return
-    setRecent((r) => {
-      const next = [t, ...r.filter((x) => x !== t)].slice(0, 5)
-      try {
-        localStorage.setItem(RECENT_KEY, JSON.stringify(next))
-      } catch {
-        /* ignore */
-      }
-      return next
-    })
-  }, [])
-
-  useEffect(() => {
-    const needle = q.trim().toLowerCase()
-    if (!needle) {
-      setHits([])
-      return
-    }
-
-    const navFiltered = NAV_HITS.filter(
-      (h) => h.label.toLowerCase().includes(needle) || h.sub?.toLowerCase().includes(needle)
-    )
-
-    const ctrl = new AbortController()
-    setLoading(true)
-    fetch(`/api/crm/suche?q=${encodeURIComponent(needle)}`, { signal: ctrl.signal })
-      .then((r) => r.json())
-      .then((data: { hits?: SearchHit[] }) => {
-        const entityHits = data.hits ?? []
-        setHits([...navFiltered, ...entityHits].slice(0, 12))
-      })
-      .catch(() => setHits(navFiltered))
-      .finally(() => setLoading(false))
-
-    return () => ctrl.abort()
-  }, [q])
+  }, [open, setQ])
 
   useEffect(() => {
     setSel(0)
@@ -134,7 +74,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       <div className="cmdk" role="dialog" aria-modal="true" aria-label="Suche">
         <div className="cmdk-input">
           <MockIcon ctx="default" n="search" size={18} />
-          <input
+          <MockInput
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Suche nach Kundenname, Titel, Nummer, Ort…"
@@ -144,42 +84,25 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         </div>
         <div className="cmdk-list">
           {q.trim() ? (
-            loading && hits.length === 0 ? (
-              <div className="cmdk-empty">Suche…</div>
-            ) : hits.length === 0 ? (
-              <div className="cmdk-empty">Keine Treffer für „{q}"</div>
-            ) : (
-              hits.map((c, i) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={cn('cmdk-item', i === sel && 'sel')}
-                  onMouseEnter={() => setSel(i)}
-                  onClick={() => {
-                    addRecent(q)
-                    onClose()
-                    router.push(c.href)
-                  }}
-                >
-                  <MockIcon ctx="default" n={c.icon || 'arrow-right'} size={16} />
-                  <span style={{ flex: 1 }}>{c.label}</span>
-                  {c.sub ? <span className="hint">{c.sub}</span> : null}
-                </button>
-              ))
-            )
+            <SearchResultsGrouped
+              groups={groups}
+              selectedIndex={sel}
+              loading={loading}
+              emptyLabel={`Keine Treffer für „${q}“`}
+              onSelect={(c) => {
+                addRecent(q)
+                onClose()
+                router.push(c.href)
+              }}
+            />
           ) : recent.length ? (
             <>
               <div className="cmdk-group">Letzte Suchen</div>
               {recent.map((r, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="cmdk-item"
-                  onClick={() => setQ(r)}
-                >
+                <MockBtn className="cmdk-item" key={i} type="button" onClick={() => setQ(r)}>
                   <MockIcon ctx="default" n="clock" size={16} />
                   <span style={{ flex: 1 }}>{r}</span>
-                </button>
+                </MockBtn>
               ))}
             </>
           ) : (
@@ -190,3 +113,4 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     </div>
   )
 }
+

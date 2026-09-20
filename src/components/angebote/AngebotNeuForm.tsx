@@ -1,13 +1,20 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import Link from 'next/link'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   createAngebot,
@@ -309,7 +316,7 @@ export function AngebotNeuForm({
         return
       }
       router.push('/einstellungen/vorlagen')
-      router.refresh()
+      afterServerActionRefresh()
       return
     }
 
@@ -375,7 +382,7 @@ export function AngebotNeuForm({
         return
       }
       router.push(`/angebote/${editAngebot.id}`)
-      router.refresh()
+      afterServerActionRefresh()
       return
     }
 
@@ -386,7 +393,7 @@ export function AngebotNeuForm({
       return
     }
     router.push(`/angebote/${res.id}`)
-    router.refresh()
+    afterServerActionRefresh()
   }
 
   const gewerkSelectOptions = useMemo(() => gewerkOptionsFromList(gewerke), [gewerke])
@@ -415,38 +422,28 @@ export function AngebotNeuForm({
       />
 
       {error ? (
-        <p className="mb-4 rounded-lg border border-danger/40 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)] text-danger">
+        <p className="mb-4 rounded-card border border-danger/40 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)] text-danger">
           {error}
         </p>
       ) : null}
 
       {istKopie && kopieVon ? (
-        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
+        <p className="mb-4 rounded-card border border-status-contact-bg bg-status-contact-bg px-3 py-2 text-[length:var(--fs-text)] text-status-contact-text">
           Kopie von Angebot <strong>{kopieVon.angebotLabel}</strong> — bitte Preise anpassen.
         </p>
       ) : null}
 
       {vorlageBootstrap && !editAngebot && !kopieVon && !modusVorlage ? (
-        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
+        <p className="mb-4 rounded-card border border-status-contact-bg bg-status-contact-bg px-3 py-2 text-[length:var(--fs-text)] text-status-contact-text">
           Vorlage geladen: <strong>{vorlageBootstrap.name}</strong> — Preise prüfen.
         </p>
       ) : null}
 
       {modusVorlage ? (
-        <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
+        <section className="mb-8 space-y-4 rounded-card border border-border bg-surface p-4">
           <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Vorlage</h2>
-          <Input
-            label="Name"
-            required
-            value={vorlageName}
-            onChange={(e) => setVorlageName(e.target.value)}
-          />
-          <Textarea
-            label="Beschreibung"
-            value={vorlageBeschreibung}
-            onChange={(e) => setVorlageBeschreibung(e.target.value)}
-            rows={2}
-          />
+          <MockField label="Name" required><MockInput required value={vorlageName} onChange={(e) => setVorlageName(e.target.value)} /></MockField>
+          <MockField label="Beschreibung"><RichTextEditor value={typeof (vorlageBeschreibung) === 'string' ? (vorlageBeschreibung) : ''} onChange={(__v) => setVorlageBeschreibung(__v)} minHeight={120} aria-label="Beschreibung" /></MockField>
           <fieldset className="space-y-2">
             <legend className="mb-1 text-[length:var(--fs-text)] font-medium text-ink">Preise speichern?</legend>
             <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
@@ -470,7 +467,7 @@ export function AngebotNeuForm({
           </fieldset>
         </section>
       ) : (
-      <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
+      <section className="mb-8 space-y-4 rounded-card border border-border bg-surface p-4">
         <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Kunde</h2>
         {readonlyKunde ? (
           <div className="space-y-1 text-[length:var(--fs-text)]">
@@ -481,7 +478,7 @@ export function AngebotNeuForm({
           </div>
         ) : istKopie && kopieKunde && kundeId === kopieKunde.id && !neuKundeOpen ? (
           <div className="space-y-3 text-[length:var(--fs-text)]">
-            <div className="rounded-lg border border-border bg-canvas/50 p-3">
+            <div className="rounded-card border border-border bg-canvas/50 p-3">
               <p className="font-medium text-ink">{kopieKunde.name}</p>
               <p className="text-muted">{kopieKunde.email ?? '—'}</p>
               <p className="text-muted">{kopieKunde.telefon ?? '—'}</p>
@@ -490,30 +487,21 @@ export function AngebotNeuForm({
               Übernommen aus dem kopierten Angebot — Sie können unten einen anderen Kunden suchen.
             </p>
             <div className="relative">
-              <Input
-                label="Anderen Kunden suchen (optional)"
-                value={kundeSuche}
-                onChange={(e) => {
+              <MockField label="Anderen Kunden suchen (optional)"><MockInput value={kundeSuche} onChange={(e) => {
                   setKundeSuche(e.target.value)
                   if (e.target.value.trim().length >= 2) setKundeId(null)
-                }}
-                placeholder="Name tippen…"
-              />
+                }} placeholder="Name tippen…" /></MockField>
               {kundeTreffer.length > 0 ? (
-                <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-border bg-surface py-1 shadow-lg">
+                <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-card border border-border bg-surface py-1 shadow-lg">
                   {kundeTreffer.map((k) => (
                     <li key={k.id}>
-                      <button
-                        type="button"
-                        className="w-full px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-canvas"
-                        onClick={() => {
+                      <MockBtn fullWidth className="px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-canvas" type="button" onClick={() => {
                           setKundeId(k.id)
                           setKundeSuche('')
                           setKundeTreffer([])
-                        }}
-                      >
+                        }}>
                         {k.name}
-                      </button>
+                      </MockBtn>
                     </li>
                   ))}
                 </ul>
@@ -523,67 +511,36 @@ export function AngebotNeuForm({
         ) : (
           <div className="space-y-4">
             <div className="relative">
-              <Input
-                label="Kunde suchen"
-                value={kundeSuche}
-                onChange={(e) => setKundeSuche(e.target.value)}
-                placeholder="Mind. 2 Zeichen Name"
-                autoComplete="off"
-              />
+              <MockField label="Kunde suchen"><MockInput value={kundeSuche} onChange={(e) => setKundeSuche(e.target.value)} placeholder="Mind. 2 Zeichen Name" autoComplete="off" /></MockField>
               {kundeTreffer.length > 0 ? (
-                <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-border bg-surface py-1 shadow-lg">
+                <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-card border border-border bg-surface py-1 shadow-lg">
                   {kundeTreffer.map((k) => (
                     <li key={k.id}>
-                      <button
-                        type="button"
-                        className="w-full px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-canvas"
-                        onClick={() => {
+                      <MockBtn fullWidth className="px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-canvas" type="button" onClick={() => {
                           setKundeId(k.id)
                           setKundeSuche(k.name)
                           setKundeTreffer([])
                           setNeuKundeOpen(false)
-                        }}
-                      >
+                        }}>
                         <span className="font-medium text-ink">{k.name}</span>
                         <span className="block text-[length:var(--fs-meta)] text-muted">
                           {k.email ?? ''}
                         </span>
-                      </button>
+                      </MockBtn>
                     </li>
                   ))}
                 </ul>
               ) : null}
             </div>
-            <button
-              type="button"
-              className="text-[length:var(--fs-text)] font-medium text-primary underline"
-              onClick={() => setNeuKundeOpen((o) => !o)}
-            >
+            <MockBtn className="text-[length:var(--fs-text)] font-medium text-primary underline" type="button" onClick={() => setNeuKundeOpen((o) => !o)}>
               {neuKundeOpen ? 'Suche nutzen' : 'Neuen Kunden anlegen'}
-            </button>
+            </MockBtn>
             {neuKundeOpen ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <Input
-                  label="Vorname"
-                  value={neuVorname}
-                  onChange={(e) => setNeuVorname(e.target.value)}
-                />
-                <Input
-                  label="Nachname"
-                  value={neuNachname}
-                  onChange={(e) => setNeuNachname(e.target.value)}
-                />
-                <Input
-                  label="E-Mail"
-                  type="email"
-                  value={neuEmail}
-                  onChange={(e) => setNeuEmail(e.target.value)}
-                />
-                <Input
-                  label="Telefon"
-                  value={neuTelefon}
-                  onChange={(e) => setNeuTelefon(e.target.value)}
-                />
+                <MockField label="Vorname"><MockInput value={neuVorname} onChange={(e) => setNeuVorname(e.target.value)} /></MockField>
+                <MockField label="Nachname"><MockInput value={neuNachname} onChange={(e) => setNeuNachname(e.target.value)} /></MockField>
+                <MockField label="E-Mail"><MockInput type="email" value={neuEmail} onChange={(e) => setNeuEmail(e.target.value)} /></MockField>
+                <MockField label="Telefon"><MockInput value={neuTelefon} onChange={(e) => setNeuTelefon(e.target.value)} /></MockField>
               </div>
             ) : null}
           </div>
@@ -591,7 +548,7 @@ export function AngebotNeuForm({
       </section>
       )}
 
-      <section className="mb-8 space-y-4 rounded-lg border border-border bg-surface p-4 shadow-card">
+      <section className="mb-8 space-y-4 rounded-card border border-border bg-surface p-4">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Positionen</h2>
@@ -623,13 +580,17 @@ export function AngebotNeuForm({
             )
           })}
         </div>
-        <Button type="button" variant="secondary" onClick={addRow}>
+        <MockBtn type="button" kind="secondary" onClick={addRow}>
+<<<<<<< Updated upstream
+          <MockIcon n="plus" ctx="default" className="mr-2 inline h-4 w-4" aria-hidden />
+=======
           <Plus className="mr-2 inline h-4 w-4" aria-hidden />
+>>>>>>> Stashed changes
           Position hinzufügen
-        </Button>
+        </MockBtn>
 
         {modusVorlage ? (
-          <div className="mt-4 rounded-lg border border-dashed border-bw-border bg-bw-bg/60 p-3 text-[length:var(--fs-text)] text-bw-text-muted">
+          <div className="mt-4 rounded-button border border-dashed border-bw-border bg-bw-bg/60 p-3 text-[length:var(--fs-text)] text-bw-text-muted">
             <span className="font-medium text-ink">Summe Vorlage (netto): </span>
             {betragAnzeige(null, summen.nettoMin, summen.nettoMax)}
           </div>
@@ -637,35 +598,30 @@ export function AngebotNeuForm({
       </section>
 
       {!modusVorlage ? (
-        <section className="mb-8 rounded-lg border border-border bg-surface p-4 shadow-card">
+        <section className="mb-8 rounded-card border border-border bg-surface p-4">
           <h2 className="mb-3 text-[length:var(--fs-head)] font-semibold text-ink">Notizen</h2>
-          <Textarea
-            value={notizen}
-            onChange={(e) => setNotizen(e.target.value)}
-            rows={4}
-            placeholder="Interne Notizen…"
-          />
+          <RichTextEditor value={typeof (notizen) === 'string' ? (notizen) : ''} onChange={(__v) => setNotizen(__v)} placeholder="Interne Notizen…" minHeight={120} aria-label="Interne Notizen…" />
         </section>
       ) : null}
 
       {!modusVorlage ? (
         <div className="sticky bottom-0 z-30 mt-4 border-t border-bw-border bg-white px-3 py-4 shadow-[0_-12px_32px_rgba(0,0,0,0.08)] sm:rounded-t-xl sm:border sm:border-b-0 sm:px-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
+            <div className="rounded-card border border-bw-border bg-bw-hover/40 px-4 py-3">
               <p className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-light">Gesamt Lohn</p>
               <p className="mt-1 text-[length:var(--fs-head)] font-semibold tabular-nums text-ink">
                 {betragAnzeige(null, summen.lohnZeileMin, summen.lohnZeileMax)}
               </p>
               <p className="text-[length:var(--fs-meta)] text-bw-text-muted">netto</p>
             </div>
-            <div className="rounded-lg border border-bw-border bg-bw-hover/40 px-4 py-3">
+            <div className="rounded-card border border-bw-border bg-bw-hover/40 px-4 py-3">
               <p className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-light">Gesamt Material</p>
               <p className="mt-1 text-[length:var(--fs-head)] font-semibold tabular-nums text-ink">
                 {betragAnzeige(null, summen.materialZeileMin, summen.materialZeileMax)}
               </p>
               <p className="text-[length:var(--fs-meta)] text-bw-text-muted">netto</p>
             </div>
-            <div className="rounded-lg border border-bw-border bg-primary/8 px-4 py-3">
+            <div className="rounded-card border border-bw-border bg-primary/8 px-4 py-3">
               <p className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-light">Netto Summe</p>
               <p className="mt-1 text-[length:var(--fs-head)] font-semibold tabular-nums text-primary">
                 {betragAnzeige(null, summen.nettoMin, summen.nettoMax)}
@@ -699,13 +655,13 @@ export function AngebotNeuForm({
       ) : null}
 
       <div className="flex flex-wrap gap-3">
-        <Button type="button" variant="primary" loading={saving} onClick={() => void submit()}>
+        <MockBtn type="button" kind="primary" loading={saving} onClick={() => void submit()}>
           {modusVorlage
             ? 'Speichern als Vorlage'
             : isEdit
               ? 'Speichern'
               : 'Angebot speichern'}
-        </Button>
+        </MockBtn>
       </div>
     </div>
   )

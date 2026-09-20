@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { normalizeFaelligAmYmd } from '@/lib/dates/werktag'
 import {
   auftragSummenAusPositionen,
@@ -42,6 +43,7 @@ export async function storniereVerwaisteVollEntwuerfe(
     .select('id, status, rechnung_art, zahlungsplan_abschlag_id')
     .eq('auftrag_id', auftragId)
     .eq('status', 'entwurf')
+  if (error) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:rechnungen', error)
 
   if (error) return { ok: false, message: error.message }
 
@@ -86,6 +88,7 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
     .select('id, kunde_id, angebot_id, titel, start_datum, end_datum')
     .eq('id', auftragId)
     .maybeSingle()
+  if (aufErr) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:auftraege', aufErr)
 
   if (aufErr || !auf) {
     return { ok: false, message: aufErr?.message ?? 'Auftrag nicht gefunden.' }
@@ -95,23 +98,25 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
   const angebotId = auf.angebot_id ? String(auf.angebot_id) : null
   if (!kundeId) return { ok: false, message: 'Kein Kunde am Auftrag.' }
 
-  const { data: auftragPosRows } = await supabase
+  const { data: auftragPosRows, error: error2 } = await supabase
     .from('auftrag_positionen')
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: true })
+  if (error2) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:auftrag_positionen', error2)
 
   const allePositionen = auftragPosRows?.length
     ? auftragPositionenToAngebotPositionen(auftragPosRows as AuftragPosition[])
     : []
   const gesamtNetto = auftragSummenAusPositionen(allePositionen).netto
 
-  const { data: rechnungen } = await supabase
+  const { data: rechnungen, error: error3 } = await supabase
     .from('rechnungen')
     .select(
       'id, status, zahlungsplan_abschlag_id, rechnung_art, abschlag_index, brutto, netto, mwst_satz, mwst_betrag, rechnungsnummer, beleg_typ, richtung'
     )
     .eq('auftrag_id', auftragId)
+  if (error3) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:rechnungen', error3)
 
   let bestehend: RechnungAbschlagLink[] = (rechnungen ?? [])
     .filter((r) => String((r as { richtung?: string | null }).richtung ?? '') !== 'eingehend')
@@ -229,7 +234,10 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
         ...payload,
       })
       if (!upd.ok) return upd
-      await persistPdfForRechnung(existing.id).catch(() => null)
+      await persistPdfForRechnung(existing.id).catch((err) => {
+        logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:persistPdf', err)
+        return null
+      })
       aktualisiert += 1
     } else {
       const created = await createRechnungEntwurf({
@@ -286,6 +294,7 @@ export async function storniereAbschlagEntwuerfeForAuftrag(
     .select('id, status, rechnung_art, zahlungsplan_abschlag_id')
     .eq('auftrag_id', auftragId)
     .eq('status', 'entwurf')
+  if (error) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:rechnungen', error)
 
   if (error) return { ok: false, message: error.message }
 

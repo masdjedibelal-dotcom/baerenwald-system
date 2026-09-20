@@ -1,10 +1,12 @@
 'use client'
 
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockFormSection, MockInput } from '@/components/mock-ui/MockForm'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { WerkzeugPanel } from '@/components/crm/WerkzeugPanel'
 import { cn } from '@/lib/utils'
 import type { FreigabeModus } from '@/lib/types'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type FreigabeRegelnValue = {
   freigabe_modus: FreigabeModus
@@ -53,7 +55,7 @@ export function patchFromFreigabeBehandlung(
 function formatSchwelleLabel(raw: string): string {
   const n = Number(String(raw).replace(',', '.'))
   if (!Number.isFinite(n) || n <= 0) return '—'
-  return `${Math.round(n).toLocaleString('de-DE')} €`
+  return `${formatEuro(n, { rounded: true, decimals: 0 })}`
 }
 
 /** HV-Freigaberegeln: immer Angebot; unter Schwelle CRM „Direkt Auftrag“; darüber Freigabe/Annahme. */
@@ -106,17 +108,7 @@ export function FreigabeRegelnEditor({ value, onChange, disabled, className }: P
         <MockField label="Automatisch beauftragen bis" full>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <div style={{ position: 'relative', width: 140 }}>
-              <input
-                className="txt"
-                type="number"
-                min={0}
-                step={50}
-                placeholder="500"
-                disabled={disabled}
-                value={value.freigabe_schwelle_eur}
-                onChange={(e) => patch({ freigabe_schwelle_eur: e.target.value })}
-                style={{ paddingRight: 28 }}
-              />
+              <MockInput className="txt" type="number" min={0} step={50} placeholder="500" disabled={disabled} value={value.freigabe_schwelle_eur} onChange={(e) => patch({ freigabe_schwelle_eur: e.target.value })} style={{ paddingRight: 28 }} />
               <span
                 aria-hidden
                 style={{
@@ -154,18 +146,10 @@ export function FreigabeRegelnEditor({ value, onChange, disabled, className }: P
             {tiles.map((opt) => {
               const on = behandlung === opt.id
               return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  disabled={disabled}
-                  className={cn('werkzeug-tile', on && 'on')}
-                  onClick={() => patch(patchFromFreigabeBehandlung(opt.id))}
-                >
+                <MockBtn className={cn('werkzeug-tile', on && 'on')} key={opt.id} type="button" role="radio" aria-checked={on} disabled={disabled} onClick={() => patch(patchFromFreigabeBehandlung(opt.id))}>
                   <span className="werkzeug-tile-title">{opt.title}</span>
                   <span className="werkzeug-tile-desc">{opt.desc}</span>
-                </button>
+                </MockBtn>
               )
             })}
           </div>

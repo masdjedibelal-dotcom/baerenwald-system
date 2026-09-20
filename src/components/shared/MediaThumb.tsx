@@ -1,15 +1,17 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useState } from 'react'
 import { refreshHandwerkerMediaUrl } from '@/app/(dashboard)/auftraege/handwerker-media-actions'
 import { cn } from '@/lib/utils'
+import { C } from '@/lib/tokens/colors'
 
 export type MediaThumbSize = 'sm' | 'md' | 'lg'
 
 const SIZE_CLASS: Record<MediaThumbSize, string> = {
-  sm: 'h-10 w-10 rounded-lg',
-  md: 'h-[4.5rem] w-[4.5rem] rounded-xl',
-  lg: 'h-28 w-28 rounded-xl',
+  sm: 'h-10 w-10 rounded-card',
+  md: 'h-[4.5rem] w-[4.5rem] rounded-sheet',
+  lg: 'h-28 w-28 rounded-sheet',
 }
 
 type MediaThumbProps = {
@@ -70,7 +72,7 @@ export function MediaThumb({
       src={url || undefined}
       alt={alt}
       className={cn(
-        'object-cover bg-[var(--bg-soft,#f5f5f5)]',
+        `object-cover bg-[var(--bg-soft,${C.gray100c})]`,
         SIZE_CLASS[size],
         failed && 'opacity-40',
         refreshing && 'opacity-60',
@@ -85,9 +87,9 @@ export function MediaThumb({
 
   if (onClick) {
     return (
-      <button type="button" className="shrink-0 overflow-hidden p-0" onClick={onClick}>
+      <MockBtn className="shrink-0 overflow-hidden p-0" type="button" onClick={onClick}>
         {img}
-      </button>
+      </MockBtn>
     )
   }
 
@@ -129,7 +131,7 @@ export function MediaThumbStrip({
         <MediaThumb key={`${u.slice(0, 48)}-${i}`} src={u} size={size} />
       ))}
       {rest > 0 ? (
-        <span className="text-[11px] font-bold tabular-nums text-[var(--text-3,#888)]">
+        <span className={`text-fs-caption font-bold tabular-nums text-[var(--text-3,${C.grayNeutral2})]`}>
           +{rest}
         </span>
       ) : null}

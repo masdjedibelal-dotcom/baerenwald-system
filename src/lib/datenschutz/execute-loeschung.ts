@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
   fotosAusMelderFunnel,
@@ -24,13 +25,14 @@ export async function insertLoeschlog(input: {
   grund: string
   geloescht_von: string | null
 }) {
-  await supabaseAdmin.from('datenschutz_loeschlog').insert({
+  const { error: __dbErr1 } = await supabaseAdmin.from('datenschutz_loeschlog').insert({
     typ: input.typ,
     referenz_id: input.referenz_id,
     referenz_typ: input.referenz_typ,
     grund: input.grund,
     geloescht_von: input.geloescht_von,
   })
+  if (__dbErr1) logDbError('lib/datenschutz/execute-loeschung:datenschutz_loeschlog', __dbErr1)
 }
 
 function kundenAnonName(kundeId: string, jahr: number): string {
@@ -39,21 +41,24 @@ function kundenAnonName(kundeId: string, jahr: number): string {
 }
 
 export async function hatKundeSteuerlicheAnhaenge(kundeId: string): Promise<{ block: boolean; detail?: string }> {
-  const { count: rCount } = await supabaseAdmin
+  const {count: rCount, error } = await supabaseAdmin
     .from('rechnungen')
     .select('id', { count: 'exact', head: true })
     .eq('kunde_id', kundeId)
+  if (error) logDbError('lib/datenschutz/execute-loeschung:rechnungen', error)
   if ((rCount ?? 0) > 0) {
     return { block: true, detail: 'Ausgehende Rechnungen (10 Jahre Aufbewahrung)' }
   }
 
-  const { data: auf } = await supabaseAdmin.from('auftraege').select('id').eq('kunde_id', kundeId)
+  const { data: auf, error: error2 } = await supabaseAdmin.from('auftraege').select('id').eq('kunde_id', kundeId)
+  if (error2) logDbError('lib/datenschutz/execute-loeschung:auftraege', error2)
   const aufIds = (auf ?? []).map((a) => String((a as { id: string }).id))
   if (aufIds.length) {
-    const { count: eCount } = await supabaseAdmin
+    const {count: eCount, error } = await supabaseAdmin
       .from('eingangsrechnungen')
       .select('id', { count: 'exact', head: true })
       .in('auftrag_id', aufIds)
+    if (error) logDbError('lib/datenschutz/execute-loeschung:eingangsrechnungen', error)
     if ((eCount ?? 0) > 0) {
       return { block: true, detail: 'Eingangsrechnungen / Belege vorhanden' }
     }
@@ -63,10 +68,11 @@ export async function hatKundeSteuerlicheAnhaenge(kundeId: string): Promise<{ bl
 }
 
 export async function anonymisiereKunde(kundeId: string, userId: string | null, grund: string) {
-  const { count: aufCount } = await supabaseAdmin
+  const {count: aufCount, error } = await supabaseAdmin
     .from('auftraege')
     .select('id', { count: 'exact', head: true })
     .eq('kunde_id', kundeId)
+  if (error) logDbError('lib/datenschutz/execute-loeschung:auftraege', error)
   if ((aufCount ?? 0) > 0) {
     return {
       ok: false as const,
@@ -83,11 +89,12 @@ export async function anonymisiereKunde(kundeId: string, userId: string | null, 
     }
   }
 
-  const { data: kunde } = await supabaseAdmin.from('kunden').select('created_at').eq('id', kundeId).maybeSingle()
+  const { data: kunde, error: error2 } = await supabaseAdmin.from('kunden').select('created_at').eq('id', kundeId).maybeSingle()
+  if (error2) logDbError('lib/datenschutz/execute-loeschung:kunden', error2)
   const created = (kunde as { created_at?: string } | null)?.created_at
   const jahr = created ? new Date(created).getFullYear() : new Date().getFullYear()
 
-  const { error } = await supabaseAdmin
+  const { error: error3 } = await supabaseAdmin
     .from('kunden')
     .update({
       name: kundenAnonName(kundeId, jahr),
@@ -98,7 +105,8 @@ export async function anonymisiereKunde(kundeId: string, userId: string | null, 
       notizen: null,
     })
     .eq('id', kundeId)
-  if (error) return { ok: false as const, message: error.message }
+  if (error3) logDbError('lib/datenschutz/execute-loeschung:kunden', error3)
+  if (error3) return { ok: false as const, message: error3.message }
 
   await insertLoeschlog({
     typ: 'kunde',
@@ -111,22 +119,24 @@ export async function anonymisiereKunde(kundeId: string, userId: string | null, 
 }
 
 async function leadHatVerknuepftenAuftrag(leadId: string): Promise<boolean> {
-  const { count } = await supabaseAdmin
+  const {count, error } = await supabaseAdmin
     .from('angebote')
     .select('id', { count: 'exact', head: true })
     .eq('lead_id', leadId)
     .not('auftrag_id', 'is', null)
+  if (error) logDbError('lib/datenschutz/execute-loeschung:angebote', error)
   return (count ?? 0) > 0
 }
 
 async function loadMelderLead(leadId: string) {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('leads')
     .select(
       'id, kanal, melder_name, melder_email, melder_telefon, melder_einheit, funnel_daten, kontakt_name, kontakt_email'
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/datenschutz/execute-loeschung:leads', error)
   return data as {
     id: string
     kanal: string
@@ -165,6 +175,7 @@ async function anonymisiereMelderLeadFelder(
       .from('leads')
       .update({ funnel_daten: funnelOhneFotos(lead.funnel_daten) })
       .eq('id', leadId)
+    if (error) logDbError('lib/datenschutz/execute-loeschung:leads', error)
     if (error) return { ok: false, message: error.message }
     return { ok: true }
   }
@@ -198,6 +209,7 @@ async function anonymisiereMelderLeadFelder(
       ort: null,
     })
     .eq('id', leadId)
+  if (error) logDbError('lib/datenschutz/execute-loeschung:leads', error)
   if (error) return { ok: false, message: error.message }
   return { ok: true }
 }
@@ -205,14 +217,16 @@ async function anonymisiereMelderLeadFelder(
 async function clearFotosForAuftrag(auftragId: string): Promise<{ urls: string[]; cleared: number }> {
   const urls: string[] = []
 
-  const { data: fe } = await supabaseAdmin.from('formular_eintraege').select('id, foto_urls').eq('auftrag_id', auftragId)
+  const { data: fe, error } = await supabaseAdmin.from('formular_eintraege').select('id, foto_urls').eq('auftrag_id', auftragId)
+  if (error) logDbError('lib/datenschutz/execute-loeschung:formular_eintraege', error)
   for (const row of fe ?? []) {
     const arr = (row as { foto_urls: string[] | null }).foto_urls
     if (Array.isArray(arr)) urls.push(...arr.filter(Boolean))
     await supabaseAdmin.from('formular_eintraege').update({ foto_urls: [] }).eq('id', (row as { id: string }).id)
   }
 
-  const { data: pl } = await supabaseAdmin.from('punch_list').select('id, foto_urls, foto_nachher_urls').eq('auftrag_id', auftragId)
+  const { data: pl, error: error2 } = await supabaseAdmin.from('punch_list').select('id, foto_urls, foto_nachher_urls').eq('auftrag_id', auftragId)
+  if (error2) logDbError('lib/datenschutz/execute-loeschung:punch_list', error2)
   for (const row of pl ?? []) {
     const a = (row as { foto_urls: string[] | null }).foto_urls
     const b = (row as { foto_nachher_urls: string[] | null }).foto_nachher_urls
@@ -224,19 +238,22 @@ async function clearFotosForAuftrag(auftragId: string): Promise<{ urls: string[]
       .eq('id', (row as { id: string }).id)
   }
 
-  const { data: vb } = await supabaseAdmin.from('vor_baubeginn_protokolle').select('id, foto_urls').eq('auftrag_id', auftragId)
+  const { data: vb, error: error3 } = await supabaseAdmin.from('vor_baubeginn_protokolle').select('id, foto_urls').eq('auftrag_id', auftragId)
+  if (error3) logDbError('lib/datenschutz/execute-loeschung:vor_baubeginn_protokolle', error3)
   for (const row of vb ?? []) {
     const a = (row as { foto_urls: string[] | null }).foto_urls
     if (Array.isArray(a)) urls.push(...a.filter(Boolean))
     await supabaseAdmin.from('vor_baubeginn_protokolle').update({ foto_urls: [] }).eq('id', (row as { id: string }).id)
   }
 
-  const { data: ns } = await supabaseAdmin.from('nachtraege').select('id, foto_urls').eq('auftrag_id', auftragId)
+  const { data: ns, error: error4 } = await supabaseAdmin.from('nachtraege').select('id, foto_urls').eq('auftrag_id', auftragId)
+  if (error4) logDbError('lib/datenschutz/execute-loeschung:nachtraege', error4)
   for (const row of ns ?? []) {
     const fu = (row as { foto_urls?: string[] | null }).foto_urls
     if (Array.isArray(fu)) urls.push(...fu.filter(Boolean))
     if (fu !== undefined) {
-      await supabaseAdmin.from('nachtraege').update({ foto_urls: [] }).eq('id', (row as { id: string }).id)
+      const { error: __dbErr2 } = await supabaseAdmin.from('nachtraege').update({ foto_urls: [] }).eq('id', (row as { id: string }).id)
+      if (__dbErr2) logDbError('lib/datenschutz/execute-loeschung:nachtraege', __dbErr2)
     }
   }
 
@@ -275,12 +292,14 @@ export async function executeDatenschutzLoeschung(input: {
   }
 
   if (kategorie === 'fotos_formulare') {
-    const { data: row } = await supabaseAdmin.from('formular_eintraege').select('id, foto_urls').eq('id', referenz_id).maybeSingle()
+    const { data: row, error } = await supabaseAdmin.from('formular_eintraege').select('id, foto_urls').eq('id', referenz_id).maybeSingle()
+    if (error) logDbError('lib/datenschutz/execute-loeschung:formular_eintraege', error)
     if (!row) return { ok: false, message: 'Eintrag nicht gefunden' }
     const arr = (row as { foto_urls: string[] | null }).foto_urls
     const urls = Array.isArray(arr) ? arr.filter(Boolean) : []
     await deleteStorageObjectsFromUrls(urls)
-    await supabaseAdmin.from('formular_eintraege').update({ foto_urls: [] }).eq('id', referenz_id)
+    const { error: __dbErr3 } = await supabaseAdmin.from('formular_eintraege').update({ foto_urls: [] }).eq('id', referenz_id)
+    if (__dbErr3) logDbError('lib/datenschutz/execute-loeschung:formular_eintraege', __dbErr3)
     await insertLoeschlog({
       typ: 'foto',
       referenz_id,
@@ -323,11 +342,12 @@ export async function executeDatenschutzLoeschung(input: {
   }
 
   if (kategorie === 'leads_abgebrochen' || kategorie === 'leads_abgeschlossen') {
-    const { data: lead } = await supabaseAdmin.from('leads').select('id, kunde_id').eq('id', referenz_id).maybeSingle()
+    const { data: lead, error } = await supabaseAdmin.from('leads').select('id, kunde_id').eq('id', referenz_id).maybeSingle()
+    if (error) logDbError('lib/datenschutz/execute-loeschung:leads', error)
     if (!lead) return { ok: false, message: 'Lead nicht gefunden' }
     const kid = (lead as { kunde_id: string | null }).kunde_id
 
-    await supabaseAdmin
+    const { error: __dbErr4 } = await supabaseAdmin
       .from('leads')
       .update({
         kontakt_name: 'Anonymisiert',
@@ -342,6 +362,7 @@ export async function executeDatenschutzLoeschung(input: {
         zeitraum: null,
       })
       .eq('id', referenz_id)
+    if (__dbErr4) logDbError('lib/datenschutz/execute-loeschung:leads', __dbErr4)
 
     await insertLoeschlog({
       typ: 'lead',
@@ -352,16 +373,18 @@ export async function executeDatenschutzLoeschung(input: {
     })
 
     if (kid) {
-      const { count: otherLeads } = await supabaseAdmin
+      const {count: otherLeads, error } = await supabaseAdmin
         .from('leads')
         .select('id', { count: 'exact', head: true })
         .eq('kunde_id', kid)
         .neq('id', referenz_id)
+      if (error) logDbError('lib/datenschutz/execute-loeschung:leads', error)
       if ((otherLeads ?? 0) === 0) {
-        const { count: aufCount } = await supabaseAdmin
+        const {count: aufCount, error } = await supabaseAdmin
           .from('auftraege')
           .select('id', { count: 'exact', head: true })
           .eq('kunde_id', kid)
+        if (error) logDbError('lib/datenschutz/execute-loeschung:auftraege', error)
         if ((aufCount ?? 0) === 0) {
           const anon = await anonymisiereKunde(kid, userId, `${grund} (Kunde ohne weitere Leads/Aufträge)`)
           if (!anon.ok) {

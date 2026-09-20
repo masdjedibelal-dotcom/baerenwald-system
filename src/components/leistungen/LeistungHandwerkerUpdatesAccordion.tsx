@@ -1,11 +1,13 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { MediaThumb, MediaThumbStrip } from '@/components/shared/MediaThumb'
 import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import { cn } from '@/lib/utils'
 import type { LeistungRow } from '@/components/leistungen/types'
+import { formatDatumZeit } from '@/lib/format/geld-datum'
 
 type Update = NonNullable<LeistungRow['handwerkerUpdates']>[number]
 
@@ -20,17 +22,11 @@ function fmtDatumZeit(v?: string | null): string {
     }
     return v.slice(0, 16)
   }
-  return d.toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDatumZeit(v)
 }
 
 /**
- * Accordion unter einer Leistung: Handwerker-Updates mit Foto-Vorschau.
+ * Accordion unter einer Leistung: Partner-Updates mit Foto-Vorschau.
  * Collapsed: Count + Thumbs. Default offen bei ≥1 Update.
  */
 export function LeistungHandwerkerUpdatesAccordion({
@@ -54,24 +50,16 @@ export function LeistungHandwerkerUpdatesAccordion({
 
   return (
     <div className={cn('hw-upd', compact && 'hw-upd--compact', className)}>
-      <button
-        type="button"
-        className="hw-upd__toggle"
-        aria-expanded={listOpen}
-        onClick={(e) => {
+      <MockBtn className="hw-upd__toggle" type="button" aria-expanded={listOpen} onClick={(e) => {
           e.stopPropagation()
           setListOpen((o) => !o)
-        }}
-      >
+        }}>
         <span className="hw-upd__toggle-label">
           {updates.length === 1 ? '1 Update' : `${updates.length} Updates`}
         </span>
         {!listOpen ? <MediaThumbStrip urls={headerThumbs} max={3} size="sm" /> : null}
-        <ChevronDown
-          className={cn('hw-upd__chev', listOpen && 'hw-upd__chev--open')}
-          aria-hidden
-        />
-      </button>
+        <MockIcon n="chevron-down" ctx="default" className={cn('hw-upd__chev', listOpen && 'hw-upd__chev--open')} aria-hidden />
+      </MockBtn>
 
       {listOpen ? (
         <ul className="hw-upd__list">
@@ -85,15 +73,10 @@ export function LeistungHandwerkerUpdatesAccordion({
               (fotos.length > 0 ? `${fotos.length} Foto(s)` : 'Ohne Text')
             return (
               <li key={key} className="hw-upd__item">
-                <button
-                  type="button"
-                  className="hw-upd__row"
-                  aria-expanded={rowOpen}
-                  onClick={(e) => {
+                <MockBtn className="hw-upd__row" type="button" aria-expanded={rowOpen} onClick={(e) => {
                     e.stopPropagation()
                     setOpenId(rowOpen ? null : key)
-                  }}
-                >
+                  }}>
                   <div className="hw-upd__row-main">
                     <div className="hw-upd__row-head">
                       <span className="hw-upd__typ">{label}</span>
@@ -105,11 +88,8 @@ export function LeistungHandwerkerUpdatesAccordion({
                     {!rowOpen ? <p className="hw-upd__preview">{preview}</p> : null}
                   </div>
                   {!rowOpen ? <MediaThumbStrip urls={fotos} max={2} size="sm" /> : null}
-                  <ChevronDown
-                    className={cn('hw-upd__chev', rowOpen && 'hw-upd__chev--open')}
-                    aria-hidden
-                  />
-                </button>
+                  <MockIcon n="chevron-down" ctx="row" className={cn('hw-upd__chev', rowOpen && 'hw-upd__chev--open')} aria-hidden />
+                </MockBtn>
                 {rowOpen ? (
                   <div className="hw-upd__detail">
                     {u.text?.trim() ? (

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -34,7 +35,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'angebotId fehlt' }, { status: 400 })
   }
 
-  const { data: row } = await createClient().from('angebote').select('id').eq('id', angebotId).maybeSingle()
+  const {data: row, error} = await createClient().from('angebote').select('id').eq('id', angebotId).maybeSingle()
+  if (error) logDbError('app/api/angebot-pdf/route:angebote', error)
   if (!row) {
     return NextResponse.json({ error: 'Nicht gefunden' }, { status: 404 })
   }

@@ -1,6 +1,8 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
-import { Eye, MessageCircle, Sparkles, Star, TrendingUp } from 'lucide-react'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
 import { useMemo, useState } from 'react'
 import { ContentCard } from '@/components/ki-hub/ContentCard'
 import { EmpfehlungCard } from '@/components/ki-hub/EmpfehlungCard'
@@ -12,12 +14,12 @@ type EmpCat = 'markt' | 'beobachten' | 'gelernt' | 'marketing'
 const CATS: {
   id: EmpCat
   label: string
-  icon: typeof TrendingUp
+  icon: string
 }[] = [
-  { id: 'markt', label: 'Markt-Trends', icon: TrendingUp },
-  { id: 'beobachten', label: 'Beobachten', icon: Eye },
-  { id: 'gelernt', label: 'Gelernt', icon: Star },
-  { id: 'marketing', label: 'Marketing-Content', icon: MessageCircle },
+  { id: 'markt', label: 'Markt-Trends', icon: 'trending-up' },
+  { id: 'beobachten', label: 'Beobachten', icon: 'eye' },
+  { id: 'gelernt', label: 'Gelernt', icon: 'star' },
+  { id: 'marketing', label: 'Marketing-Content', icon: 'message' },
 ]
 
 type Props = {
@@ -87,10 +89,10 @@ export function KiHubEmpfehlungenPanel({
     counts.markt + counts.beobachten + counts.gelernt + counts.marketing
 
   return (
-    <section className="rounded-xl border border-bw-border bg-white shadow-sm">
+    <section className="rounded-sheet border border-bw-border bg-white shadow-sm">
       <div className="border-b border-bw-border px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-bw-text">
-          <Sparkles className="h-4 w-4 text-[#7C5CFC]" aria-hidden />
+          <MockIcon n="sparkles" ctx="default" className="h-4 w-4 text-status-new-text" aria-hidden />
           KI-Empfehlungen
         </h2>
         <p className="mt-0.5 text-xs text-muted">
@@ -105,13 +107,9 @@ export function KiHubEmpfehlungenPanel({
             Starte die Analyse — Claude erzeugt Markt-Trends, Beobachtungen, Gelernte und
             Marketing-Content.
           </p>
-          <button
-            type="button"
-            onClick={onFirstAnalyze}
-            className="mt-4 rounded-lg bg-[#2E7D52] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
+          <MockBtn className="mt-4 rounded-button bg-bw-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90" type="button" onClick={onFirstAnalyze}>
             Erste Analyse starten
-          </button>
+          </MockBtn>
         </div>
       ) : (
         <div className="grid gap-0 md:grid-cols-[220px_1fr]">
@@ -120,39 +118,33 @@ export function KiHubEmpfehlungenPanel({
             aria-label="Empfehlungs-Kategorien"
           >
             {CATS.map((c) => {
-              const Icon = c.icon
               const n = counts[c.id]
               return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCat(c.id)}
-                  className={cn(
-                    'flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[12px] font-medium transition-colors md:w-full',
+                <MockBtn className={cn(
+                    'flex shrink-0 items-center gap-2 rounded-button px-3 py-2.5 text-left text-fs-meta font-medium transition-colors md:w-full',
                     cat === c.id
-                      ? 'bg-[#EAF3DE] text-[#2E7D52]'
+                      ? 'bg-bw-green-bg text-bw-primary'
                       : 'text-bw-text hover:bg-bw-bg'
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                  )} key={c.id} type="button" onClick={() => setCat(c.id)}>
+                  <MockIcon n={c.icon} ctx="nav" size={16} />
                   <span className="flex-1 truncate">{c.label}</span>
                   <span
                     className={cn(
-                      'tabular-nums text-[11px]',
+                      'tabular-nums text-fs-caption',
                       cat === c.id ? 'opacity-80' : 'text-muted'
                     )}
                   >
                     {n}
                   </span>
-                </button>
+                </MockBtn>
               )
             })}
           </nav>
 
           <div className="min-w-0 space-y-3 p-3 md:p-4">
             {items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-bw-border bg-bw-bg px-4 py-10 text-center">
-                <p className="text-sm text-muted">Keine Einträge in dieser Kategorie</p>
+              <div className="rounded-sheet border border-dashed border-bw-border bg-bw-bg px-4 py-10 text-center">
+                <MockEmpty title="Keine Einträge in dieser Kategorie" />
               </div>
             ) : cat === 'marketing' ? (
               items.map((e) => (
@@ -164,14 +156,14 @@ export function KiHubEmpfehlungenPanel({
                 return (
                   <div
                     key={item.id}
-                    className="rounded-xl border border-bw-border bg-bw-card px-4 py-3"
+                    className="rounded-sheet border border-bw-border bg-surface px-4 py-3"
                   >
                     <p className="text-sm font-medium text-bw-text">{item.titel}</p>
                     {item.beschreibung ? (
                       <p className="mt-1 text-sm text-muted">{item.beschreibung}</p>
                     ) : null}
                     {konf ? (
-                      <p className="mt-2 text-xs text-[#2E7D52]">Konfidenz: {konf}</p>
+                      <p className="mt-2 text-xs text-bw-primary">Konfidenz: {konf}</p>
                     ) : null}
                   </div>
                 )
@@ -182,14 +174,14 @@ export function KiHubEmpfehlungenPanel({
                 return (
                   <article
                     key={item.id}
-                    className="rounded-xl border border-bw-border bg-bw-card p-4"
+                    className="rounded-sheet border border-bw-border bg-surface p-4"
                   >
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-[#EAF3DE] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#2E7D52]">
+                      <span className="rounded-pill bg-bw-green-bg px-2 py-0.5 text-fs-caption font-semibold uppercase tracking-wide text-bw-primary">
                         {m.relevanz ? `P2 ${m.relevanz}` : 'Markt'}
                       </span>
                       {m.kategorie ? (
-                        <span className="text-[11px] text-muted">{m.kategorie}</span>
+                        <span className="text-fs-caption text-muted">{m.kategorie}</span>
                       ) : null}
                     </div>
                     <h3 className="text-sm font-semibold text-bw-text">{item.titel}</h3>
@@ -199,15 +191,14 @@ export function KiHubEmpfehlungenPanel({
                       </p>
                     ) : null}
                     {m.handlung ? (
-                      <p className="mt-2 text-sm text-[#2E7D52]">{m.handlung}</p>
+                      <p className="mt-2 text-sm text-bw-primary">{m.handlung}</p>
                     ) : null}
                     {m.bezug_crm ? (
                       <p className="mt-1 text-xs text-muted">CRM: {m.bezug_crm}</p>
                     ) : null}
                     <label className="mt-3 flex items-center gap-2 text-xs text-muted">
-                      <input
-                        type="checkbox"
-                        className="rounded border-bw-border"
+                      <MockCheckbox
+                        className="rounded-card border-bw-border"
                         onChange={() => void onMarkDone(item.id)}
                       />
                       erledigt?

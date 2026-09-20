@@ -1,16 +1,21 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
 import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
+import { saveKunde } from '@/app/actions/kunden'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { splitStrasseHausnummer } from '@/lib/kunde-stammdaten'
 import type { Kunde } from '@/lib/types'
+import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`
@@ -78,28 +83,23 @@ function draftToEditKunde(
   draft: EntityKundenStammDraft,
   kundeTyp?: string | null
 ): Kunde {
-  const split = splitStrasseHausnummer(draft.strasse.trim())
+  const { strasse, hausnummer } = splitStrasseHausnummer(draft.strasse)
   return {
     id: kundeId,
-    name: draft.name.trim() || '—',
-    vorname: draft.vorname?.trim() || null,
-    nachname: draft.nachname?.trim() || null,
-    email: draft.email.trim() || null,
-    telefon: draft.telefon.trim() || null,
-    adresse: draft.strasse.trim() || null,
-    strasse: split.strasse || null,
-    hausnummer: split.hausnummer || null,
-    plz: draft.plz.trim() || null,
-    ort: draft.ort.trim() || null,
-    typ: (kundeTyp?.trim() || 'privat').toLowerCase(),
-    notizen: null,
-    created_at: '',
-    ansprechpartner: draft.ansprechpartner?.trim() || null,
-    webseite: draft.webseite?.trim() || null,
-  }
+    name: draft.name,
+    vorname: draft.vorname ?? null,
+    nachname: draft.nachname ?? null,
+    telefon: draft.telefon || null,
+    email: draft.email || null,
+    plz: draft.plz || null,
+    ort: draft.ort || null,
+    strasse: strasse || null,
+    hausnummer: hausnummer || null,
+    typ: (kundeTyp as Kunde['typ']) ?? null,
+  } as Kunde
 }
 
-/** Stammdaten-View + Bearbeiten über EditorSheet (mobil Bottom, Desktop Slide-over). */
+/** Stammdaten-View: Name/Tel/E-Mail inline; Adresse & Rest über Sheet. */
 export function EntityKundenStammdatenCard({
   kundeId,
   leadId,
@@ -137,8 +137,6 @@ export function EntityKundenStammdatenCard({
       .filter(Boolean)
       .join(', ') || ''
   const showKundeLink = Boolean(kundeId?.trim() && !hideKundeLink)
-  const tel = draft.telefon.trim()
-  const mail = draft.email.trim()
 
   function beginEdit() {
     if (onEdit) {
@@ -148,11 +146,73 @@ export function EntityKundenStammdatenCard({
     setSheetOpen(true)
   }
 
+  async function saveInlineField(
+    patch: Partial<Pick<EntityKundenStammDraft, 'name' | 'telefon' | 'email'>>
+  ) {
+    const next = { ...draft, ...patch }
+    setDraft(next)
+    const kid = kundeId?.trim()
+    const lid = leadId?.trim()
+    if (kid) {
+      const { strasse, hausnummer } = splitStrasseHausnummer(next.strasse)
+      const r = await saveKunde(
+        {
+          name: next.name,
+          vorname: next.vorname,
+          nachname: next.nachname,
+          telefon: next.telefon || null,
+          email: next.email || null,
+          plz: next.plz || null,
+          ort: next.ort || null,
+          strasse: strasse || null,
+          hausnummer: hausnummer || null,
+          typ: (typ ?? 'privat') as string,
+          stammPflicht: false,
+        },
+        kid,
+        lid ? { revalidateAnfrageIds: [lid] } : undefined
+      )
+      if (!r.ok) {
+        toast.systemError(r)
+        setDraft(draft)
+        return
+      }
+    }
+    if (lid) {
+      const r = await updateLeadKontakt(lid, {
+        kontakt_name: next.name,
+        kontakt_telefon: next.telefon || null,
+        kontakt_email: next.email || null,
+        plz: next.plz || null,
+        kundentyp: typ ?? undefined,
+      })
+      if (!r.ok) {
+        toast.systemError(r)
+        return
+      }
+    }
+    toast.autoSaved({ label: 'Kontakt' })
+    onSaved?.(next as Partial<Kunde>)
+  }
+
   const viewBody = (
     <>
       {banner}
       <div className="vgid">
-        <div className="vgid-name">{draft.name.trim() || '—'}</div>
+        {canEdit ? (
+          <SheetEditableField
+            kind="text"
+            label="Name"
+            value={draft.name}
+            placeholder="Name"
+            editMode="inline"
+            sheetContext="detail"
+            onSave={(v) => void saveInlineField({ name: v })}
+            className="vgid-name-field"
+          />
+        ) : (
+          <div className="vgid-name">{draft.name.trim() || '—'}</div>
+        )}
         {typLbl && typLbl !== '—' ? <div className="vgid-meta">{typLbl}</div> : null}
       </div>
 
@@ -161,35 +221,64 @@ export function EntityKundenStammdatenCard({
           <PropRow label="Typ" value={typLbl} />
           {draft.vorname?.trim() || draft.nachname?.trim() ? (
             <PropRow
-              label="Name"
+              label="Vor-/Nachname"
               value={[draft.vorname?.trim(), draft.nachname?.trim()].filter(Boolean).join(' ')}
             />
           ) : null}
           <PropRow label="Adresse" value={adresse || '—'} />
-          <PropRow
-            label="Telefon"
-            value={
-              tel ? (
-                <a className="link" href={telHref(tel)}>
-                  {tel}
-                </a>
-              ) : (
-                '—'
-              )
-            }
-          />
-          <PropRow
-            label="E-Mail"
-            value={
-              mail ? (
-                <a className="link" href={`mailto:${mail}`}>
-                  {mail}
-                </a>
-              ) : (
-                '—'
-              )
-            }
-          />
+          {canEdit ? (
+            <>
+              <div className="prop prop--inline-edit">
+                <SheetEditableField
+                  kind="tel"
+                  label="Telefon"
+                  value={draft.telefon}
+                  placeholder="Telefon"
+                  editMode="inline"
+                  sheetContext="detail"
+                  onSave={(v) => void saveInlineField({ telefon: v })}
+                />
+              </div>
+              <div className="prop prop--inline-edit">
+                <SheetEditableField
+                  kind="email"
+                  label="E-Mail"
+                  value={draft.email}
+                  placeholder="E-Mail"
+                  editMode="inline"
+                  sheetContext="detail"
+                  onSave={(v) => void saveInlineField({ email: v })}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <PropRow
+                label="Telefon"
+                value={
+                  draft.telefon.trim() ? (
+                    <a className="link" href={telHref(draft.telefon)}>
+                      {draft.telefon.trim()}
+                    </a>
+                  ) : (
+                    '—'
+                  )
+                }
+              />
+              <PropRow
+                label="E-Mail"
+                value={
+                  draft.email.trim() ? (
+                    <a className="link" href={`mailto:${draft.email.trim()}`}>
+                      {draft.email.trim()}
+                    </a>
+                  ) : (
+                    '—'
+                  )
+                }
+              />
+            </>
+          )}
           {draft.ansprechpartner?.trim() ? (
             <PropRow label="Ansprechpartner" value={draft.ansprechpartner.trim()} />
           ) : null}
@@ -239,15 +328,16 @@ export function EntityKundenStammdatenCard({
 
   return (
     <>
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">Stammdaten</div>
-          {showPencil ? (
+      <MockCard
+        title="Stammdaten"
+        actions={
+          showPencil ? (
             <MockBtn sm kind="secondary" icon="pencil" title="Bearbeiten" onClick={beginEdit} />
-          ) : null}
-        </div>
-        <div className="card-b">{viewBody}</div>
-      </div>
+          ) : null
+        }
+      >
+        {viewBody}
+      </MockCard>
 
       {!onEdit && modalKunde ? (
         <KundeModal

@@ -1,0 +1,9 @@
+{
+  "touch_zu_klein": 0,
+  "horizontal_scroll": 0,
+  "fixed_overlap": 0,
+  "screens_ok": 80,
+  "screens_total": 80,
+  "at": "2026-09-20T14:03:05.194Z",
+  "target": "local build :3000/:3001 staging-db"
+}

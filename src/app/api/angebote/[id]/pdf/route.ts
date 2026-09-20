@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { persistPdfForAngebot } from '@/app/(dashboard)/angebote/actions'
@@ -14,7 +15,8 @@ export async function GET(
     return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
   }
 
-  const { data: row } = await supabase.from('angebote').select('id').eq('id', params.id).maybeSingle()
+  const {data: row, error} = await supabase.from('angebote').select('id').eq('id', params.id).maybeSingle()
+  if (error) logDbError('app/api/angebote/[id]/pdf/route:angebote', error)
   if (!row) {
     return NextResponse.json({ error: 'Nicht gefunden' }, { status: 404 })
   }

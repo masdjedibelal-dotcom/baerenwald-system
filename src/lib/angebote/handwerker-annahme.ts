@@ -5,6 +5,7 @@
  * Angebot-Pipeline: angebote.status = 'handwerker_akzeptiert'
  * Konditionen (separat): hw_status = 'uebernommen' — kein Annahme-Synonym
  */
+import { logDbError } from '@/lib/errors/log-db-error'
 import { buildInternHandwerkerAntwortMail } from '@/lib/angebote/angebot-mail-templates'
 import {
   HANDWERKER_ABLEHNUNG_GRUND_LABELS,
@@ -12,8 +13,11 @@ import {
 } from '@/lib/angebote/ablehnung-labels'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
 import { sendMail } from '@/lib/mail-service'
+import { buildInternSubject } from '@/lib/mail/build-subject'
 import { sendCrmPushToStaff } from '@/lib/push/send'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { planAngebotStatusWrite } from '@/lib/status/write-angebot-status'
+import { writeAngebotHandwerkerStatus } from '@/lib/status/write-angebot-handwerker-status'
 
 export const HW_ZUWEISUNG_STATUS_AKZEPTIERT = 'akzeptiert' as const
 export const HW_ZUWEISUNG_STATUS_ABGELEHNT = 'abgelehnt' as const
@@ -114,6 +118,7 @@ export async function acceptHandwerkerZuweisung(
     )
     .eq('id', zuweisungId)
     .maybeSingle()
+  if (error) logDbError('lib/angebote/handwerker-annahme:angebot_handwerker', error)
 
   if (error || !row) {
     return { ok: false, message: 'Zuweisung nicht gefunden.', httpStatus: 404 }
@@ -144,7 +149,7 @@ export async function acceptHandwerkerZuweisung(
     if (input.notify !== false && input.quelle === 'portal' && !(antwort === 'akzeptiert' && partnerEinholung)) {
       const leadId = angebotEarly?.lead_id ?? null
       const angebotId = String(raw.angebot_id ?? angebotEarly?.id ?? '')
-      const handwerkerName = hwEarly?.name?.trim() || 'Handwerker'
+      const handwerkerName = hwEarly?.name?.trim() || 'Partner'
       const gewerkName = gwEarly?.name?.trim() || 'Gewerk'
       try {
         await sendCrmPushToStaff({
@@ -185,6 +190,13 @@ export async function acceptHandwerkerZuweisung(
   const ablehnungGrund = antwort === 'abgelehnt' ? input.ablehnungGrund!.trim() : null
   const status = antwort === 'akzeptiert' ? HW_ZUWEISUNG_STATUS_AKZEPTIERT : HW_ZUWEISUNG_STATUS_ABGELEHNT
 
+<<<<<<< Updated upstream
+  const { error: updErr } = await writeAngebotHandwerkerStatus(supabaseAdmin, zuweisungId, status, {
+    antwort_at: now,
+    antwort_notiz: notiz,
+    ablehnung_grund: ablehnungGrund,
+  })
+=======
   const { error: updErr } = await supabaseAdmin
     .from('angebot_handwerker')
     .update({
@@ -194,6 +206,8 @@ export async function acceptHandwerkerZuweisung(
       ablehnung_grund: ablehnungGrund,
     })
     .eq('id', zuweisungId)
+>>>>>>> Stashed changes
+  if (updErr) logDbError('lib/angebote/handwerker-annahme:angebot_handwerker', updErr)
 
   if (updErr) return { ok: false, message: updErr.message, httpStatus: 500 }
 
@@ -202,7 +216,7 @@ export async function acceptHandwerkerZuweisung(
   const angebotId = String(raw.angebot_id ?? angebot?.id ?? '')
   const hw = one(raw.handwerker as { name: string } | null)
   const gw = one(raw.gewerke as { name: string } | null)
-  const handwerkerName = hw?.name?.trim() || 'Handwerker'
+  const handwerkerName = hw?.name?.trim() || 'Partner'
   const gewerkName = gw?.name?.trim() || 'Gewerk'
   const grundLabel =
     ablehnungGrund && isHandwerkerAblehnungGrund(ablehnungGrund)
@@ -213,20 +227,23 @@ export async function acceptHandwerkerZuweisung(
 
   // V1/Q1: Kanonische Angebot-Pipeline — nicht für intern Partner-Einholung
   if (antwort === 'akzeptiert' && angebotId && !partnerEinholung) {
-    await supabaseAdmin
+    const patchHwAkzeptiert = planAngebotStatusWrite(ANGEBOT_STATUS_HW_AKZEPTIERT)
+    const { error: __dbErr1 } = await supabaseAdmin
       .from('angebote')
-      .update({ status: ANGEBOT_STATUS_HW_AKZEPTIERT, updated_at: now })
+      .update(patchHwAkzeptiert)
       .eq('id', angebotId)
       .not('status', 'in', '("kunde_akzeptiert","beauftragt","storniert","abgelehnt")')
+    if (__dbErr1) logDbError('lib/angebote/handwerker-annahme:angebote', __dbErr1)
   }
 
   if (antwort === 'akzeptiert' && raw.gewerk_id && angebotId && !partnerEinholung) {
-    const { data: parallel } = await supabaseAdmin
+    const { data: parallel, error } = await supabaseAdmin
       .from('angebot_handwerker')
       .select('id, handwerker_id, status, handwerker(name)')
       .eq('angebot_id', angebotId)
       .eq('gewerk_id', raw.gewerk_id)
       .neq('id', zuweisungId)
+    if (error) logDbError('lib/angebote/handwerker-annahme:angebot_handwerker', error)
 
     for (const other of parallel ?? []) {
       const otherSt = normalizeHwZuweisungStatus(other.status as string)
@@ -238,10 +255,10 @@ export async function acceptHandwerkerZuweisung(
       ) {
         continue
       }
-      await supabaseAdmin
-        .from('angebot_handwerker')
-        .update({ status: 'ersetzt', antwort_at: now })
-        .eq('id', other.id)
+      const { error: __dbErr2 } = await writeAngebotHandwerkerStatus(supabaseAdmin, other.id, 'ersetzt', {
+        antwort_at: now,
+      })
+      if (__dbErr2) logDbError('lib/angebote/handwerker-annahme:angebot_handwerker', __dbErr2)
 
       if (notify && leadId) {
         const otherHw = one(
@@ -251,8 +268,8 @@ export async function acceptHandwerkerZuweisung(
           lead_id: leadId,
           angebot_id: angebotId,
           typ: 'handwerker',
-          titel: 'Handwerker nicht gewählt',
-          beschreibung: `${otherHw?.name?.trim() || 'Handwerker'} · ${gewerkName}`,
+          titel: 'Partner nicht gewählt',
+          beschreibung: `${otherHw?.name?.trim() || 'Partner'} · ${gewerkName}`,
         })
       }
     }
@@ -261,7 +278,7 @@ export async function acceptHandwerkerZuweisung(
   if (notify && leadId && angebotId && !(partnerEinholung && antwort === 'akzeptiert')) {
     // Q3: exakt dieselben Titel wie Legacy-Token (CRM-UI/Filter)
     const titel =
-      antwort === 'akzeptiert' ? 'Handwerker hat zugesagt' : 'Handwerker hat abgelehnt'
+      antwort === 'akzeptiert' ? 'Partner hat zugesagt' : 'Partner hat abgelehnt'
     const beschreibungExtra =
       input.quelle === 'crm'
         ? ' (CRM)'
@@ -281,7 +298,8 @@ export async function acceptHandwerkerZuweisung(
   }
 
   if (notify && !(partnerEinholung && antwort === 'akzeptiert')) {
-    const { data: einRows } = await supabaseAdmin.from('einstellungen').select('key, value')
+    const { data: einRows, error } = await supabaseAdmin.from('einstellungen').select('key, value')
+    if (error) logDbError('lib/angebote/handwerker-annahme:einstellungen', error)
     const einMap = new Map((einRows ?? []).map((x) => [x.key as string, String(x.value ?? '')]))
     const internTo = einMap.get('email')?.trim() || 'info@baerenwaldmuenchen.de'
     const baseUrl =
@@ -306,10 +324,10 @@ export async function acceptHandwerkerZuweisung(
 
     const mail = await sendMail({
       an: internTo,
-      betreff:
-        antwort === 'akzeptiert'
-          ? `Handwerker zugesagt: ${gewerkName}`
-          : `Handwerker abgelehnt: ${gewerkName}`,
+      betreff: buildInternSubject({
+        objekt: gewerkName,
+        ereignis: antwort === 'akzeptiert' ? 'Partner zugesagt' : 'Partner abgelehnt',
+      }),
       html: buildInternHandwerkerAntwortMail({
         handwerkerName,
         gewerkName,

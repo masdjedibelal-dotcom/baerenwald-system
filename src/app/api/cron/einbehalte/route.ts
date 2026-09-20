@@ -1,6 +1,8 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendEmailHtml } from '@/lib/auftraege/emails'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +44,7 @@ export async function GET(req: NextRequest) {
     `
     )
     .eq('status', 'einbehalten')
+  if (eErr) logDbError('app/api/cron/einbehalte/route:einbehalte', eErr)
 
   if (eErr) {
     console.error('[cron/einbehalte]', eErr.message)
@@ -63,15 +66,16 @@ export async function GET(req: NextRequest) {
     if (tage <= 30 && tage >= 7 && !r.freigabe_reminder_30_sent_at && intern) {
       await sendEmailHtml({
         to: intern,
-        subject: `Einbehalt fällig in ${tage} Tagen — ${hwName ?? 'Handwerker'}`,
-        html: `<p>Sicherheitseinbehalt: <strong>${Number(r.einbehalt_betrag ?? 0).toLocaleString('de-DE')} €</strong></p>
-          <p>Handwerker: ${hwName ?? '—'}<br/>Kundin: ${kunde}<br/>Freigabe: ${fd}</p>
+        subject: `Einbehalt fällig in ${tage} Tagen — ${hwName ?? 'Partner'}`,
+        html: `<p>Sicherheitseinbehalt: <strong>${formatEuro(Number(r.einbehalt_betrag ?? 0), { decimals: 0 })}</strong></p>
+          <p>Partner: ${hwName ?? '—'}<br/>Kundin: ${kunde}<br/>Freigabe: ${fd}</p>
           <p><a href="${base}/auftraege/${r.auftrag_id}/finanzen">Zum Auftrag (Finanzen)</a></p>`,
       })
-      await supabaseAdmin
+      const { error: __dbErr1 } = await supabaseAdmin
         .from('einbehalte')
         .update({ freigabe_reminder_30_sent_at: new Date().toISOString() })
         .eq('id', r.id as string)
+      if (__dbErr1) logDbError('app/api/cron/einbehalte/route:einbehalte', __dbErr1)
       actions.push(`einbehalt_30:${r.id}`)
     }
 
@@ -79,14 +83,15 @@ export async function GET(req: NextRequest) {
       await sendEmailHtml({
         to: intern,
         subject: `Einbehalt in ${tage} Tagen fällig — jetzt prüfen`,
-        html: `<p><strong>7-Tage-Hinweis:</strong> Einbehalt ${Number(r.einbehalt_betrag ?? 0).toLocaleString('de-DE')} € · ${hwName ?? '—'}</p>
+        html: `<p><strong>7-Tage-Hinweis:</strong> Einbehalt ${formatEuro(Number(r.einbehalt_betrag ?? 0), { decimals: 0 })} · ${hwName ?? '—'}</p>
           <p>Freigabe: ${fd} · Kundin: ${kunde}</p>
           <p><a href="${base}/auftraege/${r.auftrag_id}/finanzen">Finanzen öffnen</a></p>`,
       })
-      await supabaseAdmin
+      const { error: __dbErr2 } = await supabaseAdmin
         .from('einbehalte')
         .update({ freigabe_reminder_7_sent_at: new Date().toISOString() })
         .eq('id', r.id as string)
+      if (__dbErr2) logDbError('app/api/cron/einbehalte/route:einbehalte', __dbErr2)
       actions.push(`einbehalt_7:${r.id}`)
     }
   }
@@ -100,6 +105,7 @@ export async function GET(req: NextRequest) {
       einbehalte(id, auftrag_id, status)
     `
     )
+  if (bErr) logDbError('app/api/cron/einbehalte/route:buergschaften', bErr)
 
   if (bErr) {
     console.error('[cron/einbehalte buergschaft]', bErr.message)
@@ -123,13 +129,14 @@ export async function GET(req: NextRequest) {
       to: intern,
       subject: 'Bürgschaft läuft ab — verlängern oder Einbehalt einfordern',
       html: `<p>Bürgschaft endet in <strong>${tage}</strong> Tagen (${gd}).</p>
-        <p>Betrag: ${Number(r.betrag ?? 0).toLocaleString('de-DE')} € · ${hw?.name ?? '—'}</p>
+        <p>Betrag: ${formatEuro(Number(r.betrag ?? 0), { decimals: 0 })} · ${hw?.name ?? '—'}</p>
         ${auftragId ? `<p><a href="${base}/auftraege/${auftragId}/finanzen">Zum Auftrag</a></p>` : ''}`,
     })
-    await supabaseAdmin
+    const { error: __dbErr3 } = await supabaseAdmin
       .from('buergschaften')
       .update({ ablauf_reminder_60_sent_at: new Date().toISOString() })
       .eq('id', r.id as string)
+    if (__dbErr3) logDbError('app/api/cron/einbehalte/route:buergschaften', __dbErr3)
     actions.push(`buergschaft_60:${r.id}`)
   }
 

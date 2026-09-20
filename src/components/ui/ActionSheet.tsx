@@ -1,8 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { useSheetSwipeDismiss } from '@/hooks/useSheetSwipeDismiss'
@@ -62,12 +62,12 @@ export function ActionSheet({
         aria-modal="true"
         aria-label={title}
         style={{
-          paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
           ...sheetMotionStyle,
         }}
       >
         <div className="flex shrink-0 justify-center pb-1 pt-3" {...dragZoneProps} aria-hidden>
-          <div className="h-1 w-10 rounded-full bg-bw-border" />
+          <div className="h-1 w-10 rounded-pill bg-bw-border" />
         </div>
 
         <div
@@ -81,7 +81,7 @@ export function ActionSheet({
             aria-label="Schließen"
             title="Schließen"
           >
-            <X className="h-5 w-5" aria-hidden />
+            <MockIcon n="x" ctx="default" className="h-5 w-5" aria-hidden />
           </button>
           <span className="min-w-0 flex-1 truncate text-[length:var(--fs-title)] font-semibold text-bw-text">
             {title}
@@ -105,7 +105,7 @@ export function ActionSheet({
               disabled={it.disabled}
               title={it.disabled && it.hint ? it.hint : undefined}
               className={cn(
-                'action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium text-bw-text transition-colors active:bg-bw-hover',
+                'action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-sheet px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium text-bw-text transition-colors active:bg-bw-hover',
                 it.disabled && 'opacity-50'
               )}
               onClick={() => run(it)}
@@ -134,7 +134,7 @@ export function ActionSheet({
                   disabled={it.disabled}
                   title={it.disabled && it.hint ? it.hint : undefined}
                   className={cn(
-                    'action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium transition-colors active:bg-status-cancel-bg/30',
+                    'action-sheet-item flex w-full min-h-[48px] items-center gap-3 rounded-sheet px-3 py-2.5 text-left text-[length:var(--fs-title)] font-medium transition-colors active:bg-status-cancel-bg/30',
                     'text-status-cancel-text',
                     it.disabled && 'opacity-50'
                   )}

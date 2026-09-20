@@ -1,14 +1,25 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Trash2, X } from 'lucide-react'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 import { trapFocus } from '@/lib/a11y/focus-trap'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { editorSheetStackDepth, shouldIgnoreSuppressedEditorSheetPop } from '@/lib/surfaces/editor-sheet-history'
+import { CONFIRM, COPY_BUTTON } from '@/lib/copy'
+import { useAutoFormDirty } from '@/lib/surfaces/form-dirty'
+import {
+  formatChecklistLead,
+  formatLastSavedAt,
+  jumpToDocSection,
+  type DocCanvasDraftAction,
+  type DocCanvasGap,
+  type DocCanvasPrimaryAction,
+  type DocCanvasSection,
+} from '@/lib/surfaces/document-canvas-chrome'
 import { cn } from '@/lib/utils'
 
 export type DocumentCanvasProps = {
@@ -17,18 +28,25 @@ export type DocumentCanvasProps = {
   /** Untertitel unter dem Titel (Kunde · Region) */
   subtitle?: ReactNode
   onClose: () => void
-  /** Speichern Entwurf (✓) — S9: X speichert implizit via onClose ohne Confirm */
+  /**
+   * @deprecated Header-✓ — bevorzugt `draftAction` + `primaryAction` (Footer).
+   * Wird ignoriert, wenn primaryAction/draftAction gesetzt sind.
+   */
   onSave?: () => void
-  /** Wenn gesetzt: beschrifteter Header-CTA statt nur Check-Icon (Mock „Anfrage anlegen“) */
+  /** @deprecated siehe onSave */
   saveLabel?: string
   saveBusy?: boolean
   /**
-   * Ersetzt den Standard-✓ rechts im Header (z. B. Vorschau + Speichern/Senden-Menü).
-   * Wenn gesetzt, werden onSave / saveLabel im Header ignoriert.
+   * Header rechts (z. B. nur Vorschau). Kein Speichern-✓ wenn Footer-Chrome aktiv.
    */
   headerEnd?: ReactNode
-  /** DocBar Verwerfen — einzige destruktive Exit mit Confirm */
+  /** DocBar Verwerfen — Confirm „Änderungen verwerfen?“ */
   onDiscard?: () => void
+  /**
+   * Bei X/Escape/Back und draftDirty: Entwurf speichern & schließen
+   * (dreistufiges Confirm wie AngebotWizard).
+   */
+  onSaveDraftClose?: () => void
   docActions?: ReactNode
   /** Legacy: gesamter Dokumentkörper (wenn document/meta fehlen) */
   children?: ReactNode
@@ -38,7 +56,7 @@ export type DocumentCanvasProps = {
   meta?: ReactNode
   /** Summenblock unten in der Meta-Spalte (mobil im Wizard mitscrollend) */
   metaSum?: ReactNode
-  /** Mobil: Footer-CTA (im Positionswizard mitscrollend, nicht sticky) */
+  /** Zusätzlicher Footer-Inhalt (über der Action-Leiste) */
   footerCta?: ReactNode
   className?: string
   /** Portal fullscreen (default true) */
@@ -48,8 +66,18 @@ export type DocumentCanvasProps = {
    * Auf eigenen Routes (`/angebote/neu`) aus — sonst kämpft die History mit PickerSheets.
    */
   manageHistory?: boolean
-  /** Ungespeicherte Änderungen — beforeunload + Confirm bei Browser-Zurück */
+  /** Ungespeicherte Änderungen — Close-Confirm bei X/Back wenn dirty. */
   draftDirty?: boolean
+  /** Dezent im Kopf — wird von lastSavedAt überlagert, wenn gesetzt */
+  statusHint?: string | null
+  /** Timestamp letzter Speicherung → „Zuletzt gespeichert vor X Min.“ */
+  lastSavedAt?: number | Date | null
+  /** Gliederung: Abschnitte mit Haken „vollständig“ */
+  sections?: DocCanvasSection[]
+  /** Hauptaktion unten rechts (Text-Button) */
+  primaryAction?: DocCanvasPrimaryAction
+  /** Entwurf speichern — Sekundär links in der Footer-Leiste */
+  draftAction?: DocCanvasDraftAction
   /** Vollflächiger Lade-Overlay (z. B. Versand) */
   busy?: boolean
   busyLabel?: string
@@ -57,9 +85,9 @@ export type DocumentCanvasProps = {
 
 /**
  * Surface A — Dokument-Flow (Angebot/RE/Abnahme).
- * S9: X = schließen (Caller speichert Entwurf still); Caller zeigt `toast.autoSaved` bei Erfolg.
- * Verwerfen nur über DocBar + Confirm.
- * S10: Back schließt Canvas wenn History gesetzt.
+ * X bei dirty → Confirm (Entwurf oder Verwerfen); ohne dirty → sofort schließen.
+ * DocBar-Verwerfen nur über onDiscard + Confirm.
+ * S10: Back schließt Canvas wenn History gesetzt (bei dirty mit Confirm).
  */
 export function DocumentCanvas({
   open = true,
@@ -71,6 +99,7 @@ export function DocumentCanvas({
   saveBusy,
   headerEnd,
   onDiscard,
+  onSaveDraftClose,
   docActions,
   children,
   document: documentSlot,
@@ -80,46 +109,75 @@ export function DocumentCanvas({
   className,
   portal = true,
   manageHistory = true,
-  draftDirty = false,
+  draftDirty: draftDirtyProp,
+  statusHint,
+  lastSavedAt,
+  sections,
+  primaryAction,
+  draftAction,
   busy,
   busyLabel,
 }: DocumentCanvasProps) {
   // Client sofort mounten — sonst ein Frame Flash der darunterliegenden Seite (z. B. Vorgänge)
   const [mounted, setMounted] = useState(() => typeof document !== 'undefined')
   const [discardOpen, setDiscardOpen] = useState(false)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const [saveFlash, setSaveFlash] = useState(false)
   const [barCompact, setBarCompact] = useState(false)
+  const [checklistGaps, setChecklistGaps] = useState<DocCanvasGap[]>([])
+  const [nowTick, setNowTick] = useState(() => Date.now())
   const rootRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const historyPushed = useRef(false)
   const saveFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const draftDirtyRef = useRef(draftDirty)
-  draftDirtyRef.current = draftDirty
+
+  const useFooterChrome = Boolean(primaryAction || draftAction)
+  const lastSavedLabel = formatLastSavedAt(lastSavedAt, nowTick)
+  const headerStatus = lastSavedLabel ?? statusHint ?? null
+
+  const effectiveDirty = useAutoFormDirty(rootRef, open && mounted, draftDirtyProp)
+  const draftDirtyRef = useRef(effectiveDirty)
+  draftDirtyRef.current = effectiveDirty
+  const onSaveDraftCloseRef = useRef(onSaveDraftClose)
+  onSaveDraftCloseRef.current = onSaveDraftClose
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  /* Tab schließen / Reload bei ungespeicherten Änderungen */
   useEffect(() => {
-    if (!open || !draftDirty) return
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [open, draftDirty])
+    if (!open || lastSavedAt == null) return
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [open, lastSavedAt])
 
   /* Speichern/Laden: Soft-Keyboard zu — sonst bleibt Fokus im Feld unter dem Overlay */
   useEffect(() => {
     if (!open) return
-    if (busy || saveBusy) dismissSoftKeyboard()
-  }, [open, busy, saveBusy])
+    if (busy || saveBusy || primaryAction?.busy || draftAction?.busy) dismissSoftKeyboard()
+  }, [open, busy, saveBusy, primaryAction?.busy, draftAction?.busy])
+
+  const finishClose = useCallback(() => {
+    setCloseConfirmOpen(false)
+    setDiscardOpen(false)
+    onCloseRef.current()
+  }, [])
+
+  const requestClose = useCallback(() => {
+    if (draftDirtyRef.current) {
+      setCloseConfirmOpen(true)
+      return
+    }
+    finishClose()
+  }, [finishClose])
+  const requestCloseRef = useRef(requestClose)
+  requestCloseRef.current = requestClose
 
   const handleClose = useCallback(() => {
-    onClose()
-  }, [onClose])
+    requestCloseRef.current()
+  }, [])
   const handleCloseRef = useRef(handleClose)
   handleCloseRef.current = handleClose
 
@@ -136,11 +194,81 @@ export function DocumentCanvas({
     saveFlashTimer.current = setTimeout(() => setSaveFlash(false), 220)
   }, [onSave])
 
+  const handleDraftAction = useCallback(() => {
+    if (!draftAction || draftAction.disabled || draftAction.busy) return
+    draftAction.onClick()
+    setSaveFlash(true)
+    if (saveFlashTimer.current) clearTimeout(saveFlashTimer.current)
+    saveFlashTimer.current = setTimeout(() => setSaveFlash(false), 220)
+  }, [draftAction])
+
+  const handlePrimaryAction = useCallback(() => {
+    if (!primaryAction || primaryAction.disabled || primaryAction.busy) return
+    const gaps = primaryAction.getGaps?.() ?? []
+    if (gaps.length > 0) {
+      setChecklistGaps(gaps)
+      return
+    }
+    setChecklistGaps([])
+    primaryAction.onClick()
+  }, [primaryAction])
+
+  /* Cmd/Ctrl+Enter → Entwurf speichern, sonst Primary (Wizard) */
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'Enter') return
+      if (busy || saveBusy) return
+      if (draftAction && !draftAction.disabled && !draftAction.busy) {
+        e.preventDefault()
+        handleDraftAction()
+        return
+      }
+      if (primaryAction && !primaryAction.disabled && !primaryAction.busy) {
+        e.preventDefault()
+        handlePrimaryAction()
+        return
+      }
+      if (onSave) {
+        e.preventDefault()
+        handleSave()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [
+    open,
+    busy,
+    saveBusy,
+    draftAction,
+    primaryAction,
+    onSave,
+    handleDraftAction,
+    handlePrimaryAction,
+    handleSave,
+  ])
+
+  const onJumpGap = useCallback((gapId: string) => {
+    jumpToDocSection(rootRef.current, gapId)
+  }, [])
+
+  const onJumpSection = useCallback((sectionId: string) => {
+    jumpToDocSection(rootRef.current, sectionId)
+  }, [])
+
   useEffect(() => {
     return () => {
       if (saveFlashTimer.current) clearTimeout(saveFlashTimer.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!open) {
+      setCloseConfirmOpen(false)
+      setDiscardOpen(false)
+      setChecklistGaps([])
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open || !mounted || !portal) return
@@ -157,9 +285,8 @@ export function DocumentCanvas({
       if (editorSheetStackDepth() > 0) return
 
       /*
-       * History-Eintrag ist weg (Back). Parent (Wizard) zeigt bei Dirty das
-       * Speichern-Confirm — History wiederherstellen, sonst wirkt „Übernehmen“
-       * im Kind-Sheet wie Wizard-Schließen.
+       * History-Eintrag ist weg (Back). Bei Dirty Confirm zeigen und History
+       * wiederherstellen — sonst wirkt „Übernehmen“ im Kind-Sheet wie Wizard-Schließen.
        */
       window.history.pushState({ documentCanvas: true }, '')
       historyPushed.current = true
@@ -189,11 +316,11 @@ export function DocumentCanvas({
   /* Spät dirty geworden (z. B. Feld geändert) — History nachziehen, ohne Re-Init */
   useEffect(() => {
     if (!open || !mounted || !portal || manageHistory) return
-    if (!draftDirty || historyPushed.current) return
+    if (!effectiveDirty || historyPushed.current) return
     if (editorSheetStackDepth() > 0) return
     window.history.pushState({ documentCanvas: true }, '')
     historyPushed.current = true
-  }, [open, mounted, portal, manageHistory, draftDirty])
+  }, [open, mounted, portal, manageHistory, effectiveDirty])
 
   useOverlayChromeLock(Boolean(open && mounted))
 
@@ -335,31 +462,35 @@ export function DocumentCanvas({
 
   if (!open || (portal && !mounted)) return null
 
-  const interactionLocked = Boolean(busy || saveBusy)
+  const interactionLocked = Boolean(
+    busy || saveBusy || primaryAction?.busy || draftAction?.busy
+  )
+  const showLegacyHeaderSave = !useFooterChrome && Boolean(onSave) && headerEnd == null
+  const checklistLead =
+    checklistGaps.length > 0 ? formatChecklistLead(checklistGaps) : ''
 
   const ui = (
     <div
       ref={rootRef}
-      className={cn('document-canvas', className)}
+      className={cn('document-canvas', useFooterChrome && 'document-canvas--footer-chrome', className)}
       role="dialog"
       aria-modal="true"
       aria-busy={interactionLocked || undefined}
     >
       <header className="document-canvas__header">
-        <button
-          type="button"
-          className="editor-sheet__icon-btn"
-          onClick={handleClose}
-          disabled={interactionLocked}
-          aria-label="Schließen"
-        >
-          <X className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-        </button>
+        <MockBtn className="editor-sheet__icon-btn" type="button" onClick={handleClose} disabled={interactionLocked} aria-label="Schließen">
+          <MockIcon n="x" ctx="row" className="h-5 w-5" aria-hidden />
+        </MockBtn>
         <div className="document-canvas__title-block min-w-0 flex-1">
           <h1 className="document-canvas__title">{title}</h1>
           {subtitle ? (
             <p className="document-canvas__subtitle m-0 truncate text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
               {subtitle}
+            </p>
+          ) : null}
+          {headerStatus ? (
+            <p className="document-canvas__status-hint m-0 truncate text-[length:var(--fs-meta)] text-bw-text-muted opacity-80">
+              {headerStatus}
             </p>
           ) : null}
         </div>
@@ -372,39 +503,71 @@ export function DocumentCanvas({
           >
             {headerEnd}
           </div>
-        ) : onSave ? (
+        ) : showLegacyHeaderSave ? (
           saveLabel ? (
-            <button
-              type="button"
-              className={cn(
+            <MockBtn className={cn(
                 'editor-sheet__confirm-text inline-flex items-center gap-1.5',
                 saveFlash && 'bw-motion-save-ok'
-              )}
-              disabled={interactionLocked}
-              onClick={handleSave}
-            >
-              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
+              )} type="button" disabled={interactionLocked} onClick={handleSave}>
+              <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
               {saveBusy ? '…' : saveLabel}
-            </button>
+            </MockBtn>
           ) : (
-            <button
-              type="button"
-              className={cn(
+            <MockBtn className={cn(
                 'editor-sheet__confirm',
                 saveFlash && 'bw-motion-save-ok'
-              )}
-              disabled={interactionLocked}
-              onClick={handleSave}
-              aria-label="Speichern"
-              title="Speichern"
-            >
-              <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-            </button>
+              )} type="button" disabled={interactionLocked} onClick={handleSave} aria-label="Speichern" title="Speichern">
+              <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
+            </MockBtn>
           )
         ) : (
           <span className="editor-sheet__header-end" aria-hidden />
         )}
       </header>
+      {sections && sections.length > 0 ? (
+        <nav className="document-canvas__outline" aria-label="Gliederung">
+          {sections.map((s) => (
+            <MockBtn
+              key={s.id}
+              type="button"
+              className={cn(
+                'document-canvas__outline-chip',
+                s.complete && 'document-canvas__outline-chip--done'
+              )}
+              onClick={() => onJumpSection(s.id)}
+              disabled={interactionLocked}
+            >
+              <MockIcon
+                n={s.complete ? 'check' : 'circle'}
+                ctx="row"
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden
+              />
+              <span>{s.label}</span>
+            </MockBtn>
+          ))}
+        </nav>
+      ) : null}
+      {checklistGaps.length > 0 ? (
+        <div className="document-canvas__checklist" role="alert">
+          <p className="document-canvas__checklist-lead m-0">{checklistLead}</p>
+          <ul className="document-canvas__checklist-list m-0">
+            {checklistGaps.map((g) => (
+              <li key={g.id}>
+                <MockBtn
+                  type="button"
+                  className="document-canvas__checklist-jump"
+                  onClick={() => onJumpGap(g.id)}
+                  disabled={interactionLocked}
+                >
+                  {g.label}
+                  <MockIcon n="chevron-right" ctx="row" className="h-3.5 w-3.5" aria-hidden />
+                </MockBtn>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div
         ref={bodyRef}
         className={cn('document-canvas__body', interactionLocked && 'pointer-events-none')}
@@ -426,6 +589,40 @@ export function DocumentCanvas({
       {footerCta ? (
         <div className="document-canvas__footer-cta doccv-foot">{footerCta}</div>
       ) : null}
+      {useFooterChrome ? (
+        <div
+          className={cn(
+            'document-canvas__actions',
+            interactionLocked && 'pointer-events-none opacity-60'
+          )}
+        >
+          {draftAction ? (
+            <MockBtn
+              type="button"
+              kind="secondary"
+              className={cn(saveFlash && 'bw-motion-save-ok')}
+              disabled={interactionLocked || draftAction.disabled}
+              onClick={handleDraftAction}
+            >
+              {draftAction.busy
+                ? '…'
+                : (draftAction.label ?? COPY_BUTTON.entwurfSpeichern)}
+            </MockBtn>
+          ) : (
+            <span />
+          )}
+          {primaryAction ? (
+            <MockBtn
+              type="button"
+              kind="primary"
+              disabled={interactionLocked || primaryAction.disabled}
+              onClick={handlePrimaryAction}
+            >
+              {primaryAction.busy ? '…' : primaryAction.label}
+            </MockBtn>
+          ) : null}
+        </div>
+      ) : null}
       {docActions || onDiscard ? (
         <footer
           className={cn(
@@ -435,17 +632,10 @@ export function DocumentCanvas({
           )}
         >
           {onDiscard ? (
-            <button
-              type="button"
-              className="doc-action-bar__btn doc-action-bar__btn--danger"
-              onClick={requestDiscard}
-              disabled={interactionLocked}
-              aria-label="Verwerfen"
-              title="Verwerfen"
-            >
-              <Trash2 size={22} strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-              <span className="doc-action-bar__lbl">Verwerfen</span>
-            </button>
+            <MockBtn className="doc-action-bar__btn doc-action-bar__btn--danger" type="button" onClick={requestDiscard} disabled={interactionLocked} aria-label={COPY_BUTTON.verwerfen} title={COPY_BUTTON.verwerfen}>
+              <MockIcon n="trash" ctx="row" size={22} aria-hidden />
+              <span className="doc-action-bar__lbl">{COPY_BUTTON.verwerfen}</span>
+            </MockBtn>
           ) : null}
           {docActions}
         </footer>
@@ -462,16 +652,39 @@ export function DocumentCanvas({
       <ConfirmPopup
         open={discardOpen}
         onClose={() => setDiscardOpen(false)}
-        title="Änderungen verwerfen?"
-        confirmLabel="Verwerfen"
-        cancelLabel="Weiter bearbeiten"
+        title={CONFIRM.dirty}
+        confirmLabel={CONFIRM.discard}
+        cancelLabel={CONFIRM.continueEditing}
         danger
         onConfirm={() => {
           setDiscardOpen(false)
           onDiscard?.()
         }}
       >
-        Ungespeicherte Eingaben gehen verloren.
+        {CONFIRM.dirtyBody}
+      </ConfirmPopup>
+      <ConfirmPopup
+        open={closeConfirmOpen}
+        onClose={() => setCloseConfirmOpen(false)}
+        title={onSaveDraftClose ? 'Änderungen speichern?' : CONFIRM.dirty}
+        cancelLabel={CONFIRM.continueEditing}
+        confirmLabel={onSaveDraftClose ? undefined : CONFIRM.discard}
+        discardLabel={onSaveDraftClose ? 'Beenden ohne Speichern' : undefined}
+        saveDraftLabel={onSaveDraftClose ? CONFIRM.saveDraft : undefined}
+        danger
+        onConfirm={() => {
+          finishClose()
+        }}
+        onSaveDraft={
+          onSaveDraftClose
+            ? () => {
+                setCloseConfirmOpen(false)
+                onSaveDraftClose()
+              }
+            : undefined
+        }
+      >
+        {CONFIRM.dirtyBody}
       </ConfirmPopup>
     </div>
   )

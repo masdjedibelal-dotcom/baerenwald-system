@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AngebotPosition, AuftragStatus, Kunde, LeadStatus, NachtragRow } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
@@ -64,19 +65,21 @@ export async function loadPublicProjektByToken(token: string): Promise<PublicPro
     )
     .eq('kunden_token', t)
     .maybeSingle()
+  if (aErr) logDbError('lib/projekt/load-public-projekt:auftraege', aErr)
 
   if (aErr || !auf) return null
 
   const auftragId = auf.id as string
 
-  const { data: cur } = await supabaseAdmin
+  const { data: cur, error: error2 } = await supabaseAdmin
     .from('auftraege')
     .select('kunden_seite_aufrufe')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error2) logDbError('lib/projekt/load-public-projekt:auftraege', error2)
   const prevCount = (cur as { kunden_seite_aufrufe?: number | null } | null)?.kunden_seite_aufrufe ?? 0
 
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('auftraege')
     .update({
       kunden_seite_aufrufe: (typeof prevCount === 'number' ? prevCount : 0) + 1,
@@ -84,26 +87,30 @@ export async function loadPublicProjektByToken(token: string): Promise<PublicPro
       updated_at: new Date().toISOString(),
     })
     .eq('id', auftragId)
+  if (__dbErr1) logDbError('lib/projekt/load-public-projekt:auftraege', __dbErr1)
 
-  const { data: tlRows } = await supabaseAdmin
+  const { data: tlRows, error: error3 } = await supabaseAdmin
     .from('auftrag_timeline')
     .select('id, typ, titel, beschreibung, foto_urls, created_at')
     .eq('auftrag_id', auftragId)
     .eq('fuer_kunde_freigegeben', true)
     .order('created_at', { ascending: true })
+  if (error3) logDbError('lib/projekt/load-public-projekt:auftrag_timeline', error3)
 
-  const { data: msRows } = await supabaseAdmin
+  const { data: msRows, error: error4 } = await supabaseAdmin
     .from('auftrag_milestones')
     .select('id, titel, beschreibung, datum, erledigt, sort_order')
     .eq('auftrag_id', auftragId)
     .eq('fuer_kunden_sichtbar', true)
     .order('sort_order', { ascending: true })
+  if (error4) logDbError('lib/projekt/load-public-projekt:auftrag_milestones', error4)
 
-  const { data: nachtRows } = await supabaseAdmin
+  const { data: nachtRows, error: error5 } = await supabaseAdmin
     .from('nachtraege')
     .select('id, grund, gesamt_min, gesamt_max')
     .eq('auftrag_id', auftragId)
     .eq('status', 'akzeptiert')
+  if (error5) logDbError('lib/projekt/load-public-projekt:nachtraege', error5)
 
   const row = auf as Record<string, unknown>
   const k = row.kunden as PublicProjektPayload['kunde'] | null

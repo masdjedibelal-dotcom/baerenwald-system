@@ -1,11 +1,16 @@
 'use client'
 
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { useCallback, useEffect, useState } from 'react'
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { toast } from '@/components/ui/app-toast'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
 import { TokenLinkInvalid, PublicTokenLegalFooter } from '@/components/public/TokenLinkInvalid'
 import {
   HANDWERKER_ABLEHNUNG_GRUND_LABELS,
@@ -14,6 +19,8 @@ import {
 } from '@/lib/angebote/ablehnung-labels'
 import type { HandwerkerAnfragePublicPayload } from '@/lib/handwerker-anfrage-types'
 import { formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type Flow = 'laden' | 'offen' | 'ablehnung_form' | 'bestaetigen' | 'fertig'
 
@@ -22,6 +29,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
   const [fehler, setFehler] = useState<string | null>(null)
   const [flow, setFlow] = useState<Flow>('laden')
   const [wahl, setWahl] = useState<'akzeptiert' | 'abgelehnt' | null>(null)
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [notiz, setNotiz] = useState('')
   const [ablehnungGrund, setAblehnungGrund] = useState<HandwerkerAblehnungGrund | ''>('')
   const [busy, setBusy] = useState(false)
@@ -29,7 +37,14 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
   const laden = useCallback(async () => {
     setFehler(null)
     const res = await fetch(`/api/handwerker/anfrage/${encodeURIComponent(token)}`)
-    const json = (await res.json().catch(() => null)) as
+    const json = (await res.json().catch((err) => {
+<<<<<<< Updated upstream
+      console.error('[PartnerAnfrageClient] res.json', err)
+=======
+      console.error('[HandwerkerAnfrageClient] res.json', err)
+>>>>>>> Stashed changes
+      return null
+    })) as
       | (HandwerkerAnfragePublicPayload & { ok?: boolean; error?: string })
       | null
     if (!res.ok || !json || json.ok === false || json.error === 'ungueltig') {
@@ -52,7 +67,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
   async function absenden() {
     if (!wahl) return
     if (wahl === 'abgelehnt' && !ablehnungGrund) {
-      toast.error('Bitte einen Grund auswählen.')
+      applyFieldErrors({ _form: TOAST.bitte_einen_grund_auswaehlen })
       return
     }
     setBusy(true)
@@ -132,35 +147,23 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
       <div className="flex min-h-dvh flex-col">
         <div className="mx-auto max-w-md flex-1 px-4 py-6">
         <h2 className="mb-4 text-lg font-semibold text-ink">Anfrage ablehnen</h2>
-        <Select
-          label="Grund"
-          name="grund"
-          required
-          value={ablehnungGrund}
-          onChange={(e) => setAblehnungGrund(e.target.value as HandwerkerAblehnungGrund | '')}
-          options={grundOptions}
-        />
+        <Combobox label="Grund" id="grund" name="grund" required options={grundOptions} value={ablehnungGrund == null ? '' : String(ablehnungGrund)} placeholder="Auswählen…" onChange={(next) => { setAblehnungGrund(next as HandwerkerAblehnungGrund | ''); }} />
         <div className="mt-4">
-          <Textarea
-            label="Freitext (optional)"
-            value={notiz}
-            onChange={(e) => setNotiz(e.target.value)}
-            rows={3}
-          />
+          <MockField label="Freitext (optional)"><RichTextEditor value={typeof (notiz) === 'string' ? (notiz) : ''} onChange={(__v) => setNotiz(__v)} minHeight={120} aria-label="Freitext (optional)" /></MockField>
         </div>
         <div className="mt-4 flex flex-col gap-2">
-          <Button
+          <MockBtn
             type="button"
-            variant="danger"
+            kind="danger"
             className="min-h-[52px] w-full"
             loading={busy}
             onClick={() => void absenden()}
           >
             Absenden
-          </Button>
-          <Button
+          </MockBtn>
+          <MockBtn
             type="button"
-            variant="secondary"
+            kind="secondary"
             className="min-h-[52px] w-full"
             disabled={busy}
             onClick={() => {
@@ -171,7 +174,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
             }}
           >
             Zurück
-          </Button>
+          </MockBtn>
         </div>
         </div>
         {legal}
@@ -184,25 +187,20 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
       <div className="flex min-h-dvh flex-col">
         <div className="mx-auto max-w-md flex-1 px-4 py-6">
         <h2 className="mb-4 text-lg font-semibold text-ink">Anfrage annehmen</h2>
-        <Textarea
-          label="Anmerkungen (optional)"
-          value={notiz}
-          onChange={(e) => setNotiz(e.target.value)}
-          rows={4}
-        />
+        <MockField label="Anmerkungen (optional)"><RichTextEditor value={typeof (notiz) === 'string' ? (notiz) : ''} onChange={(__v) => setNotiz(__v)} minHeight={120} aria-label="Anmerkungen (optional)" /></MockField>
         <div className="mt-4 flex flex-col gap-2">
-          <Button
+          <MockBtn
             type="button"
-            variant="primary"
+            kind="primary"
             className="min-h-[52px] w-full"
             loading={busy}
             onClick={() => void absenden()}
           >
             Bestätigen
-          </Button>
-          <Button
+          </MockBtn>
+          <MockBtn
             type="button"
-            variant="secondary"
+            kind="secondary"
             className="min-h-[52px] w-full"
             disabled={busy}
             onClick={() => {
@@ -212,7 +210,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
             }}
           >
             Zurück
-          </Button>
+          </MockBtn>
         </div>
         </div>
         {legal}
@@ -230,7 +228,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
       </header>
 
       {fristText && data.status !== 'akzeptiert' && data.status !== 'abgelehnt' ? (
-        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm text-amber-950">
+        <div className="mb-6 rounded-card border border-status-contact-bg bg-status-contact-bg px-3 py-2 text-center text-sm text-status-contact-text">
           Bitte antworten Sie bis <strong>{fristText}</strong>
         </div>
       ) : null}
@@ -257,7 +255,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
         </h2>
         <ul className="space-y-3">
           {data.positionen.length === 0 ? (
-            <li className="text-sm text-muted">Keine Positionen für dieses Gewerk.</li>
+            <li className="text-sm text-muted"><MockEmpty title="Keine Positionen für dieses Gewerk." /></li>
           ) : (
             data.positionen.map((p, i) => {
               const titel = (p.leistung?.trim() || p.beschreibung).trim()
@@ -266,9 +264,9 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
                   ? p.beschreibung.trim()
                   : ''
               return (
-                <li key={i} className="rounded-lg border border-border bg-surface p-3 text-sm">
+                <li key={i} className="rounded-card border border-border bg-surface p-3 text-sm">
                   {data.positionen.length > 1 ? (
-                    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-primary">
+                    <p className="mb-1 text-fs-caption font-bold uppercase tracking-wide text-primary">
                       Position {i + 1}
                     </p>
                   ) : null}
@@ -303,9 +301,9 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
       </Card>
 
       <div className="flex flex-col gap-3">
-        <Button
+        <MockBtn
           type="button"
-          variant="primary"
+          kind="primary"
           className="min-h-[52px] w-full text-base"
           onClick={() => {
             setWahl('akzeptiert')
@@ -313,10 +311,10 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
           }}
         >
           Ich nehme die Anfrage an
-        </Button>
-        <Button
+        </MockBtn>
+        <MockBtn
           type="button"
-          variant="ghost"
+          kind="ghost"
           className="min-h-[52px] w-full border border-danger/40 text-base text-danger hover:bg-danger/5"
           onClick={() => {
             setWahl('abgelehnt')
@@ -326,7 +324,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
           }}
         >
           Ich bin leider nicht verfügbar
-        </Button>
+        </MockBtn>
       </div>
     </div>
     {legal}

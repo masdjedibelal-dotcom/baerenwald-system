@@ -1,5 +1,6 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { cn } from '@/lib/utils'
@@ -42,18 +43,18 @@ export function PosBoardKiSuggestions({ context, className }: Props) {
   }
 
   return (
-    <div className={cn('mb-3 rounded-lg border border-bw-border bg-bw-surface-2/60', className)}>
+    <div className={cn('mb-3 rounded-card border border-bw-border bg-bw-surface-2/60', className)}>
       <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
         <MockIcon ctx="default" n="sparkles" size={14} />
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-bw-text">KI Positionen</p>
-          <p className="text-[11px] leading-snug text-bw-text-muted">
+          <p className="text-fs-text font-semibold text-bw-text">KI Positionen</p>
+          <p className="text-fs-caption leading-snug text-bw-text-muted">
             Arbeiten beschreiben — mehrere Positionen auf einmal übernehmen
           </p>
         </div>
-        <button type="button" className="btn primary sm" onClick={openChat}>
+        <MockBtn kind="primary" sm type="button" onClick={openChat}>
           Beschreiben
-        </button>
+        </MockBtn>
       </div>
     </div>
   )

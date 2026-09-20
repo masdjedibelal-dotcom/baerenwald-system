@@ -1,4 +1,4 @@
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { DashboardClient } from '@/components/dashboard/DashboardClient'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
@@ -50,7 +50,7 @@ async function safeRows<T>(
     ) {
       throw e
     }
-    console.error(e)
+    logDbError('app/dashboard/page:safeRows', e)
     return []
   }
 }
@@ -63,7 +63,7 @@ async function safeMaybeSingle<T>(
     if (error) throw error
     return data
   } catch (e) {
-    console.error(e)
+    logDbError('app/dashboard/page:safeMaybeSingle', e)
     return null
   }
 }
@@ -129,6 +129,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
 
   const profil = user
     ? await safeMaybeSingle<{ name: string | null }>(() =>
+        // logDbError via safeMaybeSingle (catch)
         supabase.from('user_profiles').select('name').eq('id', user.id).maybeSingle()
       )
     : null
@@ -143,19 +144,17 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     marketing,
     gewerkeKatalogRaw,
   ] = await Promise.all([
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db
+    // logDbError via safeRows (catch)
+    safeRows(async () =>
+      (() => { const db = createClient(); return db
           .from('leads')
           .select('id, status, kunde_id, created_at')
           .is('geloescht_am', null)
           .order('created_at', { ascending: false })
-          .limit(2000)
-      )
+          .limit(2000) })()
     ),
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db
+    safeRows(async () =>
+      (() => { const db = createClient(); return db
           .from('angebote')
           .select(
             `
@@ -166,12 +165,10 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
           `
           )
           .order('created_at', { ascending: false })
-          .limit(2000)
-      )
+          .limit(2000) })()
     ),
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db
+    safeRows(async () =>
+      (() => { const db = createClient(); return db
           .from('auftraege')
           .select(
             `
@@ -182,12 +179,11 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
           `
           )
           .order('created_at', { ascending: false })
-          .limit(2000)
-      )
+          .limit(2000) })()
     ),
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db
+    // logDbError via safeRows (catch)
+    safeRows(async () =>
+      (() => { const db = createClient(); return db
           .from('rechnungen')
           .select(
             `
@@ -196,24 +192,20 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
           `
           )
           .order('created_at', { ascending: false })
-          .limit(2000)
-      )
+          .limit(2000) })()
     ),
     /* Separat + limitiert: positionen sind groß — nicht in der Haupt-Query (sonst Netlify „Connection closed“) */
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db
+    safeRows(async () =>
+      (() => { const db = createClient(); return db
           .from('rechnungen')
           .select('id, status, created_at, auftrag_id, ersetzt_durch, positionen, netto')
           .neq('status', 'storniert')
           .neq('status', 'entwurf')
           .order('created_at', { ascending: false })
-          .limit(800)
-      )
+          .limit(800) })()
     ),
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db
+    safeRows(async () =>
+      (() => { const db = createClient(); return db
           .from('auftrag_handwerker')
           .select(
             `
@@ -224,14 +216,11 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
               angebote(gesamt_fix, gesamt_min, gesamt_max))
           `
           )
-          .limit(3000)
-      )
+          .limit(3000) })()
     ),
     loadDashboardMarketingSafe(zeitraumFilter),
-    safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db.from('gewerke').select('id, name, slug').order('name')
-      )
+    safeRows(async () =>
+      (() => { const db = createClient(); return db.from('gewerke').select('id, name, slug').order('name') })()
     ),
   ])
 
@@ -342,10 +331,9 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
   const angebotPositionenById = new Map<string, unknown>()
   for (let i = 0; i < angebotIdsForGewerk.length; i += 40) {
     const chunk = angebotIdsForGewerk.slice(i, i + 40)
-    const rows = await safeRows(() =>
-      withCrmReadFallback(async (db) =>
-        db.from('angebote').select('id, positionen').in('id', chunk)
-      )
+    // logDbError via safeRows (catch)
+    const rows = await safeRows(async () =>
+      (() => { const db = createClient(); return db.from('angebote').select('id, positionen').in('id', chunk) })()
     )
     for (const row of rows as Array<{ id?: string; positionen?: unknown }>) {
       const id = String(row.id ?? '').trim()
@@ -446,7 +434,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     const gName = (gewerkRow as { name?: string } | null)?.name?.trim() || ''
     hwRows.push({
       handwerker_id: hwId,
-      handwerker_name: (h?.firma || h?.name || 'Handwerker').trim(),
+      handwerker_name: (h?.firma || h?.name || 'Partner').trim(),
       gewerk: gName,
       vereinbarter_preis: Number(z.vereinbarter_preis) || 0,
       auftrag_id: String(auf.id),
@@ -457,9 +445,9 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
   }
 
   // Auch Anfragen/Angebote ohne Auftrag: über angebot_handwerker für Vorgänge-Zählung
-  const angebotHw = await safeRows(() =>
-    withCrmReadFallback(async (db) =>
-      db
+  // logDbError via safeRows (catch)
+  const angebotHw = await safeRows(async () =>
+    (() => { const db = createClient(); return db
         .from('angebot_handwerker')
         .select(
           `
@@ -469,8 +457,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
           angebote(id, lead_id, kunde_id, created_at, status)
         `
         )
-        .limit(3000)
-    )
+        .limit(3000) })()
   )
 
   for (const row of angebotHw as Array<Record<string, unknown>>) {
@@ -487,7 +474,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     // Nur für Vorgänge-Zählung (kein EK/Umsatz ohne Auftrag) — EK bleibt 0, Umsatz 0
     hwRows.push({
       handwerker_id: hwId,
-      handwerker_name: (h?.firma || h?.name || 'Handwerker').trim(),
+      handwerker_name: (h?.firma || h?.name || 'Partner').trim(),
       gewerk: gName,
       vereinbarter_preis: 0,
       auftrag_id: '',

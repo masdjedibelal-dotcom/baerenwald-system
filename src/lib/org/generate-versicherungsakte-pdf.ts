@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { formatDatum } from "@/lib/format/geld-datum";
 
 export type VersicherungsaktePdfInput = {
   orgName: string;
@@ -30,11 +31,7 @@ function fmtDatum(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return d.toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatDatum(d.toISOString());
 }
 
 function wrapText(text: string, maxChars: number): string[] {
@@ -73,10 +70,17 @@ function drawFooter(ctx: DrawCtx) {
     color: LINE,
   });
   const left = `${ctx.orgName} · Erstellt ${ctx.erstelltAm}`;
-  ctx.page.drawText(left.slice(0, 70), {
+  ctx.page.drawText(left.slice(0, 55), {
     x: MARGIN,
     y: 38,
     size: 8,
+    font: ctx.font,
+    color: MUTED,
+  });
+  ctx.page.drawText("Ein Service von Bärenwald", {
+    x: MARGIN,
+    y: 26,
+    size: 7,
     font: ctx.font,
     color: MUTED,
   });
@@ -217,11 +221,7 @@ export async function generateVersicherungsaktePdf(
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const policenNr = input.versicherungsNr?.trim() || "";
-  const erstelltAm = new Date().toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  const erstelltAm = formatDatum(new Date().toISOString());
   const orgName = input.orgName?.trim() || "Hausverwaltung";
 
   const ctx: DrawCtx = {

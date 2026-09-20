@@ -1,9 +1,13 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import type { ReactNode } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailProp } from '@/components/ui/detail-prop'
 import { LeistungHandwerkerUpdatesAccordion } from '@/components/leistungen/LeistungHandwerkerUpdatesAccordion'
@@ -61,36 +65,21 @@ export function LeistungDrawer({
           const label = isZuweisen ? 'Zuweisen' : a.label
           if (isZuweisen || isAbwaehlen) {
             return (
-              <button
-                key={a.id}
-                type="button"
-                className={isAbwaehlen ? 'btn secondary sm' : 'btn primary sm'}
-                disabled={a.disabled}
-                aria-label={label}
-                onClick={() => {
+              <MockBtn kind="secondary" sm className={isAbwaehlen ? '' : ''} key={a.id} type="button" disabled={a.disabled} aria-label={label} onClick={() => {
                   onClose()
                   a.onClick()
-                }}
-              >
+                }}>
                 {label}
-              </button>
+              </MockBtn>
             )
           }
           return (
-            <button
-              key={a.id}
-              type="button"
-              className="editor-sheet__icon-btn"
-              disabled={a.disabled}
-              aria-label={a.label}
-              title={a.label}
-              onClick={() => {
+            <MockBtn className="editor-sheet__icon-btn" key={a.id} type="button" disabled={a.disabled} aria-label={a.label} title={a.label} onClick={() => {
                 onClose()
                 a.onClick()
-              }}
-            >
+              }}>
               <MockIcon ctx="default" n={a.icon ?? 'user'} size={20} />
-            </button>
+            </MockBtn>
           )
         })}
       </div>
@@ -99,31 +88,49 @@ export function LeistungDrawer({
   if (!row) {
     return (
       <EditorSheet open={open} onClose={onClose} title="Leistung" size="lg">
-        <p className="text-[length:var(--fs-text)] text-[var(--text-3)]">Keine Leistung ausgewählt.</p>
+        <MockEmpty title="Keine Leistung ausgewählt." />
       </EditorSheet>
     )
   }
 
+<<<<<<< Updated upstream
+  const footerPrimary = brauchtFreigabe
+    ? {
+        label: pruefungPending ? '…' : 'Annehmen',
+        onClick: () => onNachtragEntscheiden?.('anerkannt'),
+        disabled: pruefungPending,
+        busy: pruefungPending,
+      }
+    : null
+  const footerSecondary = brauchtFreigabe
+    ? {
+        label: 'Ablehnen',
+        onClick: () => onNachtragEntscheiden?.('abgelehnt'),
+        disabled: pruefungPending,
+      }
+    : null
+=======
   const footer = brauchtFreigabe ? (
     <div className="ldr-cta">
-      <Button
+      <MockBtn
         type="button"
-        variant="secondary"
+        kind="secondary"
         disabled={pruefungPending}
         onClick={() => onNachtragEntscheiden?.('abgelehnt')}
       >
         Ablehnen
-      </Button>
-      <Button
+      </MockBtn>
+      <MockBtn
         type="button"
-        variant="primary"
+        kind="primary"
         disabled={pruefungPending}
         onClick={() => onNachtragEntscheiden?.('anerkannt')}
       >
         {pruefungPending ? '…' : 'Annehmen'}
-      </Button>
+      </MockBtn>
     </div>
   ) : undefined
+>>>>>>> Stashed changes
 
   return (
     <EditorSheet
@@ -133,12 +140,13 @@ export function LeistungDrawer({
       crumb={row.gewerkName ? `${row.gewerkName} >` : null}
       size="lg"
       headerEnd={headerEnd}
-      footer={footer}
+      primary={footerPrimary}
+      secondary={footerSecondary}
     >
       {brauchtFreigabe ? (
         <Section title="Nachtrag zur Freigabe" icon="clipboard-list">
           <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
-            Der Handwerker hat weitere Arbeit eingereicht — bitte prüfen und freigeben oder
+            Der Partner hat weitere Arbeit eingereicht — bitte prüfen und freigeben oder
             ablehnen. Das Ergebnis erscheint im Hausmeister-Portal.
           </p>
           <div className="props">
@@ -146,7 +154,7 @@ export function LeistungDrawer({
               <StatusBadge status="offen" label="Offen" />
             </DetailProp>
             {row.handwerkerName ? (
-              <DetailProp label="Handwerker">{row.handwerkerName}</DetailProp>
+              <DetailProp label="Partner">{row.handwerkerName}</DetailProp>
             ) : null}
             <DetailProp label="Begründung">
               <span className="whitespace-pre-wrap">
@@ -203,7 +211,7 @@ export function LeistungDrawer({
       </Section>
 
       {!brauchtFreigabe && (row.istRegie || (row.handwerkerUpdates && row.handwerkerUpdates.length > 0)) ? (
-        <Section title="Handwerker-Updates" icon="camera">
+        <Section title="Partner-Updates" icon="camera">
           {row.regieSollIstLabel ? (
             <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
               {row.regieSollIstLabel}
@@ -218,7 +226,7 @@ export function LeistungDrawer({
             </p>
           ) : null}
           {(row.handwerkerUpdates ?? []).length === 0 ? (
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Keine Einträge.</p>
+            <MockEmpty title="Keine Einträge." />
           ) : (
             <LeistungHandwerkerUpdatesAccordion updates={row.handwerkerUpdates ?? []} />
           )}

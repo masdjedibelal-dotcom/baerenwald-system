@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { acceptHandwerkerZuweisung } from '@/lib/angebote/handwerker-annahme'
@@ -9,7 +10,8 @@ async function portalHandwerkerId(): Promise<string | null> {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
-  const { data } = await supabase.from('handwerker').select('id').eq('auth_user_id', user.id).maybeSingle()
+  const {data, error} = await supabase.from('handwerker').select('id').eq('auth_user_id', user.id).maybeSingle()
+  if (error) logDbError('app/api/portal/angebote/zuweisung/[zuweisungId]/annahme/route:handwerker', error)
   return (data?.id as string | undefined) ?? null
 }
 

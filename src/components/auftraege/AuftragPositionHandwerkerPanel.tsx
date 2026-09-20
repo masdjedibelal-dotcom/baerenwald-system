@@ -1,10 +1,16 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
-
+import { Combobox } from '@/components/ui/Combobox'
 import { useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { ChevronDown, FileUp } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Select } from '@/components/ui/Select'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
 import { HandwerkerEinreichungManuellModal } from '@/components/angebote/HandwerkerEinreichungManuellModal'
@@ -28,6 +34,7 @@ import {
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { cn, formatDatumZeit } from '@/lib/utils'
 import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 export function AuftragPositionHandwerkerBadge({
   pos,
@@ -43,7 +50,7 @@ export function AuftragPositionHandwerkerBadge({
   return (
     <span
       className={cn(
-        'inline-flex rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+        'inline-flex rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
         auftragHwStatusBadgeClass(st),
         className
       )}
@@ -66,7 +73,7 @@ function KonditionenWarteHinweis({
 
   if (partnerAkzeptiert) {
     return (
-      <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
+      <p className="rounded-field border border-status-contact-bg bg-status-contact-bg px-3 py-2 text-[length:var(--fs-meta)] text-status-contact-text">
         <span className="font-semibold">Zuweisung angenommen — Konditionen fehlen noch.</span>{' '}
         Der Partner muss im Portal „Gegenangebot senden“ oder Preise bestätigen. Alternativ können
         Sie das Angebot manuell erfassen.
@@ -76,14 +83,14 @@ function KonditionenWarteHinweis({
 
   if (zuweisungStatus === 'angefragt' || zuweisungStatus === 'warten') {
     return (
-      <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[length:var(--fs-meta)] text-blue-950">
+      <p className="rounded-field border border-status-new-bg bg-status-new-bg px-3 py-2 text-[length:var(--fs-meta)] text-status-new-text">
         Warte auf Antwort des Partners (Annahme oder Gegenangebot im Partner-Portal).
       </p>
     )
   }
 
   return (
-    <p className="rounded-md border border-bw-border bg-bw-bg px-3 py-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+    <p className="rounded-field border border-bw-border bg-bw-bg px-3 py-2 text-[length:var(--fs-meta)] text-bw-text-muted">
       Noch keine Konditionen vom Partner — nach Zuweisung und Annahme erscheint hier das
       Gegenangebot zur Prüfung.
     </p>
@@ -100,21 +107,21 @@ function PositionKonditionVorschau({
   const delta = hwKonditionDelta(kondition.ek_netto, kondition.hw_netto)
 
   return (
-    <div className="rounded-md border border-bw-border bg-surface p-3 space-y-2">
+    <div className="rounded-field border border-bw-border bg-surface p-3 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
           Partner-Vorschlag diese Leistung
         </span>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+            'rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
             hwKonditionenArtBadgeClass(art)
           )}
         >
           {hwKonditionenArtLabel(art)}
         </span>
         {kondition.geaendert ? (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-amber-950">
+          <span className="rounded-card bg-status-contact-bg px-1.5 py-0.5 text-[length:var(--fs-meta)] font-medium text-status-contact-text">
             Geändert
           </span>
         ) : null}
@@ -139,8 +146,8 @@ function PositionKonditionVorschau({
           <p
             className={cn(
               'tabular-nums font-medium',
-              delta != null && delta > 0 && 'text-amber-800',
-              delta != null && delta < 0 && 'text-emerald-800',
+              delta != null && delta > 0 && 'text-status-contact-text',
+              delta != null && delta < 0 && 'text-status-order-text',
               delta == null && 'text-bw-text-muted'
             )}
           >
@@ -229,9 +236,9 @@ export function AuftragPositionHandwerkerPanel({
         positionId: pos.id,
         status: st,
       })
-      if (!r.ok) toast.error(r.message)
+      if (!r.ok) toast.systemError(r)
       else {
-        toast.success('Status aktualisiert')
+        toast.success(TOAST.statusAktualisiert)
         onChanged()
       }
     })
@@ -241,7 +248,7 @@ export function AuftragPositionHandwerkerPanel({
     partnerRow &&
     (partnerRow.status ?? '').toLowerCase() === 'abgelehnt' &&
     partnerRow.ablehnung_grund ? (
-      <p className="rounded-md border border-danger/30 bg-danger/5 px-2 py-1.5 text-[length:var(--fs-meta)] text-danger">
+      <p className="rounded-field border border-danger/30 bg-danger/5 px-2 py-1.5 text-[length:var(--fs-meta)] text-danger">
         Ablehnung: {labelHandwerkerAblehnung(partnerRow.ablehnung_grund)}
         {partnerRow.antwort_notiz?.trim() ? ` — ${partnerRow.antwort_notiz.trim()}` : ''}
       </p>
@@ -250,42 +257,19 @@ export function AuftragPositionHandwerkerPanel({
   const crmAdvancedBlock = (
     <div className={embedded ? 'pos-v2-advanced' : undefined}>
       {!embedded ? (
-        <button
-          type="button"
-          className="mt-2 flex items-center gap-1 text-[length:var(--fs-meta)] text-bw-text-muted hover:text-bw-text"
-          onClick={toggleCrmStatus}
-        >
-          <ChevronDown
-            className={cn('h-3.5 w-3.5 transition-transform', crmStatusOpen && 'rotate-180')}
-            aria-hidden
-          />
+        <MockBtn className="mt-2 flex items-center gap-1 text-[length:var(--fs-meta)] text-bw-text-muted hover:text-bw-text" type="button" onClick={toggleCrmStatus}>
+          <MockIcon n="chevron-down" ctx="default" className={cn('h-3.5 w-3.5 transition-transform', crmStatusOpen && 'rotate-180')} aria-hidden />
           CRM-Status manuell setzen
-        </button>
+        </MockBtn>
       ) : (
-        <button
-          type="button"
-          className="pos-v2-advanced-trigger"
-          onClick={toggleCrmStatus}
-          aria-expanded={crmStatusOpen}
-        >
-          <ChevronDown
-            className={cn('h-3.5 w-3.5 transition-transform', crmStatusOpen && 'rotate-180')}
-            aria-hidden
-          />
+        <MockBtn className="pos-v2-advanced-trigger" type="button" onClick={toggleCrmStatus} aria-expanded={crmStatusOpen}>
+          <MockIcon n="chevron-down" ctx="default" className={cn('h-3.5 w-3.5 transition-transform', crmStatusOpen && 'rotate-180')} aria-hidden />
           Erweitert — CRM-Status manuell
-        </button>
+        </MockBtn>
       )}
       {crmStatusOpen ? (
         <div className={embedded ? 'pos-v2-advanced-body' : 'mt-2'}>
-          <Select
-            label="Zuweisungs-Status (intern)"
-            name={`hw-status-${pos.id}`}
-            value={zuweisungStatus as AuftragHandwerkerZuweisungStatus}
-            disabled={pending}
-            onChange={(e) => changeStatus(e.target.value as AuftragHandwerkerZuweisungStatus)}
-            options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-            className="text-[length:var(--fs-text)]"
-          />
+          <Combobox label="Zuweisungs-Status (intern)" id={`hw-status-${pos.id}`} name={`hw-status-${pos.id}`} disabled={pending} options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} value={zuweisungStatus as AuftragHandwerkerZuweisungStatus == null ? '' : String(zuweisungStatus as AuftragHandwerkerZuweisungStatus)} placeholder="Auswählen…" onChange={(next) => { changeStatus(next as AuftragHandwerkerZuweisungStatus); }} className="text-[length:var(--fs-text)]" />
         </div>
       ) : null}
     </div>
@@ -294,7 +278,7 @@ export function AuftragPositionHandwerkerPanel({
   return (
     <div className="space-y-3">
       {!embedded ? (
-        <div className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-3">
+        <div className="rounded-card border border-bw-border bg-bw-bg-soft/40 p-3">
           <p className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
             Zuweisung
           </p>
@@ -304,7 +288,7 @@ export function AuftragPositionHandwerkerPanel({
             ) : null}
             <span
               className={cn(
-                'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                'rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                 auftragHwStatusBadgeClass(zuweisungStatus)
               )}
             >
@@ -317,7 +301,7 @@ export function AuftragPositionHandwerkerPanel({
             ) : null}
           </div>
           <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
-            „Akzeptiert“ bedeutet: Partner hat die Anfrage angenommen — nicht automatisch, dass Preise
+            „Angenommen“ bedeutet: Partner hat die Anfrage angenommen — nicht automatisch, dass Preise
             vereinbart sind.
           </p>
           {ablehnungBlock}
@@ -327,7 +311,7 @@ export function AuftragPositionHandwerkerPanel({
 
       <div
         className={cn(
-          embedded ? 'pos-v2-konditionen-card' : 'rounded-lg border border-bw-border bg-bw-bg-soft/40 p-3'
+          embedded ? 'pos-v2-konditionen-card' : 'rounded-card border border-bw-border bg-bw-bg-soft/40 p-3'
         )}
       >
         <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -341,7 +325,7 @@ export function AuftragPositionHandwerkerPanel({
           {eingereicht ? (
             <span
               className={cn(
-                'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                'rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                 hwStatusBadgeClass(partnerRow?.hw_status)
               )}
             >
@@ -352,7 +336,7 @@ export function AuftragPositionHandwerkerPanel({
 
         {!partnerRow ? (
           <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            Keine Angebots-Zuweisung verknüpft — Handwerker wurde ggf. nur direkt auf dem Auftrag
+            Keine Angebots-Zuweisung verknüpft — Partner wurde ggf. nur direkt auf dem Auftrag
             gesetzt.
           </p>
         ) : (
@@ -379,23 +363,22 @@ export function AuftragPositionHandwerkerPanel({
             ) : null}
 
             {konditionenWartenAufHw ? (
-              <p className="mt-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-[length:var(--fs-meta)] text-violet-950">
+              <p className="mt-2 rounded-field border border-status-new-bg bg-status-new-bg px-3 py-2 text-[length:var(--fs-meta)] text-status-new-text">
                 <span className="font-semibold">CRM hat übernommen.</span> Der Partner muss die vereinbarten
                 Konditionen im Portal noch bestätigen — danach Status „übernommen“ und optional Angebots-PDF.
               </p>
             ) : null}
 
             {kannManuell ? (
-              <Button
+              <MockBtn
                 type="button"
-                variant="secondary"
-                size="sm"
+                kind="secondary" sm
                 className="mt-3 h-7 gap-1 text-[length:var(--fs-meta)]"
                 onClick={() => setManuellOpen(true)}
               >
-                <FileUp className="h-3.5 w-3.5" aria-hidden />
+                <MockIcon n="upload" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                 Angebot manuell erfassen
-              </Button>
+              </MockBtn>
             ) : null}
 
             {angebotId && partnerRow.id && eingereicht ? (

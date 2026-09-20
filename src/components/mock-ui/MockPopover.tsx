@@ -129,7 +129,7 @@ export function MockPopoverMenu({
             {it.icon ? iconFn(it.icon) : <span style={{ width: 18 }} />}
             <span>{it.label}</span>
             {it.hint ? (
-              <span className="ml-auto pl-2 text-[10px] text-bw-text-muted">{it.hint}</span>
+              <span className="ml-auto pl-2 text-fs-caption text-bw-text-muted">{it.hint}</span>
             ) : null}
           </button>
         )

@@ -1,9 +1,15 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { DateInput } from '@/components/ui/DateInput'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
-import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import {
   type BaustoppTyp,
@@ -16,24 +22,18 @@ import {
   updateNachtragHandwercherBestaetigt,
 } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { genehmigeOrgNachtrag } from '@/lib/org/nachtrag-org-freigabe-actions'
-import {
-  AlertTriangle,
-  Check,
-  Clock,
-  CloudRain,
-  Mail,
-  Send,
-  Smartphone,
-  X,
-} from 'lucide-react'
 import { IconText } from '@/components/ui/IconText'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
-import { Modal } from '@/components/ui/Modal'
 import { neuePositionsId } from '@/lib/angebot-positionen'
 import type { AuftragDetail, AngebotPosition } from '@/lib/types'
 import { formatDatum, formatDatumZeit, formatPreis } from '@/lib/utils'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function nachtragPublicUrl(token: string) {
   /** Strikt CRM-Domain (NEXT_PUBLIC_APP_URL), nie Website-Origin. */
@@ -77,6 +77,7 @@ export function AuftragNachtragBaustoppSection({
   vertragNachtragVerfuegbar?: boolean
   onVertragNachtragErstellen?: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const [nachtragOpen, setNachtragOpen] = useState(false)
   const [grund, setGrund] = useState('')
@@ -138,34 +139,34 @@ export function AuftragNachtragBaustoppSection({
   async function copyText(text: string) {
     try {
       await navigator.clipboard.writeText(text)
-      toast.success('In Zwischenablage kopiert')
+      toast.success(TOAST.in_zwischenablage_kopiert)
     } catch {
-      toast.error('Kopieren nicht möglich')
+      toast.error(TOAST.kopieren_nicht_moeglich)
     }
   }
 
   return (
     <div className="space-y-6 border-b border-border pb-8">
       {hwWarn ? (
-        <div className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-3 text-[length:var(--fs-text)] text-amber-950">
+        <div className="rounded-card border border-[color-mix(in_srgb,var(--yel-tx)_45%,var(--border))] bg-[var(--yel-bg)] px-3 py-3 text-[length:var(--fs-text)] text-[var(--yel-tx)]">
           <p className="font-semibold">
-            <IconText icon={AlertTriangle}>Kunden-Bestätigung liegt vor</IconText>
+            <IconText icon="alert-triangle">Kunden-Bestätigung liegt vor</IconText>
           </p>
           <p className="mt-1">
-            Handwerker {ersteHw?.handwerker?.name ?? '(nicht zugeordnet)'} hat die Mehrkosten noch nicht bestätigt.
+            Partner {ersteHw?.handwerker?.name ?? '(nicht zugeordnet)'} hat die Mehrkosten noch nicht bestätigt.
           </p>
           {ersteHw?.handwerker?.telefon ? (
             <div className="mt-2 flex flex-wrap gap-2">
               <a
-                className="inline-flex min-h-[40px] items-center rounded-lg bg-primary px-3 text-[length:var(--fs-text)] font-medium text-white"
+                className="inline-flex min-h-[40px] items-center rounded-card bg-primary px-3 text-[length:var(--fs-text)] font-medium text-white"
                 href={`https://wa.me/${ersteHw.handwerker.telefon.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Handwerker kontaktieren (WhatsApp)
+                Partner kontaktieren (WhatsApp)
               </a>
               <a
-                className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
+                className="inline-flex min-h-[40px] items-center rounded-card border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
                 href={`tel:${ersteHw.handwerker.telefon}`}
               >
                 Anrufen
@@ -180,18 +181,18 @@ export function AuftragNachtragBaustoppSection({
           <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Nachträge</h2>
           <div className="flex flex-wrap gap-2">
             {vertragNachtragVerfuegbar && onVertragNachtragErstellen ? (
-              <Button type="button" variant="secondary" onClick={onVertragNachtragErstellen}>
+              <MockBtn type="button" kind="secondary" onClick={onVertragNachtragErstellen}>
                 Vertrags-Änderung
-              </Button>
+              </MockBtn>
             ) : null}
-            <Button type="button" variant="primary" onClick={() => setNachtragOpen(true)}>
+            <MockBtn type="button" kind="primary" onClick={() => setNachtragOpen(true)}>
               Änderung anlegen
-            </Button>
+            </MockBtn>
           </div>
         </div>
 
         {nachtraege.length === 0 ? (
-          <p className="text-[length:var(--fs-text)] text-muted">Keine Nachträge.</p>
+          <MockEmpty title="Keine Nachträge." />
         ) : (
           <ul className="space-y-3">
             {nachtraege.map((n) => {
@@ -208,19 +209,18 @@ export function AuftragNachtragBaustoppSection({
                       <p className="mt-1 text-[length:var(--fs-meta)] text-muted">Summe: {summe}</p>
                     </div>
                     <label className="flex items-center gap-2 text-[length:var(--fs-meta)]">
-                      <input
-                        type="checkbox"
+                      <MockCheckbox
                         checked={Boolean(n.handwercher_bestaetigt)}
                         disabled={pending}
                         onChange={(e) => {
                           startTransition(async () => {
                             const r = await updateNachtragHandwercherBestaetigt(n.id, detail.id, e.target.checked)
-                            if (!r.ok) toast.error(r.message)
+                            if (!r.ok) toast.systemError(r)
                             else {
                               toast.success(
                                 e.target.checked
-                                  ? 'Handwerker-Bestätigung gesetzt'
-                                  : 'Handwerker-Bestätigung entfernt'
+                                  ? 'Partner-Bestätigung gesetzt'
+                                  : 'Partner-Bestätigung entfernt'
                               )
                               onChanged()
                             }
@@ -232,7 +232,7 @@ export function AuftragNachtragBaustoppSection({
                   </div>
 
                   {pos.length > 0 ? (
-                    <ul className="divide-y divide-border rounded border border-border text-[length:var(--fs-meta)]">
+                    <ul className="divide-y divide-border rounded-card border border-border text-[length:var(--fs-meta)]">
                       {pos.map((p) => (
                         <li key={p.id} className="flex justify-between gap-2 px-2 py-1">
                           <span className="min-w-0 truncate">{p.beschreibung}</span>
@@ -246,16 +246,16 @@ export function AuftragNachtragBaustoppSection({
                   ) : null}
 
                   {n.status === 'abgelehnt' ? (
-                    <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[length:var(--fs-meta)] text-red-900">
+                    <div className="rounded-card border border-[color-mix(in_srgb,var(--red-tx)_35%,var(--border))] bg-[var(--red-bg)] px-3 py-2 text-[length:var(--fs-meta)] text-[var(--red-tx)]">
                       <p className="font-medium">
-                        <IconText icon={X}>Abgelehnt</IconText>
+                        <IconText icon="x">Abgelehnt</IconText>
                       </p>
                       <p>{n.abgelehnt_grund ?? '—'}</p>
                     </div>
                   ) : n.status === 'akzeptiert' || n.kunde_bestaetigt_at ? (
-                    <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-[length:var(--fs-meta)] text-emerald-950">
+                    <div className="rounded-card border border-[color-mix(in_srgb,var(--bw-success)_35%,var(--border))] bg-[var(--bw-green-bg)] px-3 py-2 text-[length:var(--fs-meta)] text-[var(--bw-success)]">
                       <p className="font-medium">
-                        <IconText icon={Check}>Akzeptiert</IconText>
+                        <IconText icon="check">Angenommen</IconText>
                       </p>
                       <p>
                         Bestätigt am{' '}
@@ -267,113 +267,116 @@ export function AuftragNachtragBaustoppSection({
                       </p>
                       {n.kunde_ip ? <p className="mt-1">IP: {n.kunde_ip} (gespeichert)</p> : null}
                       {detail.lead_id && n.status !== 'genehmigt' ? (
-                        <Button
+                        <MockBtn
                           type="button"
-                          variant="secondary"
-                          size="sm"
+                          kind="secondary" sm
                           className="mt-2"
                           loading={pending}
                           onClick={() => {
                             startTransition(async () => {
                               const r = await genehmigeOrgNachtrag(n.id, detail.id)
-                              if (!r.ok) toast.error(r.message)
+                              if (!r.ok) toast.systemError(r)
                               else {
-                                toast.success('Nachtrag genehmigt — Org-Freigabe geprüft')
+                                toast.success(TOAST.nachtrag_genehmigt_org_freigabe_geprueft)
                                 onChanged()
                               }
                             })
                           }}
                         >
                           CRM: Nachtrag genehmigen
-                        </Button>
+                        </MockBtn>
                       ) : null}
                     </div>
                   ) : n.status === 'gesendet' ? (
-                    <div className="space-y-2 rounded border border-amber-200 bg-amber-50/80 px-3 py-2 text-[length:var(--fs-meta)] text-amber-950">
+                    <div className="space-y-2 rounded-card border border-[color-mix(in_srgb,var(--yel-tx)_35%,var(--border))] bg-[var(--yel-bg)] px-3 py-2 text-[length:var(--fs-meta)] text-[var(--yel-tx)]">
                       <p className="font-medium">
-                        <IconText icon={Send}>Gesendet</IconText>
+                        <IconText icon="send">Gesendet</IconText>
                       </p>
                       <p>Wartet auf Kunden-Bestätigung · seit {seitText(n.gesendet_at)}</p>
                       {link ? (
-                        <div className="mt-2 space-y-2 rounded border border-border bg-surface p-2 text-ink">
+                        <div className="mt-2 space-y-2 rounded-card border border-border bg-surface p-2 text-ink">
                           <p className="font-semibold">Kunden-Link</p>
                           <div className="flex flex-wrap gap-2">
-                            <Button type="button" variant="ghost" onClick={() => void copyText(link)}>
+                            <MockBtn type="button" kind="ghost" onClick={() => void copyText(link)}>
                               Link kopieren
-                            </Button>
-                            <Button
+                            </MockBtn>
+                            <MockBtn
                               type="button"
-                              variant="secondary"
+                              kind="secondary"
                               loading={pending}
                               onClick={() => {
                                 startTransition(async () => {
                                   const r = await sendNachtragEmailAnKunde(n.id, detail.id)
-                                  if (!r.ok) toast.error(r.message)
+                                  if (!r.ok) toast.systemError(r)
                                   else {
-                                    toast.success('E-Mail versendet')
+                                    toast.success(TOAST.e_mail_versendet)
                                     onChanged()
                                   }
                                 })
                               }}
                             >
+<<<<<<< Updated upstream
+                              <IconText icon="mail">Per Mail senden</IconText>
+=======
                               <IconText icon={Mail}>Per Mail senden</IconText>
-                            </Button>
+>>>>>>> Stashed changes
+                            </MockBtn>
                             <a
-                              className="inline-flex min-h-[40px] items-center rounded-lg border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
+                              className="inline-flex min-h-[40px] items-center rounded-card border border-border px-3 text-[length:var(--fs-text)] font-medium text-primary"
                               href={`https://wa.me/?text=${encodeURIComponent(
                                 `Guten Tag, hier ist Ihr Link zur Bestätigung des Nachtrags (${summe}): ${link}`
                               )}`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >
-                              <IconText icon={Smartphone}>WhatsApp</IconText>
+                              <IconText icon="phone">WhatsApp</IconText>
                             </a>
                           </div>
-                          <Button
+                          <MockBtn
                             type="button"
-                            variant="ghost"
+                            kind="ghost"
                             className="mt-1"
                             loading={pending}
                             onClick={() => {
                               startTransition(async () => {
                                 const r = await sendNachtragErinnerungAnKunde(n.id, detail.id)
-                                if (!r.ok) toast.error(r.message)
+                                if (!r.ok) toast.systemError(r)
                                 else {
-                                  toast.success('Erinnerung gesendet')
+                                  toast.success(TOAST.erinnerung_gesendet)
                                   onChanged()
                                 }
                               })
                             }}
                           >
                             Erinnern
-                          </Button>
+                          </MockBtn>
                         </div>
                       ) : null}
                     </div>
                   ) : (
-                    <div className="rounded bg-canvas px-2 py-2 text-[length:var(--fs-meta)] text-muted">
+                    <div className="rounded-card bg-canvas px-2 py-2 text-[length:var(--fs-meta)] text-muted">
                       <p className="font-medium text-ink">
-                        <IconText icon={Clock}>Entwurf</IconText>
+                        <IconText icon="clock">Entwurf</IconText>
                       </p>
                       <p>Noch nicht gesendet.</p>
-                      <Button
+                      <MockBtn
                         type="button"
-                        variant="secondary"
+                        kind="secondary"
                         className="mt-2"
                         loading={pending}
                         onClick={() => {
                           startTransition(async () => {
                             const r = await markNachtragGesendet(n.id, detail.id)
-                            if (!r.ok) toast.error(r.message)
+                            if (!r.ok) toast.systemError(r)
                             else {
-                              toast.success('Als gesendet markiert')
+                              toast.success(TOAST.als_gesendet_markiert)
                               onChanged()
                             }
                           })
                         }}
                       >
                         Senden
-                      </Button>
+                      </MockBtn>
                     </div>
                   )}
                 </Card>
@@ -387,55 +390,55 @@ export function AuftragNachtragBaustoppSection({
         <section>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-[length:var(--fs-head)] font-semibold text-ink">Baustopps</h2>
-            <Button type="button" variant="primary" onClick={() => setBaustoppOpen(true)}>
+            <MockBtn type="button" kind="primary" onClick={() => setBaustoppOpen(true)}>
+<<<<<<< Updated upstream
+              <IconText icon="droplet">Baustopp melden</IconText>
+=======
               <IconText icon={CloudRain}>Baustopp melden</IconText>
-            </Button>
+>>>>>>> Stashed changes
+            </MockBtn>
           </div>
           {aktiv.length > 0 ? (
-            <div className="mb-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-[length:var(--fs-text)] text-orange-950">
+            <div className="mb-3 rounded-card border border-status-contact-bg bg-status-contact-bg px-3 py-2 text-[length:var(--fs-text)] text-status-contact-text">
               <p className="font-semibold">
-                <IconText icon={CloudRain}>Baustopp aktiv seit {formatDatum(aktiv[0]!.beginn_datum)}</IconText>
+                <IconText icon="droplet">Baustopp aktiv seit {formatDatum(aktiv[0]!.beginn_datum)}</IconText>
               </p>
               <p className="text-[length:var(--fs-meta)]">{aktiv[0]!.grund}</p>
               {aktiv.map((b) => (
-                <Button
+                <MockBtn
                   key={b.id}
                   type="button"
-                  variant="secondary"
+                  kind="secondary"
                   className="mt-2"
                   loading={pending}
                   onClick={() => {
                     startTransition(async () => {
                       const r = await beendeBaustopp(b.id, detail.id)
-                      if (!r.ok) toast.error(r.message)
+                      if (!r.ok) toast.systemError(r)
                       else {
-                        toast.success('Baustopp beendet')
+                        toast.success(TOAST.baustopp_beendet)
                         onChanged()
                       }
                     })
                   }}
                 >
                   Baustopp beenden
-                </Button>
+                </MockBtn>
               ))}
             </div>
           ) : null}
           {baustopps.length === 0 ? (
             <p className="text-[length:var(--fs-text)] text-muted">
               Keine Baustopps erfasst.{' '}
-              <button
-                type="button"
-                className="font-medium text-primary underline-offset-2 hover:underline"
-                onClick={() => setBaustoppOpen(true)}
-              >
+              <MockBtn className="font-medium text-primary underline-offset-2 hover:underline" type="button" onClick={() => setBaustoppOpen(true)}>
                 Baustopp jetzt melden
-              </button>
+              </MockBtn>
             </p>
           ) : (
             <>
               <ul className="space-y-2 text-[length:var(--fs-text)]">
                 {baustopps.map((b) => (
-                  <li key={b.id} className="rounded border border-border p-2">
+                  <li key={b.id} className="rounded-card border border-border p-2">
                     <p className="font-medium">
                       {baustoppTypLabel(b.typ)} · {formatDatum(b.beginn_datum)}
                       {b.ende_datum ? ` – ${formatDatum(b.ende_datum)}` : ' (offen)'}
@@ -456,15 +459,12 @@ export function AuftragNachtragBaustoppSection({
         </section>
       ) : null}
 
-      <Modal open={nachtragOpen} onClose={() => setNachtragOpen(false)} title="Nachtrag erstellen" size="md">
-            <div className="space-y-3 text-[length:var(--fs-text)]">
+      <EditorSheet open={nachtragOpen} onClose={() => setNachtragOpen(false)} title="Nachtrag erstellen" size="md">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                    <div className="space-y-3 text-[length:var(--fs-text)]">
               <label className="block">
                 <span className="font-medium">Grund</span>
-                <input
-                  value={grund}
-                  onChange={(e) => setGrund(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                />
+                <MockInput value={grund} onChange={(e) => setGrund(e.target.value)} className="mt-1 w-full rounded-card border border-border px-3 py-2" />
               </label>
               <KiAssistFieldLabel
                 label="Beschreibung"
@@ -472,11 +472,7 @@ export function AuftragNachtragBaustoppSection({
                 onApply={setBeschreibung}
                 extraHint="Nachtrag-Beschreibung für den Kunden."
               >
-                <Textarea
-                  value={beschreibung}
-                  onChange={(e) => setBeschreibung(e.target.value)}
-                  rows={3}
-                />
+                <RichTextEditor value={typeof (beschreibung) === 'string' ? (beschreibung) : ''} onChange={(__v) => setBeschreibung(__v)} minHeight={120} />
               </KiAssistFieldLabel>
               <KiAssistFieldLabel
                 label="Position (Beschreibung)"
@@ -484,52 +480,36 @@ export function AuftragNachtragBaustoppSection({
                 onApply={setPosText}
                 extraHint="Leistungsbeschreibung der Nachtragsposition."
               >
-                <Textarea
-                  value={posText}
-                  onChange={(e) => setPosText(e.target.value)}
-                  rows={2}
-                />
+                <RichTextEditor value={typeof (posText) === 'string' ? (posText) : ''} onChange={(__v) => setPosText(__v)} minHeight={120} />
               </KiAssistFieldLabel>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block">
                   <span className="font-medium">Preis min (€)</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={posMin}
-                    onChange={(e) => setPosMin(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                  />
+                  <MockInput type="number" inputMode="decimal" value={posMin} onChange={(e) => setPosMin(e.target.value)} className="mt-1 w-full rounded-card border border-border px-3 py-2" />
                 </label>
                 <label className="block">
                   <span className="font-medium">Preis max (€)</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={posMax}
-                    onChange={(e) => setPosMax(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                  />
+                  <MockInput type="number" inputMode="decimal" value={posMax} onChange={(e) => setPosMax(e.target.value)} className="mt-1 w-full rounded-card border border-border px-3 py-2" />
                 </label>
               </div>
               <label className="flex items-start gap-2 text-[length:var(--fs-meta)]">
-                <input type="checkbox" checked={hwBest} onChange={(e) => setHwBest(e.target.checked)} />
+                <MockCheckbox checked={hwBest} onChange={(e) => setHwBest(e.target.checked)} />
                 <span>
-                  Handwerker hat die Mehrkosten bestätigt?{' '}
+                  Partner hat die Mehrkosten bestätigt?{' '}
                   <span className="text-muted">(manuell setzen)</span>
                 </span>
               </label>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => setNachtragOpen(false)}>
+              <MockBtn kind="secondary" onClick={() => setNachtragOpen(false)}>
                 Abbrechen
-              </Button>
-              <Button
-                variant="primary"
+              </MockBtn>
+              <MockBtn
+                kind="primary"
                 loading={pending}
                 onClick={() => {
                   if (!grund.trim()) {
-                    toast.error('Grund ausfüllen')
+                    applyFieldErrors({ _form: TOAST.grund_ausfuellen })
                     return
                   }
                   startTransition(async () => {
@@ -540,9 +520,9 @@ export function AuftragNachtragBaustoppSection({
                       positionen: [buildPosition()],
                       handwercher_bestaetigt: hwBest,
                     })
-                    if (!r.ok) toast.error(r.message)
+                    if (!r.ok) toast.systemError(r)
                     else {
-                      toast.success('Nachtrag gespeichert')
+                      toast.success(TOAST.nachtrag_gespeichert)
                       setNachtragOpen(false)
                       setGrund('')
                       setBeschreibung('')
@@ -556,11 +536,11 @@ export function AuftragNachtragBaustoppSection({
                 }}
               >
                 Speichern
-              </Button>
+              </MockBtn>
             </div>
-      </Modal>
+      </EditorSheet>
 
-      <Modal
+      <EditorSheet
         open={baustoppOpen && detail.status === 'in_arbeit'}
         onClose={() => setBaustoppOpen(false)}
         title="Baustopp melden"
@@ -569,42 +549,21 @@ export function AuftragNachtragBaustoppSection({
             <div className="space-y-3 text-[length:var(--fs-text)]">
               <label className="block">
                 <span className="font-medium">Typ</span>
-                <select
-                  value={bsTyp}
-                  onChange={(e) => setBsTyp(e.target.value as BaustoppTyp)}
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                >
+                <MockSelect value={bsTyp} onChange={(e) => setBsTyp(e.target.value as BaustoppTyp)} className="mt-1 w-full rounded-card border border-border px-3 py-2">
                   <option value="witterung">Witterung</option>
                   <option value="material">Material nicht geliefert</option>
                   <option value="zugang">Kein Zugang zur Baustelle</option>
                   <option value="sonstiges">Sonstiges</option>
-                </select>
+                </MockSelect>
               </label>
-              <Textarea
-                label="Grund"
-                value={bsGrund}
-                onChange={(e) => setBsGrund(e.target.value)}
-                rows={3}
-                placeholder="Was genau verhindert die Arbeiten?"
-              />
+              <MockField label="Grund"><RichTextEditor value={typeof (bsGrund) === 'string' ? (bsGrund) : ''} onChange={(__v) => setBsGrund(__v)} placeholder="Was genau verhindert die Arbeiten?" minHeight={120} aria-label="Grund" /></MockField>
               <label className="block">
                 <span className="font-medium">Beginn</span>
-                <input
-                  type="date"
-                  value={bsBeginn}
-                  onChange={(e) => setBsBeginn(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                />
+                <DateInput value={bsBeginn} onChange={(e) => setBsBeginn(e.target.value)} className="mt-1 w-full rounded-card border border-border px-3 py-2" />
               </label>
               <label className="block">
                 <span className="font-medium">Verzögerung (Tage)</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={bsVerzug}
-                  onChange={(e) => setBsVerzug(Math.max(0, Number(e.target.value) || 0))}
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2"
-                />
+                <MockInput type="number" min={0} value={bsVerzug} onChange={(e) => setBsVerzug(Math.max(0, Number(e.target.value) || 0))} className="mt-1 w-full rounded-card border border-border px-3 py-2" />
               </label>
               <p className="text-[length:var(--fs-meta)] text-muted">
                 Aktuelles Enddatum Auftrag: <strong>{detail.end_datum ? formatDatum(detail.end_datum) : '—'}</strong>
@@ -613,20 +572,20 @@ export function AuftragNachtragBaustoppSection({
                 Neues Enddatum (Vorschau): <strong>{formatDatum(neuesEndPreview)}</strong>
               </p>
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={bsKundeInfo} onChange={(e) => setBsKundeInfo(e.target.checked)} />
+                <MockCheckbox checked={bsKundeInfo} onChange={(e) => setBsKundeInfo(e.target.checked)} />
                 Kundin informieren (E-Mail)
               </label>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => setBaustoppOpen(false)}>
+              <MockBtn kind="secondary" onClick={() => setBaustoppOpen(false)}>
                 Abbrechen
-              </Button>
-              <Button
-                variant="primary"
+              </MockBtn>
+              <MockBtn
+                kind="primary"
                 loading={pending}
                 onClick={() => {
                   if (!bsGrund.trim()) {
-                    toast.error('Grund ausfüllen')
+                    applyFieldErrors({ _form: TOAST.grund_ausfuellen })
                     return
                   }
                   startTransition(async () => {
@@ -639,9 +598,9 @@ export function AuftragNachtragBaustoppSection({
                       neues_enddatum: neuesEndPreview,
                       kunde_informiert: bsKundeInfo,
                     })
-                    if (!r.ok) toast.error(r.message)
+                    if (!r.ok) toast.systemError(r)
                     else {
-                      toast.success('Baustopp gespeichert')
+                      toast.success(TOAST.baustopp_gespeichert)
                       setBaustoppOpen(false)
                       setBsGrund('')
                       setBsVerzug(3)
@@ -651,9 +610,9 @@ export function AuftragNachtragBaustoppSection({
                 }}
               >
                 Speichern
-              </Button>
+              </MockBtn>
             </div>
-      </Modal>
+      </EditorSheet>
     </div>
   )
 }

@@ -1,7 +1,4 @@
-function formatEur(n: number): string {
-  return `${n.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €`
-}
-
+import { formatEuro } from '@/lib/format/geld-datum'
 /** Gelber Hinweis: Angebot unter Freigabe-Schwelle → Direktauftrag ohne HV. */
 export function DirektauftragUnterSchwelleBanner({
   betragEur,
@@ -16,7 +13,7 @@ export function DirektauftragUnterSchwelleBanner({
         Direktauftrag möglich — unter Freigabe-Schwelle
       </div>
       <p className="crm-direkt-schwelle-banner__body">
-        Angebotspreis {formatEur(betragEur)} ≤ Schwelle {formatEur(schwelleEur)}. Auftrag ohne
+        Angebotspreis {formatEuro(betragEur)} ≤ Schwelle {formatEuro(schwelleEur)}. Auftrag ohne
         HV-Freigabe / ohne Kundenmail anlegen.
       </p>
     </div>

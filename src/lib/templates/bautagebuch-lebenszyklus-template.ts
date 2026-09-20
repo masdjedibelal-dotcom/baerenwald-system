@@ -4,7 +4,6 @@
  */
 
 import {
-  ANGEBOT_PDF_BOTTOM_MARGIN_MM,
   buildAngebotPdfFooterTemplate,
   type AngebotHtmlInput,
 } from '@/lib/templates/angebot-template'
@@ -13,12 +12,19 @@ import {
   formatBerichtMinuten,
   formatBerichtSchichtLabel,
 } from '@/lib/auftraege/bericht-datenquelle'
-import { formatDatum } from '@/lib/utils'
+import { formatDatum } from '@/lib/format/geld-datum'
+import {
+  pdfAbsenderFromReportFirm,
+  pdfKopfHtml,
+  pdfReportShell,
+  pdfTitelzeileHtml,
+} from '@/lib/pdf/chrome'
+import { C } from '@/lib/tokens/colors'
 
-const ACCENT = '#1A3D2B'
-const MUTED = '#6B7280'
-const BORDER = '#D1D5DB'
-const TINT = '#F3F7F4'
+const ACCENT = C.greenDark
+const MUTED = C.gray500
+const BORDER = C.gray300
+const TINT = C.greenTint
 
 export type BautagebuchLebenszyklusHtmlInput = {
   firmen_logo_url?: string | null
@@ -32,15 +38,6 @@ export type BautagebuchLebenszyklusHtmlInput = {
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-function logoKopf(p: BautagebuchLebenszyklusHtmlInput): string {
-  const src = p.firmen_logo_url?.trim()
-  if (!src || /^file:/i.test(src)) return ''
-  if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
-  return `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid ${ACCENT};">
-    <img src="${src.replace(/"/g, '&quot;')}" alt="${esc(p.firmenname)}" style="height:64px;width:auto;max-width:280px;object-fit:contain;display:block;" />
-  </div>`
 }
 
 function dayBlock(tag: BerichtDatenquelle['tage'][number]): string {
@@ -58,7 +55,7 @@ function dayBlock(tag: BerichtDatenquelle['tage'][number]): string {
               </li>`
             })
             .join('')
-          return `<div style="margin:8px 0 10px;padding:8px 10px;border:1px solid ${BORDER};border-radius:4px;background:#fff;page-break-inside:avoid;">
+          return `<div style="margin:8px 0 10px;padding:8px 10px;border:1px solid ${BORDER};border-radius:4px;background:${C.white};page-break-inside:avoid;">
             <div style="font-size:10pt;font-weight:700;color:${ACCENT};margin-bottom:4px;">
               ${esc(pos.position_label)}
               ${pos.gewerk_name ? `<span style="font-weight:400;color:${MUTED};"> · ${esc(pos.gewerk_name)}</span>` : ''}
@@ -66,7 +63,7 @@ function dayBlock(tag: BerichtDatenquelle['tage'][number]): string {
             <div style="font-size:8.5pt;color:${MUTED};margin-bottom:6px;">
               Zeit ${esc(formatBerichtMinuten(pos.minuten))} · Fotos ${pos.fotoCount}
             </div>
-            <ul style="margin:0;padding-left:16px;">${entries || '<li style="font-size:9pt;color:#6B7280;">—</li>'}</ul>
+            <ul style="margin:0;padding-left:16px;">${entries || `<li style="font-size:9pt;color:${C.gray500};">—</li>`}</ul>
           </div>`
         })
         .join('')
@@ -116,8 +113,16 @@ export function buildBautagebuchLebenszyklusHtml(p: BautagebuchLebenszyklusHtmlI
       : `<p style="font-size:10pt;color:${MUTED};">Keine Einträge und keine Schichten.</p>`
 
   const body = `
-    ${logoKopf(p)}
-    <h1 style="font-size:17pt;font-weight:700;margin:0 0 4px;color:${ACCENT};">Bautagebuch</h1>
+    ${pdfKopfHtml({
+      variant: 'bw-kunde',
+      absender: pdfAbsenderFromReportFirm(p),
+    })}
+    ${pdfTitelzeileHtml({
+      dokumentTyp: 'Bautagebuch',
+      objektOderAdresse: d.projektTitel,
+      datum: formatDatum(new Date().toISOString().slice(0, 10)),
+      accent: ACCENT,
+    })}
     <p style="font-size:10pt;color:${MUTED};margin:0 0 12px;">Aus Positions-Dokumentation und Schichten · Auftrag ${esc(d.auftragId.slice(0, 8))}</p>
     <div style="margin:0 0 16px;padding:10px 12px;background:${TINT};border:1px solid ${BORDER};border-radius:4px;font-size:9.5pt;line-height:1.5;">
       <div><strong>Projekt:</strong> ${esc(d.projektTitel)}</div>
@@ -128,16 +133,13 @@ export function buildBautagebuchLebenszyklusHtml(p: BautagebuchLebenszyklusHtmlI
     ${days}
   `
 
-  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"/><title>Bautagebuch</title>
-<style>@page{size:A4;margin:12mm 12mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 12mm;}body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#111;}</style>
-</head><body>${body}</body></html>`
+  return pdfReportShell({ title: 'Bautagebuch', bodyHtml: body })
 }
 
 export function buildBautagebuchLebenszyklusPdfFooterTemplate(
   p: BautagebuchLebenszyklusHtmlInput
 ): string {
-  return buildAngebotPdfFooterTemplate(footerInput(p)).replace(
-    '</span>',
-    ' · Bautagebuch</span>'
-  )
+  return buildAngebotPdfFooterTemplate(footerInput(p), {
+    seitenZusatz: 'Bautagebuch',
+  })
 }

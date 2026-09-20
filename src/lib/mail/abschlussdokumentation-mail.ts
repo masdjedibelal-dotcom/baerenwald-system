@@ -1,7 +1,9 @@
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
+import { buildSubject } from '@/lib/mail/build-subject'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { C } from '@/lib/tokens/colors'
 
 /** Google-Bewertungslink (Bärenwald München auf Maps). */
 export const BAERENWALD_GOOGLE_BEWERTUNG_URL =
@@ -10,7 +12,7 @@ export const BAERENWALD_GOOGLE_BEWERTUNG_URL =
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -20,7 +22,7 @@ function textToHtmlParagraphs(text: string): string {
     .split(/\n\n+/)
     .map((block) => block.replace(/\n/g, '<br/>'))
     .filter(Boolean)
-    .map((block) => `<p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${block}</p>`)
+    .map((block) => `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${block}</p>`)
     .join('')
 }
 
@@ -74,14 +76,12 @@ Herzlichen Dank für Ihr Vertrauen!`
 }
 
 export function abschlussdokumentationMailBetreff(
-  anrede: AngebotMailAnrede,
-  projektTitel: string,
-  firmenname: string
+  projektTitel: string | null | undefined
 ): string {
-  const titel = projektTitel.trim() || (anrede === 'du' ? 'Dein Projekt' : 'Ihr Projekt')
-  return anrede === 'du'
-    ? `Projektabschluss — ${titel} · ${firmenname}`
-    : `Projektabschluss — ${titel} · ${firmenname}`
+  return buildSubject({
+    objekt: projektTitel,
+    ereignis: 'Projekt abgeschlossen',
+  })
 }
 
 export type AbschlussdokumentationMailInput = {
@@ -110,8 +110,8 @@ export function buildAbschlussdokumentationMail(
   const telHref = tel.replace(/\s/g, '')
   const contact =
     anrede === 'du'
-      ? `Bei Fragen erreichst du uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
-      : `Bei Fragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:#2E7D52;text-decoration:none;">${tel}</a>.`
+      ? `Bei Fragen erreichst du uns unter <a href="tel:${telHref}" style="color:${C.green};text-decoration:none;">${tel}</a>.`
+      : `Bei Fragen erreichen Sie uns unter <a href="tel:${telHref}" style="color:${C.green};text-decoration:none;">${tel}</a>.`
 
   const gruss =
     anrede === 'du'
@@ -123,15 +123,15 @@ export function buildAbschlussdokumentationMail(
       ? 'Du erhältst diese Mail, weil dein Projekt bei uns abgeschlossen wurde.'
       : 'Sie erhalten diese Mail, weil Ihr Projekt bei uns abgeschlossen wurde.'
 
-  const googleCta = `<p style="font-size:14px;color:#374151;margin:0 0 8px;line-height:1.6;">${esc(googleIntro)}</p>
+  const googleCta = `<p style="font-size:14px;color:${C.gray700};margin:0 0 8px;line-height:1.6;">${esc(googleIntro)}</p>
       <p style="margin:0 0 20px;">${mailPrimaryButtonHtml(`${googleBtnLabel} →`, BAERENWALD_GOOGLE_BEWERTUNG_URL, { margin: '0', size: 'sm' })}</p>`
 
   const html = mailHtmlBase(
-    `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
+    `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
       ${nachrichtHtml}
       ${googleCta}
-      <p style="font-size:14px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
-      <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
+      <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     `${projektTitel} · Abschlussdokumentation`,
     b,
     disclaimer,
@@ -139,7 +139,7 @@ export function buildAbschlussdokumentationMail(
   )
 
   return {
-    betreff: abschlussdokumentationMailBetreff(anrede, projektTitel, b.firmenname),
+    betreff: abschlussdokumentationMailBetreff(projektTitel),
     html,
   }
 }

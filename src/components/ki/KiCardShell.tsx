@@ -1,11 +1,14 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { useState, type ReactNode } from 'react'
-import { ChevronDown } from 'lucide-react'
 import type { KiClusterAnalyseRow } from '@/lib/ki/types'
 import { KiClaudeNarrative } from '@/components/ki/KiClaudeNarrative'
 import { KiThinDataBanner } from '@/components/ki/ki-card-shared'
 import { cn } from '@/lib/utils'
+import { formatDatumZeit } from '@/lib/format/geld-datum'
 
 type Props = {
   analyse: KiClusterAnalyseRow
@@ -34,21 +37,16 @@ export function KiCardShell({
   const hasDetails = !!details && !empty
 
   return (
-    <article className="overflow-hidden rounded-xl border border-bw-border bg-bw-card shadow-sm">
-      <header className="border-b border-bw-border px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-semibold text-bw-text">{analyse.titel}</h3>
-          <time className="shrink-0 text-[11px] text-muted" dateTime={analyse.generiert_am}>
-            {new Date(analyse.generiert_am).toLocaleString('de-DE', {
-              day: '2-digit',
-              month: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </time>
-        </div>
-        {hinweis ? <p className="mt-1 text-xs text-muted">{hinweis}</p> : null}
-      </header>
+    <MockCard
+      title={analyse.titel}
+      actions={
+        <time className="shrink-0 text-fs-caption text-muted" dateTime={analyse.generiert_am}>
+          {formatDatumZeit(String(analyse.generiert_am))}
+        </time>
+      }
+      flush
+    >
+      {hinweis ? <p className="border-b border-bw-border px-4 py-2 text-xs text-muted">{hinweis}</p> : null}
 
       <KiThinDataBanner sampleSize={analyse.sample_size} />
 
@@ -59,17 +57,15 @@ export function KiCardShell({
           <div className="border-b border-bw-border px-4 py-4">{hero}</div>
           {hasDetails ? (
             <div className="border-b border-bw-border">
-              <button
+              <MockBtn
+                fullWidth
+                className="flex items-center justify-between px-4 py-2.5 text-left text-xs font-medium text-muted hover:bg-bw-bg/80"
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="flex w-full items-center justify-between px-4 py-2.5 text-left text-xs font-medium text-muted hover:bg-bw-bg/80"
               >
                 {detailsLabel}
-                <ChevronDown
-                  className={cn('h-4 w-4 transition-transform', open && 'rotate-180')}
-                  aria-hidden
-                />
-              </button>
+                <MockIcon n="chevron-down" ctx="default" className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} aria-hidden />
+              </MockBtn>
               {open ? <div className="border-t border-bw-border px-4 py-4">{details}</div> : null}
             </div>
           ) : null}
@@ -81,6 +77,6 @@ export function KiCardShell({
         onGenerate={onGenerateKi}
         loading={kiLoading}
       />
-    </article>
+    </MockCard>
   )
 }

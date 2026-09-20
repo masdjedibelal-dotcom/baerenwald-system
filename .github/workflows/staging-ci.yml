@@ -1,0 +1,24 @@
+name: Staging CI
+
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/audit-status.mjs
+      - run: npm run build
+        env:
+          # Build-Guards brauchen keine echten Secrets; Platzhalter für Next/Env-Checks
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: public-anon-placeholder
+          SUPABASE_SERVICE_ROLE_KEY: service-role-placeholder

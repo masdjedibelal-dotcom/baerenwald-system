@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import { FilterChips } from '@/components/ui/FilterChips'
+import { MockChip } from '@/components/mock-ui'
 import { ComplianceEinstellungenClient } from '@/components/einstellungen/ComplianceEinstellungenClient'
 import { CustomFieldsEinstellungenClient } from '@/components/einstellungen/CustomFieldsEinstellungenClient'
 import { DatenschutzPageClient } from '@/components/datenschutz/DatenschutzPageClient'
@@ -53,11 +53,13 @@ function IntegrationInner({ compliance, felder, datenschutz }: Props) {
 
   return (
     <div className="space-y-4">
-      <FilterChips
-        options={SECTIONS.map((s) => ({ label: s.label, value: s.id }))}
-        selected={[section]}
-        onChange={(v) => setSection((v[0] as Section) ?? 'compliance')}
-      />
+      <div className="chiprow">
+        {SECTIONS.map((s) => (
+          <MockChip key={s.id} active={section === s.id} onClick={() => setSection(s.id)}>
+            {s.label}
+          </MockChip>
+        ))}
+      </div>
 
       {section === 'compliance' ? <ComplianceEinstellungenClient initial={compliance} /> : null}
       {section === 'felder' ? <CustomFieldsEinstellungenClient initial={felder} /> : null}

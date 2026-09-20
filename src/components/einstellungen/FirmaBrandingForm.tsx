@@ -1,11 +1,12 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockFormSection, MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import { saveEinstellungen } from '@/app/(dashboard)/einstellungen/actions'
 import {
   firmZeileAdresse,
@@ -13,6 +14,7 @@ import {
 } from '@/lib/einstellungen-keys'
 import { splitStrasseHausnummer } from '@/lib/kunde-stammdaten'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 /** IBAN lesbar mit Leerzeichen (DE12 3456 …), Speichern ohne. */
 function formatIbanAnzeige(iban: string): string {
@@ -115,12 +117,12 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
       }
       const r = await saveEinstellungen(next)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       setV(next)
       setSheetOpen(false)
-      toast.success('Gespeichert')
+      toast.success(TOAST.gespeichert)
     })
   }
 
@@ -140,15 +142,9 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
         title="Stammdaten"
         icon="clipboard-list"
         actions={
-          <button
-            type="button"
-            className="qa-btn"
-            title="Bearbeiten"
-            aria-label="Stammdaten bearbeiten"
-            onClick={openEdit}
-          >
+          <MockBtn className="qa-btn" type="button" title="Bearbeiten" aria-label="Stammdaten bearbeiten" onClick={openEdit}>
             <MockIcon ctx="btn" n="pencil" size={16} />
-          </button>
+          </MockBtn>
         }
       >
         <div className="mb-3">
@@ -183,129 +179,53 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
         <div className="kunde-create">
           <MockFormSection title="Firma" icon="building" columns={2}>
             <MockField label="Firma" required full>
-              <input
-                className="input"
-                value={draft.firmenname}
-                onChange={(e) => setDraft((d) => ({ ...d, firmenname: e.target.value }))}
-              />
+              <MockInput value={draft.firmenname} onChange={(e) => setDraft((d) => ({ ...d, firmenname: e.target.value }))} />
             </MockField>
             <MockField label="Inhaber" full>
-              <input
-                className="input"
-                value={draft.geschaeftsfuehrer}
-                onChange={(e) => setDraft((d) => ({ ...d, geschaeftsfuehrer: e.target.value }))}
-              />
+              <MockInput value={draft.geschaeftsfuehrer} onChange={(e) => setDraft((d) => ({ ...d, geschaeftsfuehrer: e.target.value }))} />
             </MockField>
             <MockField label="Straße">
-              <input
-                className="input"
-                value={draft.strasse}
-                onChange={(e) => setDraft((d) => ({ ...d, strasse: e.target.value }))}
-                placeholder="Bärenwaldstraße"
-                autoComplete="address-line1"
-              />
+              <MockInput value={draft.strasse} onChange={(e) => setDraft((d) => ({ ...d, strasse: e.target.value }))} placeholder="Bärenwaldstraße" autoComplete="address-line1" />
             </MockField>
             <MockField label="Hausnummer">
-              <input
-                className="input"
-                value={draft.hausnummer}
-                onChange={(e) => setDraft((d) => ({ ...d, hausnummer: e.target.value }))}
-                placeholder="20"
-                autoComplete="address-line2"
-              />
+              <MockInput value={draft.hausnummer} onChange={(e) => setDraft((d) => ({ ...d, hausnummer: e.target.value }))} placeholder="20" autoComplete="address-line2" />
             </MockField>
             <div className="kunde-create__plz-ort full">
               <MockField label="PLZ">
-                <input
-                  className="input"
-                  value={draft.plz}
-                  onChange={(e) => setDraft((d) => ({ ...d, plz: e.target.value }))}
-                  placeholder="81737"
-                  autoComplete="postal-code"
-                  inputMode="numeric"
-                />
+                <MockInput value={draft.plz} onChange={(e) => setDraft((d) => ({ ...d, plz: e.target.value }))} placeholder="81737" autoComplete="postal-code" inputMode="numeric" />
               </MockField>
               <MockField label="Ort">
-                <input
-                  className="input"
-                  value={draft.ort}
-                  onChange={(e) => setDraft((d) => ({ ...d, ort: e.target.value }))}
-                  placeholder="München"
-                  autoComplete="address-level2"
-                />
+                <MockInput value={draft.ort} onChange={(e) => setDraft((d) => ({ ...d, ort: e.target.value }))} placeholder="München" autoComplete="address-level2" />
               </MockField>
             </div>
             <MockField label="Telefon">
-              <input
-                className="input"
-                value={draft.telefon}
-                onChange={(e) => setDraft((d) => ({ ...d, telefon: e.target.value }))}
-              />
+              <MockInput value={draft.telefon} onChange={(e) => setDraft((d) => ({ ...d, telefon: e.target.value }))} />
             </MockField>
             <MockField label="E-Mail">
-              <input
-                className="input"
-                value={draft.email}
-                onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
-              />
+              <MockInput value={draft.email} onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))} />
             </MockField>
             <MockField label="USt-IdNr.">
-              <input
-                className="input"
-                value={draft.ust_id}
-                onChange={(e) => setDraft((d) => ({ ...d, ust_id: e.target.value }))}
-              />
+              <MockInput value={draft.ust_id} onChange={(e) => setDraft((d) => ({ ...d, ust_id: e.target.value }))} />
             </MockField>
             <MockField label="Steuernummer">
-              <input
-                className="input"
-                value={draft.steuernummer}
-                onChange={(e) => setDraft((d) => ({ ...d, steuernummer: e.target.value }))}
-              />
+              <MockInput value={draft.steuernummer} onChange={(e) => setDraft((d) => ({ ...d, steuernummer: e.target.value }))} />
             </MockField>
             <MockField label="Handelsregister" full>
-              <input
-                className="input"
-                value={draft.handelsregister}
-                onChange={(e) => setDraft((d) => ({ ...d, handelsregister: e.target.value }))}
-                placeholder="HRB … · AG …"
-              />
+              <MockInput value={draft.handelsregister} onChange={(e) => setDraft((d) => ({ ...d, handelsregister: e.target.value }))} placeholder="HRB … · AG …" />
             </MockField>
           </MockFormSection>
 
           <MockFormSection title="Bankverbindung" icon="building">
             <MockField label="Bankname" full>
-              <input
-                className="input"
-                value={draft.bank_name}
-                onChange={(e) => setDraft((d) => ({ ...d, bank_name: e.target.value }))}
-                placeholder="z. B. Postbank"
-                autoComplete="off"
-              />
+              <MockInput value={draft.bank_name} onChange={(e) => setDraft((d) => ({ ...d, bank_name: e.target.value }))} placeholder="z. B. Postbank" autoComplete="off" />
             </MockField>
             <MockField label="IBAN" full>
-              <input
-                className="input"
-                value={draft.iban}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, iban: formatIbanAnzeige(e.target.value) }))
-                }
-                placeholder="DE00 0000 0000 0000 0000 00"
-                autoComplete="off"
-                spellCheck={false}
-              />
+              <MockInput value={draft.iban} onChange={(e) =>
+                  setDraft((d) => ({ ...d, iban: formatIbanAnzeige(e.target.value) }))} placeholder="DE00 0000 0000 0000 0000 00" autoComplete="off" spellCheck={false} />
             </MockField>
             <MockField label="BIC" full>
-              <input
-                className="input"
-                value={draft.bic}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, bic: normalizeBic(e.target.value) }))
-                }
-                placeholder="z. B. PBNKDEFF"
-                autoComplete="off"
-                spellCheck={false}
-              />
+              <MockInput value={draft.bic} onChange={(e) =>
+                  setDraft((d) => ({ ...d, bic: normalizeBic(e.target.value) }))} placeholder="z. B. PBNKDEFF" autoComplete="off" spellCheck={false} />
             </MockField>
           </MockFormSection>
         </div>

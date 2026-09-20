@@ -1,8 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-
 export function MockListBar({
   chips,
   activeFilterCount = 0,

@@ -1,7 +1,14 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidatePreislistenList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
+import { revalidateWizardContext } from '@/lib/wizard-context'
 import type { NeueLeistungSyncInput } from '@/lib/preislisten/sync-neue-leistungen'
 import { toSlug } from '@/lib/utils'
 
@@ -30,10 +37,10 @@ export async function updatePreisliste(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const { error } = await supabase.from('preislisten').update(patch).eq('id', id)
+  if (error) logDbError('app/preislisten/actions:preislisten', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/preislisten')
-  revalidatePath('/einstellungen/preise')
-  revalidatePath('/einstellungen/gewerke')
+  revalidatePreislistenList()
+  revalidateWizardContext()
   return { ok: true }
 }
 
@@ -58,11 +65,11 @@ export async function createPreisliste(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/preislisten/actions:preislisten', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath('/preislisten')
-  revalidatePath('/einstellungen/preise')
-  revalidatePath('/einstellungen/gewerke')
+  revalidatePreislistenList()
+  revalidateWizardContext()
   return { ok: true, id: data.id as string }
 }
 
@@ -78,10 +85,10 @@ export async function setGewerkAktiv(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const { error } = await supabase.from('gewerke').update({ aktiv }).eq('id', id)
+  if (error) logDbError('app/preislisten/actions:gewerke', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/preislisten')
-  revalidatePath('/einstellungen/preise')
-  revalidatePath('/einstellungen/gewerke')
+  revalidatePreislistenList()
+  revalidateWizardContext()
   return { ok: true }
 }
 
@@ -93,10 +100,10 @@ export async function updateGewerk(
   if (!trimmed) return { ok: false, message: 'Name erforderlich' }
   const supabase = createClient()
   const { error } = await supabase.from('gewerke').update({ name: trimmed }).eq('id', id)
+  if (error) logDbError('app/preislisten/actions:gewerke', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/preislisten')
-  revalidatePath('/einstellungen/preise')
-  revalidatePath('/einstellungen/gewerke')
+  revalidatePreislistenList()
+  revalidateWizardContext()
   return { ok: true }
 }
 
@@ -112,19 +119,26 @@ export async function createGewerk(
 
   for (let i = 0; i < 50; i++) {
     const slug = i === 0 ? base : `${base}_${i}`
-    const { data: existing } = await supabase.from('gewerke').select('id').eq('slug', slug).maybeSingle()
+    const { data: existing, error } = await supabase.from('gewerke').select('id').eq('slug', slug).maybeSingle()
+    if (error) logDbError('app/preislisten/actions:gewerke', error)
     if (existing) continue
 
-    const { data, error } = await supabase
+    const { data, error: error2 } = await supabase
       .from('gewerke')
       .insert({ name: trimmed, slug, aktiv: true })
       .select('id, slug, name')
       .single()
+    if (error2) logDbError('app/preislisten/actions:gewerke', error2)
 
-    if (error || !data) return { ok: false, message: error?.message ?? 'Anlegen fehlgeschlagen' }
+    if (error2 || !data) return { ok: false, message: error2?.message ?? 'Anlegen fehlgeschlagen' }
+<<<<<<< Updated upstream
+    revalidatePreislistenList()
+  revalidateWizardContext()
+=======
     revalidatePath('/preislisten')
   revalidatePath('/einstellungen/preise')
     revalidatePath('/einstellungen/gewerke')
+>>>>>>> Stashed changes
     return { ok: true, id: data.id as string, slug: data.slug as string, name: data.name as string }
   }
 

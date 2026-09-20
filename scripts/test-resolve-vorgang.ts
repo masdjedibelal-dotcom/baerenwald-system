@@ -1,5 +1,5 @@
 /**
- * Automatisierte Tests: 6 kanonische resolveVorgang()-Fixtures.
+ * Automatisierte Tests: kanonische resolveVorgang()-Fixtures.
  * Aufruf: npx --yes tsx scripts/test-resolve-vorgang.ts
  */
 import { resolveVorgang } from '../src/lib/vorgang/resolve-vorgang'
@@ -67,8 +67,10 @@ function checkFixture(
 }
 
 function main() {
-  if (RESOLVE_VORGANG_FIXTURES.length !== 6) {
-    throw new Error(`Erwartet 6 Fixtures, gefunden ${RESOLVE_VORGANG_FIXTURES.length}`)
+  if (RESOLVE_VORGANG_FIXTURES.length < 6) {
+    throw new Error(
+      `Erwartet ≥6 Fixtures, gefunden ${RESOLVE_VORGANG_FIXTURES.length}`
+    )
   }
 
   let failed = 0

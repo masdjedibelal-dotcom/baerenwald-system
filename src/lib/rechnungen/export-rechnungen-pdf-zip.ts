@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { PassThrough } from 'stream'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildRechnungPdfBuffer } from '@/lib/rechnungen/persist-pdf'
@@ -100,6 +101,7 @@ export async function buildRechnungenPdfZip(
     .order('rechnungsdatum', { ascending: true })
     .order('rechnungsnummer', { ascending: true })
     .limit(RECHNUNGEN_PDF_ZIP_MAX + 1)
+  if (error) logDbError('lib/rechnungen/export-rechnungen-pdf-zip:rechnungen', error)
 
   if (error) return { ok: false, message: error.message, status: 500 }
 

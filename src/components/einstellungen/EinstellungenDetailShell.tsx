@@ -1,9 +1,8 @@
 'use client'
 
-import Link from 'next/link'
+import { MockTabs } from '@/components/mock-ui/MockTabs'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { activeEinstellungenTab, EINSTELLUNGEN_TABS } from '@/lib/einstellungen-tabs'
 import { cn } from '@/lib/utils'
@@ -28,34 +27,23 @@ export function EinstellungenDetailShell({
 
   return (
     <div className={cn('dshell', isMobile && 'dshell--tabs-mobile')}>
-      <nav
+      <MockTabs
         ref={tabsRef}
-        className={cn(isMobile ? 'dshell-tabs-mobile' : 'dshell-nav')}
+        items={EINSTELLUNGEN_TABS.map((tab) => ({
+          id: tab.id,
+          label: tab.label,
+          href: tab.href,
+          icon: tab.mockIcon,
+          count: !isMobile && tab.id === 'team' && teamCount > 0 ? teamCount : undefined,
+        }))}
+        value={active}
         aria-label="Einstellungen"
-        role="tablist"
-      >
-        {EINSTELLUNGEN_TABS.map((tab) => {
-          const isActive = tab.id === active
-          const count = tab.id === 'team' && teamCount > 0 ? teamCount : undefined
-          return (
-            <Link
-              key={tab.id}
-              href={tab.href}
-              data-tab-id={tab.id}
-              role="tab"
-              aria-selected={isActive}
-              className={cn(
-                isMobile ? 'dshell-tab-mobile' : 'dshell-navitem',
-                isActive && 'active'
-              )}
-            >
-              {!isMobile ? <MockIcon ctx="nav" n={tab.mockIcon} size={16} /> : null}
-              <span>{tab.label}</span>
-              {!isMobile && count != null ? <span className="dshell-count">{count}</span> : null}
-            </Link>
-          )
-        })}
-      </nav>
+        className={isMobile ? 'dshell-tabs-mobile' : 'dshell-nav'}
+        tabClassName={isMobile ? 'dshell-tab-mobile' : 'dshell-navitem'}
+        activeClassName="active"
+        iconCtx="nav"
+        showIcons={!isMobile}
+      />
       <div className="dshell-body">
         <div className="dshell-group active">
           <div className="dshell-cards">{children}</div>

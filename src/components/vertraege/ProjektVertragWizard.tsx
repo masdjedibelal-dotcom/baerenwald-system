@@ -1,13 +1,19 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useCallback, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Download, FileText, Save } from 'lucide-react'
+import { Combobox } from '@/components/ui/Combobox'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
-import { DocActionBar } from '@/components/surfaces/primitives'
 import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+>>>>>>> Stashed changes
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -29,6 +35,9 @@ import { NachtragPositionenEditor } from '@/components/vertraege/NachtragPositio
 import type { AuftragPosition } from '@/lib/types'
 import type { NachtragPositionDraft, ProjektVertragWizardBootstrap, ProjektVertragWizardMeta } from '@/lib/vertraege/types'
 import { cn } from '@/lib/utils'
+import { COPY_BUTTON, TOAST } from '@/lib/copy'
+import type { DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 /** Sichtbare Phasen ≤3: Partner · Inhalt (+ Unterlagen bei Accept) · PDF */
 const PHASES = [
@@ -62,9 +71,16 @@ export function ProjektVertragWizard({
   const acceptMode = bootstrap.accept_mode
   const nachtragMode = bootstrap.nachtrag_mode
   const pdfStep = 3
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
 
   const [step, setStep] = useState(1)
-  const [meta, setMeta] = useState<ProjektVertragWizardMeta>(() => bootstrap.meta)
+  const [meta, setMetaState] = useState<ProjektVertragWizardMeta>(() => bootstrap.meta)
+  const [draftDirty, setDraftDirty] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  const setMeta: typeof setMetaState = (next) => {
+    setDraftDirty(true)
+    setMetaState(next)
+  }
   const [complianceSlugs, setComplianceSlugs] = useState<string[]>(
     () => acceptMode?.initial_compliance_slugs ?? []
   )
@@ -121,7 +137,7 @@ export function ProjektVertragWizard({
   const persistDraft = useCallback(
     async (opts?: { notify?: boolean; manageBusy?: boolean }): Promise<string | null> => {
       if (!meta.handwerker_id) {
-        toast.error('Bitte Handwerker wählen.')
+        applyFieldErrors({ _form: TOAST.bitte_partner_waehlen })
         return null
       }
       const manageBusy = opts?.manageBusy !== false
@@ -140,12 +156,14 @@ export function ProjektVertragWizard({
               meta,
             })
         if (!res.ok) {
-          toast.error(res.message)
+          toast.systemError(res)
           return null
         }
         setVertragId(res.vertrag_id)
         setVertragsNr(res.vertrags_nr)
-        if (opts?.notify) toast.success('Entwurf gespeichert')
+        setDraftDirty(false)
+        setLastSavedAt(Date.now())
+        if (opts?.notify) toast.success(TOAST.entwurf_gespeichert)
         return res.vertrag_id
       } finally {
         if (manageBusy) setSaving(false)
@@ -157,7 +175,7 @@ export function ProjektVertragWizard({
   const handleWeiter = async () => {
     if (step === 1) {
       if (!meta.handwerker_id) {
-        toast.error('Bitte Handwerker wählen.')
+        applyFieldErrors({ _form: TOAST.bitte_partner_waehlen })
         return
       }
       await persistDraft()
@@ -166,11 +184,11 @@ export function ProjektVertragWizard({
     }
     if (step === 2) {
       if (nachtragMode && !meta.nachtrag_positionen?.length) {
-        toast.error('Bitte mindestens eine Position für den Nachtrag anlegen.')
+        applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_position_fuer_den_nachtrag })
         return
       }
       if (!meta.bauvorhaben.trim() || !meta.leistungsumfang.trim()) {
-        toast.error('Bauvorhaben und Leistungsumfang ausfüllen.')
+        toast.error(TOAST.bauvorhaben_und_leistungsumfang_ausfuellen)
         return
       }
       await persistDraft()
@@ -209,14 +227,14 @@ export function ProjektVertragWizard({
               meta,
             })
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setVertragId(res.vertrag_id)
       setVertragsNr(res.vertrags_nr)
       setPdfUrl(res.pdf_url)
       if (acceptMode) {
-        toast.success('Vertrag erzeugt')
+        toast.success(TOAST.vertrag_erzeugt)
       } else if (nachtragMode) {
         const mailTeil =
           'mailGesendet' in res && res.mailGesendet
@@ -226,7 +244,7 @@ export function ProjektVertragWizard({
               : ''
         toast.success(`Ergänzungsvereinbarung erzeugt.${mailTeil}`)
       } else {
-        toast.success('Vertrag als PDF erzeugt und hochgeladen')
+        toast.success(TOAST.vertrag_als_pdf_erzeugt_und_hochgeladen)
       }
       onDone?.()
     } finally {
@@ -251,84 +269,125 @@ export function ProjektVertragWizard({
     .filter(Boolean)
     .join(' · ')
 
-  const docActions = (
-    <DocActionBar
-      actions={[
-        {
-          id: 'save',
-          label: 'Speichern',
-          onClick: () => void persistDraft({ notify: true }),
-          icon: <Save size={20} strokeWidth={1.75} aria-hidden />,
-        },
-        {
-          id: 'pdf',
-          label: acceptMode ? 'Vertrag senden' : 'PDF erzeugen',
-          onClick: () => {
-            if (step < pdfStep) void handleWeiter()
-            else void handlePdfErzeugen()
-          },
-          icon: <FileText size={20} strokeWidth={1.75} aria-hidden />,
-        },
-      ]}
-    />
-  )
-
   return (
     <DocumentCanvas
       title="Vertrag"
       onClose={onClose}
-      onSave={() => void persistDraft({ notify: true })}
-      saveBusy={saving}
-      docActions={docActions}
+      onSaveDraftClose={async () => {
+        const id = await persistDraft({ notify: true })
+        if (id) onClose()
+      }}
+      draftDirty={draftDirty}
+      lastSavedAt={lastSavedAt}
+      sections={
+        PHASES.map((p) => ({
+          id: String(p.id),
+          label: p.label,
+          complete:
+            p.id === 1
+              ? Boolean(meta.handwerker_id)
+              : p.id === 2
+                ? Boolean(meta.bauvorhaben.trim() && meta.leistungsumfang.trim())
+                : Boolean(pdfUrl),
+        })) satisfies DocCanvasSection[]
+      }
+      draftAction={{
+        label: COPY_BUTTON.entwurfSpeichern,
+        onClick: () => void persistDraft({ notify: true }),
+        busy: saving,
+      }}
+      primaryAction={{
+        label:
+          step < pdfStep
+            ? COPY_BUTTON.weiter
+            : acceptMode
+              ? 'Vertrag senden'
+              : 'PDF erzeugen',
+        onClick: () => {
+          if (step < pdfStep) void handleWeiter()
+          else void handlePdfErzeugen()
+        },
+        busy: saving,
+        getGaps: () => {
+          if (step === 1 && !meta.handwerker_id) {
+            return [{ id: '1', label: 'Partner' }]
+          }
+          if (
+            step === 2 &&
+            (!meta.bauvorhaben.trim() || !meta.leistungsumfang.trim())
+          ) {
+            return [{ id: '2', label: 'Inhalt' }]
+          }
+          if (
+            step === 2 &&
+            nachtragMode &&
+            !meta.nachtrag_positionen?.length
+          ) {
+            return [{ id: '2', label: 'Nachtrag-Positionen' }]
+          }
+          return []
+        },
+      }}
       className="wizard-flow"
     >
       {subtitle ? <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">{subtitle}</p> : null}
 
       <nav className="document-section-nav" aria-label="Abschnitte">
         {PHASES.map((p) => (
-          <button
-            key={p.id}
-            type="button"
+          <MockBtn
             className={cn(
               'document-section-nav__chip',
               step === p.id && 'document-section-nav__chip--active'
             )}
+            key={p.id}
+            type="button"
+            data-doc-section={String(p.id)}
             onClick={() => setStep(p.id)}
           >
             {p.label}
-          </button>
+          </MockBtn>
         ))}
+<<<<<<< Updated upstream
+        {step > 1 ? (
+          <div className="ml-auto hidden items-center gap-2 md:flex">
+            <MockBtn kind="secondary" sm onClick={() => setStep((s) => s - 1)}>
+              <MockIcon n="chevron-left" ctx="default" className="h-4 w-4" />
+              Zurück
+            </MockBtn>
+          </div>
+        ) : null}
+=======
         <div className="ml-auto hidden items-center gap-2 md:flex">
           {step > 1 ? (
-            <Button variant="secondary" size="sm" onClick={() => setStep((s) => s - 1)}>
+            <MockBtn kind="secondary" sm onClick={() => setStep((s) => s - 1)}>
               <ChevronLeft className="h-4 w-4" />
               Zurück
-            </Button>
+            </MockBtn>
           ) : null}
           {step < pdfStep ? (
             <>
-              <Button
-                variant="secondary"
-                size="sm"
+              <MockBtn
+                kind="secondary" sm
                 disabled={saving}
                 onClick={() => void persistDraft({ notify: true })}
                 className="gap-1.5"
               >
                 <Save className="h-4 w-4" aria-hidden />
                 Speichern
-              </Button>
-              <Button size="sm" disabled={saving} onClick={() => void handleWeiter()} className="gap-1.5">
+              </MockBtn>
+              <MockBtn kind="primary" sm disabled={saving} onClick={() => void handleWeiter()} className="gap-1.5">
                 Weiter
                 <ChevronRight className="h-4 w-4" aria-hidden />
-              </Button>
+              </MockBtn>
             </>
           ) : (
-            <Button size="sm" disabled={saving} onClick={() => void handlePdfErzeugen()} className="gap-1.5">
+            <MockBtn kind="primary" sm disabled={saving} onClick={() => void handlePdfErzeugen()} className="gap-1.5">
               <FileText className="h-4 w-4" aria-hidden />
               {acceptMode ? 'Vertrag senden' : 'PDF erzeugen'}
-            </Button>
+            </MockBtn>
           )}
         </div>
+>>>>>>> Stashed changes
       </nav>
 
       <div className="wizard-inner max-w-3xl">
@@ -344,7 +403,7 @@ export function ProjektVertragWizard({
           >
             <div className="space-y-4">
               {nachtragMode ? (
-                <div className="rounded-lg border border-bw-border bg-bw-primary/5 p-3 text-[length:var(--fs-text)]">
+                <div className="rounded-card border border-bw-border bg-bw-primary/5 p-3 text-[length:var(--fs-text)]">
                   <p className="font-medium text-bw-text">Ergänzung zum bestehenden Vertrag</p>
                   <p className="mt-1 text-bw-text-muted">
                     Bezug: Nachunternehmervertrag
@@ -361,20 +420,14 @@ export function ProjektVertragWizard({
                   Partner und Gewerk sind für diesen Nachtrag festgelegt.
                 </p>
               ) : null}
-              <Select
-                label="Handwerker"
-                required
-                disabled={!!acceptMode || !!nachtragMode}
-                value={meta.handwerker_id}
-                options={[
-                  { value: '', label: 'Handwerker wählen…' },
+              <Combobox label="Partner" required disabled={!!acceptMode || !!nachtragMode} options={[
+                  { value: '', label: 'Partner wählen…' },
                   ...bootstrap.handwerker_optionen.map((h) => ({
                     value: h.id,
                     label: handwerkerAnzeigename(h),
                   })),
-                ]}
-                onChange={(e) => {
-                  const id = e.target.value
+                ]} value={meta.handwerker_id == null ? '' : String(meta.handwerker_id)} placeholder="Auswählen…" onChange={(next) => {
+                  const id = next
                   const gewerk =
                     bootstrap.gewerk_optionen[0]?.name ??
                     bootstrap.positionen.find((p) => p.handwerker_id === id)?.gewerk_name ??
@@ -382,22 +435,15 @@ export function ProjektVertragWizard({
                   const gewerkId =
                     bootstrap.gewerk_optionen.find((g) => g.name === gewerk)?.id ?? null
                   applyHandwerkerGewerk(id, gewerk, gewerkId)
-                }}
-              />
-              <Select
-                label="Gewerk"
-                disabled={!!acceptMode || !!nachtragMode}
-                value={meta.gewerk_name}
-                options={gewerkOptions}
-                onChange={(e) => {
-                  const name = e.target.value
+                }} />
+              <Combobox label="Gewerk" disabled={!!acceptMode || !!nachtragMode} options={gewerkOptions} value={meta.gewerk_name == null ? '' : String(meta.gewerk_name)} placeholder="Auswählen…" onChange={(next) => {
+                  const name = next
                   const gewerkId = bootstrap.gewerk_optionen.find((g) => g.name === name)?.id ?? null
                   if (meta.handwerker_id) applyHandwerkerGewerk(meta.handwerker_id, name, gewerkId)
                   else setMeta((m) => ({ ...m, gewerk_name: name, gewerk_id: gewerkId }))
-                }}
-              />
+                }} />
               {handwerker ? (
-                <div className="rounded-lg border border-bw-border bg-bw-hover/40 p-3 text-[length:var(--fs-text)] text-bw-text-muted">
+                <div className="rounded-card border border-bw-border bg-bw-hover/40 p-3 text-[length:var(--fs-text)] text-bw-text-muted">
                   <p className="font-medium text-bw-text">{handwerkerAnzeigename(handwerker)}</p>
                   {handwerker.adresse ? <p>{handwerker.adresse}</p> : null}
                   {handwerker.telefon ? <p>Tel. {handwerker.telefon}</p> : null}
@@ -443,7 +489,7 @@ export function ProjektVertragWizard({
                   kiExtraHint="Vergütungstext im Vertrag für den Kunden."
                 />
                 {nachtragMode?.parent_verguetung_text ? (
-                  <div className="rounded-lg border border-bw-border bg-bw-bg-soft p-3 text-[length:var(--fs-meta)] text-bw-text-muted">
+                  <div className="rounded-card border border-bw-border bg-bw-bg-soft p-3 text-[length:var(--fs-meta)] text-bw-text-muted">
                     <p className="mb-1 font-medium text-bw-text">Ursprüngliche Vergütung (Referenz)</p>
                     <p className="whitespace-pre-wrap">{nachtragMode.parent_verguetung_text}</p>
                   </div>
@@ -453,51 +499,20 @@ export function ProjektVertragWizard({
             {!nachtragMode ? (
               <Card title="Vertragskonditionen">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Input
-                    label="Regiesatz netto (€/h)"
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={meta.regiesatz_netto ?? ''}
-                    onChange={(e) =>
+                  <MockField label="Regiesatz netto (€/h)"><MockInput type="number" min={0} step={0.5} value={meta.regiesatz_netto ?? ''} onChange={(e) =>
                       setMeta((m) => ({
                         ...m,
                         regiesatz_netto: e.target.value ? Number(e.target.value) : null,
-                      }))
-                    }
-                  />
-                  <Input
-                    label="Sicherheitseinbehalt (%)"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.5}
-                    value={meta.einbehalt_prozent}
-                    onChange={(e) =>
-                      setMeta((m) => ({ ...m, einbehalt_prozent: Number(e.target.value) || 0 }))
-                    }
-                  />
-                  <Input
-                    label="Zahlungsziel (Tage)"
-                    type="number"
-                    min={1}
-                    value={meta.zahlungsziel_tage}
-                    onChange={(e) =>
-                      setMeta((m) => ({ ...m, zahlungsziel_tage: Number(e.target.value) || 14 }))
-                    }
-                  />
-                  <Input
-                    label="Aufmaß-Rhythmus (Tage)"
-                    type="number"
-                    min={1}
-                    value={meta.aufmass_rhythmus_tage}
-                    onChange={(e) =>
+                      }))} /></MockField>
+                  <MockField label="Sicherheitseinbehalt (%)"><MockInput type="number" min={0} max={100} step={0.5} value={meta.einbehalt_prozent} onChange={(e) =>
+                      setMeta((m) => ({ ...m, einbehalt_prozent: Number(e.target.value) || 0 }))} /></MockField>
+                  <MockField label="Zahlungsziel (Tage)"><MockInput type="number" min={1} value={meta.zahlungsziel_tage} onChange={(e) =>
+                      setMeta((m) => ({ ...m, zahlungsziel_tage: Number(e.target.value) || 14 }))} /></MockField>
+                  <MockField label="Aufmaß-Rhythmus (Tage)"><MockInput type="number" min={1} value={meta.aufmass_rhythmus_tage} onChange={(e) =>
                       setMeta((m) => ({
                         ...m,
                         aufmass_rhythmus_tage: Number(e.target.value) || 14,
-                      }))
-                    }
-                  />
+                      }))} /></MockField>
                 </div>
                 <div className="mt-4">
                   <SheetEditableField
@@ -516,12 +531,12 @@ export function ProjektVertragWizard({
               <Card title="Unterlagen für den Partner">
                 <div className="space-y-4">
                   <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-                    Wähle aus dem Leistungs-Pool, welche Unterlagen der Handwerker für diesen Auftrag
+                    Wähle aus dem Leistungs-Pool, welche Unterlagen der Partner für diesen Auftrag
                     verbindlich einreichen muss. Er kann Stamm-Dokumente aus seinem Profil
                     wiederverwenden oder projektbezogen hochladen.
                   </p>
                   {!acceptMode.compliance_pool.length ? (
-                    <p className="rounded-lg border border-bw-border bg-bw-bg-soft p-3 text-[length:var(--fs-text)] text-bw-text-muted">
+                    <p className="rounded-card border border-bw-border bg-bw-bg-soft p-3 text-[length:var(--fs-text)] text-bw-text-muted">
                       Keine passenden Leistungs-Unterlagen im Pool — der Partner muss nur den
                       Projektvertrag bestätigen.
                     </p>
@@ -533,14 +548,13 @@ export function ProjektVertragWizard({
                           <li key={item.slug}>
                             <label
                               className={cn(
-                                'flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors',
+                                'flex cursor-pointer gap-3 rounded-card border p-3 transition-colors',
                                 checked
                                   ? 'border-bw-primary/40 bg-bw-primary/5'
                                   : 'border-bw-border hover:bg-bw-hover/40'
                               )}
                             >
-                              <input
-                                type="checkbox"
+                              <MockCheckbox
                                 className="mt-1 h-4 w-4 shrink-0 accent-bw-primary"
                                 checked={checked}
                                 onChange={() => toggleComplianceSlug(item.slug)}
@@ -591,9 +605,8 @@ export function ProjektVertragWizard({
                     : 'Der Vertrag wird im Bärenwald-Design erzeugt und automatisch in den Auftragsdokumenten gespeichert.'}
               </p>
               {nachtragMode ? (
-                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-bw-border p-3">
-                  <input
-                    type="checkbox"
+                <label className="flex cursor-pointer items-start gap-2 rounded-card border border-bw-border p-3">
+                  <MockCheckbox
                     className="mt-0.5 h-4 w-4 accent-bw-primary"
                     checked={positionenAuftragSpeichern}
                     onChange={(e) => setPositionenAuftragSpeichern(e.target.checked)}
@@ -632,7 +645,7 @@ export function ProjektVertragWizard({
                             .filter((p) => complianceSlugs.includes(p.slug))
                             .map((p) => p.bezeichnung)
                             .join(', ')
-                        : 'Keine — nur Projektvertrag'}
+                        : 'Nur Projektvertrag'}
                     </dd>
                   </div>
                 ) : null}
@@ -645,12 +658,16 @@ export function ProjektVertragWizard({
                     rel="noopener noreferrer"
                     className="btn primary sm inline-flex gap-1.5"
                   >
-                    <Download className="h-4 w-4" aria-hidden />
+                    <MockIcon n="download" ctx="default" className="h-4 w-4" aria-hidden />
                     PDF öffnen
                   </a>
-                  <Button variant="secondary" onClick={onClose}>
+                  <MockBtn kind="secondary" onClick={onClose}>
+<<<<<<< Updated upstream
+                    Abbrechen
+=======
                     Schließen
-                  </Button>
+>>>>>>> Stashed changes
+                  </MockBtn>
                 </div>
               ) : null}
             </div>

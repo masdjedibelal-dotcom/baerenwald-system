@@ -1,12 +1,19 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import {
+  DetailShell,
+  EntityDetailLayout,
+  type DetailShellGroup,
+} from '@/components/layout/EntityDetailLayout'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import Link from 'next/link'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
-import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
@@ -109,7 +116,7 @@ export function ObjektAkteDetailClient({
     .join(', ')
 
   function refresh() {
-    router.refresh()
+    afterServerActionRefresh()
   }
 
   const einheiten = useMemo(
@@ -152,9 +159,9 @@ export function ObjektAkteDetailClient({
           onBerichtClick={() => setBerichtOpen(true)}
         />
       ) : null}
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">Objektdaten</div>
+      <MockCard
+        title="Objektdaten"
+        actions={
           <MockBtn
             sm
             kind="ghost"
@@ -162,36 +169,35 @@ export function ObjektAkteDetailClient({
             title="Objektdaten bearbeiten"
             onClick={() => setObjektModalOpen(true)}
           />
-        </div>
-        <div className="card-b">
-          <div className="vgid">
-            <div className="vgid-name">{objektState.titel}</div>
-            {adresse ? <div className="vgid-meta">{adresse}</div> : null}
-            <div className="vgid-chips" style={{ marginTop: 10 }}>
+        }
+      >
+        <div className="vgid">
+          <div className="vgid-name">{objektState.titel}</div>
+          {adresse ? <div className="vgid-meta">{adresse}</div> : null}
+          <div className="vgid-chips" style={{ marginTop: 10 }}>
+            <span className="vgid-chip ghost">
+              <MockIcon ctx="default" n="building" size={14} />
+              {einheitenAnzahl} {einheitenAnzahl === 1 ? 'Einheit' : 'Einheiten'}
+            </span>
+            <span className="vgid-chip ghost">
+              <MockIcon ctx="default" n="users" size={14} />
+              {personenAnzahl} Personen
+            </span>
+            {flaecheGesamt > 0 ? (
               <span className="vgid-chip ghost">
                 <MockIcon ctx="default" n="building" size={14} />
-                {einheitenAnzahl} {einheitenAnzahl === 1 ? 'Einheit' : 'Einheiten'}
+                {Math.round(flaecheGesamt)} m²
               </span>
-              <span className="vgid-chip ghost">
-                <MockIcon ctx="default" n="users" size={14} />
-                {personenAnzahl} Personen
-              </span>
-              {flaecheGesamt > 0 ? (
-                <span className="vgid-chip ghost">
-                  <MockIcon ctx="default" n="building" size={14} />
-                  {Math.round(flaecheGesamt)} m²
-                </span>
-              ) : null}
-            </div>
+            ) : null}
           </div>
-          <p style={{ marginTop: 12, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-            Verwaltung:{' '}
-            <Link href={`/kunden/${kunde.id}`} className="text-bw-link hover:underline">
-              {kunde.name}
-            </Link>
-          </p>
         </div>
-      </div>
+        <p style={{ marginTop: 12, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+          Verwaltung:{' '}
+          <Link href={`/kunden/${kunde.id}`} className="text-bw-link hover:underline">
+            {kunde.name}
+          </Link>
+        </p>
+      </MockCard>
 
       {zeigtMeldeLinks && orgSlug && objektMeldeSlug ? (
         <MeldeLinksCard
@@ -342,6 +348,22 @@ export function ObjektAkteDetailClient({
             </MockBadge>
           ) : null,
         badges: adresse ? <span>{adresse}</span> : null,
+        actions: (
+          <DetailActionsBar
+            sheetTitle="Objekt"
+            primary={{
+              label: 'Objektdaten bearbeiten',
+              icon: 'pencil',
+              onClick: () => setObjektModalOpen(true),
+            }}
+            secondary={{
+              label: 'Versammlungsbericht',
+              icon: 'file-text',
+              onClick: () => setBerichtOpen(true),
+            }}
+            menuItems={[]}
+          />
+        ),
       }}
     >
       <DetailShell

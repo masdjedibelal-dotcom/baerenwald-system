@@ -56,7 +56,7 @@ export function createKundeHref(): string {
   return '/neu?art=kunde'
 }
 
-/** Handwerker = Tabelle `handwerker` (eine Create-Route). */
+/** Partner = Tabelle `handwerker` (eine Create-Route). */
 export function createPartnerHref(): string {
   return '/neu?art=handwerker'
 }
@@ -89,6 +89,6 @@ export const CREATE_ENTRY_LABELS = {
   angebot: 'Neues Angebot',
   rechnung: 'Neue Rechnung',
   kunde: 'Neuer Kunde',
-  partner: 'Neuer Handwerker',
-  handwerker: 'Neuer Handwerker',
+  partner: 'Neuer Partner',
+  handwerker: 'Neuer Partner',
 } as const

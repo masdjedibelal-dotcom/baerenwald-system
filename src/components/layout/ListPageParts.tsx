@@ -1,27 +1,11 @@
 'use client'
 
-import { createContext, useContext, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { MockTable } from '@/components/mock-ui'
 import { cn } from '@/lib/utils'
-import { FilterChips, type FilterOption } from '@/components/ui/FilterChips'
-
-export type ListFilterChipGroup = {
-  label?: string
-  options: FilterOption[]
-  selected: string[]
-  onChange: (values: string[]) => void
-  multiple?: boolean
-}
-
-const ListFilterChipGroupsContext = createContext<ListFilterChipGroup[]>([])
-
-export function useListFilterChipGroups(): ListFilterChipGroup[] {
-  return useContext(ListFilterChipGroupsContext)
-}
 
 type ListFilterSectionProps = {
   /** Status-/Typ-Chips — Desktop sichtbar, Mobil im Filter-Sheet */
-  chipGroups?: ListFilterChipGroup[]
-  /** Legacy: freie Chip-Zeile (nur Desktop) */
   chips?: ReactNode
   children: ReactNode
   className?: string
@@ -32,47 +16,17 @@ type ListFilterSectionProps = {
  * Desktop — Zeile 1: Suche | Filter; Zeile 2: Chips
  * Mobil — eine Zeile: kompakte Suche links, Filter-Button rechts (Sheet); Chips nur im Sheet
  */
-export function ListFilterSection({ chipGroups, chips, children, className }: ListFilterSectionProps) {
-  const desktopChips =
-    chipGroups && chipGroups.length > 0 ? (
-      <div className="flex min-w-0 flex-col gap-1.5">
-        {chipGroups.map((group, index) => (
-          <div key={group.label ?? `chip-group-${index}`} className="min-w-0">
-            {group.label ? (
-              <p className="mb-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
-                {group.label}
-              </p>
-            ) : null}
-            <FilterChips
-              options={group.options}
-              selected={group.selected}
-              onChange={group.onChange}
-              multiple={group.multiple}
-            />
-          </div>
-        ))}
-      </div>
-    ) : (
-      chips
-    )
-
+export function ListFilterSection({ chips, children, className }: ListFilterSectionProps) {
   return (
-    <ListFilterChipGroupsContext.Provider value={chipGroups ?? []}>
-      <div
-        data-list-filter-sticky
-        className={cn('list-filter-section list-filter-sticky mb-[14px] flex flex-col gap-[10px]', className)}
-      >
-        <div className="toolbar">{children}</div>
-        {desktopChips ? (
-          <div className="list-filter-chips-row chiprow hidden min-w-0 md:block">{desktopChips}</div>
-        ) : null}
-      </div>
-    </ListFilterChipGroupsContext.Provider>
+    <div className={cn('list-filter-section', className)}>
+      <div className="toolbar">{children}</div>
+      {chips ? <div className="chiprow">{chips}</div> : null}
+    </div>
   )
 }
 
-/** Wireframe-Listenhülle: `.listcard` mit optionalem horizontalem Scroll. */
-export function ListGridShell({
+/** Scroll-/min-width-Hülle um ListCards (kein table). */
+export function ListCardScroll({
   children,
   minWidth = '720px',
   className,
@@ -88,7 +42,7 @@ export function ListGridShell({
   )
 }
 
-/** Desktop-Tabellen-Container (einheitlich: rounded-lg, shadow-card). */
+/** Desktop-Tabellen-Container (einheitlich: rounded-lg). */
 export function ListTableShell({
   children,
   minWidth = '720px',
@@ -99,11 +53,13 @@ export function ListTableShell({
   className?: string
 }) {
   return (
-    <div className={cn('list-table-shell', className)}>
-      <table className="w-full border-collapse text-left text-[length:var(--fs-text)]" style={{ minWidth }}>
-        {children}
-      </table>
-    </div>
+    <MockTable
+      wrapClassName={cn('list-table-shell', className)}
+      className="w-full border-collapse text-left text-[length:var(--fs-text)]"
+      style={{ minWidth }}
+    >
+      {children}
+    </MockTable>
   )
 }
 

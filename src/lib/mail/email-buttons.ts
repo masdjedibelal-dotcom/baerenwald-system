@@ -1,5 +1,6 @@
 /** Markengrün für E-Mail-CTAs (inline styles — E-Mail-Clients unterstützen kein CSS extern). */
-export const MAIL_BTN_GREEN = '#2E7D52'
+import { C } from '@/lib/tokens/colors'
+export const MAIL_BTN_GREEN = C.green
 
 function escAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
@@ -29,13 +30,13 @@ function buttonBase(
   const textAlign = opts?.block ? 'text-align:center;' : ''
 
   if (variant === 'primary') {
-    return `<a href="${escAttr(url)}" style="display:${display};background:${MAIL_BTN_GREEN};color:#FFFFFF;text-decoration:none;padding:${padding};border-radius:8px;font-weight:600;font-size:${fontSize};margin:${margin};border:2px solid ${MAIL_BTN_GREEN};font-family:Arial,Helvetica,sans-serif;${textAlign}">${escText(text)}</a>`
+    return `<a href="${escAttr(url)}" style="display:${display};background:${MAIL_BTN_GREEN};color:${C.white};text-decoration:none;padding:${padding};border-radius:8px;font-weight:600;font-size:${fontSize};margin:${margin};border:2px solid ${MAIL_BTN_GREEN};font-family:Arial,Helvetica,sans-serif;${textAlign}">${escText(text)}</a>`
   }
 
   return `<a href="${escAttr(url)}" style="display:${display};background:transparent;color:${MAIL_BTN_GREEN};text-decoration:none;padding:${padding};border-radius:8px;font-weight:600;font-size:${fontSize};margin:${margin};border:2px solid ${MAIL_BTN_GREEN};font-family:Arial,Helvetica,sans-serif;${textAlign}">${escText(text)}</a>`
 }
 
-/** Hauptaktion in der Mail (z. B. Nachtrag bestätigen, Handwerker antworten). */
+/** Hauptaktion in der Mail (z. B. Nachtrag bestätigen, Partner antworten). */
 export function mailPrimaryButtonHtml(text: string, url: string, opts?: MailButtonOpts): string {
   return buttonBase(text, url, 'primary', opts)
 }

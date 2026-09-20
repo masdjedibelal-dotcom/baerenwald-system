@@ -1,10 +1,15 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { ExternalLink } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 
+>>>>>>> Stashed changes
 type Props = {
   kundeId?: string
   handwerkerId?: string
@@ -56,7 +61,7 @@ export function CrmPortalOpenButtons({
   if (!showKunde && !showHandwerker && !showMieter) return null
 
   return (
-    <div className="rounded-xl border border-bw-border bg-bw-surface-alt/60 p-3 space-y-2">
+    <div className="rounded-sheet border border-bw-border bg-bw-surface-alt/60 p-3 space-y-2">
       <p className="text-xs font-medium text-bw-muted uppercase tracking-wide">
         Portal aus CRM öffnen
       </p>
@@ -66,43 +71,40 @@ export function CrmPortalOpenButtons({
       </p>
       <div className="flex flex-wrap gap-2">
         {showKunde && kundeId ? (
-          <Button
+          <MockBtn
             type="button"
-            variant="secondary"
-            size="sm"
+            kind="secondary" sm
             disabled={pending}
             onClick={() => open({ targetType: 'kunde', targetId: kundeId })}
           >
-            <ExternalLink className="h-3.5 w-3.5 mr-1" aria-hidden />
+            <MockIcon n="external-link" ctx="default" className="h-3.5 w-3.5 mr-1" aria-hidden />
             HV-/Kunden-Portal
-          </Button>
+          </MockBtn>
         ) : null}
         {showHandwerker && handwerkerId ? (
-          <Button
+          <MockBtn
             type="button"
-            variant="secondary"
-            size="sm"
+            kind="secondary" sm
             disabled={pending}
             onClick={() => open({ targetType: 'handwerker', targetId: handwerkerId })}
           >
-            <ExternalLink className="h-3.5 w-3.5 mr-1" aria-hidden />
+            <MockIcon n="external-link" ctx="default" className="h-3.5 w-3.5 mr-1" aria-hidden />
             Partner-Portal
-          </Button>
+          </MockBtn>
         ) : null}
         {showMieter && leadId ? (
-          <Button
+          <MockBtn
             type="button"
-            variant="secondary"
-            size="sm"
+            kind="secondary" sm
             disabled={pending}
             onClick={() => open({ targetType: 'mieter_status', leadId })}
           >
-            <ExternalLink className="h-3.5 w-3.5 mr-1" aria-hidden />
+            <MockIcon n="external-link" ctx="default" className="h-3.5 w-3.5 mr-1" aria-hidden />
             Mieter-Status
-          </Button>
+          </MockBtn>
         ) : null}
       </div>
-      {hint ? <p className="text-xs text-amber-800">{hint}</p> : null}
+      {hint ? <p className="text-xs text-status-contact-text">{hint}</p> : null}
     </div>
   )
 }

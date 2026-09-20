@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -42,7 +43,8 @@ async function signInWithServiceOtp() {
   const { data: usersData, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 50 })
   if (listErr) return { error: listErr }
 
-  const { data: crmProfiles } = await admin.from('user_profiles').select('id')
+  const {data: crmProfiles, error} = await admin.from('user_profiles').select('id')
+  if (error) logDbError('app/api/dev/auto-login/route:user_profiles', error)
   const crmIds = new Set((crmProfiles ?? []).map((p) => p.id))
 
   const candidates = usersData.users.filter((u) => u.email && !u.email.endsWith('@anon.local'))

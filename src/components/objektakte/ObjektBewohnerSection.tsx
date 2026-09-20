@@ -1,19 +1,18 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
-
-import { useEffect, useMemo, useState } from 'react'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockBtn } from '@/components/mock-ui'
 import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { useTransition } from '@/components/ui/action-busy'
+import { Combobox } from '@/components/ui/Combobox'
+import { useEffect, useMemo, useState } from 'react'
 import { LIST } from '@/lib/crm-labels'
 import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import {
   createEinheitBewohner,
   deleteEinheitBewohner,
@@ -24,6 +23,7 @@ import type { EntityMenuItem } from '@/lib/entity-menu'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { TOAST } from '@/lib/copy'
 
 const BEWOHNER_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) 44px'
 
@@ -139,6 +139,10 @@ export function ObjektBewohnerSection({
   }
 
   function speichern() {
+    if (!edit && !einheitId) {
+      setErr('Bitte Einheit wählen.')
+      return
+    }
     setErr(null)
     startTransition(async () => {
       if (edit) {
@@ -163,7 +167,7 @@ export function ObjektBewohnerSection({
               : b
           )
         )
-        toast.success('Bewohner gespeichert')
+        toast.success(TOAST.bewohner_gespeichert)
       } else {
         const r = await createEinheitBewohner(kundeId, objektId, {
           objekt_einheit_id: einheitId,
@@ -176,7 +180,7 @@ export function ObjektBewohnerSection({
           return
         }
         setListe((prev) => [...prev, r.bewohner])
-        toast.success('Bewohner angelegt')
+        toast.success(TOAST.bewohner_angelegt)
       }
       setDirty(false)
       setModalOpen(false)
@@ -237,7 +241,7 @@ export function ObjektBewohnerSection({
     try {
       const r = await deleteEinheitBewohner(kundeId, objektId, deleteTarget.id)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       setListe((prev) => prev.filter((x) => x.id !== deleteTarget.id))
@@ -247,7 +251,7 @@ export function ObjektBewohnerSection({
         delete next[deleteTarget.id]
         return next
       })
-      toast.success('Bewohner gelöscht')
+      toast.success(TOAST.bewohner_geloescht)
       onChanged()
     } finally {
       setDeletePending(false)
@@ -289,11 +293,7 @@ export function ObjektBewohnerSection({
           onToggle={() => toggleSel(b.id)}
           title={`${b.name} auswählen`}
         />
-        <button
-          type="button"
-          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
-          onClick={() => openBearbeiten(b)}
-        >
+        <MockBtn className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'} type="button" onClick={() => openBearbeiten(b)}>
           {isMobile ? (
             <>
               <div className="ap-mobile-card__top">
@@ -309,7 +309,7 @@ export function ObjektBewohnerSection({
               <span className="ap-list__dim">{kontaktZeile}</span>
             </>
           )}
-        </button>
+        </MockBtn>
         <div
           className="row-actions always"
           onClick={(e) => e.stopPropagation()}
@@ -388,32 +388,20 @@ export function ObjektBewohnerSection({
         )}
       </MockCard>
 
-      <MockModal
+      <ConfirmPopup
         open={bulkDeleteOpen}
         onClose={() => {
           if (!bulkDeletePending) setBulkDeleteOpen(false)
         }}
-        icon="trash"
         title={selectedCount === 1 ? 'Bewohner löschen?' : `${selectedCount} Bewohner löschen?`}
-        sub="Dauerhaft entfernen."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
-              onClick={() => void runBulkDelete()}
-            >
-              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={bulkDeletePending}
+        confirmLabel={bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runBulkDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Dauerhaft entfernen.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {bulkDeletePending
             ? 'Bitte warten…'
@@ -421,40 +409,28 @@ export function ObjektBewohnerSection({
               ? `„${selectedRows[0]?.name ?? 'Bewohner'}“ wird unwiderruflich gelöscht.`
               : `${selectedCount} ausgewählte Bewohner werden unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
-      <MockModal
+      <ConfirmPopup
         open={Boolean(deleteTarget)}
         onClose={() => {
           if (!deletePending) setDeleteTarget(null)
         }}
-        icon="trash"
         title="Bewohner löschen?"
-        sub="Dauerhaft entfernen."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={deletePending ? undefined : 'trash'}
-              disabled={deletePending}
-              onClick={() => void runSingleDelete()}
-            >
-              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={deletePending}
+        confirmLabel={deletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runSingleDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Dauerhaft entfernen.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {deletePending
             ? 'Bitte warten…'
             : `„${deleteTarget?.name ?? 'Bewohner'}“ wird unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
       <EditorSheet
         open={modalOpen}
@@ -463,53 +439,40 @@ export function ObjektBewohnerSection({
         context="detail"
         dirty={dirty}
         confirmBusy={pending}
-        confirmDisabled={pending || (!edit && !einheitId)}
+        confirmDisabled={pending}
         onConfirm={speichern}
       >
         <div className="space-y-3">
           {!edit ? (
-            <Select
-              label="Einheit"
-              name="einheit"
-              value={einheitId}
-              onChange={(e) => {
-                setDirty(true)
-                setEinheitId(e.target.value)
-              }}
-              options={einheitOptions}
-            />
+            <MockField label="Einheit">
+              <MockSelect name="einheit" id="einheit" value={einheitId} onChange={(e) => {
+                  setDirty(true)
+                  setEinheitId(e.target.value)
+                }}>
+                {einheitOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </MockSelect>
+            </MockField>
           ) : (
             <p className="text-[length:var(--fs-text)]" style={{ color: 'var(--text-3)' }}>
               Einheit: {edit.objekt_einheiten?.bezeichnung ?? '—'}
             </p>
           )}
-          <Input
-            label="Name"
-            value={name}
-            onChange={(e) => {
+          <MockField label="Name" required><MockInput value={name} onChange={(e) => {
               setDirty(true)
               setName(e.target.value)
-            }}
-            required
-          />
-          <Input
-            label="Telefon"
-            value={telefon}
-            onChange={(e) => {
+            }} required /></MockField>
+          <MockField label="Telefon"><MockInput type="tel" value={telefon} onChange={(e) => {
               setDirty(true)
               setTelefon(e.target.value)
-            }}
-            type="tel"
-          />
-          <Input
-            label="E-Mail"
-            value={email}
-            onChange={(e) => {
+            }} /></MockField>
+          <MockField label="E-Mail"><MockInput type="email" value={email} onChange={(e) => {
               setDirty(true)
               setEmail(e.target.value)
-            }}
-            type="email"
-          />
+            }} /></MockField>
           {err ? <p className="text-[length:var(--fs-text)] text-danger">{err}</p> : null}
         </div>
       </EditorSheet>

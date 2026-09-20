@@ -1,5 +1,22 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import {
+  DetailShell,
+  EntityDetailLayout,
+  type DetailShellGroup,
+} from '@/components/layout/EntityDetailLayout'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockNotizComposer, MockNotizenCard } from '@/components/mock-ui/MockDetailCards'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openActionConfirm } from '@/components/ui/ConfirmPopup'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
+import { C } from '@/lib/tokens/colors'
 
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
@@ -7,10 +24,12 @@ import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { EntityHandwerkerStammdatenCard } from '@/components/crm/EntityHandwerkerStammdatenCard'
 import { EntityHandwerkerBankCard } from '@/components/crm/EntityHandwerkerBankCard'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { HandwerkerAkteDokumente } from '@/components/handwerker/HandwerkerAkteDokumente'
 import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/HandwerkerComplianceUnterlagenTable'
 import {
@@ -18,12 +37,7 @@ import {
   istEigeneUnterlageTyp,
   standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
-import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
-import { MockBadge, MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
-import { MockNotizenCard, MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -35,7 +49,6 @@ import {
 } from '@/app/(dashboard)/vertraege/wizard-actions'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import { toast } from '@/components/ui/app-toast'
-import { confirmAction } from '@/components/ui/confirm-action'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
 import {
   formatHandwerkerBewertung,
@@ -69,6 +82,7 @@ import {
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import { formatRelativeDate } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'compliance' | 'akte'
 
@@ -94,7 +108,7 @@ function gewerkTagsFromSlugs(gewerke: unknown, slugToName: Map<string, string>):
 }
 
 function RatingStars({ value, size = 14 }: { value: number | null | undefined; size?: number }) {
-  const n = typeof value === 'number' && Number.isFinite(value) ? Math.min(5, Math.max(0, value)) : 0
+const n = typeof value === 'number' && Number.isFinite(value) ? Math.min(5, Math.max(0, value)) : 0
   const full = Math.floor(n)
   return (
     <span className="inline-flex items-center gap-0.5" aria-label={`${formatHandwerkerBewertung(n)} von 5`}>
@@ -104,7 +118,7 @@ function RatingStars({ value, size = 14 }: { value: number | null | undefined; s
           ctx="default"
           n={i < full ? 'star-filled' : 'star'}
           size={size}
-          className={i < full ? 'text-[var(--yel-tx,#c9a227)]' : 'text-[var(--text-4)]'}
+          className={i < full ? `text-[var(--yel-tx,${C.accentGold})]` : 'text-[var(--text-4)]'}
         />
       ))}
     </span>
@@ -180,7 +194,7 @@ export function HandwerkerDetailClient({
 
   function togglePortalGesperrt() {
     const next = !istPortalGesperrt
-    confirmAction({
+    openActionConfirm({
       title: next ? 'Vom Portal ausschließen?' : 'Portal-Ausschluss aufheben?',
       body: next
         ? 'Der Betrieb kann sich dann nicht mehr anmelden oder registrieren und sieht den Hinweis, sich an Bärenwald zu wenden.'
@@ -194,12 +208,12 @@ export function HandwerkerDetailClient({
         try {
           const r = await setHandwerkerPortalGesperrt(hw.id, next)
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             return
           }
           setIstPortalGesperrt(next)
           toast.success(next ? 'Vom Portal ausgeschlossen' : 'Portal-Ausschluss aufgehoben')
-          router.refresh()
+          afterServerActionRefresh()
         } finally {
           setPortalGesperrtPending(false)
         }
@@ -230,7 +244,7 @@ export function HandwerkerDetailClient({
       void (async () => {
         const r = await updateHandwerkerNotizen(hw.id, t || null)
         if (!r.ok) setErr(r.message)
-        else router.refresh()
+        else afterServerActionRefresh()
       })()
     }, 800)
     return () => {
@@ -245,13 +259,13 @@ export function HandwerkerDetailClient({
 
   const bewertungGesamt = hw.bewertung_gesamt ?? null
   const bewertungAnzahl = hw.bewertung_anzahl ?? 0
-  const kategorie = hw.subkategorie?.trim() || gewerkNamen[0] || 'Handwerker'
+  const kategorie = hw.subkategorie?.trim() || gewerkNamen[0] || 'Partner'
 
   const openRahmenvertrag = useCallback(() => {
     startTransition(async () => {
       const res = await loadRahmenVertragBootstrap(hw.id, rahmenVertrag?.id ?? null)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setRahmenWizardBootstrap(res.bootstrap)
@@ -263,7 +277,7 @@ export function HandwerkerDetailClient({
   async function openPortalModal() {
     const draft = await getPartnerPortalMailDraft(hw.id)
     if (!draft.ok) {
-      toast.error(draft.message)
+      toast.systemError(draft)
       return
     }
     setPortalLink(draft.portalLink)
@@ -290,10 +304,10 @@ export function HandwerkerDetailClient({
     })
     setPortalSending(false)
     if (!res.ok) {
-      toast.error(res.message)
+      toast.systemError(res)
       return
     }
-    toast.success('Handwerker-Link versendet')
+    toast.success(TOAST.partner_link_versendet)
     setPortalModalOpen(false)
   }
 
@@ -311,7 +325,6 @@ export function HandwerkerDetailClient({
     }, 300)
     return () => clearTimeout(timer)
   }, [portalModalOpen, portalText, hw.id])
-
 
   const anschriftView = resolveHandwerkerAnschrift(hw)
   const adresseView =
@@ -353,78 +366,70 @@ export function HandwerkerDetailClient({
 
       <HandwerkerWirtschaftlicheUebersicht payload={payload} />
 
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">
-            <MockIcon ctx="emphasis" n="star" size={16} />
-            Bewertungen von Kunden
+      <MockCard title="Bewertungen von Kunden" icon="star">
+        <div className="mb-4 flex flex-wrap items-baseline gap-3">
+          <div
+            className="text-[length:var(--fs-head)] font-semibold leading-none tabular-nums"
+            style={{ color: C.accentGold2 }}
+          >
+            {bewertungGesamt != null && bewertungGesamt > 0
+              ? formatHandwerkerBewertung(bewertungGesamt)
+              : '—'}
+          </div>
+          <div>
+            <RatingStars value={bewertungGesamt} size={14} />
+            <div className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
+              {bewertungAnzahl > 0
+                ? `aus ${bewertungAnzahl} Bewertung${bewertungAnzahl === 1 ? '' : 'en'}`
+                : 'Noch keine Bewertungen'}
+            </div>
           </div>
         </div>
-        <div className="card-b">
-          <div className="mb-4 flex flex-wrap items-baseline gap-3">
-            <div
-              className="text-[length:var(--fs-head)] font-semibold leading-none tabular-nums"
-              style={{ color: '#D9A800' }}
-            >
-              {bewertungGesamt != null && bewertungGesamt > 0
-                ? formatHandwerkerBewertung(bewertungGesamt)
-                : '—'}
-            </div>
-            <div>
-              <RatingStars value={bewertungGesamt} size={14} />
-              <div className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-                {bewertungAnzahl > 0
-                  ? `aus ${bewertungAnzahl} Bewertung${bewertungAnzahl === 1 ? '' : 'en'}`
-                  : 'Noch keine Bewertungen'}
-              </div>
-            </div>
-          </div>
 
-          {payload.bewertungen.length > 0 ? (
-            <ul>
-              {payload.bewertungen.map((b) => (
+        {payload.bewertungen.length > 0 ? (
+          <ul>
+            {payload.bewertungen.map((b) => (
+              <li
+                key={b.id}
+                className="border-b border-[var(--border)] py-2.5 last:border-0"
+              >
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">
+                    {b.kundeName || 'Kunde'}
+                  </div>
+                  <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
+                    {b.updatedAt ? formatRelativeDate(b.updatedAt) : ''}
+                  </div>
+                </div>
+                <div className="mb-1">
+                  <RatingStars value={b.note} />
+                </div>
+                {b.notiz?.trim() ? (
+                  <p className="text-[length:var(--fs-text)] text-[var(--text-2)]">&ldquo;{b.notiz.trim()}&rdquo;</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul className="space-y-2">
+            {HANDWERKER_BEWERTUNG_KATEGORIEN.map((k) => {
+              const val = bewertungKategorieWert(hw, k.key)
+              return (
                 <li
-                  key={b.id}
-                  className="border-b border-[var(--border)] py-2.5 last:border-0"
+                  key={k.key}
+                  className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-2 last:border-0"
                 >
-                  <div className="mb-1 flex items-center justify-between gap-3">
-                    <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">
-                      {b.kundeName || 'Kunde'}
-                    </div>
-                    <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
-                      {b.updatedAt ? formatRelativeDate(b.updatedAt) : ''}
-                    </div>
+                  <div className="min-w-0">
+                    <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">{k.label}</div>
+                    <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">{k.hint}</div>
                   </div>
-                  <div className="mb-1">
-                    <RatingStars value={b.note} />
-                  </div>
-                  {b.notiz?.trim() ? (
-                    <p className="text-[length:var(--fs-text)] text-[var(--text-2)]">&ldquo;{b.notiz.trim()}&rdquo;</p>
-                  ) : null}
+                  <RatingStars value={val} />
                 </li>
-              ))}
-            </ul>
-          ) : (
-            <ul className="space-y-2">
-              {HANDWERKER_BEWERTUNG_KATEGORIEN.map((k) => {
-                const val = bewertungKategorieWert(hw, k.key)
-                return (
-                  <li
-                    key={k.key}
-                    className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-2 last:border-0"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">{k.label}</div>
-                      <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">{k.hint}</div>
-                    </div>
-                    <RatingStars value={val} />
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
-      </div>
+              )
+            })}
+          </ul>
+        )}
+      </MockCard>
     </div>
   )
 
@@ -540,7 +545,7 @@ export function HandwerkerDetailClient({
     email: hw.email,
     notiz: { kind: 'handwerker', handwerkerId: hw.id, initial: hw.notizen ?? '' },
     dokument: { kind: 'handwerker', handwerkerId: hw.id },
-    onSaved: () => router.refresh(),
+    onSaved: () => afterServerActionRefresh(),
   })
 
   return (
@@ -564,7 +569,7 @@ export function HandwerkerDetailClient({
                   ctx="default"
                   n="star-filled"
                   size={12}
-                  className="text-[var(--yel-tx,#c9a227)]"
+                  className={`text-[var(--yel-tx,${C.accentGold})]`}
                 />
                 {formatHandwerkerBewertung(bewertungGesamt)}
               </span>
@@ -579,7 +584,7 @@ export function HandwerkerDetailClient({
             ) : null}
           </>
         ),
-        actions: <DetailActionsBar sheetTitle="Handwerker" menuItems={[]} />,
+        actions: <DetailActionsBar sheetTitle="Partner" menuItems={[]} />,
       }}
     >
       <DetailShell
@@ -588,49 +593,48 @@ export function HandwerkerDetailClient({
         onChange={(id) => setTab(id as HandwerkerDetailTab)}
       />
 
-      <Modal
+      <EditorSheet
         open={portalModalOpen}
         onClose={() => setPortalModalOpen(false)}
-        title="Handwerker-Link versenden"
+        title="Partner-Link versenden"
         size="lg"
+<<<<<<< Updated upstream
+        secondary={{ label: 'Abbrechen' }}
+        primary={{
+          label: 'Senden',
+          onClick: () => void sendenPortalLink(),
+          busy: portalSending,
+        }}
+=======
         footer={
           <div className="kunde-create-footer">
-            <Button type="button" variant="secondary" onClick={() => setPortalModalOpen(false)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setPortalModalOpen(false)}>
               Abbrechen
-            </Button>
-            <Button type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
+            </MockBtn>
+            <MockBtn kind="primary" type="button" onClick={() => void sendenPortalLink()} loading={portalSending}>
               Senden
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         <div className="space-y-3">
-          <Input
-            label="An"
-            value={portalTo}
-            onChange={(e) => setPortalTo(e.target.value)}
-            placeholder="partner@beispiel.de; weitere@beispiel.de"
-          />
-          <Input
-            label="CC (optional)"
-            value={portalCc}
-            onChange={(e) => setPortalCc(e.target.value)}
-            placeholder="intern@baerenwald.de; team@baerenwald.de"
-          />
-          <Input label="Betreff" value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} />
-          <Textarea label="Text" rows={6} value={portalText} onChange={(e) => setPortalText(e.target.value)} />
+          <MockField label="An"><MockInput value={portalTo} onChange={(e) => setPortalTo(e.target.value)} placeholder="partner@beispiel.de; weitere@beispiel.de" /></MockField>
+          <MockField label="CC (optional)"><MockInput value={portalCc} onChange={(e) => setPortalCc(e.target.value)} placeholder="intern@baerenwald.de; team@baerenwald.de" /></MockField>
+          <MockField label="Betreff"><MockInput value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} /></MockField>
+          <MockField label="Text"><RichTextEditor value={typeof (portalText) === 'string' ? (portalText) : ''} onChange={(__v) => setPortalText(__v)} minHeight={144} aria-label="Text" /></MockField>
           <div>
             <p className="mb-1 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">Mail-Vorschau</p>
             <iframe
               title="Partner-Portal Mail Vorschau"
               sandbox="allow-same-origin"
-              className="h-[300px] w-full rounded-lg border border-bw-border bg-white"
+              className="h-[300px] w-full rounded-card border border-bw-border bg-white"
               srcDoc={portalHtml}
             />
           </div>
-          <Input label="Partner-Portal Login" value={portalLink} readOnly className="bg-bw-bg-soft" />
+          <MockField label="Partner-Portal Login"><MockInput value={portalLink} readOnly className="bg-bw-bg-soft" /></MockField>
         </div>
-      </Modal>
+      </EditorSheet>
 
       {rahmenWizardOpen && rahmenWizardBootstrap ? (
         <ClientOnly>
@@ -641,7 +645,7 @@ export function HandwerkerDetailClient({
               setRahmenWizardOpen(false)
               setRahmenWizardBootstrap(null)
             }}
-            onDone={() => router.refresh()}
+            onDone={() => afterServerActionRefresh()}
           />
         </ClientOnly>
       ) : null}

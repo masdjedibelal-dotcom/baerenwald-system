@@ -1,6 +1,8 @@
+import { formatDatum } from '@/lib/utils'
 import type { AuftragPosition } from '@/lib/types'
 import type { NachtragPositionDraft } from '@/lib/vertraege/types'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
+import { formatEuro, formatNumber } from '@/lib/format/geld-datum'
 
 export function bauvorhabenAusAuftrag(input: {
   titel?: string | null
@@ -41,27 +43,23 @@ export function verguetungAusPositionen(positionen: AuftragPosition[]): string {
     const preis = p.preis_partner ?? p.preis_fix
     if (preis != null && preis > 0) {
       if (einheit === 'qm' || einheit === 'm²' || einheit === 'm2') {
-        lines.push(`Die Vergütung beträgt ${formatEur(preis)} netto je m².`)
+        lines.push(`Die Vergütung beträgt ${formatEuro(preis)} netto je m².`)
       } else if (einheit === 'stunde' || einheit === 'h') {
-        lines.push(`Stundensatz ${formatEur(preis)} netto.`)
+        lines.push(`Stundensatz ${formatEuro(preis)} netto.`)
       } else if (einheit === 'pauschal' || group.length === 1) {
-        lines.push(`${p.leistung_name}: ${formatEur(preis)} netto pauschal.`)
+        lines.push(`${p.leistung_name}: ${formatEuro(preis)} netto pauschal.`)
       } else {
-        lines.push(`${p.leistung_name}: ${formatEur(preis)} netto je ${p.einheit ?? 'Einheit'}.`)
+        lines.push(`${p.leistung_name}: ${formatEuro(preis)} netto je ${p.einheit ?? 'Einheit'}.`)
       }
     }
   }
   if (!lines.length) {
     const sum = positionen.reduce((s, p) => s + (p.preis_partner ?? p.preis_fix ?? 0), 0)
-    if (sum > 0) return `Die Vergütung beträgt ${formatEur(sum)} netto (Summe der vereinbarten Positionen).`
+    if (sum > 0) return `Die Vergütung beträgt ${formatEuro(sum)} netto (Summe der vereinbarten Positionen).`
     return 'Vergütung gemäß Aufmaß und bestätigter Mengen.'
   }
   lines.push('Regiearbeiten werden ausschließlich nach vorheriger schriftlicher Freigabe vergütet.')
   return lines.join(' ')
-}
-
-function formatEur(n: number) {
-  return `${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 }
 
 export function handwerkerAnzeigename(h: {
@@ -86,7 +84,7 @@ export function formatVertragDatumDe(iso: string | null | undefined): string | n
   if (!iso?.trim()) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return formatDatum(d.toISOString())
 }
 
 export function nachtragPositionenAusAuftrag(positionen: AuftragPosition[]): NachtragPositionDraft[] {
@@ -139,7 +137,7 @@ export function leistungsumfangNachtragAusPositionen(
   if (geaendert.length) {
     const lines = geaendert
       .map((p) => {
-        const menge = p.menge != null ? `${p.menge.toLocaleString('de-DE')} ${p.einheit ?? ''}`.trim() : ''
+        const menge = p.menge != null ? `${formatNumber(p.menge)} ${p.einheit ?? ''}`.trim() : ''
         return menge ? `${p.leistung_name} (${menge})` : p.leistung_name
       })
       .filter(Boolean)

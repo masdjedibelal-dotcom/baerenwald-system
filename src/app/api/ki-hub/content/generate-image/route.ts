@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import {
@@ -33,11 +34,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'empfehlung_id fehlt' }, { status: 400 })
   }
 
-  const { data: empfehlung } = await supabaseAdmin
+  const {data: empfehlung, error} = await supabaseAdmin
     .from('ki_empfehlungen')
     .select('id, content, bereich')
     .eq('id', empfehlungId)
     .maybeSingle()
+  if (error) logDbError('app/api/ki-hub/content/generate-image/route:ki_empfehlungen', error)
 
   if (!empfehlung) {
     return NextResponse.json({ error: 'Empfehlung nicht gefunden' }, { status: 404 })
@@ -64,12 +66,13 @@ export async function POST(req: NextRequest) {
 
     await updateEmpfehlungBildUrl(empfehlungId, uploaded.publicUrl)
 
-    await supabaseAdmin.from('system_events').insert({
+    const { error: __dbErr1 } = await supabaseAdmin.from('system_events').insert({
       quelle: 'ki_hub',
       event_typ: 'content_bild_generiert',
       severity: 'info',
       details: { empfehlung_id: empfehlungId, bild_url: uploaded.publicUrl },
     })
+    if (__dbErr1) logDbError('app/api/ki-hub/content/generate-image/route:system_events', __dbErr1)
 
     const all = await loadContentForEmpfehlung(empfehlungId)
 

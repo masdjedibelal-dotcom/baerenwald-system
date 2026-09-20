@@ -1,12 +1,11 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { useTransition } from '@/components/ui/action-busy'
+import { useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Input } from '@/components/ui/Input'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { toast } from '@/components/ui/app-toast'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
@@ -16,6 +15,7 @@ import {
   loadBenutzerListe,
   updateBenutzerProfil,
 } from '@/app/(dashboard)/einstellungen/benutzer/actions'
+import { TOAST } from '@/lib/copy'
 
 const COLS = '1.4fr 1.6fr 1.1fr 0.9fr'
 
@@ -24,7 +24,6 @@ function rolleLabel(rolle: BenutzerZeile['rolle']): string {
 }
 
 export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeile[] }) {
-  const router = useRouter()
   const isMobile = useIsMobile()
   const [rows, setRows] = useState(initial)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -41,7 +40,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
   async function refresh() {
     const next = await loadBenutzerListe()
     setRows(next)
-    router.refresh()
   }
 
   function openEdit(u: BenutzerZeile) {
@@ -56,7 +54,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     startTransition(async () => {
       const r = await inviteBenutzer(inviteEmail, inviteName, inviteRolle)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       toast.success(r.message ?? 'Einladung versendet')
@@ -77,10 +75,10 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         telefon: editTelefon,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Gespeichert')
+      toast.success(TOAST.gespeichert)
       setEdit(null)
       await refresh()
     })
@@ -102,7 +100,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     rows.length === 0 ? (
       empty
     ) : (
-      <div className="dok-cards">
+      <div className="dok-mobiles">
         {rows.map((u) => {
           const tel = u.telefon?.trim() || ''
           const mail = u.email?.trim() || ''
@@ -111,7 +109,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
               key={u.id}
               role="button"
               tabIndex={0}
-              className={`dok-card${!u.aktiv ? ' opacity-55' : ''}`}
+              className={`dok-mobile${!u.aktiv ? ' opacity-55' : ''}`}
               style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
               onClick={() => openEdit(u)}
               onKeyDown={(e) => {
@@ -121,14 +119,14 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                 }
               }}
             >
-              <div className="dok-card__head">
-                <span className="dok-card__title">
+              <div className="dok-mobile__head">
+                <span className="dok-mobile__title">
                   {u.name}
                   {!u.aktiv ? (
                     <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> · deaktiviert</span>
                   ) : null}
                 </span>
-                <div className="dok-card__badge">
+                <div className="dok-mobile__badge">
                   <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
                 </div>
               </div>
@@ -275,27 +273,16 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         onConfirm={() => sendInvite()}
       >
         <div className="space-y-3">
-          <Input
-            label="E-Mail"
-            type="email"
-            required
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-          />
-          <Input label="Name" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
+          <MockField label="E-Mail" required><MockInput type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} /></MockField>
+          <MockField label="Name"><MockInput value={inviteName} onChange={(e) => setInviteName(e.target.value)} /></MockField>
           <div>
             <label className="input-label" htmlFor="invite-rolle">
               Rolle
             </label>
-            <select
-              id="invite-rolle"
-              className="input max-w-xs w-full"
-              value={inviteRolle}
-              onChange={(e) => setInviteRolle(e.target.value as 'admin' | 'manager')}
-            >
+            <MockSelect id="invite-rolle" className="max-w-xs w-full" value={inviteRolle} onChange={(e) => setInviteRolle(e.target.value as 'admin' | 'manager')}>
               <option value="manager">Mitarbeiter</option>
               <option value="admin">Administrator</option>
-            </select>
+            </MockSelect>
           </div>
         </div>
       </EditorSheet>
@@ -309,34 +296,17 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         onConfirm={() => saveEdit()}
       >
         <div className="space-y-3">
-          <Input label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-          <Input
-            label="E-Mail"
-            type="email"
-            required
-            value={editEmail}
-            onChange={(e) => setEditEmail(e.target.value)}
-          />
-          <Input
-            label="Handy / Direktwahl"
-            type="tel"
-            value={editTelefon}
-            onChange={(e) => setEditTelefon(e.target.value)}
-            placeholder="+49 …"
-          />
+          <MockField label="Name"><MockInput value={editName} onChange={(e) => setEditName(e.target.value)} /></MockField>
+          <MockField label="E-Mail" required><MockInput type="email" required value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></MockField>
+          <MockField label="Handy / Direktwahl"><MockInput type="tel" value={editTelefon} onChange={(e) => setEditTelefon(e.target.value)} placeholder="+49 …" /></MockField>
           <div>
             <label className="input-label" htmlFor="edit-rolle">
               Rolle
             </label>
-            <select
-              id="edit-rolle"
-              className="input max-w-xs w-full"
-              value={editRolle}
-              onChange={(e) => setEditRolle(e.target.value as 'admin' | 'manager')}
-            >
+            <MockSelect id="edit-rolle" className="max-w-xs w-full" value={editRolle} onChange={(e) => setEditRolle(e.target.value as 'admin' | 'manager')}>
               <option value="manager">Mitarbeiter</option>
               <option value="admin">Administrator</option>
-            </select>
+            </MockSelect>
           </div>
         </div>
       </EditorSheet>

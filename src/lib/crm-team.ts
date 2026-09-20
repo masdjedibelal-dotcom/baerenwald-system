@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { crmRoleFromUser } from '@/lib/auth/crm-access'
 
@@ -21,6 +22,7 @@ export async function loadCrmTeamMitglieder(): Promise<CrmTeamMitglied[]> {
   const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers({
     perPage: 500,
   })
+  if (authErr) logDbError('lib/crm-team:query', authErr)
   if (authErr) {
     console.warn('loadCrmTeamMitglieder auth', authErr.message)
     return []
@@ -35,10 +37,11 @@ export async function loadCrmTeamMitglieder(): Promise<CrmTeamMitglied[]> {
   const profileTel = new Map<string, string>()
   const profileName = new Map<string, string>()
 
-  const { data: profiles } = await supabaseAdmin
+  const { data: profiles, error: error2 } = await supabaseAdmin
     .from('user_profiles')
     .select('id, name, telefon')
     .in('id', ids)
+  if (error2) logDbError('lib/crm-team:user_profiles', error2)
 
   for (const p of profiles ?? []) {
     const id = p.id as string

@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
@@ -17,6 +23,11 @@ import {
   replaceAngebotHandwerkerUndSenden,
   type HandwerkerGewerkListeEintrag,
 } from '@/app/(dashboard)/angebote/actions'
+import {
+  planAuftragHandwerkerStatusWrite,
+  writeAuftragHandwerkerStatus,
+} from '@/lib/status/write-auftrag-handwerker-status'
+import { planAngebotHandwerkerStatusWrite } from '@/lib/status/write-angebot-handwerker-status'
 export { listHandwerkerFuerGewerk }
 
 type HandwerkerRow = {
@@ -58,10 +69,11 @@ async function loadEinsatzMeta(
   const busyIds = new Set<string>()
   if (!ids.length) return { lastByHw, busyIds }
 
-  const { data: ah } = await supabase
+  const { data: ah, error } = await supabase
     .from('auftrag_handwerker')
     .select('handwerker_id, auftraege(created_at, status)')
     .in('handwerker_id', ids)
+  if (error) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error)
 
   for (const row of ah ?? []) {
     const hid = row.handwerker_id as string
@@ -91,7 +103,8 @@ export async function listHandwerkerAuswahlFuerGewerk(input: {
   let slug = input.gewerkSlug?.trim() || null
 
   if (!slug && input.gewerkId) {
-    const { data: gw } = await supabase.from('gewerke').select('slug').eq('id', input.gewerkId).maybeSingle()
+    const { data: gw, error } = await supabase.from('gewerke').select('slug').eq('id', input.gewerkId).maybeSingle()
+    if (error) logDbError('app/auftraege/handwerker-actions:gewerke', error)
     slug = (gw?.slug as string | null) ?? null
   }
 
@@ -100,6 +113,7 @@ export async function listHandwerkerAuswahlFuerGewerk(input: {
     .select('id, name, firma, telefon, email, gewerke, aktiv, bewertung_gesamt')
     .eq('aktiv', true)
     .order('name')
+  if (hErr) logDbError('app/auftraege/handwerker-actions:handwerker', hErr)
 
   if (hErr) {
     // Fallback ohne Bewertungs-Spalte (ältere DBs)
@@ -186,28 +200,36 @@ export async function assignAuftragHandwerkerGewerk(input: {
   const status = input.status ?? 'angefragt'
   const now = new Date().toISOString()
 
-  const { data: hw } = await supabase
+  const { data: hw, error } = await supabase
     .from('handwerker')
     .select('id, name')
     .eq('id', input.handwerkerId)
     .maybeSingle()
+  if (error) logDbError('app/auftraege/handwerker-actions:handwerker', error)
+<<<<<<< Updated upstream
+  if (!hw) return { ok: false, message: 'Partner nicht gefunden' }
+=======
   if (!hw) return { ok: false, message: 'Handwerker nicht gefunden' }
+>>>>>>> Stashed changes
 
-  const { data: gw } = await supabase.from('gewerke').select('id, name, slug').eq('id', input.gewerkId).maybeSingle()
+  const { data: gw, error: error2 } = await supabase.from('gewerke').select('id, name, slug').eq('id', input.gewerkId).maybeSingle()
+  if (error2) logDbError('app/auftraege/handwerker-actions:gewerke', error2)
   if (!gw) return { ok: false, message: 'Gewerk nicht gefunden' }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: error3 } = await supabase
     .from('auftrag_handwerker')
     .select('id')
     .eq('auftrag_id', input.auftragId)
     .eq('gewerk_id', input.gewerkId)
     .maybeSingle()
+  if (error3) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error3)
 
   if (existing?.id) {
     const { error } = await supabase
       .from('auftrag_handwerker')
-      .update({ handwerker_id: input.handwerkerId, status })
+      .update(planAuftragHandwerkerStatusWrite(status, { handwerker_id: input.handwerkerId }))
       .eq('id', existing.id)
+    if (error) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error)
     if (error) return { ok: false, message: error.message }
   } else {
     const { error } = await supabase.from('auftrag_handwerker').insert({
@@ -216,6 +238,7 @@ export async function assignAuftragHandwerkerGewerk(input: {
       handwerker_id: input.handwerkerId,
       status,
     })
+    if (error) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error)
     if (error) return { ok: false, message: error.message }
   }
 
@@ -242,13 +265,14 @@ export async function assignAuftragHandwerkerGewerk(input: {
       }
       // preis_partner nur aus EK/Kondition — nie lohn_fix+material_fix (Kunden-VK)
       const { error: posErr } = await supabase.from('auftrag_positionen').update(patch).eq('id', p.id as string)
+      if (posErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', posErr)
       if (posErr) return { ok: false, message: posErr.message }
     }
   }
 
   await logHwTimeline(
     input.auftragId,
-    `Handwerker zugewiesen: ${hw.name}`,
+    `Partner zugewiesen: ${hw.name}`,
     `${gw.name} → ${hw.name} (${status})`,
     input.handwerkerId
   )
@@ -260,11 +284,12 @@ export async function assignAuftragHandwerkerGewerk(input: {
     gewerkName: gw.name as string,
   })
 
-  const { data: auftragMeta } = await supabase
+  const { data: auftragMeta, error: error4 } = await supabase
     .from('auftraege')
     .select('angebot_id')
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (error4) logDbError('app/auftraege/handwerker-actions:auftraege', error4)
   const angebotId = String(auftragMeta?.angebot_id ?? '').trim()
   if (angebotId) {
     const rc13b = input.hwRechnungReverseCharge13b === true
@@ -277,11 +302,12 @@ export async function assignAuftragHandwerkerGewerk(input: {
   }
 
   {
-    const { data: auf } = await supabase
+    const { data: auf, error } = await supabase
       .from('auftraege')
       .select('titel')
       .eq('id', input.auftragId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/handwerker-actions:auftraege', error)
     const projektName =
       String(auf?.titel ?? '').trim() || `Auftrag ${input.auftragId.slice(0, 8)}`
     const posIds = (posRows ?? []).map((p) => String(p.id))
@@ -305,12 +331,11 @@ export async function assignAuftragHandwerkerGewerk(input: {
     }
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
-/** Handwerker einer einzelnen Leistungsposition zuweisen */
+/** Partner einer einzelnen Leistungsposition zuweisen */
 export async function assignAuftragHandwerkerPosition(input: {
   auftragId: string
   positionId: string
@@ -333,18 +358,24 @@ export async function assignAuftragHandwerkerPosition(input: {
     .select('id, auftrag_id, gewerk_slug, gewerk_name, leistung_name, preis_partner, lohn_fix, material_fix')
     .eq('id', input.positionId)
     .maybeSingle()
+  if (posErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', posErr)
   if (posErr) return { ok: false, message: posErr.message }
   if (!pos) return { ok: false, message: 'Position nicht gefunden' }
   if (pos.auftrag_id !== input.auftragId) {
     return { ok: false, message: 'Position gehört nicht zu diesem Auftrag' }
   }
 
-  const { data: hw } = await supabase
+  const { data: hw, error: error2 } = await supabase
     .from('handwerker')
     .select('id, name')
     .eq('id', input.handwerkerId)
     .maybeSingle()
+  if (error2) logDbError('app/auftraege/handwerker-actions:handwerker', error2)
+<<<<<<< Updated upstream
+  if (!hw) return { ok: false, message: 'Partner nicht gefunden' }
+=======
   if (!hw) return { ok: false, message: 'Handwerker nicht gefunden' }
+>>>>>>> Stashed changes
 
   const posPatch: Record<string, unknown> = {
     handwerker_id: input.handwerkerId,
@@ -352,44 +383,49 @@ export async function assignAuftragHandwerkerPosition(input: {
     handwerker_angefragt_at: status === 'angefragt' ? now : null,
   }
 
-  const { error } = await supabase
+  const { error: error3 } = await supabase
     .from('auftrag_positionen')
     .update(posPatch)
     .eq('id', input.positionId)
-  if (error) return { ok: false, message: error.message }
+  if (error3) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', error3)
+  if (error3) return { ok: false, message: error3.message }
 
   if (pos.gewerk_slug) {
-    const { data: gw } = await supabase
+    const { data: gw, error } = await supabase
       .from('gewerke')
       .select('id')
       .eq('slug', pos.gewerk_slug as string)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/handwerker-actions:gewerke', error)
     if (gw?.id) {
-      const { data: existing } = await supabase
+      const { data: existing, error } = await supabase
         .from('auftrag_handwerker')
         .select('id')
         .eq('auftrag_id', input.auftragId)
         .eq('gewerk_id', gw.id)
         .maybeSingle()
+      if (error) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error)
       if (existing?.id) {
-        await supabase
+        const { error: __dbErr1 } = await supabase
           .from('auftrag_handwerker')
-          .update({ handwerker_id: input.handwerkerId, status })
+          .update(planAuftragHandwerkerStatusWrite(status, { handwerker_id: input.handwerkerId }))
           .eq('id', existing.id)
+        if (__dbErr1) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', __dbErr1)
       } else {
-        await supabase.from('auftrag_handwerker').insert({
+        const { error: __dbErr2 } = await supabase.from('auftrag_handwerker').insert({
           auftrag_id: input.auftragId,
           gewerk_id: gw.id,
           handwerker_id: input.handwerkerId,
           status,
         })
+        if (__dbErr2) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', __dbErr2)
       }
     }
   }
 
   await logHwTimeline(
     input.auftragId,
-    `Handwerker für Leistung: ${hw.name}`,
+    `Partner für Leistung: ${hw.name}`,
     `${pos.leistung_name} (${pos.gewerk_name}) → ${hw.name} (${status})`,
     input.handwerkerId
   )
@@ -401,18 +437,20 @@ export async function assignAuftragHandwerkerPosition(input: {
     gewerkName: String(pos.gewerk_name ?? ''),
   })
 
-  const { data: auftragMeta } = await supabase
+  const { data: auftragMeta, error: error4 } = await supabase
     .from('auftraege')
     .select('angebot_id')
     .eq('id', input.auftragId)
     .maybeSingle()
+  if (error4) logDbError('app/auftraege/handwerker-actions:auftraege', error4)
   const angebotId = String(auftragMeta?.angebot_id ?? '').trim()
   if (angebotId && pos.gewerk_slug) {
-    const { data: gwForPos } = await supabase
+    const { data: gwForPos, error } = await supabase
       .from('gewerke')
       .select('id')
       .eq('slug', pos.gewerk_slug as string)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/handwerker-actions:gewerke', error)
     const gewerkIdForPos = String(gwForPos?.id ?? '').trim()
     if (gewerkIdForPos) {
       const rc13b = input.hwRechnungReverseCharge13b === true
@@ -426,11 +464,12 @@ export async function assignAuftragHandwerkerPosition(input: {
   }
 
   {
-    const { data: auf } = await supabase
+    const { data: auf, error } = await supabase
       .from('auftraege')
       .select('titel')
       .eq('id', input.auftragId)
       .maybeSingle()
+    if (error) logDbError('app/auftraege/handwerker-actions:auftraege', error)
     const projektName =
       String(auf?.titel ?? '').trim() || `Auftrag ${input.auftragId.slice(0, 8)}`
     const notify = await notifyPartnerUnified({
@@ -448,7 +487,7 @@ export async function assignAuftragHandwerkerPosition(input: {
     }
   }
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -477,6 +516,7 @@ export async function clearAuftragHandwerkerPositionen(input: {
     .select('id, status, angebot_id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (aErr) logDbError('app/auftraege/handwerker-actions:auftraege', aErr)
   if (aErr || !auftrag) return { ok: false, message: 'Auftrag nicht gefunden.' }
   if (String(auftrag.status ?? '') === 'storniert') {
     return { ok: false, message: 'Stornierte Aufträge können nicht geändert werden.' }
@@ -489,6 +529,7 @@ export async function clearAuftragHandwerkerPositionen(input: {
     )
     .eq('auftrag_id', auftragId)
     .in('id', positionIds)
+  if (pErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', pErr)
 
   if (pErr) return { ok: false, message: pErr.message }
   const rows = positions ?? []
@@ -511,6 +552,7 @@ export async function clearAuftragHandwerkerPositionen(input: {
       'id',
       assigned.map((r) => String(r.id))
     )
+  if (upErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 
@@ -535,25 +577,28 @@ export async function clearAuftragHandwerkerPositionen(input: {
     if ((rest ?? []).length > 0) continue
 
     if (gewerkSlug) {
-      const { data: gw } = await supabase
+      const { data: gw, error } = await supabase
         .from('gewerke')
         .select('id')
         .eq('slug', gewerkSlug)
         .maybeSingle()
+      if (error) logDbError('app/auftraege/handwerker-actions:gewerke', error)
       if (gw?.id) {
-        await supabase
+        const { error: __dbErr3 } = await supabase
           .from('auftrag_handwerker')
           .delete()
           .eq('auftrag_id', auftragId)
           .eq('handwerker_id', handwerkerId)
           .eq('gewerk_id', gw.id)
+        if (__dbErr3) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', __dbErr3)
       }
     } else {
-      await supabase
+      const { error: __dbErr4 } = await supabase
         .from('auftrag_handwerker')
         .delete()
         .eq('auftrag_id', auftragId)
         .eq('handwerker_id', handwerkerId)
+      if (__dbErr4) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', __dbErr4)
     }
   }
 
@@ -569,10 +614,9 @@ export async function clearAuftragHandwerkerPositionen(input: {
     String(assigned[0]?.handwerker_id ?? '') || null
   )
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
   const angebotId = String(auftrag.angebot_id ?? '').trim()
-  if (angebotId) revalidatePath(`/angebote/${angebotId}`)
+  if (angebotId) revalidateAngebotDetail(angebotId)
 
   return { ok: true, cleared: assigned.length }
 }
@@ -615,6 +659,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
     .eq('id', alteZuweisungId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (zErr) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', zErr)
 
   if (zErr || !zuAlt) return { ok: false, message: 'Zuweisung nicht gefunden.' }
 
@@ -650,6 +695,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
     .select('id, name, gewerke, aktiv')
     .eq('id', neuerHandwerkerId)
     .maybeSingle()
+  if (hwErr) logDbError('app/auftraege/handwerker-actions:handwerker', hwErr)
   if (hwErr || !hwNeu?.aktiv) return { ok: false, message: 'Partner nicht gefunden oder inaktiv.' }
   if (gewerkSlug && !handwerkerHatGewerkSlug(hwNeu.gewerke as string[] | null, gewerkSlug)) {
     return { ok: false, message: 'Partner deckt dieses Gewerk nicht ab.' }
@@ -660,6 +706,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
     .select('id, titel, angebot_id, lead_id, kunde_id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (aErr) logDbError('app/auftraege/handwerker-actions:auftraege', aErr)
   if (aErr || !auftrag) return { ok: false, message: 'Auftrag nicht gefunden.' }
 
   const hwAltRaw = zuAlt.handwerker as unknown
@@ -716,14 +763,20 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
       .from('auftrag_positionen')
       .update({ preis_partner: Number(m.preisPartner) })
       .eq('id', p.id as string)
+    if (betragErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', betragErr)
     if (betragErr) return { ok: false, message: betragErr.message }
   }
 
   if (toAlt.length === 0) {
+<<<<<<< Updated upstream
+    const { error: markAltErr } = await writeAuftragHandwerkerStatus(supabase, alteZuweisungId, 'ersetzt')
+=======
     const { error: markAltErr } = await supabase
       .from('auftrag_handwerker')
       .update({ status: 'ersetzt' })
       .eq('id', alteZuweisungId)
+>>>>>>> Stashed changes
+    if (markAltErr) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', markAltErr)
     if (markAltErr) return { ok: false, message: markAltErr.message }
   }
 
@@ -740,6 +793,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
     .insert(insertPayload)
     .select('id')
     .single()
+  if (insErr) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', insErr)
 
   if (insErr || !inserted?.id) {
     if (toAlt.length > 0) {
@@ -750,8 +804,9 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
     }
     const { error: fallbackErr } = await supabase
       .from('auftrag_handwerker')
-      .update({ handwerker_id: neuerHandwerkerId, status: 'angefragt' })
+      .update(planAuftragHandwerkerStatusWrite('angefragt', { handwerker_id: neuerHandwerkerId }))
       .eq('id', alteZuweisungId)
+    if (fallbackErr) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', fallbackErr)
     if (fallbackErr) {
       return { ok: false, message: insErr?.message ?? fallbackErr.message ?? 'Neue Zuweisung fehlgeschlagen.' }
     }
@@ -772,6 +827,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
       ...sendPatch,
     }
     const { error: upPosErr } = await supabase.from('auftrag_positionen').update(patch).eq('id', p.id as string)
+    if (upPosErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', upPosErr)
     if (upPosErr) return { ok: false, message: upPosErr.message }
     posIds.push(String(p.id))
   }
@@ -782,7 +838,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   if (toAlt.length === 0 && angebotId) {
     let ahQ = supabase
       .from('angebot_handwerker')
-      .update({ status: 'ersetzt' })
+      .update(planAngebotHandwerkerStatusWrite('ersetzt'))
       .eq('angebot_id', angebotId)
       .eq('handwerker_id', alterHandwerkerId)
       .not('status', 'eq', 'ersetzt')
@@ -796,7 +852,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
   let partnerBenachrichtigt = false
 
   if (angebotId && gewerkId && toAlt.length === 0) {
-    const { data: ahAlt } = await supabase
+    const { data: ahAlt, error } = await supabase
       .from('angebot_handwerker')
       .select('id')
       .eq('angebot_id', angebotId)
@@ -804,6 +860,7 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
       .eq('gewerk_id', gewerkId)
       .eq('status', 'abgelehnt')
       .maybeSingle()
+    if (error) logDbError('app/auftraege/handwerker-actions:angebot_handwerker', error)
 
     if (ahAlt?.id) {
       const angebotReplace = await replaceAngebotHandwerkerUndSenden({
@@ -874,14 +931,13 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
     },
   })
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
+  revalidateAuftragDetail(auftragId)
   if (angebotId) {
-    revalidatePath(`/angebote/${angebotId}`)
+    revalidateAngebotDetail(angebotId)
   }
   const leadId = (auftrag as { lead_id?: string | null }).lead_id
   if (leadId) {
-    revalidatePath(`/anfragen/${String(leadId)}`)
+    revalidateLeadDetail(String(leadId))
   }
 
   return { ok: true }
@@ -903,18 +959,29 @@ export async function updateAuftragHandwerkerStatus(input: {
     .eq('id', input.zuweisungId)
     .eq('auftrag_id', input.auftragId)
     .maybeSingle()
+  if (findErr) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', findErr)
   if (findErr || !row) return { ok: false, message: 'Zuweisung nicht gefunden' }
 
-  const { error } = await supabase
+<<<<<<< Updated upstream
+  const { error: error2 } = await writeAuftragHandwerkerStatus(
+    supabase,
+    input.zuweisungId,
+    input.status
+  )
+=======
+  const { error: error2 } = await supabase
     .from('auftrag_handwerker')
     .update({ status: input.status })
     .eq('id', input.zuweisungId)
-  if (error) return { ok: false, message: error.message }
+>>>>>>> Stashed changes
+  if (error2) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   const gewerkId = (row as { gewerk_id?: string }).gewerk_id
   const handwerkerId = row.handwerker_id as string
   if (gewerkId && handwerkerId) {
-    const { data: gw } = await supabase.from('gewerke').select('slug, name').eq('id', gewerkId).maybeSingle()
+    const { data: gw, error } = await supabase.from('gewerke').select('slug, name').eq('id', gewerkId).maybeSingle()
+    if (error) logDbError('app/auftraege/handwerker-actions:gewerke', error)
     let posQuery = supabase
       .from('auftrag_positionen')
       .select('id')
@@ -928,13 +995,14 @@ export async function updateAuftragHandwerkerStatus(input: {
     const { data: posRows } = await posQuery
     const now = new Date().toISOString()
     for (const p of posRows ?? []) {
-      await supabase
+      const { error: __dbErr5 } = await supabase
         .from('auftrag_positionen')
         .update({
           handwerker_status: input.status,
           handwerker_angefragt_at: input.status === 'angefragt' ? now : null,
         })
         .eq('id', p.id as string)
+      if (__dbErr5) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', __dbErr5)
     }
   }
 
@@ -945,12 +1013,12 @@ export async function updateAuftragHandwerkerStatus(input: {
 
   await logHwTimeline(
     input.auftragId,
-    `Status geändert: ${hwName?.name ?? 'Handwerker'}`,
+    `Status geändert: ${hwName?.name ?? 'Partner'}`,
     `${gwName?.name ?? 'Gewerk'} → ${input.status}`,
     row.handwerker_id as string
   )
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -970,20 +1038,22 @@ export async function updateAuftragPositionHandwerkerStatus(input: {
     .select('id, auftrag_id, leistung_name, handwerker_id')
     .eq('id', input.positionId)
     .maybeSingle()
+  if (posErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', posErr)
   if (posErr) return { ok: false, message: posErr.message }
   if (!pos) return { ok: false, message: 'Position nicht gefunden' }
   if (pos.auftrag_id !== input.auftragId) {
     return { ok: false, message: 'Position gehört nicht zu diesem Auftrag' }
   }
 
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('auftrag_positionen')
     .update({
       handwerker_status: input.status,
       handwerker_angefragt_at: input.status === 'angefragt' ? now : null,
     })
     .eq('id', input.positionId)
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   await logHwTimeline(
     input.auftragId,
@@ -992,7 +1062,7 @@ export async function updateAuftragPositionHandwerkerStatus(input: {
     pos.handwerker_id as string | null
   )
 
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -1017,8 +1087,9 @@ export async function updateAuftragHandwerkerDetails(input: {
     .update(patch)
     .eq('id', input.zuweisungId)
     .eq('auftrag_id', input.auftragId)
+  if (error) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }
 
@@ -1043,7 +1114,8 @@ export async function updateAuftragPositionDetails(input: {
     .update(patch)
     .eq('id', input.positionId)
     .eq('auftrag_id', input.auftragId)
+  if (error) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/auftraege/${input.auftragId}`)
+  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }

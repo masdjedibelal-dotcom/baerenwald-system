@@ -216,7 +216,7 @@ export function handwerkerDokumentZeilen(rows: AngebotHandwerkerRow[]): AuftragD
   const out: AuftragDokumentZeile[] = []
   for (const row of rows) {
     const gewerkName = row.gewerke?.name?.trim() || 'Gewerk'
-    const hwName = row.handwerker?.name?.trim() || 'Handwerker'
+    const hwName = row.handwerker?.name?.trim() || 'Partner'
     const beschreibung = `${gewerkName} · ${hwName}`
 
     const paths = parseHwAnhangStoragePaths(row.hw_angebot_anhang_urls, row.hw_angebot_pdf_url)

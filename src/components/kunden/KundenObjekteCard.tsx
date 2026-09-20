@@ -1,10 +1,20 @@
 'use client'
-
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField } from '@/components/mock-ui/MockForm'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
+import { Combobox } from '@/components/ui/Combobox'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+<<<<<<< Updated upstream
+=======
 import { Select } from '@/components/ui/Select'
-import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
+>>>>>>> Stashed changes
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import {
   deleteKundenObjekt,
@@ -17,12 +27,6 @@ import {
   kundenObjektStrasseZeile,
 } from '@/lib/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
-import { MockModal } from '@/components/mock-ui/MockModal'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { LIST } from '@/lib/crm-labels'
 import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
@@ -30,6 +34,7 @@ import type { EntityMenuItem } from '@/lib/entity-menu'
 import type { KundenObjekt } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { TOAST } from '@/lib/copy'
 
 const OBJEKT_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.7fr) 44px'
 
@@ -161,19 +166,19 @@ export function KundenObjekteCard({
     setModalOpen(true)
   }
 
-  async function confirmDeleteEinzel() {
+  async function runDeleteEinzel() {
     if (!deleteTarget || deletePending) return
     setDeletePending(true)
     try {
       const r = await deleteKundenObjekt(deleteTarget.id, kundeId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       setLocalObjekte((prev) => prev.filter((x) => x.id !== deleteTarget.id))
       if (selectedId === deleteTarget.id) onSelect?.(null)
       setDeleteTarget(null)
-      toast.success('Objekt gelöscht')
+      toast.success(TOAST.objekt_geloescht)
       onChanged()
     } finally {
       setDeletePending(false)
@@ -231,11 +236,7 @@ export function KundenObjekteCard({
           onToggle={() => toggleSel(o.id)}
           title={`${o.titel} auswählen`}
         />
-        <button
-          type="button"
-          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
-          onClick={() => openAkte(o)}
-        >
+        <MockBtn className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'} type="button" onClick={() => openAkte(o)}>
           {isMobile ? (
             <>
               <div className="ap-mobile-card__top">
@@ -251,7 +252,7 @@ export function KundenObjekteCard({
               <span className="ap-list__dim">{bezug}</span>
             </>
           )}
-        </button>
+        </MockBtn>
         <div
           className="row-actions always"
           onClick={(e) => e.stopPropagation()}
@@ -331,18 +332,16 @@ export function KundenObjekteCard({
   const selectBlock = (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
       <div className="min-w-0 flex-1">
-        <Select
-          label="Objekt für dieses Angebot"
-          name="kunde_objekt"
-          value={selectedId ?? ''}
-          onChange={(e) => onSelect?.(e.target.value.trim() || null)}
-          options={selectOptions}
-        />
+        <Combobox label="Objekt für dieses Angebot" id="kunde_objekt" name="kunde_objekt" options={selectOptions} value={selectedId ?? '' == null ? '' : String(selectedId ?? '')} placeholder="Auswählen…" onChange={(next) => { onSelect?.(next.trim() || null); }} />
       </div>
-      <Button type="button" variant="primary" size="sm" className="shrink-0 gap-1.5" onClick={openNeu}>
+      <MockBtn type="button" kind="primary" sm className="shrink-0 gap-1.5" onClick={openNeu}>
+<<<<<<< Updated upstream
+        <MockIcon n="plus" ctx="default" className="h-4 w-4" aria-hidden />
+=======
         <Plus className="h-4 w-4" aria-hidden />
+>>>>>>> Stashed changes
         Objekt hinzufügen
-      </Button>
+      </MockBtn>
     </div>
   )
 
@@ -415,32 +414,20 @@ export function KundenObjekteCard({
         )}
       </MockCard>
 
-      <MockModal
+      <ConfirmPopup
         open={bulkDeleteOpen}
         onClose={() => {
           if (!bulkDeletePending) setBulkDeleteOpen(false)
         }}
-        icon="trash"
         title={selectedCount === 1 ? 'Objekt löschen?' : `${selectedCount} Objekte löschen?`}
-        sub="Einheiten und Kontakte gehen mit verloren."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
-              onClick={() => void runBulkDelete()}
-            >
-              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={bulkDeletePending}
+        confirmLabel={bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runBulkDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Einheiten und Kontakte gehen mit verloren.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {bulkDeletePending
             ? 'Bitte warten…'
@@ -448,40 +435,28 @@ export function KundenObjekteCard({
               ? `„${selectedRows[0]?.titel ?? 'Objekt'}“ wird unwiderruflich gelöscht.`
               : `${selectedCount} ausgewählte Objekte werden unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
-      <MockModal
+      <ConfirmPopup
         open={Boolean(deleteTarget)}
         onClose={() => {
           if (!deletePending) setDeleteTarget(null)
         }}
-        icon="trash"
         title="Objekt löschen?"
-        sub="Einheiten und Kontakte gehen mit verloren."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={deletePending ? undefined : 'trash'}
-              disabled={deletePending}
-              onClick={() => void confirmDeleteEinzel()}
-            >
-              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={deletePending}
+        confirmLabel={deletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runDeleteEinzel()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Einheiten und Kontakte gehen mit verloren.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {deletePending
             ? 'Bitte warten…'
             : `„${deleteTarget?.titel ?? 'Objekt'}“ wird unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
       {modal}
     </>

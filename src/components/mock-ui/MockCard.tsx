@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, type HTMLAttributes, type ReactNode } from 'react'
-import { ChevronDown } from 'lucide-react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { useState, type HTMLAttributes, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 type MockCardProps = Omit<HTMLAttributes<HTMLDivElement>, 'title'> & {
@@ -47,10 +46,7 @@ export function MockCard({
           >
             {icon ? <MockIcon ctx="emphasis" n={icon} size={16} /> : null}
             <span className="min-w-0 flex-1">{title}</span>
-            <ChevronDown
-              className={cn('h-4 w-4 shrink-0 text-muted transition-transform', open && 'rotate-180')}
-              aria-hidden
-            />
+            <MockIcon n="chevron-down" ctx="default" className={cn('h-4 w-4 shrink-0 text-muted transition-transform', open && 'rotate-180')} aria-hidden />
           </button>
           {actions}
         </div>

@@ -1,25 +1,18 @@
 'use client'
+
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import {
-  Calendar,
-  Camera,
-  ChevronDown,
-  ImagePlus,
-  Pencil,
-  Plus,
-  X,
-} from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { Input } from '@/components/ui/Input'
-import { Modal } from '@/components/ui/Modal'
-import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
-import { Textarea } from '@/components/ui/Textarea'
 import { RichTextContent } from '@/components/ui/RichTextContent'
-import { confirmDelete } from '@/components/ui/confirm-delete'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import {
   addLeadNotizRow,
   deleteLeadNotizRow,
@@ -29,6 +22,7 @@ import {
 import { LeadTerminEditModal } from '@/components/anfragen/LeadTerminEditModal'
 import { kalenderTitelZeile } from '@/components/kalender/KalenderTerminZeile'
 import { toast } from '@/components/ui/app-toast'
+import { deleteWithUndo } from '@/lib/ui/delete-with-undo'
 import {
   dedupeKalenderTermineAnzeige,
   formatTerminUhrzeitKurz,
@@ -45,6 +39,8 @@ import type { KalenderTermin, LeadNotizRow } from '@/lib/types'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn, formatDatum } from '@/lib/utils'
 import { richTextToPlain } from '@/lib/rich-text'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function teamMitgliedName(team: CrmTeamMitglied[], id: string | null | undefined): string {
   if (!id?.trim()) return '—'
@@ -61,12 +57,12 @@ function terminZeileKurz(t: KalenderTermin): string {
 function TerminNotizLightbox({ url, onClose }: { url: string | null; onClose: () => void }) {
   if (!url) return null
   return (
-    <Modal open={!!url} onClose={onClose} title="Foto" size="xl">
+    <EditorSheet open={!!url} onClose={onClose} title="Foto" size="lg">
       <div className="flex max-h-[min(85vh,800px)] items-center justify-center overflow-auto p-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="Termin-Foto" className="max-h-full max-w-full object-contain" />
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }
 
@@ -94,16 +90,11 @@ function TerminNotizFotoVorschau({
           <img
             src={item.url}
             alt=""
-            className="aspect-square w-full rounded-md border border-bw-border object-cover"
+            className="aspect-square w-full rounded-button border border-bw-border object-cover"
           />
-          <button
-            type="button"
-            className="absolute right-1 top-1 rounded-full bg-black/55 p-1 text-white"
-            onClick={() => onRemove(item.key)}
-            aria-label="Foto entfernen"
-          >
-            <X className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          <MockBtn className="absolute right-1 top-1 rounded-pill bg-black/55 p-1 text-white" type="button" onClick={() => onRemove(item.key)} aria-label="Foto löschen">
+            <MockIcon n="x" ctx="default" className="h-3.5 w-3.5" aria-hidden />
+          </MockBtn>
         </div>
       ))}
     </div>
@@ -128,6 +119,7 @@ function TerminNotizFormModal({
   onReload: () => void
 }) {
   const router = useRouter()
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
@@ -143,6 +135,7 @@ function TerminNotizFormModal({
 
   useEffect(() => {
     if (!open) return
+    clearFieldErrors()
     if (mode === 'edit' && notiz) {
       setTitel(notiz.titel?.trim() ?? '')
       setBeschreibung((notiz.inhalt ?? '').trim())
@@ -170,7 +163,7 @@ function TerminNotizFormModal({
     const maxBytes = 8 * 1024 * 1024
     const tooLarge = list.find((f) => f.size > maxBytes)
     if (tooLarge) {
-      toast.error('Datei zu groß (max. 8 MB)')
+      toast.error(TOAST.datei_zu_gross_max_8_mb)
       if (fileGalleryRef.current) fileGalleryRef.current.value = ''
       if (fileCameraRef.current) fileCameraRef.current.value = ''
       return
@@ -221,11 +214,11 @@ function TerminNotizFormModal({
     const titelTrim = titel.trim()
     const text = beschreibung.trim()
     if (!titelTrim) {
-      toast.error('Bitte einen Titel eingeben.')
+      applyFieldErrors({ _form: TOAST.bitte_einen_titel_eingeben })
       return
     }
     if (!text && fotoCount === 0) {
-      toast.error('Bitte Beschreibung oder Foto hinzufügen.')
+      applyFieldErrors({ _form: TOAST.bitte_beschreibung_oder_foto_hinzufuegen })
       return
     }
     startTransition(async () => {
@@ -236,7 +229,7 @@ function TerminNotizFormModal({
           pendingFotos.map((p) => p.file)
         )
         if (!up.ok) {
-          toast.error(up.message)
+          toast.systemError(up)
           return
         }
         uploadedUrls = up.urls
@@ -251,7 +244,7 @@ function TerminNotizFormModal({
           datei_urls: allUrls,
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           return
         }
       } else {
@@ -261,18 +254,16 @@ function TerminNotizFormModal({
           datei_urls: allUrls.length ? allUrls : null,
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           return
         }
       }
       onReload()
-      router.refresh()
+      afterServerActionRefresh()
       toast.success(mode === 'edit' ? 'Notiz aktualisiert' : 'Notiz gespeichert')
       onClose()
     })
   }
-
-  const canSave = !!titel.trim() && !!(beschreibung.trim() || fotoCount > 0) && !pending
 
   const vorschauItems = [
     ...existingUrls.map((url) => ({ key: `existing:${url}`, url })),
@@ -280,26 +271,36 @@ function TerminNotizFormModal({
   ]
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
       title={mode === 'edit' ? 'Notiz bearbeiten' : 'Notiz hinzufügen'}
       size="md"
+      secondary={{ label: 'Abbrechen', onClick: onClose }}
+      primary={{
+        label: mode === 'edit' ? 'Speichern' : 'Notiz speichern',
+        onClick: () => void speichern(),
+        busy: pending,
+        disabled: pending,
+      }}
     >
-      <Input
-        label="Titel"
-        placeholder="z. B. Badzustand, Maße Küche…"
-        value={titel}
-        onChange={(e) => setTitel(e.target.value)}
-      />
-      <div className="mt-3">
-        <Textarea
-          label="Beschreibung"
-          rows={4}
-          placeholder="Beobachtungen, Maße, Besonderheiten…"
-          value={beschreibung}
-          onChange={(e) => setBeschreibung(e.target.value)}
+      {fieldErrors._form ? (
+        <p className="field-error" role="alert">
+          {fieldErrors._form}
+        </p>
+      ) : null}
+      <MockField label="Titel" name="titel" error={fieldErrors.titel}>
+        <MockInput
+          placeholder="z. B. Badzustand, Maße Küche…"
+          value={titel}
+          onChange={(e) => {
+            clearField('_form')
+            setTitel(e.target.value)
+          }}
         />
+      </MockField>
+      <div className="mt-3">
+        <MockField label="Beschreibung"><RichTextEditor value={typeof (beschreibung) === 'string' ? (beschreibung) : ''} onChange={(__v) => setBeschreibung(__v)} placeholder="Beobachtungen, Maße, Besonderheiten…" minHeight={120} aria-label="Beschreibung" /></MockField>
       </div>
       <>
         <input
@@ -319,38 +320,21 @@ function TerminNotizFormModal({
           onChange={onFileChosen}
         />
         <div className={cn('lead-notiz-compose__media', mode === 'edit' ? 'mt-3' : 'mt-2')}>
-          <button
-            type="button"
-            disabled={pending || !canAddFotos}
-            onClick={() => fileGalleryRef.current?.click()}
-            className="btn ghost sm inline-flex items-center justify-center gap-1.5"
-          >
-            <ImagePlus className="h-4 w-4" aria-hidden />
+          <MockBtn kind="ghost" sm className="inline-flex items-center justify-center gap-1.5" type="button" disabled={pending || !canAddFotos} onClick={() => fileGalleryRef.current?.click()}>
+            <MockIcon n="photo-plus" ctx="default" className="h-4 w-4" aria-hidden />
             {mode === 'add' ? 'Fotos' : 'Fotos hinzufügen'}
-          </button>
-          <button
-            type="button"
-            disabled={pending || !canAddFotos}
-            onClick={() => fileCameraRef.current?.click()}
-            className="btn ghost sm inline-flex items-center justify-center gap-1.5"
-          >
-            <Camera className="h-4 w-4" aria-hidden />
+          </MockBtn>
+          <MockBtn kind="ghost" sm className="inline-flex items-center justify-center gap-1.5" type="button" disabled={pending || !canAddFotos} onClick={() => fileCameraRef.current?.click()}>
+            <MockIcon n="photo" ctx="default" className="h-4 w-4" aria-hidden />
             Aufnehmen
-          </button>
+          </MockBtn>
         </div>
         <p className="mt-2 text-[length:var(--fs-meta)] text-bw-text-muted">
           Bis zu {TERMIN_NOTIZ_MAX_FOTOS} Fotos · {fotoCount}/{TERMIN_NOTIZ_MAX_FOTOS}
         </p>
         <TerminNotizFotoVorschau items={vorschauItems} onRemove={removeFoto} />
       </>
-      <ModalFormFooter
-        onCancel={onClose}
-        onSubmit={() => void speichern()}
-        submitLabel={mode === 'edit' ? 'Speichern' : 'Notiz speichern'}
-        loading={pending}
-        submitDisabled={!canSave}
-      />
-    </Modal>
+    </EditorSheet>
   )
 }
 
@@ -367,27 +351,29 @@ function TerminNotizZeile({
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [hidden, setHidden] = useState(false)
   const [pending, startTransition] = useLocalTransition()
 
   async function loeschen() {
-    const preview =
-      notiz.titel?.trim() ||
-      richTextToPlain(notiz.inhalt ?? '').trim().split('\n')[0] ||
-      'Notiz'
-    confirmDelete(
-      'Notiz löschen?',
-      async () => {
+    deleteWithUndo({
+      key: `lead-notiz:${notiz.id}`,
+      removeOptimistic: () => setHidden(true),
+      restoreOptimistic: () => setHidden(false),
+      commit: async () => {
         const r = await deleteLeadNotizRow(notiz.id, leadId)
         if (!r.ok) {
-          toast.error(r.message)
-          throw new Error(r.message)
+          toast.systemError(r)
+          setHidden(false)
+          return
         }
         onReload()
-        router.refresh()
+        afterServerActionRefresh()
       },
-      { body: preview }
-    )
+      message: TOAST.geloescht,
+    })
   }
+
+  if (hidden) return null
 
   const titel = notiz.titel?.trim() || 'Notiz'
   const fotos = leadNotizFotoUrls(notiz).filter(istBildAnhangUrl)
@@ -395,16 +381,11 @@ function TerminNotizZeile({
   return (
     <li className="lead-notiz-row">
       <div className="lead-notiz-row__header">
-        <button
-          type="button"
-          className="lead-notiz-row__trigger"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-        >
+        <MockBtn className="lead-notiz-row__trigger" type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           <span className="lead-notiz-row__meta">{formatDatum(notiz.created_at)}</span>
           <span className="lead-notiz-row__title">{titel}</span>
-          <ChevronDown className={cn('lead-notiz-row__chevron', open && 'is-open')} aria-hidden />
-        </button>
+          <MockIcon n="chevron-down" ctx="row" className={cn('lead-notiz-row__chevron', open && 'is-open')} aria-hidden />
+        </MockBtn>
         <div className="lead-notiz-row__actions">
           <MockEntityRowMenu
             title="Notiz"
@@ -436,19 +417,14 @@ function TerminNotizZeile({
           {fotos.length ? (
             <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
               {fotos.map((url) => (
-                <button
-                  key={url}
-                  type="button"
-                  className="block overflow-hidden rounded-md border border-bw-border text-left"
-                  onClick={() => setLightboxUrl(url)}
-                >
+                <MockBtn className="block overflow-hidden rounded-button border border-bw-border text-left" key={url} type="button" onClick={() => setLightboxUrl(url)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={url}
                     alt=""
                     className="aspect-square w-full object-cover"
                   />
-                </button>
+                </MockBtn>
               ))}
             </div>
           ) : null}
@@ -487,14 +463,10 @@ function TerminNotizenBlock({
         <p className="text-[length:var(--fs-meta)] font-medium uppercase tracking-wide text-bw-text-muted">
           Notizen zum Termin
         </p>
-        <button
-          type="button"
-          className="btn primary sm inline-flex items-center gap-1"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden />
+        <MockBtn kind="primary" sm className="inline-flex items-center gap-1" type="button" onClick={() => setAddOpen(true)}>
+          <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" aria-hidden />
           Hinzufügen
-        </button>
+        </MockBtn>
       </div>
 
       {notizen.length === 0 ? (
@@ -543,27 +515,14 @@ function LeadTerminZeile({
   return (
     <div className="lead-termin-row">
       <div className="lead-termin-row__header">
-        <button
-          type="button"
-          className="lead-termin-row__trigger"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-        >
+        <MockBtn className="lead-termin-row__trigger" type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           <span className="lead-termin-row__title">{terminZeileKurz(termin)}</span>
-          <ChevronDown
-            className={cn('lead-termin-row__chevron', open && 'is-open')}
-            aria-hidden
-          />
-        </button>
+          <MockIcon n="chevron-down" ctx="row" className={cn('lead-termin-row__chevron', open && 'is-open')} aria-hidden />
+        </MockBtn>
         <div className="lead-termin-row__actions">
-          <button
-            type="button"
-            className="lead-termin-row__icon-btn"
-            onClick={() => setEditOpen(true)}
-            aria-label="Termin bearbeiten"
-          >
-            <Pencil className="h-4 w-4" aria-hidden />
-          </button>
+          <MockBtn className="lead-termin-row__icon-btn" type="button" onClick={() => setEditOpen(true)} aria-label="Termin bearbeiten">
+            <MockIcon n="pencil" ctx="default" className="h-4 w-4" aria-hidden />
+          </MockBtn>
         </div>
       </div>
       {open ? (
@@ -660,7 +619,7 @@ export function LeadTermineCard({
   const body =
     sorted.length === 0 ? (
       <div className="px-4 py-6 text-center">
-        <Calendar className="mx-auto h-8 w-8 text-bw-text-muted" aria-hidden />
+        <MockIcon n="calendar" ctx="default" className="mx-auto h-8 w-8 text-bw-text-muted" aria-hidden />
         <p className="mt-2 text-[length:var(--fs-text)] font-medium text-bw-text">Noch kein Termin</p>
         <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">
           Termin über <strong>Aktionen → Termin vereinbart</strong> anlegen — Kalender-Eintrag und

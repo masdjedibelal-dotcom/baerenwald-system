@@ -1,11 +1,19 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useMemo, useState } from 'react'
+<<<<<<< Updated upstream
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+=======
 import { Copy, ExternalLink, Mail, MessageCircle } from 'lucide-react'
 import { EditorSheet, useEditorSheetRequestClose } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { AngebotWizardVersandEmpfaengerCard } from '@/components/angebote/AngebotWizardVersandEmpfaengerCard'
 import {
@@ -14,9 +22,15 @@ import {
   type HandwerkerNachrichtInput,
 } from '@/lib/auftraege/handwerker-nachricht'
 import { formatDatum } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 export type HandwerkerKontaktModalMode = 'whatsapp' | 'email'
 
+<<<<<<< Updated upstream
+/** Partner WhatsApp/Mail — EditorSheet Split-over (Mock Surface B). */
+export function PartnerKontaktModal({
+=======
 function KontaktFooter({
   mode,
   onCopy,
@@ -29,23 +43,23 @@ function KontaktFooter({
   const requestClose = useEditorSheetRequestClose()
   return (
     <div className="sheet-footer-actions ldr-cta">
-      <Button type="button" variant="secondary" onClick={() => requestClose?.()}>
+      <MockBtn type="button" kind="secondary" onClick={() => requestClose?.()}>
         Abbrechen
-      </Button>
-      <Button type="button" variant="secondary" onClick={onCopy}>
+      </MockBtn>
+      <MockBtn type="button" kind="secondary" onClick={onCopy}>
         <Copy className="mr-1.5 h-4 w-4" aria-hidden />
         Text kopieren
-      </Button>
+      </MockBtn>
       {mode === 'whatsapp' ? (
-        <Button type="button" variant="primary" onClick={onPrimary}>
+        <MockBtn type="button" kind="primary" onClick={onPrimary}>
           <MessageCircle className="mr-1.5 h-4 w-4" aria-hidden />
           In WhatsApp öffnen
-        </Button>
+        </MockBtn>
       ) : (
-        <Button type="button" variant="primary" onClick={onPrimary}>
+        <MockBtn type="button" kind="primary" onClick={onPrimary}>
           <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
           In Mail-App öffnen
-        </Button>
+        </MockBtn>
       )}
     </div>
   )
@@ -53,6 +67,7 @@ function KontaktFooter({
 
 /** Handwerker WhatsApp/Mail — EditorSheet Split-over (Mock Surface B). */
 export function HandwerkerKontaktModal({
+>>>>>>> Stashed changes
   open,
   onClose,
   mode,
@@ -69,6 +84,7 @@ export function HandwerkerKontaktModal({
   email?: string | null
   nachrichtInput: HandwerkerNachrichtInput
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [nachricht, setNachricht] = useState('')
   const [betreff, setBetreff] = useState('')
   const [mailTo, setMailTo] = useState<string[]>([])
@@ -109,20 +125,20 @@ export function HandwerkerKontaktModal({
   async function copyText(text: string) {
     try {
       await navigator.clipboard.writeText(text)
-      toast.success('Nachricht kopiert')
+      toast.success(TOAST.nachricht_kopiert)
     } catch {
-      toast.error('Kopieren nicht möglich')
+      toast.error(TOAST.kopieren_nicht_moeglich)
     }
   }
 
   function openWhatsapp() {
     const digits = telefonDraft.replace(/\D/g, '')
     if (!digits) {
-      toast.error('Bitte Telefonnummer eingeben.')
+      applyFieldErrors({ _form: TOAST.bitte_telefonnummer_eingeben })
       return
     }
     if (!nachricht.trim()) {
-      toast.error('Bitte Nachricht ausfüllen.')
+      applyFieldErrors({ _form: TOAST.bitte_nachricht_ausfuellen })
       return
     }
     window.open(`https://wa.me/${digits}?text=${encodeURIComponent(nachricht)}`, '_blank', 'noopener,noreferrer')
@@ -130,11 +146,11 @@ export function HandwerkerKontaktModal({
 
   function openMailApp() {
     if (!mailTo.length) {
-      toast.error('Bitte mindestens eine Empfänger-Adresse in An angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_empfaenger_adresse_in_an_a })
       return
     }
     if (!betreff.trim() || !nachricht.trim()) {
-      toast.error('Bitte Betreff und Nachricht ausfüllen.')
+      applyFieldErrors({ _form: TOAST.bitte_betreff_und_nachricht_ausfuellen })
       return
     }
     const params = new URLSearchParams()
@@ -154,16 +170,15 @@ export function HandwerkerKontaktModal({
       context="detail"
       dirty={dirty}
       size="lg"
-      footer={
-        <KontaktFooter
-          mode={mode}
-          onCopy={() => void copyText(nachricht)}
-          onPrimary={mode === 'whatsapp' ? openWhatsapp : openMailApp}
-        />
-      }
+      secondary={{ label: 'Abbrechen' }}
+      primary={{
+        label: mode === 'whatsapp' ? 'In WhatsApp öffnen' : 'In Mail-App öffnen',
+        onClick: mode === 'whatsapp' ? openWhatsapp : openMailApp,
+      }}
     >
-      <div className="space-y-4">
-        <div className="rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-[length:var(--fs-text)]">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              <div className="space-y-4">
+        <div className="rounded-card border border-bw-border bg-bw-bg px-3 py-2.5 text-[length:var(--fs-text)]">
           <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
             Projektdaten
           </p>
@@ -189,32 +204,14 @@ export function HandwerkerKontaktModal({
 
         {mode === 'whatsapp' ? (
           <>
-            <Input
-              label="Telefon / WhatsApp"
-              type="tel"
-              value={telefonDraft}
-              onChange={(e) => {
+            <MockField label="Telefon / WhatsApp" hint={telefon?.trim()
+                  ? 'Nummer aus dem Partner-Stamm — bei Bedarf anpassen.'
+                  : 'Nummer fehlt — bitte eintragen oder Text kopieren.'}><MockInput type="tel" value={telefonDraft} onChange={(e) => {
                 setTelefonDraft(e.target.value)
                 setDirty(true)
-              }}
-              placeholder="+49 …"
-              hint={
-                telefon?.trim()
-                  ? 'Nummer aus dem Handwerker-Stamm — bei Bedarf anpassen.'
-                  : 'Keine Nummer hinterlegt — bitte eintragen oder Text kopieren.'
-              }
-            />
-            <Textarea
-              label="Nachricht"
-              rows={14}
-              value={nachricht}
-              onChange={(e) => {
-                setNachricht(e.target.value)
-                setDirty(true)
-              }}
-              className="font-mono text-[length:var(--fs-text)]"
-              hint="Enthält Kunde, Ort, Zeitraum, Gewerk und Leistungen — vor dem Senden anpassen."
-            />
+              }} placeholder="+49 …" /></MockField>
+            <MockField label="Nachricht" hint="Enthält Kunde, Ort, Zeitraum, Gewerk und Leistungen — vor dem Senden anpassen."><RichTextEditor value={typeof (nachricht) === 'string' ? (nachricht) : ''} onChange={(__v) => {setNachricht(__v)
+                setDirty(true)}} minHeight={336} className=" font-mono text-[length:var(--fs-text)]" aria-label="Nachricht" /></MockField>
           </>
         ) : (
           <>
@@ -230,33 +227,25 @@ export function HandwerkerKontaktModal({
                 setDirty(true)
               }}
             />
-            <Input
-              label="Betreff"
-              value={betreff}
-              onChange={(e) => {
+            <MockField label="Betreff"><MockInput value={betreff} onChange={(e) => {
                 setBetreff(e.target.value)
                 setDirty(true)
-              }}
-            />
-            <Textarea
-              label="Nachricht"
-              rows={14}
-              value={nachricht}
-              onChange={(e) => {
-                setNachricht(e.target.value)
-                setDirty(true)
-              }}
-              className="font-mono text-[length:var(--fs-text)]"
-              hint="Enthält die wichtigsten Projektdaten — vor dem Öffnen der Mail-App anpassen."
-            />
+              }} /></MockField>
+            <MockField label="Nachricht" hint="Enthält die wichtigsten Projektdaten — vor dem Öffnen der Mail-App anpassen."><RichTextEditor value={typeof (nachricht) === 'string' ? (nachricht) : ''} onChange={(__v) => {setNachricht(__v)
+                setDirty(true)}} minHeight={336} className=" font-mono text-[length:var(--fs-text)]" aria-label="Nachricht" /></MockField>
             {!email?.trim() ? (
-              <p className="flex items-start gap-2 text-[length:var(--fs-text)] text-amber-800">
-                <Mail className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                Keine E-Mail beim Handwerker hinterlegt — bitte unter An eine Adresse eintragen.
+              <p className="flex items-start gap-2 text-[length:var(--fs-text)] text-status-contact-text">
+                <MockIcon n="mail" ctx="default" className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                Keine E-Mail beim Partner hinterlegt — bitte unter An eine Adresse eintragen.
               </p>
             ) : null}
           </>
         )}
+
+        <MockBtn type="button" kind="secondary" onClick={() => void copyText(nachricht)}>
+          <MockIcon n="copy" ctx="default" className="mr-1.5 h-4 w-4" aria-hidden />
+          Text kopieren
+        </MockBtn>
       </div>
     </EditorSheet>
   )

@@ -1,0 +1,90 @@
+{
+  "header": "// SYNCED FROM CRM — do not edit\n",
+  "files": [
+    {
+      "crm": "src/lib/status/status-map.ts",
+      "portal": "src/lib/shared-domain/status-map.ts"
+    },
+    {
+      "crm": "src/lib/status/status-vokabular.ts",
+      "portal": "src/lib/shared-domain/status-vokabular.ts"
+    },
+    {
+      "crm": "src/lib/format/geld-datum.ts",
+      "portal": "src/lib/shared-domain/geld-datum.ts"
+    },
+    {
+      "crm": "src/lib/tokens/colors.ts",
+      "portal": "src/lib/shared-domain/colors.ts"
+    },
+    {
+      "crm": "src/lib/vorgang/types.ts",
+      "portal": "src/lib/crm-vorgang/types.ts",
+      "rewrite": true
+    },
+    {
+      "crm": "src/lib/vorgang/vorgang-labels.ts",
+      "portal": "src/lib/crm-vorgang/vorgang-labels.ts",
+      "rewrite": true
+    },
+    {
+      "crm": "src/lib/vorgang/vorgang-anzeige-titel.ts",
+      "portal": "src/lib/crm-vorgang/vorgang-anzeige-titel.ts",
+      "rewrite": true
+    },
+    {
+      "crm": "src/lib/org/hv-lead-helpers.ts",
+      "portal": "src/lib/crm-vorgang/hv-lead-helpers.ts",
+      "rewrite": true
+    },
+    {
+      "crm": "src/lib/anfragen/anfrage-akut-schwelle.ts",
+      "portal": "src/lib/crm-vorgang/anfrage-akut-schwelle.ts",
+      "rewrite": true
+    },
+    {
+      "crm": "src/lib/vorgang/resolve-vorgang.ts",
+      "portal": "src/lib/crm-vorgang/resolve-vorgang.ts",
+      "rewrite": true
+    },
+    {
+      "crm": "src/lib/pdf/chrome/index.ts",
+      "portal": "src/lib/shared-domain/pdf-chrome.ts",
+      "rewrite": true
+    },
+    {
+      "crm": "src/lib/templates/aushang-template.ts",
+      "portal": "src/lib/shared-domain/aushang-template.ts",
+      "rewrite": true
+    },
+    {
+      "crm": "src/lib/mail/build-subject.ts",
+      "portal": "src/lib/shared-domain/build-subject.ts"
+    },
+    {
+      "crm": "src/lib/mail/html-to-plain-text.ts",
+      "portal": "src/lib/shared-domain/html-to-plain-text.ts"
+    },
+    {
+      "crm": "src/lib/media/optimize-image-for-upload.ts",
+      "portal": "src/lib/media/optimize-image-for-upload.ts"
+    }
+  ],
+  "planned": [
+    {
+      "crm": "src/lib/vorgang/vorgang-labels.ts",
+      "portal": "src/lib/shared-domain/vorgang-labels.ts",
+      "note": "Bereits unter crm-vorgang sync — shared-domain-Pfad entfällt."
+    },
+    {
+      "crm": "src/lib/templates/versammlungsbericht-template.ts",
+      "portal": "src/lib/shared-domain/versammlungsbericht-template.ts",
+      "note": "Nach Sync der View-Model-Deps; dann Portal pdf-lib löschen."
+    },
+    {
+      "crm": "src/lib/org/generate-versicherungsakte-pdf.ts",
+      "portal": "src/lib/shared-domain/versicherungsakte-html.ts",
+      "note": "HTML-Vorlage erst im CRM, dann Sync; Portal pdf-lib danach löschen."
+    }
+  ]
+}

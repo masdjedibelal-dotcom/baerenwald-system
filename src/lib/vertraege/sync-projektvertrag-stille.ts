@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
   bauvorhabenAusAuftrag,
@@ -35,23 +36,25 @@ export type SyncProjektvertragStilleResult =
   | { ok: false; message: string }
 
 async function loadVertragMeta(auftragId: string, handwerkerId: string) {
-  const { data: zuordnung } = await supabaseAdmin
+  const { data: zuordnung, error } = await supabaseAdmin
     .from('auftrag_handwerker')
     .select('id, projektvertrag_bestaetigt_am, gewerke(name)')
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
     .maybeSingle()
+  if (error) logDbError('lib/vertraege/sync-projektvertrag-stille:auftrag_handwerker', error)
 
   const gewerk = unwrapJoin(
     (zuordnung as { gewerke?: { name: string } | { name: string }[] | null } | null)?.gewerke
   )
   const gewerkName = gewerk?.name ?? ''
 
-  const { data: auf } = await supabaseAdmin
+  const { data: auf, error: error2 } = await supabaseAdmin
     .from('auftraege')
     .select('id, titel, kunden(plz, ort, adresse, strasse, hausnummer), auftrag_positionen(*)')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error2) logDbError('lib/vertraege/sync-projektvertrag-stille:auftraege', error2)
 
   if (!auf) return { ok: false as const, message: 'Auftrag nicht gefunden' }
 
@@ -107,7 +110,7 @@ export async function syncProjektvertragStille(
 ): Promise<SyncProjektvertragStilleResult> {
   const aid = auftragId.trim()
   const hid = handwerkerId.trim()
-  if (!aid || !hid) return { ok: false, message: 'Auftrag oder Handwerker fehlt.' }
+  if (!aid || !hid) return { ok: false, message: 'Auftrag oder Partner fehlt.' }
 
   if (!(await auftragErfordertProjektvertrag(aid))) {
     return { ok: true, updated: false, skipped: true, reason: 'kein_bauprojekt' }
@@ -116,13 +119,14 @@ export async function syncProjektvertragStille(
   const loaded = await loadVertragMeta(aid, hid)
   if (!loaded.ok) return loaded
 
-  const { data: vertraegeRaw } = await supabaseAdmin
+  const { data: vertraegeRaw, error } = await supabaseAdmin
     .from('handwerker_vertraege')
     .select('*')
     .eq('auftrag_id', aid)
     .eq('handwerker_id', hid)
     .eq('typ', 'projekt')
     .order('created_at', { ascending: false })
+  if (error) logDbError('lib/vertraege/sync-projektvertrag-stille:handwerker_vertraege', error)
 
   const vertraege = (vertraegeRaw ?? []) as HandwerkerVertragRow[]
   const hauptvertrag = letzterHauptvertrag(vertraege, aid, hid)
@@ -145,7 +149,7 @@ export async function syncProjektvertragStille(
   }
 
   const now = new Date().toISOString()
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('handwerker_vertraege')
     .update({
       bauvorhaben: meta.bauvorhaben,
@@ -154,8 +158,9 @@ export async function syncProjektvertragStille(
       updated_at: now,
     })
     .eq('id', hauptvertrag.id)
+  if (error2) logDbError('lib/vertraege/sync-projektvertrag-stille:handwerker_vertraege', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
 
   const pdf = await persistPdfForVertrag(hauptvertrag.id)
   if (!pdf.ok) return pdf
@@ -186,6 +191,7 @@ export async function syncProjektvertragStilleFuerAuftrag(
     .select('handwerker_id, projektvertrag_bestaetigt_am')
     .eq('auftrag_id', aid)
     .not('projektvertrag_bestaetigt_am', 'is', null)
+  if (error) logDbError('lib/vertraege/sync-projektvertrag-stille:auftrag_handwerker', error)
 
   if (error) return { ok: false, message: error.message }
 
@@ -194,11 +200,12 @@ export async function syncProjektvertragStilleFuerAuftrag(
   )
 
   if (!hwIds.size) {
-    const { data: vertraege } = await supabaseAdmin
+    const { data: vertraege, error } = await supabaseAdmin
       .from('handwerker_vertraege')
       .select('handwerker_id, status, signiert_am, dokument_art, parent_vertrag_id')
       .eq('auftrag_id', aid)
       .eq('typ', 'projekt')
+    if (error) logDbError('lib/vertraege/sync-projektvertrag-stille:handwerker_vertraege', error)
 
     for (const v of vertraege ?? []) {
       const row = v as {

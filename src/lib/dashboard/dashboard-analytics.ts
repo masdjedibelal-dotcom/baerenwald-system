@@ -1,3 +1,4 @@
+import { formatMonatKurzJahr, formatDatum } from '@/lib/utils'
 import {
   endOfDay,
   endOfMonth,
@@ -13,6 +14,7 @@ import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
+import { C } from '@/lib/tokens/colors'
 
 export type DashboardZeitraumPreset =
   | 'heute'
@@ -32,7 +34,7 @@ export type DashboardZeitraumFilter = {
 }
 
 export const DASHBOARD_ZEITRAUM_OPTIONS: { value: DashboardZeitraumPreset; label: string }[] = [
-  { value: 'heute', label: 'Heute' },
+{ value: 'heute', label: 'Heute' },
   { value: 'diese_woche', label: 'Diese Woche' },
   { value: 'dieser_monat', label: 'Dieser Monat' },
   { value: 'dieses_jahr', label: 'Dieses Jahr' },
@@ -124,8 +126,7 @@ export function inZeitraum(
 
 export function dashboardZeitraumLabel(filter: DashboardZeitraumFilter): string {
   if (filter.preset === 'benutzerdefiniert' && filter.von && filter.bis) {
-    const fmt = (d: string) =>
-      parseISO(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const fmt = (d: string) => formatDatum(d)
     return `${fmt(filter.von)} – ${fmt(filter.bis)}`
   }
   return DASHBOARD_ZEITRAUM_OPTIONS.find((o) => o.value === filter.preset)?.label ?? 'Gesamt'
@@ -234,7 +235,7 @@ function monthKey(d: Date): string {
 }
 
 function monthLabel(d: Date): string {
-  return d.toLocaleDateString('de-DE', { month: 'short' }).replace(/\.$/, '')
+  return formatMonatKurzJahr(d, { withYear: false })
 }
 
 function buildMonthBuckets(
@@ -350,14 +351,14 @@ export type DashboardGewerkKatalog = {
 }
 
 const GEWERK_COLORS = [
-  '#2E7D52',
-  '#3B82F6',
-  '#F59E0B',
-  '#8B5CF6',
-  '#6B8F71',
-  '#C45C26',
-  '#0D9488',
-  '#64748B',
+  C.green,
+  C.blue2,
+  C.amber,
+  C.purple2,
+  C.greenMuted,
+  C.orange,
+  C.teal2,
+  C.slate500,
 ]
 
 export function gewerkColor(index: number): string {
@@ -573,7 +574,7 @@ export type RankingZeile = {
   sub: string
   vorgaenge: number
   umsatz: number
-  /** Handwerker: Summe Einkaufspreis Zuweisung */
+  /** Partner: Summe Einkaufspreis Zuweisung */
   ek?: number
 }
 
@@ -721,20 +722,20 @@ export function buildVertriebsFunnel(input: {
   const rateOf = (n: number) => (a > 0 ? Math.round((n / a) * 100) : 0)
 
   const stufen: FunnelStufe[] = [
-    { key: 'anfrage', label: 'Anfragen', count: a, rate: 100, color: '#3B82F6' },
+    { key: 'anfrage', label: 'Anfragen', count: a, rate: 100, color: C.blue2 },
     {
       key: 'angebot',
       label: 'Angebote erstellt',
       count: b,
       rate: rateOf(b),
-      color: '#F59E0B',
+      color: C.amber,
     },
     {
       key: 'auftrag',
       label: 'Aufträge',
       count: c,
       rate: rateOf(c),
-      color: '#2E7D52',
+      color: C.green,
     },
   ]
 

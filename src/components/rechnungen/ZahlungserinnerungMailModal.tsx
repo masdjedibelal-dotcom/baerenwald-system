@@ -1,15 +1,16 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { useTransition } from '@/components/ui/action-busy'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { Paperclip } from 'lucide-react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { Input } from '@/components/ui/Input'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
-import { ModalFormFooter } from '@/components/ui/ModalFormFooter'
 import { toast } from '@/components/ui/app-toast'
 import { cn, formatDatum } from '@/lib/utils'
 import {
@@ -17,6 +18,8 @@ import {
   sendZahlungserinnerungMail,
 } from '@/app/(dashboard)/rechnungen/actions'
 import type { ZahlungserinnerungStufe } from '@/lib/mail/zahlungserinnerung-mail'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 function defaultStufe(opts: {
   erinnerung7?: string | null
@@ -47,6 +50,7 @@ export function ZahlungserinnerungMailModal({
   erinnerung21SentAt?: string | null
   onSent?: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const router = useRouter()
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
@@ -87,7 +91,7 @@ export function ZahlungserinnerungMailModal({
       if (cancelled) return
       setLoading(false)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         onCloseRef.current()
         return
       }
@@ -109,9 +113,12 @@ export function ZahlungserinnerungMailModal({
   }, [open, rechnungId, stufe])
 
   function sendNow() {
-    if (!mail) return
+    if (!mail) {
+      applyFieldErrors({ _form: 'Mail wird geladen…' })
+      return
+    }
     if (!mail.to.length) {
-      toast.error('Bitte mindestens eine Empfänger-Adresse unter An angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_empfaenger_adresse_unter_a })
       return
     }
     startTransition(async () => {
@@ -123,7 +130,7 @@ export function ZahlungserinnerungMailModal({
         html: mail.html,
       })
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       toast.success(
@@ -133,7 +140,7 @@ export function ZahlungserinnerungMailModal({
       )
       setDirty(false)
       onSent?.()
-      router.refresh()
+      afterServerActionRefresh()
       onClose()
     })
   }
@@ -149,21 +156,13 @@ export function ZahlungserinnerungMailModal({
       compose
       composeLabel="Jetzt senden"
       onConfirm={sendNow}
-      confirmDisabled={!mail || loading}
+      confirmDisabled={loading}
       confirmBusy={pending || loading}
       dirty={dirty}
-      footer={
-        <ModalFormFooter
-          onCancel={onClose}
-          onSubmit={sendNow}
-          submitLabel="Jetzt senden"
-          cancelLabel="Abbrechen"
-          loading={pending || loading}
-          submitDisabled={!mail}
-        />
-      }
+      secondary={{ label: 'Abbrechen', onClick: onClose }}
     >
-      {loading ? (
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              {loading ? (
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">E-Mail-Vorschau wird geladen…</p>
       ) : mail ? (
         <div className="space-y-3">
@@ -171,33 +170,28 @@ export function ZahlungserinnerungMailModal({
             {([1, 2] as const).map((s) => {
               const gesendet = s === 1 ? mail.stufe1Gesendet : mail.stufe2Gesendet
               return (
-                <button
-                  key={s}
-                  type="button"
-                  className={cn(
-                    'rounded-lg border px-3 py-2 text-[length:var(--fs-text)] font-medium transition-colors',
+                <MockBtn className={cn(
+                    'rounded-button border px-3 py-2 text-[length:var(--fs-text)] font-medium transition-colors',
                     stufe === s
                       ? 'border-bw-primary bg-bw-primary/10 text-bw-primary'
-                      : 'border-bw-border bg-bw-card text-bw-text hover:bg-bw-hover/60'
-                  )}
-                  onClick={() => setStufe(s)}
-                >
+                      : 'border-bw-border bg-surface text-bw-text hover:bg-bw-hover/60'
+                  )} key={s} type="button" onClick={() => setStufe(s)}>
                   Stufe {s}
                   {gesendet ? (
                     <span className="ml-1.5 text-[length:var(--fs-meta)] font-normal text-bw-text-muted">(bereits gesendet)</span>
                   ) : null}
-                </button>
+                </MockBtn>
               )
             })}
           </div>
 
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[length:var(--fs-text)] text-amber-950">
+          <p className="rounded-card border border-status-contact-bg bg-status-contact-bg px-3 py-2 text-[length:var(--fs-text)] text-status-contact-text">
             {stufe === 1
               ? 'Geht automatisch am Tag nach Ablauf des Zahlungsziels (Fälligkeit auf Werktag), wenn nicht bezahlt.'
               : 'Zweite Erinnerung — 7 Tage nach der ersten, falls weiter unbezahlt.'}{' '}
             In der Mail: Zahlbar bis <strong>{mail.zahlbarBisLabel}</strong>
             {erinnerung7SentAt ? (
-              <span className="mt-1 block text-[length:var(--fs-meta)] text-amber-900/80">
+              <span className="mt-1 block text-[length:var(--fs-meta)] text-status-contact-text/80">
                 Stufe 1 zuletzt: {formatDatum(erinnerung7SentAt.slice(0, 10))}
               </span>
             ) : null}
@@ -213,13 +207,10 @@ export function ZahlungserinnerungMailModal({
             extraHint={`Zahlungserinnerung Stufe ${stufe} — Betreff an den Kunden.`}
             multiline={false}
           >
-            <Input
-              value={mail.betreff}
-              onChange={(e) => {
+            <MockInput value={mail.betreff} onChange={(e) => {
                 setDirty(true)
                 setMail((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))
-              }}
-            />
+              }} />
           </KiAssistFieldLabel>
           <EmailPillsField
             label="An"
@@ -241,7 +232,7 @@ export function ZahlungserinnerungMailModal({
             placeholder="weitere@beispiel.de"
           />
           <p className="inline-flex items-center gap-1.5 text-[length:var(--fs-meta)] text-bw-text-muted">
-            <Paperclip className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <MockIcon n="file" ctx="default" className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Anhang: {mail.pdfName}
           </p>
           <CollapsibleMailPreview previewHtml={mail.html} />

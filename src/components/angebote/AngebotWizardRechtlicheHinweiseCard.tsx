@@ -1,7 +1,8 @@
 'use client'
 
-import { Card } from '@/components/ui/Card'
+import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { Card } from '@/components/ui/Card'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import type { AngebotWizardMeta } from '@/lib/angebote/angebot-wizard-types'
 import { cn } from '@/lib/utils'
@@ -24,11 +25,7 @@ export function AngebotWizardRechtlicheHinweiseCard({
         Steuerliche Hinweise
       </div>
       <div className="rw-tax__list">
-        <button
-          type="button"
-          className={cn('rw-tax__opt', meta.hinweis_35a && 'on')}
-          onClick={() => onMetaChange({ hinweis_35a: !meta.hinweis_35a })}
-        >
+        <MockBtn className={cn('rw-tax__opt', meta.hinweis_35a && 'on')} type="button" onClick={() => onMetaChange({ hinweis_35a: !meta.hinweis_35a })}>
           <span className="rw-tax__check" aria-hidden>
             {meta.hinweis_35a ? <MockIcon ctx="btn" n="check" size={12} /> : null}
           </span>
@@ -40,12 +37,8 @@ export function AngebotWizardRechtlicheHinweiseCard({
                 : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen'}
             </span>
           </span>
-        </button>
-        <button
-          type="button"
-          className={cn('rw-tax__opt', meta.hinweis_13b && 'on')}
-          onClick={() => onMetaChange({ hinweis_13b: !meta.hinweis_13b })}
-        >
+        </MockBtn>
+        <MockBtn className={cn('rw-tax__opt', meta.hinweis_13b && 'on')} type="button" onClick={() => onMetaChange({ hinweis_13b: !meta.hinweis_13b })}>
           <span className="rw-tax__check" aria-hidden>
             {meta.hinweis_13b ? <MockIcon ctx="btn" n="check" size={12} /> : null}
           </span>
@@ -53,7 +46,7 @@ export function AngebotWizardRechtlicheHinweiseCard({
             <span className="rw-tax__lab">Reverse-Charge (§13b UStG)</span>
             <span className="rw-tax__sub">Steuerschuldnerschaft des Leistungsempfängers</span>
           </span>
-        </button>
+        </MockBtn>
       </div>
     </div>
   )

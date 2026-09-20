@@ -1,11 +1,18 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockField } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { Star } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { StarRatingInput } from '@/components/ui/StarRatingInput'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -22,6 +29,7 @@ import {
 } from '@/lib/handwerker/bewertung-kategorien'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { cn } from '@/lib/utils'
+import { formatNumber } from '@/lib/format/geld-datum'
 
 type BewertungFormular = HandwerkerBewertungWerte & {
   notiz: string
@@ -66,7 +74,7 @@ export function HandwerkerBewertungModal({
     void loadHandwerkerBewertungenFuerAuftrag(auftragId).then((r) => {
       setLoading(false)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       const byHw = new Map(r.bewertungen.map((b) => [b.handwerkerId, b]))
@@ -115,13 +123,13 @@ export function HandwerkerBewertungModal({
     startTransition(async () => {
       const r = await saveHandwerkerBewertungen(auftragId, eingaben)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       toast.success(
         r.gespeichert === 1
-          ? '1 Handwerker-Bewertung gespeichert'
-          : `${r.gespeichert} Handwerker-Bewertungen gespeichert`
+          ? '1 Partner-Bewertung gespeichert'
+          : `${r.gespeichert} Partner-Bewertungen gespeichert`
       )
       onSaved()
       onClose()
@@ -129,44 +137,57 @@ export function HandwerkerBewertungModal({
   }
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      title="Handwerker bewerten"
+      title="Partner bewerten"
       size="lg"
+<<<<<<< Updated upstream
+      secondary={{ label: 'Abbrechen' }}
+      primary={{
+        label: 'Bewertungen speichern',
+        busy: pending,
+        disabled: loading || vollstaendigCount === 0,
+        onClick: speichern,
+      }}
+=======
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
             {vollstaendigCount}/{ziele.length} Handwerker vollständig bewertet
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <MockBtn type="button" kind="secondary" onClick={onClose}>
               Abbrechen
-            </Button>
-            <Button
+            </MockBtn>
+            <MockBtn
               type="button"
-              variant="primary"
+              kind="primary"
               loading={pending}
               disabled={loading || vollstaendigCount === 0}
               onClick={speichern}
             >
               Bewertungen speichern
-            </Button>
+            </MockBtn>
           </div>
         </div>
       }
+>>>>>>> Stashed changes
     >
       <div className="space-y-4">
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-          Bewerte jeden beteiligten Handwerker in fünf Kategorien (1–5 Sterne). Die Durchschnittswerte
+          Bewerte jeden beteiligten Partner in fünf Kategorien (1–5 Sterne). Die Durchschnittswerte
           werden am Partner-Profil gespeichert.
+        </p>
+        <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
+          {vollstaendigCount}/{ziele.length} Handwerker vollständig bewertet
         </p>
 
         {loading ? (
           <p className="py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">Bewertungen werden geladen…</p>
         ) : ziele.length === 0 ? (
           <p className="py-8 text-center text-[length:var(--fs-text)] text-bw-text-muted">
-            Keine Handwerker an diesem Auftrag hinterlegt.
+            Keine Partner an diesem Auftrag hinterlegt.
           </p>
         ) : (
           <div className="space-y-4">
@@ -176,29 +197,29 @@ export function HandwerkerBewertungModal({
               return (
                 <div
                   key={z.handwerkerId}
-                  className="rounded-lg border border-bw-border bg-bw-card p-4 shadow-sm"
+                  className="rounded-card border border-bw-border bg-surface p-4 shadow-sm"
                 >
                   <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <p className="font-semibold text-bw-text">{z.name}</p>
                       <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-                        {[z.firma, z.gewerkName].filter(Boolean).join(' · ') || 'Handwerker'}
+                        {[z.firma, z.gewerkName].filter(Boolean).join(' · ') || 'Partner'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       {f.gespeichert ? (
-                        <span className="rounded-full bg-bw-green-bg px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-bw-primary">
+                        <span className="rounded-pill bg-bw-green-bg px-2 py-0.5 text-[length:var(--fs-meta)] font-medium text-bw-primary">
                           Gespeichert
                         </span>
                       ) : null}
                       {avg > 0 ? (
                         <span
                           className={cn(
-                            'inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[length:var(--fs-meta)] font-semibold tabular-nums text-amber-900'
+                            'inline-flex items-center gap-1 rounded-pill bg-status-contact-bg px-2.5 py-0.5 text-[length:var(--fs-meta)] font-semibold tabular-nums text-status-contact-text'
                           )}
                         >
-                          <Star className="h-3 w-3 fill-current" aria-hidden />
-                          Ø {avg.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                          <MockIcon n="star" ctx="default" className="h-3 w-3 fill-current" aria-hidden />
+                          Ø {formatNumber(avg, { decimals: 1 })}
                         </span>
                       ) : null}
                     </div>
@@ -218,14 +239,7 @@ export function HandwerkerBewertungModal({
                   </div>
 
                   <div className="mt-4 border-t border-bw-border pt-4">
-                    <Textarea
-                      label="Interne Notiz (optional)"
-                      rows={2}
-                      value={f.notiz}
-                      disabled={pending}
-                      onChange={(e) => updateFormular(z.handwerkerId, { notiz: e.target.value })}
-                      placeholder="z. B. Besonderheiten zur Zusammenarbeit…"
-                    />
+                    <MockField label="Interne Notiz (optional)"><RichTextEditor value={typeof (f.notiz) === 'string' ? (f.notiz) : ''} onChange={(__v) => updateFormular(z.handwerkerId, { notiz: __v })} disabled={pending} placeholder="z. B. Besonderheiten zur Zusammenarbeit…" minHeight={120} aria-label="Interne Notiz (optional)" /></MockField>
                   </div>
                 </div>
               )
@@ -233,6 +247,6 @@ export function HandwerkerBewertungModal({
           </div>
         )}
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

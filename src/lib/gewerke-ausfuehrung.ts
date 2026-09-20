@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AngebotPosition, Gewerk } from '@/lib/types'
 
@@ -93,19 +94,19 @@ export function gewerkAusfuehrungBadge(
   if (ausfuehrung === 'fachbetrieb') {
     return {
       label: 'Fachbetrieb',
-      className: 'bg-[#E6F1FB] text-[#185FA5]',
+      className: 'bg-status-new-bg text-status-new-text',
     }
   }
   if (ausfuehrung === 'beides') {
     return {
       label: 'Eigen + Partner',
-      className: 'bg-amber-50 text-amber-900',
+      className: 'bg-status-contact-bg text-status-contact-text',
     }
   }
   if (ausfuehrung === 'eigen') {
     return {
       label: 'Eigenleistung',
-      className: 'bg-[#EAF3DE] text-[#2E7D52]',
+      className: 'bg-bw-green-bg text-bw-primary',
     }
   }
   return null
@@ -118,10 +119,11 @@ export function gewerkById(gewerke: Gewerk[], gewerkId: string | undefined): Gew
 
 /** Für Angebots-PDF: alle Gewerke inkl. inaktiver (alte Positionen). */
 export async function loadGewerkeAusfuehrung(supabase: SupabaseClient): Promise<Gewerk[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('gewerke')
     .select('id, name, slug, aktiv, ausfuehrung, fachbetrieb_hinweis, ist_bauleistung, sort_order')
     .order('sort_order', { ascending: true })
     .order('name', { ascending: true })
+  if (error) logDbError('lib/gewerke-ausfuehrung:gewerke', error)
   return (data ?? []) as Gewerk[]
 }

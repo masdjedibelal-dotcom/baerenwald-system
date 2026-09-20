@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 /** Speichert Abschlussdokumentation im Bucket `protokolle` (wie Abnahmeprotokoll). */
@@ -11,6 +12,7 @@ export async function persistAbschlussdokumentationPdf(
   const { error: upErr } = await supabaseAdmin.storage
     .from('protokolle')
     .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
+  if (upErr) logDbError('lib/auftraege/persist-abschlussdokumentation-pdf:protokolle', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 

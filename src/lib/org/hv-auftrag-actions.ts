@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { generateVersicherungsaktePdf } from '@/lib/org/generate-versicherungsakte-pdf'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -30,6 +31,7 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
     )
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/org/hv-auftrag-actions:auftraege', error)
 
   if (error || !auftrag) {
     return { ok: false, message: error?.message ?? 'Auftrag nicht gefunden.' }
@@ -45,13 +47,14 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
 
   let lead: Record<string, unknown> | null = null
   if (auftrag.lead_id) {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('leads')
       .select(
         'id, kostentraeger, versicherungs_nr, kontakt_nachricht, notizen, situation, melder_name, created_at, strasse, hausnummer, plz, kunde_objekt_id, funnel_daten'
       )
       .eq('id', auftrag.lead_id)
       .maybeSingle()
+    if (error) logDbError('lib/org/hv-auftrag-actions:leads', error)
     lead = data
   }
 
@@ -73,11 +76,12 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
 
   let orgName = 'Hausverwaltung'
   if (auftrag.kunde_id) {
-    const { data: kunde } = await supabaseAdmin
+    const { data: kunde, error } = await supabaseAdmin
       .from('kunden')
       .select('name')
       .eq('id', auftrag.kunde_id)
       .maybeSingle()
+    if (error) logDbError('lib/org/hv-auftrag-actions:kunden', error)
     if (kunde?.name) orgName = String(kunde.name)
   }
 
@@ -88,23 +92,25 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
   if (street || plz) objektAdresse = [street, plz].filter(Boolean).join(', ')
 
   if (lead?.kunde_objekt_id) {
-    const { data: obj } = await supabaseAdmin
+    const { data: obj, error } = await supabaseAdmin
       .from('kunden_objekte')
       .select('titel, strasse, hausnummer, plz')
       .eq('id', lead.kunde_objekt_id)
       .maybeSingle()
+    if (error) logDbError('lib/org/hv-auftrag-actions:kunden_objekte', error)
     if (obj?.titel) objektTitel = String(obj.titel)
     const oStreet = [obj?.strasse, obj?.hausnummer].filter(Boolean).join(' ').trim()
     const oPlz = obj?.plz ? String(obj.plz) : ''
     if (oStreet || oPlz) objektAdresse = [oStreet, oPlz].filter(Boolean).join(', ')
   }
 
-  const { data: befundRows } = await supabaseAdmin
+  const { data: befundRows, error: error2 } = await supabaseAdmin
     .from('auftrag_bautagebuch_eintraege')
     .select('titel, beschreibung, datum, foto_urls, eintrag_typ')
     .eq('auftrag_id', id)
     .order('datum', { ascending: true })
     .limit(40)
+  if (error2) logDbError('lib/org/hv-auftrag-actions:auftrag_bautagebuch_eintraege', error2)
 
   const befundZeilen = (befundRows ?? [])
     .filter((r) => String(r.eintrag_typ ?? '') === 'befund')
@@ -122,12 +128,13 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
     }`,
   }))
 
-  const { data: rechnungen } = await supabaseAdmin
+  const { data: rechnungen, error: error3 } = await supabaseAdmin
     .from('rechnungen')
     .select('rechnungsnummer, status')
     .eq('auftrag_id', id)
     .order('created_at', { ascending: false })
     .limit(3)
+  if (error3) logDbError('lib/org/hv-auftrag-actions:rechnungen', error3)
 
   const rechnungHinweis =
     (rechnungen ?? [])
@@ -170,13 +177,14 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
       upsert: true,
       contentType: 'application/pdf',
     })
+  if (upErr) logDbError('lib/org/hv-auftrag-actions:query', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 
   const { data: pub } = supabaseAdmin.storage.from(bucket).getPublicUrl(path)
   const url = pub.publicUrl
 
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('auftraege')
     .update({
       versicherungsakte_pdf_url: url,
@@ -184,6 +192,7 @@ export async function erzeugeVersicherungsaktePdf(auftragId: string): Promise<
       ...(versNr ? { versicherungs_nr: versNr } : {}),
     })
     .eq('id', id)
+  if (__dbErr1) logDbError('lib/org/hv-auftrag-actions:auftraege', __dbErr1)
 
   if (auftrag.lead_id) {
     const { writeAuditEvent } = await import('@/lib/audit/write-audit-event')
@@ -213,22 +222,24 @@ export async function registriereGewaehrleistung(
   const frist = new Date(abnahme)
   frist.setFullYear(frist.getFullYear() + 5)
 
-  const { data: auftrag } = await supabaseAdmin
+  const { data: auftrag, error } = await supabaseAdmin
     .from('auftraege')
     .select('id, partner_id')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/org/hv-auftrag-actions:auftraege', error)
 
   if (!auftrag) return { ok: false, message: 'Auftrag nicht gefunden.' }
 
-  const { error } = await supabaseAdmin.from('gewaehrleistungen').insert({
+  const { error: error2 } = await supabaseAdmin.from('gewaehrleistungen').insert({
     auftrag_id: id,
     partner_id: auftrag.partner_id ?? null,
     abnahme_am: abnahmeAm,
     frist_bis: frist.toISOString().slice(0, 10),
     status: 'aktiv',
   })
+  if (error2) logDbError('lib/org/hv-auftrag-actions:gewaehrleistungen', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
   return { ok: true }
 }

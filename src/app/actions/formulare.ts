@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateFormularBearbeiten, revalidateFormulareEinstellungen, revalidateFormulareList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import type { FormularFeld, FormularTemplate } from '@/lib/types'
 
@@ -29,10 +35,11 @@ export async function saveFormularTemplate(
 
   if (templateId) {
     const { error } = await supabase.from('formular_templates').update(payload).eq('id', templateId)
+    if (error) logDbError('app/actions/formulare:formular_templates', error)
     if (error) throw new Error(error.message)
-    revalidatePath('/formulare')
-    revalidatePath('/einstellungen/formulare')
-    revalidatePath(`/formulare/${templateId}/bearbeiten`)
+    revalidateFormulareList()
+    revalidateFormulareEinstellungen()
+    revalidateFormularBearbeiten(templateId)
     return templateId
   }
 
@@ -41,12 +48,13 @@ export async function saveFormularTemplate(
     .insert(payload)
     .select('id')
     .single()
+  if (error) logDbError('app/actions/formulare:formular_templates', error)
 
   if (error || !row) throw new Error(error?.message ?? 'Speichern fehlgeschlagen')
   const id = row.id as string
-  revalidatePath('/formulare')
-  revalidatePath('/einstellungen/formulare')
-  revalidatePath(`/formulare/${id}/bearbeiten`)
+  revalidateFormulareList()
+  revalidateFormulareEinstellungen()
+  revalidateFormularBearbeiten(id)
   return id
 }
 
@@ -56,8 +64,9 @@ export async function deleteFormularTemplate(templateId: string): Promise<void> 
     .from('formular_templates')
     .update({ aktiv: false })
     .eq('id', templateId)
+  if (error) logDbError('app/actions/formulare:formular_templates', error)
 
   if (error) throw new Error(error.message)
-  revalidatePath('/formulare')
-  revalidatePath('/einstellungen/formulare')
+  revalidateFormulareList()
+  revalidateFormulareEinstellungen()
 }

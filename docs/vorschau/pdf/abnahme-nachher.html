@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Abnahmeprotokoll</title>
+<style>
+
+  * { box-sizing: border-box; }
+  @page { size: A4; margin: 12mm 12mm 36mm 12mm; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #16201b;
+    font-size: 10pt;
+    font-weight: 400;
+    padding-bottom: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  table { border-collapse: collapse; width: 100%; }
+  .page { padding: 0 4mm; max-width: 210mm; margin: 0 auto; }
+  .pdf-fs-caption { font-size: 7.5pt; color: #6a746f; }
+  .pdf-fs-meta { font-size: 8.5pt; color: #6a746f; }
+  .pdf-fs-text { font-size: 10pt; color: #16201b; }
+  .pdf-fs-title { font-size: 12pt; font-weight: 700; color: #16201b; }
+  .pdf-fs-head { font-size: 16pt; font-weight: 700; letter-spacing: -0.02em; color: #16201b; }
+  .pdf-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .projekt-block { break-inside: avoid-page; }
+  @media print {
+    .avoid-fuss-overlap { break-inside: avoid-page; page-break-inside: avoid; }
+  }
+
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-body">
+    <header class="pdf-kopf" style="display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid #2e7d52;padding-bottom:14px;margin-bottom:18px;">
+  <div style="flex:0 0 auto;">
+    <div style="width:40px;height:40px;border-radius:8px;background:#2e7d52;color:#ffffff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;">BÄ</div>
+    
+  </div>
+  <div style="flex:1;min-width:0;text-align:right;"><div style="font-size:8.5pt;color:#6a746f;line-height:1.45;text-align:right;"><strong style="font-size:12pt;">Bärenwald München</strong><br/>Bärenwaldstraße 20, 81737 München<br/>089 8095 5726 · info@baerenwald-muenchen.de</div></div>
+</header>
+    <div class="pdf-titelzeile" style="margin-bottom:16px;">
+  <h1 class="pdf-fs-head" style="margin:0 0 4px;color:#1a3d2b;">Abnahmeprotokoll</h1>
+  <p class="pdf-fs-meta" style="margin:0;">Objekt: Malerarbeiten Wohnräume · 12.07.2026</p>
+</div>
+    <div style="display:flex;background:#f3f4f6;border-radius:4px;margin:0 0 14px;border:1px solid #d1d5db;page-break-inside:avoid;">
+    <div style="flex:1;min-width:0;padding:8px 10px;">
+      <div style="font-size:7.5pt;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;">Übergabedatum</div>
+      <div style="font-size:9.5pt;font-weight:600;color:#111111;">12.07.2026</div>
+    </div>
+    <div style="width:1px;background:#d1d5db;"></div>
+    <div style="flex:1;min-width:0;padding:8px 10px;">
+      <div style="font-size:7.5pt;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;">Übergabe Uhrzeit</div>
+      <div style="font-size:9.5pt;font-weight:600;color:#111111;">11:00 Uhr</div>
+    </div>
+    <div style="width:1px;background:#d1d5db;"></div>
+    <div style="flex:1;min-width:0;padding:8px 10px;">
+      <div style="font-size:7.5pt;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;">Übergabe Ort</div>
+      <div style="font-size:9.5pt;font-weight:600;color:#111111;">80331 München</div>
+    </div>
+  </div>
+    <div style="display:flex;gap:10px;margin:0 0 14px;">
+    <div style="flex:1;"><div style="border:1px solid #d1d5db;border-radius:4px;padding:10px 12px;page-break-inside:avoid;">
+    <div style="font-size:8pt;font-weight:700;color:#1a3d2b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">Auftragnehmer</div>
+    <table style="width:100%;border-collapse:collapse;"><tr>
+          <td style="padding:2px 8px 2px 0;font-size:8pt;color:#6b7280;vertical-align:top;white-space:nowrap;">Firma</td>
+          <td style="padding:2px 0;font-size:9pt;color:#111111;vertical-align:top;">Bärenwald München</td>
+        </tr><tr>
+          <td style="padding:2px 8px 2px 0;font-size:8pt;color:#6b7280;vertical-align:top;white-space:nowrap;">Adresse</td>
+          <td style="padding:2px 0;font-size:9pt;color:#111111;vertical-align:top;">Bärenwaldstraße 20, 81737 München</td>
+        </tr><tr>
+          <td style="padding:2px 8px 2px 0;font-size:8pt;color:#6b7280;vertical-align:top;white-space:nowrap;">Partner vor Ort</td>
+          <td style="padding:2px 0;font-size:9pt;color:#111111;vertical-align:top;">Max Mustermann (Bärenwald)</td>
+        </tr></table>
+  </div></div>
+    <div style="flex:1;"><div style="border:1px solid #d1d5db;border-radius:4px;padding:10px 12px;page-break-inside:avoid;">
+    <div style="font-size:8pt;font-weight:700;color:#1a3d2b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;">Auftraggeber / Kunde</div>
+    <table style="width:100%;border-collapse:collapse;"><tr>
+          <td style="padding:2px 8px 2px 0;font-size:8pt;color:#6b7280;vertical-align:top;white-space:nowrap;">Name</td>
+          <td style="padding:2px 0;font-size:9pt;color:#111111;vertical-align:top;">Max Mustermann</td>
+        </tr><tr>
+          <td style="padding:2px 8px 2px 0;font-size:8pt;color:#6b7280;vertical-align:top;white-space:nowrap;">Adresse</td>
+          <td style="padding:2px 0;font-size:9pt;color:#111111;vertical-align:top;">Musterstraße 12, 80331 München</td>
+        </tr><tr>
+          <td style="padding:2px 8px 2px 0;font-size:8pt;color:#6b7280;vertical-align:top;white-space:nowrap;">Kunde vor Ort</td>
+          <td style="padding:2px 0;font-size:9pt;color:#111111;vertical-align:top;">Max Mustermann</td>
+        </tr><tr>
+          <td style="padding:2px 8px 2px 0;font-size:8pt;color:#6b7280;vertical-align:top;white-space:nowrap;">Anwesend bei Übergabe</td>
+          <td style="padding:2px 0;font-size:9pt;color:#111111;vertical-align:top;">Erika Mustermann</td>
+        </tr></table>
+  </div></div>
+  </div>
+    <h2 style="font-size:10.5pt;font-weight:700;color:#1a3d2b;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #1a3d2b;page-break-after:avoid;">
+    <span style="margin-right:6px;">1.</span>Bauvorhaben
+  </h2>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 4px;">
+      <tr>
+      <td style="padding:3px 10px 3px 0;font-size:8.5pt;color:#6b7280;vertical-align:top;width:28%;">Projektbezeichnung</td>
+      <td style="padding:3px 0;font-size:9pt;color:#111111;vertical-align:top;white-space:pre-wrap;">Malerarbeiten Wohnräume</td>
+    </tr>
+      <tr>
+      <td style="padding:3px 10px 3px 0;font-size:8.5pt;color:#6b7280;vertical-align:top;width:28%;">Projektadresse</td>
+      <td style="padding:3px 0;font-size:9pt;color:#111111;vertical-align:top;white-space:pre-wrap;">Musterstraße 12, 80331 München</td>
+    </tr>
+      <tr>
+      <td style="padding:3px 10px 3px 0;font-size:8.5pt;color:#6b7280;vertical-align:top;width:28%;">Leistungsumfang</td>
+      <td style="padding:3px 0;font-size:9pt;color:#111111;vertical-align:top;white-space:pre-wrap;">Streichen der Wohnräume inkl. Decken.</td>
+    </tr>
+      <tr>
+      <td style="padding:3px 10px 3px 0;font-size:8.5pt;color:#6b7280;vertical-align:top;width:28%;">Auftrag</td>
+      <td style="padding:3px 0;font-size:9pt;color:#111111;vertical-align:top;white-space:pre-wrap;">AU-2026-0087</td>
+    </tr>
+    </table>
+    <h2 style="font-size:10.5pt;font-weight:700;color:#1a3d2b;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #1a3d2b;page-break-after:avoid;">
+    <span style="margin-right:6px;">2.</span>Ausgeführte Leistungen
+  </h2>
+    <p style="margin:0 0 8px;font-size:8pt;color:#6b7280;page-break-after:avoid;break-after:avoid;">Alle unten genannten Leistungen wurden nach den anerkannten Regeln der Technik ausgeführt.</p>
+    <div style="margin:0 0 10px;">
+        <p style="margin:0 0 6px;font-size:9pt;font-weight:700;color:#111111;page-break-after:avoid;break-after:avoid;">Malerarbeiten</p>
+        <ul style="margin:0;padding:0;"><li style="margin:0 0 10px;list-style:none;page-break-inside:avoid;break-inside:avoid;">
+              <table style="width:100%;border-collapse:collapse;page-break-inside:avoid;break-inside:avoid;"><tr>
+                <td style="width:18px;vertical-align:top;padding:2px 0 0;line-height:0;"><span style="display:inline-block;width:14px;height:14px;flex-shrink:0;margin-top:1px;line-height:0;vertical-align:top;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="#1a3d2b"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
+                <td style="vertical-align:top;padding:0 0 0 6px;">
+                  <div style="font-size:9.5pt;font-weight:700;line-height:1.35;color:#111111;">Wände streichen (Wohnräume)</div>
+                  <div style="margin:3px 0 0;font-size:8pt;font-weight:400;line-height:1.4;color:#6b7280;">Oberfläche gleichmäßig, ohne Fehlstellen · Schutz von Böden und Möbeln entfernt</div>
+                </td>
+              </tr></table>
+            </li><li style="margin:0 0 10px;list-style:none;page-break-inside:avoid;break-inside:avoid;">
+              <table style="width:100%;border-collapse:collapse;page-break-inside:avoid;break-inside:avoid;"><tr>
+                <td style="width:18px;vertical-align:top;padding:2px 0 0;line-height:0;"><span style="display:inline-block;width:14px;height:14px;flex-shrink:0;margin-top:1px;line-height:0;vertical-align:top;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="#1a3d2b"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
+                <td style="vertical-align:top;padding:0 0 0 6px;">
+                  <div style="font-size:9.5pt;font-weight:700;line-height:1.35;color:#111111;">Decken weiß streichen</div>
+                  <div style="margin:3px 0 0;font-size:8pt;font-weight:400;line-height:1.4;color:#6b7280;">Leichte Nacharbeit an der Decke Wohnzimmer vereinbart.</div>
+                </td>
+              </tr></table>
+            </li></ul>
+      </div>
+    <h2 style="font-size:10.5pt;font-weight:700;color:#1a3d2b;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #1a3d2b;page-break-after:avoid;">
+    <span style="margin-right:6px;">3.</span>Abnahmeergebnis
+  </h2>
+    <p style="margin:0 0 10px;font-size:9pt;line-height:1.5;color:#111111;">
+      Die Leistungen wurden am 12.07.2026 gemeinsam vor Ort besichtigt und geprüft.
+    </p>
+    <div style="display:flex;align-items:center;gap:12px;background:#fef9c3;border:1.5px solid #1a3d2b;border-radius:6px;padding:12px 14px;page-break-inside:avoid;">
+      <span style="display:inline-block;width:22px;height:22px;line-height:0;flex-shrink:0;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6.2" fill="none" stroke="#1a3d2b" stroke-width="1.4"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="#1a3d2b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span style="font-size:11pt;font-weight:700;color:#1a3d2b;">Die Leistungen werden unter Vorbehalt abgenommen</span>
+    </div>
+    <h2 style="font-size:10.5pt;font-weight:700;color:#1a3d2b;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #1a3d2b;page-break-after:avoid;">
+    <span style="margin-right:6px;">4.</span>Festgestellte Hinweise
+  </h2>
+    <div style="border:1px solid #d1d5db;border-radius:4px;padding:10px 12px;page-break-inside:avoid;"><ul style="margin:0 0 8px;padding-left:18px;font-size:9pt;line-height:1.45;">
+        <li style="margin:0 0 10px;page-break-inside:avoid;break-inside:avoid;">
+              <div style="font-weight:700;color:#111111;">Kleine Fehlstelle an der Decke Wohnzimmer nacharbeiten <span style="font-weight:400;color:#991b1b;">(Beseitigung bis: 19.07.2026)</span></div>
+              
+              
+            </li>
+      </ul><div style="background:#f3f4f6;border-left:3px solid #1a3d2b;padding:8px 10px;margin:8px 0 0;font-size:8.5pt;line-height:1.45;color:#111111;white-space:pre-wrap;">Nacharbeit Decke Wohnzimmer bis 19.07.2026.</div><p style="margin:8px 0 0;font-size:8.5pt;color:#6b7280;white-space:pre-wrap;">Abnahme unter Vorbehalt der genannten Nacharbeit.</p></div>
+    <h2 style="font-size:10.5pt;font-weight:700;color:#1a3d2b;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #1a3d2b;page-break-after:avoid;">
+    <span style="margin-right:6px;">5.</span>Weitere Hinweise
+  </h2>
+    <ul style="margin:0;padding-left:18px;font-size:8.5pt;line-height:1.45;color:#111111;"><li style="margin:0 0 4px;">Die Übergabe erfolgte gemeinsam vor Ort.</li><li style="margin:0 0 4px;">Die Leistungen wurden besichtigt; Beanstandungen sind unter „Festgestellte Hinweise“ vermerkt.</li><li style="margin:0 0 4px;">Mit der Abnahme geht die Gefahr gemäß § 640 BGB auf den Auftraggeber über.</li><li style="margin:0 0 4px;">Es gelten die gesetzlichen Gewährleistungsfristen ab Abnahme.</li><li style="margin:0 0 4px;">Für Leistungen Dritter oder ausdrücklich ausgeschlossene Bereiche wird keine Gewähr übernommen.</li></ul>
+    <h2 style="font-size:10.5pt;font-weight:700;color:#1a3d2b;margin:16px 0 8px;padding-bottom:5px;border-bottom:2px solid #1a3d2b;page-break-after:avoid;">
+    <span style="margin-right:6px;">6.</span>Unterschriften
+  </h2>
+    <div style="display:flex;gap:16px;margin-top:8px;">
+      <div style="flex:1;min-width:0;page-break-inside:avoid;">
+      <div style="font-size:8pt;font-weight:700;color:#1a3d2b;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:28px;">Auftragnehmer</div>
+      <div style="border-bottom:1px solid #111111;min-height:20px;margin-bottom:4px;font-size:9pt;color:#111111;"> </div>
+      <div style="font-size:7.5pt;color:#6b7280;">Ort, Datum</div>
+      <div style="border-bottom:1px solid #111111;height:36px;margin:16px 0 4px;"></div>
+      <div style="font-size:7.5pt;color:#6b7280;">Unterschrift · Max Mustermann (Bärenwald)</div>
+    </div>
+      <div style="flex:1;min-width:0;page-break-inside:avoid;">
+      <div style="font-size:8pt;font-weight:700;color:#1a3d2b;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:28px;">Auftraggeber</div>
+      <div style="border-bottom:1px solid #111111;min-height:20px;margin-bottom:4px;font-size:9pt;color:#111111;"> </div>
+      <div style="font-size:7.5pt;color:#6b7280;">Ort, Datum</div>
+      <div style="border-bottom:1px solid #111111;height:36px;margin:16px 0 4px;"></div>
+      <div style="font-size:7.5pt;color:#6b7280;">Unterschrift · Max Mustermann</div>
+    </div>
+      <div style="flex:1;min-width:0;page-break-inside:avoid;">
+      <div style="font-size:8pt;font-weight:700;color:#1a3d2b;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:28px;">Anwesend bei Übergabe</div>
+      <div style="border-bottom:1px solid #111111;min-height:20px;margin-bottom:4px;font-size:9pt;color:#111111;"> </div>
+      <div style="font-size:7.5pt;color:#6b7280;">Ort, Datum</div>
+      <div style="border-bottom:1px solid #111111;height:36px;margin:16px 0 4px;"></div>
+      <div style="font-size:7.5pt;color:#6b7280;">Unterschrift · Erika Mustermann</div>
+    </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

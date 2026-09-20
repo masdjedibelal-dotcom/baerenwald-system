@@ -2,6 +2,7 @@ import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import { kundeAngebotBegruessung } from '@/lib/kunde-rechnungsempfaenger'
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
+import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -12,6 +13,8 @@ import {
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
 import type { PortalMailAudience } from '@/lib/portal-utils'
+import { formatEuro } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
 
 export type AngebotMailAnrede = 'du' | 'sie'
 
@@ -109,7 +112,7 @@ export const ANGEBOT_MAIL_CTA_ANNEHMEN = {
 /** CTA unter Freigabeschwelle — kein Annehmen/Ablehnen. */
 export const ANGEBOT_MAIL_CTA_UNTER_SCHWELLE = {
   du: 'Aufgrund Ihrer erteilten Freigabeschwelle liegt dieses Angebot darunter — wir kümmern uns direkt um den Auftrag. Eine Annahme oder Ablehnung ist nicht nötig; den Stand siehst du jederzeit im Auftraggeber-Portal.',
-  sie: 'Aufgrund Ihrer erteilten Freigabeschwelle liegt dieses Angebot darunter — wir kümmern uns direkt um den Auftrag. Eine Annahme oder Ablehnung ist nicht nötig; den Stand sehen Sie jederzeit im Auftraggeber-Portal.',
+sie: 'Aufgrund Ihrer erteilten Freigabeschwelle liegt dieses Angebot darunter — wir kümmern uns direkt um den Auftrag. Eine Annahme oder Ablehnung ist nicht nötig; den Stand sehen Sie jederzeit im Auftraggeber-Portal.',
 } as const
 
 export const ANGEBOT_MAIL_SCHLUSS_STANDARD = {
@@ -375,14 +378,14 @@ export function resolveAngebotPdfEinleitung(
 }
 
 export function angebotMailBetreff(
-  anrede: AngebotMailAnrede,
-  angebotsnr: string,
-  firmenname = 'Bärenwald München'
+  objekt: string | null | undefined,
+  angebotsnr: string
 ): string {
-  const nr = angebotsnr.trim() || 'Angebot'
-  return anrede === 'du'
-    ? `Dein Angebot — ${firmenname} · ${nr}`
-    : `Ihr Angebot — ${firmenname} · ${nr}`
+  return buildSubject({
+    objekt,
+    ereignis: 'Angebot bereit',
+    nummer: angebotsnr.trim() || undefined,
+  })
 }
 
 function textToHtmlParagraphs(text: string): string {
@@ -390,7 +393,7 @@ function textToHtmlParagraphs(text: string): string {
     .split(/\n\n+/)
     .map((block) => block.replace(/\n/g, '<br/>'))
     .filter(Boolean)
-    .map((block) => `<p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${block}</p>`)
+    .map((block) => `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${block}</p>`)
     .join('')
 }
 
@@ -408,10 +411,7 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
   } = data
 
   const formatEur = (n: number) =>
-    n.toLocaleString('de-DE', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
+    formatEuro(n, { suffix: false })
 
   const einleitungResolved = resolveAngebotMailEinleitung(einleitung, anrede, leistungsumfang)
   const { greeting: customGreet, body: einleitungBody } = splitAngebotMailGreeting(einleitungResolved)
@@ -443,7 +443,7 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
     label: `${boxLabel} · ${esc(angebotsnr)}`,
     title: esc(leistungsumfang),
     priceHtml: mailBetragPriceHtml(gesamt_brutto, { reverseCharge: data.reverseCharge }),
-    metaHtml: `<p style="font-size:12px;color:#6B7280;margin:8px 0 0;">Gültig bis: <strong style="color:#374151;">${esc(gueltig_bis)}</strong></p>`,
+    metaHtml: `<p style="font-size:12px;color:${C.gray500};margin:8px 0 0;">Gültig bis: <strong style="color:${C.gray700};">${esc(gueltig_bis)}</strong></p>`,
   })
 
   const vizHtml = data.visualisierung_vorschau_url
@@ -452,16 +452,16 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
 
   const anredeKey = anrede === 'sie' ? 'sie' : 'du'
   const content = `
-      <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${anredeText}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${anredeText}</p>
       ${einleitungHtml}
       ${summaryHtml}
       ${vizHtml}
-      <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">
         ${ctaText}
       </p>
       ${grussHtml}
-      <p style="font-size:15px;color:#374151;margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
+      <p style="font-size:15px;color:${C.gray700};margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
 
   const preheader = `${angebotsnr} · ${formatEur(gesamt_brutto)} € · gültig bis ${gueltig_bis}`
   return mailHtmlBase(
@@ -476,14 +476,14 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
 export type NachfassMailInput = AngebotMailInput
 
 export function gueltigReminderMailBetreff(
-  anrede: AngebotMailAnrede,
-  angebotsnr: string,
-  gueltigBisDe: string
+  objekt: string | null | undefined,
+  angebotsnr: string
 ): string {
-  const nr = angebotsnr.trim() || 'Angebot'
-  return anrede === 'du'
-    ? `Dein Angebot läuft am ${gueltigBisDe} aus — ${nr}`
-    : `Ihr Angebot läuft am ${gueltigBisDe} aus — ${nr}`
+  return buildSubject({
+    objekt,
+    ereignis: 'Angebot läuft bald aus',
+    nummer: angebotsnr.trim() || undefined,
+  })
 }
 
 /** Erinnerung 7 Tage nach Versand/Verlängerung — weiß, schlicht, ohne Summary-Card. */
@@ -513,23 +513,26 @@ export function buildAngebotGueltigReminderMail(
       : 'Sie erhalten diese Erinnerung zu Ihrem Angebot.'
 
   const content = `
-      <h1 style="font-size:22px;font-weight:700;color:#111111;margin:0 0 20px;">${h1}</h1>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${anredeText}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${anrede === 'du' ? bodyDu : bodySie}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 20px;line-height:1.6;">${cta}</p>
+      <h1 style="font-size:22px;font-weight:700;color:${C.gray900};margin:0 0 20px;">${h1}</h1>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${anredeText}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${anrede === 'du' ? bodyDu : bodySie}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 20px;line-height:1.6;">${cta}</p>
       <p style="margin:0 0 20px;">
         ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
       </p>`
 
-  const betreff = gueltigReminderMailBetreff(anrede, angebotsnr, gueltig_bis)
+  const betreff = gueltigReminderMailBetreff(leistungsumfang, angebotsnr)
   const preheader = `${angebotsnr} · gültig bis ${gueltig_bis}`
   const html = mailHtmlBase(content, preheader, branding, disclaimer, { anrede })
   return { betreff, html }
 }
 
 /** @deprecated Alias — nutzt buildAngebotGueltigReminderMail */
-export function nachfassMailBetreff(anrede: AngebotMailAnrede, angebotsnr: string): string {
-  return gueltigReminderMailBetreff(anrede, angebotsnr, '…')
+export function nachfassMailBetreff(
+  objekt: string | null | undefined,
+  angebotsnr: string
+): string {
+  return gueltigReminderMailBetreff(objekt, angebotsnr)
 }
 
 /** @deprecated Alias — nutzt buildAngebotGueltigReminderMail */

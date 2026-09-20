@@ -44,6 +44,9 @@ export const DOC = {
   emptyHint: 'Dateien über „Hochladen“ oder per Drag & Drop ablegen.',
 } as const
 
+/** @deprecated Import aus `@/lib/copy` — Re-Export für bestehende Imports. */
+export { EMPTY } from '@/lib/copy/empty'
+
 export const CHECKLISTE = {
   tab: 'Checkliste',
   laeuft: 'Läuft',

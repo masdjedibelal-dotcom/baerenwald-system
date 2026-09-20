@@ -1,12 +1,12 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
-import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { AngebotEinfachStatusBadge } from '@/components/ui/AngebotEinfachStatusBadge'
-import { AuftragStatusBadge } from '@/components/ui/AuftragStatusBadge'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { LeadStatusBadge } from '@/components/ui/Badge'
 import { RECHNUNG_STATUS_LABELS, type RechnungStatus } from '@/lib/rechnung-config'
 import { buildKundeProjektBaeume, type KundeProjektAst } from '@/lib/crm/build-kunde-projekt-baum'
@@ -27,17 +27,12 @@ function AstKnoten({
   const [open, setOpen] = useState(defaultOpen ?? false)
 
   return (
-    <div className="rounded-lg border border-bw-border bg-white">
-      <button
-        type="button"
-        className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-bw-hover/40"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
+    <div className="rounded-button border border-bw-border bg-white">
+      <MockBtn fullWidth className="flex items-start gap-2 px-3 py-2.5 text-left hover:bg-bw-hover/40" type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         {open ? (
-          <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
+          <MockIcon n="chevron-down" ctx="default" className="mt-0.5 h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
         ) : (
-          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
+          <MockIcon n="chevron-right" ctx="default" className="mt-0.5 h-4 w-4 shrink-0 text-bw-text-muted" aria-hidden />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -56,13 +51,13 @@ function AstKnoten({
             {ast.rechnungen.length ? ` · ${ast.rechnungen.length} Rechnung${ast.rechnungen.length === 1 ? '' : 'en'}` : ''}
           </p>
         </div>
-      </button>
+      </MockBtn>
 
       {open ? (
         <div className="space-y-3 border-t border-bw-border px-3 py-3 pl-9">
           {ast.angebote.length > 0 ? (
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
+              <p className="mb-1 text-fs-caption font-semibold uppercase tracking-wide text-bw-text-muted">
                 Angebote
               </p>
               <ul className="space-y-1.5">
@@ -72,7 +67,7 @@ function AstKnoten({
                       {a.label}
                     </Link>
                     <span className="flex items-center gap-2">
-                      <AngebotEinfachStatusBadge status={a.statusEinfach} />
+                      <StatusBadge status={a.statusEinfach} />
                       <span className="tabular-nums text-bw-text-muted">{a.betrag}</span>
                     </span>
                   </li>
@@ -83,7 +78,7 @@ function AstKnoten({
 
           {ast.auftrag ? (
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
+              <p className="mb-1 text-fs-caption font-semibold uppercase tracking-wide text-bw-text-muted">
                 Auftrag
               </p>
               <Link
@@ -91,14 +86,14 @@ function AstKnoten({
                 className="flex flex-wrap items-center justify-between gap-2 text-sm hover:underline"
               >
                 <span>{ast.auftrag.titel}</span>
-                <AuftragStatusBadge status={ast.auftrag.status} />
+                <StatusBadge status={ast.auftrag.status} />
               </Link>
             </div>
           ) : null}
 
           {ast.rechnungen.length > 0 ? (
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
+              <p className="mb-1 text-fs-caption font-semibold uppercase tracking-wide text-bw-text-muted">
                 Rechnungen
               </p>
               <ul className="space-y-1.5">

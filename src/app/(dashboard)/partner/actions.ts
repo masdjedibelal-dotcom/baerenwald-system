@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidatePartnerDetail, revalidatePartnerList } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 
 export async function createPartner(input: {
@@ -26,12 +32,13 @@ export async function createPartner(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/partner/actions:partner', error)
 
   if (error || !data?.id) {
     return { ok: false, message: error?.message ?? 'Netzwerk-Eintrag konnte nicht angelegt werden.' }
   }
 
-  revalidatePath('/partner')
+  revalidatePartnerList()
   return { ok: true, id: data.id }
 }
 
@@ -40,8 +47,9 @@ export async function deletePartner(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const { error } = await supabase.from('partner').delete().eq('id', partnerId)
+  if (error) logDbError('app/partner/actions:partner', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/partner')
-  revalidatePath(`/partner/${partnerId}`)
+  revalidatePartnerList()
+  revalidatePartnerDetail(partnerId)
   return { ok: true }
 }

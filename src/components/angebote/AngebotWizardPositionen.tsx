@@ -1,23 +1,21 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import {
-  AlignLeft,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Pencil,
-  Percent,
-  Trash2,
-} from 'lucide-react'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { DokumentGesamtrabattPanel } from '@/components/dokumente/DokumentGesamtrabattPanel'
 import { PosAddRow } from '@/components/posboard/PosAddRow'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { MobileEditSheet } from '@/components/ui/MobileEditSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
-import { Textarea } from '@/components/ui/Textarea'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { richTextToPlain } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
@@ -97,11 +95,7 @@ function KostenverteilungField({
 }) {
   return (
     <WizardField label="Kostenart">
-      <select
-        className="input w-full"
-        value={value}
-        onChange={(e) => onChange(e.target.value as KostenVerteilung)}
-      >
+      <MockSelect className="w-full" value={value} onChange={(e) => onChange(e.target.value as KostenVerteilung)}>
         {(Object.entries(KOSTEN_VERTEILUNG_LABELS) as [KostenVerteilung, string][]).map(
           ([key, label]) => (
             <option key={key} value={key}>
@@ -109,7 +103,7 @@ function KostenverteilungField({
             </option>
           )
         )}
-      </select>
+      </MockSelect>
     </WizardField>
   )
 }
@@ -130,11 +124,10 @@ function FachbetriebHinweisCheckbox({
   onPatch: (patch: Partial<DokumentArtikelZeile>) => void
 }) {
   return (
-    <div className="full col-span-full rounded-lg border border-bw-border bg-bw-bg-soft/60 px-3 py-2.5">
+    <div className="full col-span-full rounded-card border border-bw-border bg-bw-bg-soft/60 px-3 py-2.5">
       <label className="flex cursor-pointer items-start gap-2.5">
-        <input
-          type="checkbox"
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-bw-border text-bw-accent focus:ring-bw-accent"
+        <MockCheckbox
+          className="mt-0.5 h-4 w-4 shrink-0 rounded-card border-bw-border text-bw-accent focus:ring-bw-accent"
           checked={hinweisAnzeigen !== false}
           onChange={(e) => {
             const an = e.target.checked
@@ -319,40 +312,19 @@ function PositionAccordionItem({
         {z.typ === 'freitext' ? (
           <>
             <WizardField label="Überschrift" required full>
-              <input
-                className="input w-full"
-                value={z.titel}
-                onChange={(e) => onPatch({ titel: e.target.value })}
-                placeholder="z. B. Wichtiger Hinweis"
-                autoFocus={display === 'editor'}
-              />
+              <MockInput className="w-full" value={z.titel} onChange={(e) => onPatch({ titel: e.target.value })} placeholder="z. B. Wichtiger Hinweis" autoFocus={display === 'editor'} />
             </WizardField>
             <WizardField label="Beschreibung" full>
-              <Textarea
-                rows={3}
-                value={z.text}
-                onChange={(e) => onPatch({ text: e.target.value })}
-                placeholder="z. B. Hinweis zu Ablauf oder Garantie"
-              />
+              <RichTextEditor value={typeof (z.text) === 'string' ? (z.text) : ''} onChange={(__v) => onPatch({ text: __v })} placeholder="z. B. Hinweis zu Ablauf oder Garantie" minHeight={120} aria-label="z. B. Hinweis zu Ablauf oder Garantie" />
             </WizardField>
           </>
         ) : z.typ === 'gesamtrabatt' ? (
           <>
             <WizardField label="Bezeichnung" required full>
-              <input
-                className="input w-full"
-                value={z.bezeichnung}
-                onChange={(e) => onPatch({ bezeichnung: e.target.value })}
-                autoFocus={display === 'editor'}
-              />
+              <MockInput className="w-full" value={z.bezeichnung} onChange={(e) => onPatch({ bezeichnung: e.target.value })} autoFocus={display === 'editor'} />
             </WizardField>
             <WizardField label="Art des Nachlasses" hint="Oder neuen Gesamtbetrag setzen — Rabatt wird berechnet">
-              <select
-                className="input w-full"
-                value={
-                  z.modus === 'ziel_netto' || z.modus === 'ziel_brutto' ? 'ziel' : z.modus
-                }
-                onChange={(e) => {
+              <MockSelect className="w-full" value={z.modus === 'ziel_netto' || z.modus === 'ziel_brutto' ? 'ziel' : z.modus} onChange={(e) => {
                   const v = e.target.value
                   if (v === 'ziel') {
                     const artikelNetto = summeArtikelNetto(zeilen)
@@ -366,30 +338,21 @@ function PositionAccordionItem({
                     return
                   }
                   onPatch({ modus: v as DokumentGesamtrabattZeile['modus'] })
-                }}
-              >
+                }}>
                 <option value="prozent">Prozent vom Netto</option>
                 <option value="betrag">Fester Betrag</option>
                 <option value="ziel">Neuer Gesamtbetrag</option>
-              </select>
+              </MockSelect>
             </WizardField>
             {z.modus === 'ziel_netto' || z.modus === 'ziel_brutto' ? (
               <WizardField label="Basis">
                 <div className="seg" role="group" aria-label="Netto oder Brutto">
-                  <button
-                    type="button"
-                    className={z.modus === 'ziel_netto' ? 'on' : undefined}
-                    onClick={() => onPatch({ modus: 'ziel_netto' })}
-                  >
+                  <MockBtn className={z.modus === 'ziel_netto' ? 'on' : undefined} type="button" onClick={() => onPatch({ modus: 'ziel_netto' })}>
                     Netto
-                  </button>
-                  <button
-                    type="button"
-                    className={z.modus === 'ziel_brutto' ? 'on' : undefined}
-                    onClick={() => onPatch({ modus: 'ziel_brutto' })}
-                  >
+                  </MockBtn>
+                  <MockBtn className={z.modus === 'ziel_brutto' ? 'on' : undefined} type="button" onClick={() => onPatch({ modus: 'ziel_brutto' })}>
                     Brutto
-                  </button>
+                  </MockBtn>
                 </div>
               </WizardField>
             ) : null}
@@ -415,7 +378,7 @@ function PositionAccordionItem({
               </div>
             </WizardField>
             <WizardField label="Abzug (netto)">
-              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums text-amber-800">
+              <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums text-status-contact-text">
                 {formatEurBetrag(total)}
               </div>
             </WizardField>
@@ -424,10 +387,7 @@ function PositionAccordionItem({
           <>
             {!lockGewerk ? (
               <WizardField label="Gewerk">
-                <select
-                  className="input w-full"
-                  value={z.gewerk_id ?? ''}
-                  onChange={(e) => {
+                <MockSelect className="w-full" value={z.gewerk_id ?? ''} onChange={(e) => {
                     const gid = e.target.value
                     const g = gewerkById(gewerke, gid)
                     onPatch({
@@ -437,8 +397,7 @@ function PositionAccordionItem({
                       bezeichnung: '',
                       preisliste_id: null,
                     } as Partial<DokumentArtikelZeile>)
-                  }}
-                >
+                  }}>
                   <option value="">Gewerk wählen…</option>
                   {gewerke
                     .filter((g) => g.aktiv !== false)
@@ -447,16 +406,11 @@ function PositionAccordionItem({
                         {g.name}
                       </option>
                     ))}
-                </select>
+                </MockSelect>
               </WizardField>
             ) : null}
             <WizardField label="Leistung aus Liste" required>
-              <select
-                className="input w-full"
-                value={z.preisliste_id ?? ''}
-                onChange={(e) => applyPreisliste(e.target.value)}
-                disabled={!z.gewerk_id}
-              >
+              <MockSelect className="w-full" value={z.preisliste_id ?? ''} onChange={(e) => applyPreisliste(e.target.value)} disabled={!z.gewerk_id}>
                 <option value="">
                   {z.gewerk_id ? 'Leistung wählen…' : 'Zuerst Gewerk wählen…'}
                 </option>
@@ -465,15 +419,10 @@ function PositionAccordionItem({
                     {pl.leistung}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </WizardField>
             <WizardField label="Beschreibung (optional)" full>
-              <Textarea
-                rows={3}
-                value={z.positionBeschreibung ?? ''}
-                onChange={(e) => onPatch({ positionBeschreibung: e.target.value })}
-                placeholder="z. B. inkl. Grundierung, zwei Anstriche, Endreinigung"
-              />
+              <RichTextEditor value={typeof (z.positionBeschreibung ?? '') === 'string' ? (z.positionBeschreibung ?? '') : ''} onChange={(__v) => onPatch({ positionBeschreibung: __v })} placeholder="z. B. inkl. Grundierung, zwei Anstriche, Endreinigung" minHeight={120} aria-label="z. B. inkl. Grundierung, zwei Anstriche, Endreinigung" />
             </WizardField>
             {!istAnfahrt ? (
               <KostenverteilungField
@@ -492,17 +441,13 @@ function PositionAccordionItem({
                   value={z.menge}
                   onValueChange={(menge) => onPatch({ menge })}
                 />
-                <select
-                  className="input"
-                  value={z.einheit}
-                  onChange={(e) => onPatch({ einheit: e.target.value })}
-                >
+                <MockSelect value={z.einheit} onChange={(e) => onPatch({ einheit: e.target.value })}>
                   {POSITION_MENGE_EINHEITEN.map((u) => (
                     <option key={u} value={u}>
                       {groesseEinheitLabel(u)}
                     </option>
                   ))}
-                </select>
+                </MockSelect>
               </div>
             </WizardField>
             <WizardField label="Einzelpreis netto">
@@ -527,20 +472,11 @@ function PositionAccordionItem({
         ) : (
           <>
             <WizardField label="Leistung" required full>
-              <input
-                className="input w-full"
-                value={z.bezeichnung}
-                onChange={(e) => onPatch({ bezeichnung: e.target.value })}
-                placeholder="z. B. Wände streichen"
-                autoFocus={display === 'editor'}
-              />
+              <MockInput className="w-full" value={z.bezeichnung} onChange={(e) => onPatch({ bezeichnung: e.target.value })} placeholder="z. B. Wände streichen" autoFocus={display === 'editor'} />
             </WizardField>
             {!lockGewerk ? (
               <WizardField label="Gewerk">
-                <select
-                  className="input w-full"
-                  value={z.gewerk_id ?? ''}
-                  onChange={(e) => {
+                <MockSelect className="w-full" value={z.gewerk_id ?? ''} onChange={(e) => {
                     const gid = e.target.value
                     const g = gewerkById(gewerke, gid)
                     const hinweis = g ? getHinweisForPosition(g.id, gewerke) : ''
@@ -552,8 +488,7 @@ function PositionAccordionItem({
                       positionBeschreibung: hinweis || undefined,
                       fachbetriebHinweisAnzeigen: fachbetrieb ? true : undefined,
                     } as Partial<DokumentArtikelZeile>)
-                  }}
-                >
+                  }}>
                   <option value="">Gewerk wählen…</option>
                   {gewerke
                     .filter((g) => g.aktiv !== false)
@@ -562,7 +497,7 @@ function PositionAccordionItem({
                         {g.name}
                       </option>
                     ))}
-                </select>
+                </MockSelect>
               </WizardField>
             ) : null}
             {fachbetriebHinweisAktiv ? (
@@ -576,12 +511,7 @@ function PositionAccordionItem({
               />
             ) : null}
             <WizardField label="Beschreibung (optional)" full>
-              <Textarea
-                rows={3}
-                value={z.positionBeschreibung ?? ''}
-                onChange={(e) => onPatch({ positionBeschreibung: e.target.value })}
-                placeholder="z. B. inkl. Untergrund vorbereiten, Material, Endreinigung"
-              />
+              <RichTextEditor value={typeof (z.positionBeschreibung ?? '') === 'string' ? (z.positionBeschreibung ?? '') : ''} onChange={(__v) => onPatch({ positionBeschreibung: __v })} placeholder="z. B. inkl. Untergrund vorbereiten, Material, Endreinigung" minHeight={120} aria-label="z. B. inkl. Untergrund vorbereiten, Material, Endreinigung" />
             </WizardField>
             <WizardField label="Menge">
               <div className="lead-leistung-menge">
@@ -592,17 +522,13 @@ function PositionAccordionItem({
                   value={z.menge}
                   onValueChange={(menge) => onPatch({ menge })}
                 />
-                <select
-                  className="input"
-                  value={z.einheit}
-                  onChange={(e) => onPatch({ einheit: e.target.value })}
-                >
+                <MockSelect value={z.einheit} onChange={(e) => onPatch({ einheit: e.target.value })}>
                   {POSITION_MENGE_EINHEITEN.map((u) => (
                     <option key={u} value={u}>
                       {groesseEinheitLabel(u)}
                     </option>
                   ))}
-                </select>
+                </MockSelect>
               </div>
             </WizardField>
             <WizardField label="Einzelpreis netto">
@@ -617,19 +543,14 @@ function PositionAccordionItem({
               />
             ) : null}
             <WizardField label="Steuersatz">
-              <select
-                className="input w-full"
-                value={String(z.mwstSatz)}
-                onChange={(e) =>
-                  onPatch({ mwstSatz: Number(e.target.value) as MwstSatzOption })
-                }
-              >
+              <MockSelect className="w-full" value={String(z.mwstSatz)} onChange={(e) =>
+                  onPatch({ mwstSatz: Number(e.target.value) as MwstSatzOption })}>
                 {MWST_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </WizardField>
             <WizardField label="Zeilensumme">
               <div className="input flex min-h-[34px] items-center bg-bw-bg-soft text-[length:var(--fs-text)] font-semibold tabular-nums">
@@ -640,10 +561,10 @@ function PositionAccordionItem({
         )}
       </div>
       <div className="pos-edit-foot">
-        <button type="button" className="btn ghost sm gap-1.5" onClick={onRemove}>
-          <Trash2 className="h-3.5 w-3.5" />
-          Entfernen
-        </button>
+        <MockBtn kind="ghost" sm className="gap-1.5" type="button" onClick={onRemove}>
+          <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" />
+          Löschen
+        </MockBtn>
         <div className="flex-1" />
         {kind !== 'freitext' ? (
           <span className="pos-sub-total">
@@ -651,10 +572,10 @@ function PositionAccordionItem({
           </span>
         ) : null}
         {display !== 'editor' ? (
-          <button type="button" className="btn primary sm gap-1.5" onClick={onClose}>
-            <Check className="h-3.5 w-3.5" />
+          <MockBtn kind="primary" sm className="gap-1.5" type="button" onClick={onClose}>
+            <MockIcon n="check" ctx="default" className="h-3.5 w-3.5" />
             Speichern
-          </button>
+          </MockBtn>
         ) : null}
       </div>
     </>
@@ -692,9 +613,9 @@ function PositionAccordionItem({
           {posNr != null ? (
             posNr
           ) : kind === 'rabatt' ? (
-            <Percent className="h-3.5 w-3.5 text-bw-text-muted" aria-hidden />
+            <MockIcon n="percentage" ctx="default" className="h-3.5 w-3.5 text-bw-text-muted" aria-hidden />
           ) : kind === 'freitext' ? (
-            <AlignLeft className="h-3.5 w-3.5 text-bw-text-muted" aria-hidden />
+            <MockIcon n="list" ctx="default" className="h-3.5 w-3.5 text-bw-text-muted" aria-hidden />
           ) : (
             <span className="text-bw-text-subtle">—</span>
           )}
@@ -728,61 +649,37 @@ function PositionAccordionItem({
         <div className="pos-actions">
           {canMoveUp || canMoveDown ? (
             <div className="pos-reorder" aria-label="Reihenfolge">
-              <button
-                type="button"
-                className="btn ghost sm pos-reorder-btn"
-                title="Nach oben"
-                aria-label="Position nach oben verschieben"
-                disabled={!canMoveUp}
-                onClick={(e) => {
+              <MockBtn kind="ghost" sm className="pos-reorder-btn" type="button" title="Nach oben" aria-label="Position nach oben verschieben" disabled={!canMoveUp} onClick={(e) => {
                   e.stopPropagation()
                   onMoveUp?.()
-                }}
-              >
-                <ChevronUp className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                className="btn ghost sm pos-reorder-btn"
-                title="Nach unten"
-                aria-label="Position nach unten verschieben"
-                disabled={!canMoveDown}
-                onClick={(e) => {
+                }}>
+                <MockIcon n="chevron-up" ctx="default" className="h-3.5 w-3.5" />
+              </MockBtn>
+              <MockBtn kind="ghost" sm className="pos-reorder-btn" type="button" title="Nach unten" aria-label="Position nach unten verschieben" disabled={!canMoveDown} onClick={(e) => {
                   e.stopPropagation()
                   onMoveDown?.()
-                }}
-              >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </button>
+                }}>
+                <MockIcon n="chevron-down" ctx="default" className="h-3.5 w-3.5" />
+              </MockBtn>
             </div>
           ) : null}
-          <button
-            type="button"
-            className="btn ghost sm"
-            title={browseMode ? 'Bearbeiten' : inlineOpen ? 'Schließen' : 'Bearbeiten'}
-            onClick={(e) => {
+          <MockBtn kind="ghost" sm type="button" title={browseMode ? 'Bearbeiten' : inlineOpen ? 'Abbrechen' : 'Bearbeiten'} onClick={(e) => {
               e.stopPropagation()
               if (browseMode || !inlineOpen) onToggle()
               else onClose()
-            }}
-          >
+            }}>
             {browseMode || !inlineOpen ? (
-              <Pencil className="h-3.5 w-3.5" />
+              <MockIcon n="pencil" ctx="default" className="h-3.5 w-3.5" />
             ) : (
-              <ChevronUp className="h-3.5 w-3.5" />
+              <MockIcon n="chevron-up" ctx="default" className="h-3.5 w-3.5" />
             )}
-          </button>
-          <button
-            type="button"
-            className="btn ghost sm"
-            title="Entfernen"
-            onClick={(e) => {
+          </MockBtn>
+          <MockBtn kind="ghost" sm type="button" title="Löschen" onClick={(e) => {
               e.stopPropagation()
               onRemove()
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+            }}>
+            <MockIcon n="trash" ctx="default" className="h-3.5 w-3.5" />
+          </MockBtn>
         </div>
       </div>
 
@@ -1016,7 +913,7 @@ export function AngebotWizardPositionen({
               {rabattAbzugSumme > 0 ? (
                 <div className="row">
                   <div className="lbl">Rabatt</div>
-                  <div className="val text-amber-800">−{formatEurBetrag(rabattAbzugSumme)}</div>
+                  <div className="val text-status-contact-text">−{formatEurBetrag(rabattAbzugSumme)}</div>
                 </div>
               ) : null}
               <div className="row">

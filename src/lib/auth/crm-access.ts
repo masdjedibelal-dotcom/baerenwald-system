@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { isStagingAdminEmail } from '@/lib/auth/staging-admin'
+import { COPY_ROLE } from '@/lib/copy'
 
 const BAERENWALD_PRIMARY_STAFF_EMAIL = 'info@baerenwald-muenchen.de'
 
@@ -41,7 +42,7 @@ export function isLikelyPortalOnlyUser(user: User): boolean {
 }
 
 export const CRM_LOGIN_PORTAL_ONLY_MESSAGE =
-  'Diese E-Mail ist für MeinBärenwald / das Partner-Portal registriert, nicht für das CRM. ' +
+  `Diese E-Mail ist für MeinBärenwald / das ${COPY_ROLE.partnerPortal} registriert, nicht für das CRM. ` +
   'Für das CRM nutze die Einladungs-E-Mail (z. B. info@baerenwald-muenchen.de mit Bindestrich) oder bitte einen Admin um CRM-Zugang.'
 
 export const CRM_LOGIN_INVALID_MESSAGE = 'E-Mail oder Passwort falsch.'

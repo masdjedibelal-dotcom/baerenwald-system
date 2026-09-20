@@ -1,5 +1,5 @@
 import { RAHMENVERTRAG_TYP_SLUG } from '@/lib/handwerker/compliance-vertrag-status'
-import { replacePartnerDokumentForTyp } from '@/app/(dashboard)/handwerker/actions'
+import { replaceHandwerkerDokumentForTyp } from '@/app/(dashboard)/handwerker/actions'
 
 /** Verknüpft erzeugten Rahmenvertrag-PDF mit Compliance-Dokumenttyp „rahmenvertrag“. */
 export async function syncRahmenvertragComplianceDoc(input: {
@@ -8,7 +8,7 @@ export async function syncRahmenvertragComplianceDoc(input: {
   vertrags_nr?: string | null
 }): Promise<void> {
   if (!input.pdf_url.trim()) return
-  await replacePartnerDokumentForTyp({
+  await replaceHandwerkerDokumentForTyp({
     handwerker_id: input.handwerker_id,
     auftrag_id: null,
     typ: RAHMENVERTRAG_TYP_SLUG,

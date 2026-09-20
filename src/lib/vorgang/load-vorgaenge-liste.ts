@@ -1,4 +1,4 @@
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { filterKundenAngebote } from '@/lib/angebote/partner-einholung'
 import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
@@ -25,6 +25,7 @@ import {
   istRechnungGestelltOderBezahlt,
   parseZahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 export type { VorgangListeRow } from '@/lib/vorgang/types'
 
@@ -64,31 +65,43 @@ const VORGAENGE_LEAD_SELECT = `
 export type LoadVorgaengeListeOpts = {
   /** Nur Vorgänge dieses Kunden (statt globale Liste). */
   kundeId?: string
-  /** Nur Vorgänge mit diesem Handwerker (über Auftragspositionen / Zuweisungen). */
+  /** Nur Vorgänge mit diesem Partner (über Auftragspositionen / Zuweisungen). */
   handwerkerId?: string
   /** Nur Vorgänge an diesem Verwaltungsobjekt (leads.kunde_objekt_id). */
   objektId?: string
+  /** 1-basierte Seite (echte DB-Paginierung über crm_vorgaenge_lead_page). */
+  page?: number
+  /** Seitengröße 1–100, Default 50. */
+  pageSize?: number
+  /**
+   * Alle Lead-Seiten laden (Kunde-/Objekt-/Partner-Einbettung).
+   * Ignoriert page; pageSize = Batch-Größe für RPC.
+   */
+  fetchAllPages?: boolean
 }
 
-async function resolveLeadIdsForHandwerker(
+export type VorgaengeListePagination = {
+  page: number
+  pageSize: number
+  totalLeads: number
+  totalPages: number
+}
+
+async function resolveLeadIdsForPartner(
   handwerkerId: string
 ): Promise<string[]> {
   const ids = new Set<string>()
   const [posRes, zuwRes] = await Promise.all([
-    withCrmReadFallback(async (db) =>
-      db
+    await (() => { const db = createClient(); return db
         .from('auftrag_positionen')
         .select('auftrag_id')
         .eq('handwerker_id', handwerkerId)
-        .limit(300)
-    ),
-    withCrmReadFallback(async (db) =>
-      db
+        .limit(300) })(),
+    await (() => { const db = createClient(); return db
         .from('angebot_handwerker')
         .select('angebot_id')
         .eq('handwerker_id', handwerkerId)
-        .limit(200)
-    ),
+        .limit(200) })(),
   ])
   const auftragIds = Array.from(
     new Set(
@@ -106,14 +119,10 @@ async function resolveLeadIdsForHandwerker(
   )
   const [aufLeads, angLeads] = await Promise.all([
     auftragIds.length
-      ? withCrmReadFallback(async (db) =>
-          db.from('auftraege').select('lead_id').in('id', auftragIds)
-        )
+      ? await (() => { const db = createClient(); return db.from('auftraege').select('lead_id').in('id', auftragIds) })()
       : Promise.resolve({ data: [] as { lead_id?: string }[] }),
     angebotIds.length
-      ? withCrmReadFallback(async (db) =>
-          db.from('angebote').select('lead_id').in('id', angebotIds)
-        )
+      ? await (() => { const db = createClient(); return db.from('angebote').select('lead_id').in('id', angebotIds) })()
       : Promise.resolve({ data: [] as { lead_id?: string }[] }),
   ])
   for (const row of [...(aufLeads.data ?? []), ...(angLeads.data ?? [])]) {
@@ -126,71 +135,145 @@ async function resolveLeadIdsForHandwerker(
 export async function loadVorgaengeListe(opts?: LoadVorgaengeListeOpts): Promise<{
   rows: VorgangListeRow[]
   error: string | null
+<<<<<<< Updated upstream
+  pagination?: VorgaengeListePagination | null
+=======
+  /** P4-5: gesetzt wenn Lead-Hard-Limit greift */
+  listeTruncated?: { shown: number; total: number } | null
+>>>>>>> Stashed changes
 }> {
   try {
     return await loadVorgaengeListeInner(opts)
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Vorgänge konnten nicht geladen werden.'
     console.error('loadVorgaengeListe', e)
-    return { rows: [], error: msg }
+    return { rows: [], error: msg, pagination: null }
   }
 }
 
 async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
   rows: VorgangListeRow[]
   error: string | null
+<<<<<<< Updated upstream
+  pagination?: VorgaengeListePagination | null
+=======
+  listeTruncated?: { shown: number; total: number } | null
+>>>>>>> Stashed changes
 }> {
   const supabase = createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return { rows: [], error: 'Sitzung abgelaufen — bitte erneut anmelden.' }
+    return { rows: [], error: 'Sitzung abgelaufen — bitte erneut anmelden.', pagination: null }
   }
 
   const kundeId = opts?.kundeId?.trim() || null
   const handwerkerId = opts?.handwerkerId?.trim() || null
   const objektId = opts?.objektId?.trim() || null
   const scoped = Boolean(kundeId || handwerkerId || objektId)
-  const leadLimit = scoped ? 80 : 200
+  const fetchAllPages = Boolean(opts?.fetchAllPages ?? scoped)
+  const pageSize = Math.min(100, Math.max(1, opts?.pageSize ?? 50))
+  const page = Math.max(1, opts?.page ?? 1)
 
   const RECHNUNG_SELECT =
     'id, status, faellig_am, brutto, created_at, updated_at, auftrag_id, angebot_id, kunde_id, rechnung_art, abschlag_index, rechnungsnummer, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, korrektur_von, korrektur_art, bezug_rechnung_id, richtung, beleg_typ, handwerker_id, angebot_handwerker_id, angebote(lead_id), auftraege(lead_id), kunden!kunde_id(id, name, vorname, nachname, typ), handwerker:handwerker_id(id, name, firma)'
 
   let handwerkerLeadIds: string[] | null = null
   if (handwerkerId) {
-    handwerkerLeadIds = await resolveLeadIdsForHandwerker(handwerkerId)
+    handwerkerLeadIds = await resolveLeadIdsForPartner(handwerkerId)
     if (!handwerkerLeadIds.length) {
-      return { rows: [], error: null }
+      return {
+        rows: [],
+        error: null,
+        pagination: { page: 1, pageSize, totalLeads: 0, totalPages: 1 },
+      }
     }
   }
 
-  const leadsRes = await withCrmReadFallback(async (db) => {
-    let q = db
-      .from('leads')
-      .select(VORGAENGE_LEAD_SELECT)
-      .is('geloescht_am', null)
-      .order('updated_at', { ascending: false })
-      .limit(leadLimit)
-    if (kundeId) {
-      q = q.or(`kunde_id.eq.${kundeId},auftraggeber_kunde_id.eq.${kundeId}`)
+  type LeadPageRow = { id: string; updated_at: string | null; total_count: number | string }
+  const rpcArgsBase = {
+    p_kunde_id: kundeId,
+    p_objekt_id: objektId,
+    p_lead_ids: handwerkerLeadIds,
+  }
+
+  let pageLeadIds: string[] = []
+  let totalLeads = 0
+
+  if (fetchAllPages) {
+    let offset = 0
+    for (;;) {
+      const { data, error } = await supabase.rpc('crm_vorgaenge_lead_page', {
+        ...rpcArgsBase,
+        p_limit: pageSize,
+        p_offset: offset,
+      })
+      if (error) {
+        logDbError('loadVorgaengeListe:crm_vorgaenge_lead_page', error)
+        return { rows: [], error: error.message, pagination: null }
+      }
+      const batch = (data ?? []) as LeadPageRow[]
+      if (!batch.length) break
+      totalLeads = Number(batch[0]?.total_count ?? 0)
+      for (const row of batch) {
+        const id = String(row.id ?? '')
+        if (id) pageLeadIds.push(id)
+      }
+      offset += batch.length
+      if (offset >= totalLeads || batch.length < pageSize) break
     }
-    if (objektId) {
-      q = q.eq('kunde_objekt_id', objektId)
+  } else {
+    const offset = (page - 1) * pageSize
+    const { data, error } = await supabase.rpc('crm_vorgaenge_lead_page', {
+      ...rpcArgsBase,
+      p_limit: pageSize,
+      p_offset: offset,
+    })
+    if (error) {
+      logDbError('loadVorgaengeListe:crm_vorgaenge_lead_page', error)
+      return { rows: [], error: error.message, pagination: null }
     }
-    if (handwerkerLeadIds?.length) {
-      q = q.in('id', handwerkerLeadIds)
-    }
-    return q
-  })
+    const batch = (data ?? []) as LeadPageRow[]
+    totalLeads = Number(batch[0]?.total_count ?? 0)
+    pageLeadIds = batch.map((r) => String(r.id ?? '')).filter(Boolean)
+  }
+
+  const totalPages = Math.max(1, Math.ceil(totalLeads / pageSize))
+  const pagination: VorgaengeListePagination = {
+    page: fetchAllPages ? 1 : page,
+    pageSize,
+    totalLeads,
+    totalPages: fetchAllPages ? 1 : totalPages,
+  }
+
+  if (!pageLeadIds.length) {
+    return { rows: [], error: null, pagination }
+  }
+
+  const leadsRes = await supabase
+    .from('leads')
+    .select(VORGAENGE_LEAD_SELECT)
+    .in('id', pageLeadIds)
+    .is('geloescht_am', null)
 
   if (leadsRes.error || !leadsRes.data) {
-    return { rows: [], error: leadsRes.error?.message ?? 'Leads konnten nicht geladen werden.' }
+    return {
+      rows: [],
+      error: leadsRes.error?.message ?? 'Leads konnten nicht geladen werden.',
+      pagination,
+    }
   }
 
-  const leadIds = (leadsRes.data ?? [])
-    .map((l) => String((l as { id?: unknown }).id ?? ''))
-    .filter(Boolean)
+  // RPC-Reihenfolge (updated_at desc) beibehalten
+  const leadById = new Map(
+    (leadsRes.data ?? []).map((l) => [String((l as { id?: unknown }).id ?? ''), l])
+  )
+  const orderedLeads = pageLeadIds
+    .map((id) => leadById.get(id))
+    .filter((l): l is NonNullable<typeof l> => Boolean(l))
+
+  const leadIds = pageLeadIds
 
   const emptySatellites = {
     data: [] as unknown[],
@@ -199,26 +282,22 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
 
   const [angeboteRes, auftraegeRes] = leadIds.length
     ? await Promise.all([
-        withCrmReadFallback(async (db) =>
-          db
+        await (() => { const db = createClient(); return db
             .from('angebote')
             .select(
               'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, zahlungsplan, ist_partner_einholung'
             )
             .in('lead_id', leadIds)
             .order('created_at', { ascending: false })
-            .limit(500)
-        ),
-        withCrmReadFallback(async (db) =>
-          db
+            .limit(500) })(),
+        await (() => { const db = createClient(); return db
             .from('auftraege')
             .select(
               'id, lead_id, angebot_id, status, titel, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ist_notfall'
             )
             .in('lead_id', leadIds)
             .order('created_at', { ascending: false })
-            .limit(500)
-        ),
+            .limit(500) })(),
       ])
     : [emptySatellites, emptySatellites]
 
@@ -243,8 +322,9 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
   const [rechnungenLinkedRes, rechnungenStandaloneRes, rechnungenEingehendRes, positionenRes] =
     await Promise.all([
     auftragIds.length || angebotIds.length
-      ? withCrmReadFallback(async (db) => {
-          let q = db
+      ? await (async () => {
+  const db = createClient()
+  let q = db
             .from('rechnungen')
             .select(RECHNUNG_SELECT)
             .order('created_at', { ascending: false })
@@ -259,39 +339,33 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
             q = q.in('angebot_id', angebotIds)
           }
           return q
-        })
+})()
       : Promise.resolve(emptySatellites),
-    // Globale Liste: Direktrechnungen ohne Lead. Scoped (Kunde/HW): überspringen.
-    scoped
+    // Globale Liste Seite 1: Direktrechnungen ohne Lead. Scoped / weitere Seiten: überspringen.
+    scoped || (!fetchAllPages && page > 1)
       ? Promise.resolve(emptySatellites)
-      : withCrmReadFallback(async (db) =>
-          db
+      : await (() => { const db = createClient(); return db
             .from('rechnungen')
             .select(RECHNUNG_SELECT)
             .is('auftrag_id', null)
             .is('angebot_id', null)
             .order('created_at', { ascending: false })
-            .limit(100)
-        ),
-    scoped
+            .limit(100) })(),
+    scoped || (!fetchAllPages && page > 1)
       ? Promise.resolve(emptySatellites)
-      : withCrmReadFallback(async (db) =>
-          db
+      : await (() => { const db = createClient(); return db
             .from('rechnungen')
             .select(RECHNUNG_SELECT)
             .eq('richtung', 'eingehend')
             .order('created_at', { ascending: false })
-            .limit(200)
-        ),
+            .limit(200) })(),
     auftragIds.length
-      ? withCrmReadFallback(async (db) =>
-          db
+      ? await (() => { const db = createClient(); return db
             .from('auftrag_positionen')
             .select('auftrag_id, handwerker_id, handwerker_status, preis_fix, menge, aenderung_typ, gewerk_slug')
             .in('auftrag_id', auftragIds)
             .order('created_at', { ascending: false })
-            .limit(scoped ? 800 : 2000)
-        )
+            .limit(scoped ? 800 : 2000) })()
       : Promise.resolve(emptySatellites),
   ])
 
@@ -362,7 +436,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     } | null
   }
 
-  const leads = filterOutLegacyDemoLeads(leadsRes.data as unknown as LeadRow[])
+  const leads = filterOutLegacyDemoLeads(orderedLeads as unknown as LeadRow[])
   const angebote = filterKundenAngebote(
     (angeboteRes.data ?? []) as Array<{
       id: string
@@ -640,7 +714,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       if (!rechnungId) return null
       const rechnung = leadRechnungen.find((r) => r.id === rechnungId)
       if (rechnung?.brutto == null) return null
-      return `${Math.round(Number(rechnung.brutto)).toLocaleString('de-DE')} €`
+      return `${formatEuro(Number(rechnung.brutto), { rounded: true, decimals: 0 })}`
     }
 
     const leadListenSummeEuro = computeLeadListenSummeEuro({
@@ -679,7 +753,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
         }, 0)
         if (posNetto > 0) {
           const brutto = nettoZuBrutto(posNetto, 19)
-          return `${brutto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+          return `${formatEuro(brutto)}`
         }
         const leadAngs = angeboteByLead.get(lead.id) ?? []
         const linked = auf?.angebot_id
@@ -855,7 +929,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     const wertLabel =
       r.brutto == null
         ? null
-        : `${Math.round(Number(r.brutto)).toLocaleString('de-DE')} €`
+        : `${formatEuro(Number(r.brutto), { rounded: true, decimals: 0 })}`
     const listenSummeEuro =
       r.brutto == null ? null : Math.round(Number(r.brutto))
     rows.push({
@@ -906,7 +980,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     const wertLabel =
       r.brutto == null
         ? null
-        : `${Math.round(Number(r.brutto)).toLocaleString('de-DE')} €`
+        : `${formatEuro(Number(r.brutto), { rounded: true, decimals: 0 })}`
     const listenSummeEuro =
       r.brutto == null ? null : Math.round(Number(r.brutto))
     rows.push({
@@ -946,7 +1020,41 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
 
   rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
-  return { rows, error: null }
+<<<<<<< Updated upstream
+  return { rows, error: null, pagination }
+=======
+  let listeTruncated: { shown: number; total: number } | null = null
+  const loadedLeadCount = (leadsRes.data ?? []).length
+  if (loadedLeadCount >= leadLimit) {
+    const countRes = await withCrmReadFallback<number>(async (db) => {
+      let q = db
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .is('geloescht_am', null)
+      if (kundeId) {
+        q = q.or(`kunde_id.eq.${kundeId},auftraggeber_kunde_id.eq.${kundeId}`)
+      }
+      if (objektId) {
+        q = q.eq('kunde_objekt_id', objektId)
+      }
+      if (handwerkerLeadIds?.length) {
+        q = q.in('id', handwerkerLeadIds)
+      }
+      const r = await q
+      return { data: r.count ?? null, error: r.error }
+    })
+    const totalLeads = countRes.data ?? loadedLeadCount
+    if (totalLeads > loadedLeadCount) {
+      const extraRows = Math.max(0, rows.length - loadedLeadCount)
+      listeTruncated = {
+        shown: rows.length,
+        total: totalLeads + extraRows,
+      }
+    }
+  }
+
+  return { rows, error: null, listeTruncated }
+>>>>>>> Stashed changes
 }
 
 function angebotBetragLabel(

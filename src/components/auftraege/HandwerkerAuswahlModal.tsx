@@ -1,11 +1,15 @@
 'use client'
+import { MockBtn } from '@/components/mock-ui'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState } from 'react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Accordion } from '@/components/ui/Accordion'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import {
   assignAuftragHandwerkerPosition,
@@ -14,6 +18,7 @@ import {
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
 import type { HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
 import type { AuftragPosition } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 const ToolIcon = resolveMockIcon('tool')
 
@@ -44,9 +49,9 @@ function HandwerkerPickRow({
           </p>
         </div>
       </div>
-      <Button type="button" variant="primary" size="sm" disabled={disabled} onClick={onAdd}>
+      <MockBtn type="button" kind="primary" sm disabled={disabled} onClick={onAdd}>
         Hinzufügen
-      </Button>
+      </MockBtn>
     </div>
   )
 }
@@ -146,10 +151,10 @@ export function HandwerkerAuswahlModal({
         status: 'angefragt' })
       setPendingHwId(null)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Handwerker zugewiesen')
+      toast.success(TOAST.partner_zugewiesen)
       onMailOpen({
         handwerkerId,
         handwerkerName: picked?.name ?? 'Partner',
@@ -174,7 +179,7 @@ export function HandwerkerAuswahlModal({
 
       {listErr ? <p className="mb-2 text-[length:var(--fs-text)] text-danger">{listErr}</p> : null}
       {loading ? (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Handwerker werden geladen…</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Partner werden geladen…</p>
       ) : (
         <div className="max-h-[min(56vh,480px)] space-y-2 overflow-y-auto pr-0.5">
           <HandwerkerPickAccordion
@@ -182,7 +187,7 @@ export function HandwerkerAuswahlModal({
             defaultOpen
             emptyHint={
               target?.gewerkId || target?.gewerkSlug
-                ? 'Keine Handwerker mit diesem Gewerk in den Stammdaten.'
+                ? 'Keine Partner mit diesem Gewerk in den Stammdaten.'
                 : 'Gewerk nicht in Stammdaten — alle Partner unten.'
             }
             rows={empfohlen}
@@ -190,8 +195,8 @@ export function HandwerkerAuswahlModal({
             onAdd={hinzufuegen}
           />
           <HandwerkerPickAccordion
-            title={`Alle Handwerker${alle.length ? ` · ${alle.length}` : ''}`}
-            emptyHint="Keine weiteren Handwerker."
+            title={`Alle Partner${alle.length ? ` · ${alle.length}` : ''}`}
+            emptyHint="Keine weiteren Partner."
             rows={alle}
             pendingId={pendingHwId}
             onAdd={hinzufuegen}

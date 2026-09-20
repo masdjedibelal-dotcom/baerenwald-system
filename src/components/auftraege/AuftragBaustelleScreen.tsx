@@ -1,8 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { AppFlowScreen } from '@/components/layout/app'
 
 export function AuftragBaustelleScreen({
@@ -24,10 +24,10 @@ export function AuftragBaustelleScreen({
         <div className="flex items-center gap-3">
           <Link
             href={`/auftraege/${auftragId}`}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-bw-border bg-bw-bg text-bw-text-muted hover:bg-bw-hover"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-field border border-bw-border bg-bw-bg text-bw-text-muted hover:bg-bw-hover"
             aria-label="Zurück zum Auftrag"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <MockIcon n="arrow-left" ctx="default" className="h-4 w-4" />
           </Link>
           <div className="min-w-0">
             <p className="text-[length:var(--fs-meta)] text-bw-text-muted">{subtitle}</p>

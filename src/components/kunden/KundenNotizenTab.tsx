@@ -1,17 +1,19 @@
 'use client'
+
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
 import { addKundenNotiz, deleteKundenNotiz } from '@/app/actions/kunden'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { KundenNotizRow } from '@/lib/types'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { formatTimelineStamp } from '@/lib/utils'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockNotizComposer } from '@/components/mock-ui/MockDetailCards'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { deleteWithUndo } from '@/lib/ui/delete-with-undo'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { TOAST } from '@/lib/copy'
 
 function notizAutor(n: KundenNotizRow): string {
   const name = n.user_profiles?.name?.trim()
@@ -42,12 +44,15 @@ export function KundenNotizenTab({
 }) {
   const isMobile = useIsMobile()
   const [val, setVal] = useState('')
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set())
   const [pending, startTransition] = useTransition()
 
   const notes = useMemo((): DisplayNote[] => {
-    const rows = [...notizen].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
+    const rows = [...notizen]
+      .filter((n) => !hiddenIds.has(n.id))
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
     if (rows.length > 0) {
       return rows.map((n) => ({
         id: n.id,
@@ -70,7 +75,7 @@ export function KundenNotizenTab({
       ]
     }
     return []
-  }, [notizen, legacyNotiz])
+  }, [notizen, legacyNotiz, hiddenIds])
 
   function speichern() {
     const text = val.trim()
@@ -78,30 +83,42 @@ export function KundenNotizenTab({
     startTransition(async () => {
       const r = await addKundenNotiz(kundeId, text)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Notiz hinzugefügt')
+      toast.success(TOAST.notizHinzugefuegt)
       setVal('')
       onReload()
     })
   }
 
-  function loeschen(id: string, preview?: string) {
+  function loeschen(id: string, _preview?: string) {
     if (id === 'legacy') return
-    confirmDelete(
-      'Notiz löschen?',
-      async () => {
+    deleteWithUndo({
+      key: `kunde-notiz:${id}`,
+      removeOptimistic: () =>
+        setHiddenIds((prev) => new Set(prev).add(id)),
+      restoreOptimistic: () =>
+        setHiddenIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        }),
+      commit: async () => {
         const r = await deleteKundenNotiz(id, kundeId)
         if (!r.ok) {
-          toast.error(r.message)
-          throw new Error(r.message)
+          toast.systemError(r)
+          setHiddenIds((prev) => {
+            const next = new Set(prev)
+            next.delete(id)
+            return next
+          })
+          return
         }
-        toast.success('Notiz gelöscht')
         onReload()
       },
-      { body: preview?.trim() || undefined }
-    )
+      message: TOAST.geloescht,
+    })
   }
 
   return (
@@ -115,7 +132,7 @@ export function KundenNotizenTab({
         }}
       >
         {notes.length === 0 ? (
-          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
+          <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '0.25rem 0' }}>
             {isMobile
               ? 'Noch keine Notizen. Über „Notiz“ oben hinzufügen.'
               : 'Noch keine Notizen — schreibe die erste unten.'}

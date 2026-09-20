@@ -1,4 +1,9 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 /**
@@ -6,12 +11,14 @@ import { useLocalTransition } from '@/components/ui/action-busy'
  */
 import Link from 'next/link'
 import { useState } from 'react'
-import { Download } from 'lucide-react'
 import { toast } from '@/components/ui/app-toast'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { cn, formatDatumZeit } from '@/lib/utils'
 import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition } from '@/lib/types'
@@ -40,6 +47,8 @@ import {
   handwerkerEinreichungAntwortPreviewHtml,
 } from '@/lib/partner/handwerker-einreichung-antwort-mail'
 import type { PartnerAngebotAntwortTyp } from '@/lib/partner/notify-partner-angebot-antwort'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type AntwortModal = {
   typ: PartnerAngebotAntwortTyp
@@ -80,9 +89,15 @@ export function HandwerkerEinreichungPruefung({
   /** Partner-Einholung: Bestätigen erst nach Kunden-Ja. */
   bestaetigenErstNachKundenJa?: boolean
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const [pending, startTransition] = useLocalTransition()
+  const [notizModal, setNotizModal] = useState<PartnerAngebotAntwortTyp | null>(null)
+  const [crmNotiz, setCrmNotiz] = useState('')
+  const [mailModal, setMailModal] = useState<AntwortModal | null>(null)
+
   if (auftragId && z.ohne_lv !== true) {
     return (
-      <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2.5 text-[length:var(--fs-meta)] text-bw-text-muted">
+      <div className="mt-3 rounded-card border border-bw-border bg-bw-bg px-3 py-2.5 text-[length:var(--fs-meta)] text-bw-text-muted">
         <p className="font-medium text-bw-text">Vorgänge-Flow (Auftrag aktiv)</p>
         <p className="mt-1">
           Preise und Leistungen pflegt ihr im Auftrag unter Tab{' '}
@@ -98,11 +113,6 @@ export function HandwerkerEinreichungPruefung({
       </div>
     )
   }
-
-  const [pending, startTransition] = useLocalTransition()
-  const [notizModal, setNotizModal] = useState<PartnerAngebotAntwortTyp | null>(null)
-  const [crmNotiz, setCrmNotiz] = useState('')
-  const [mailModal, setMailModal] = useState<AntwortModal | null>(null)
 
   const eingereicht = hasHwEinreichung(z)
   const konditionenRaw = parseHwKonditionen(z.hw_konditionen)
@@ -126,7 +136,7 @@ export function HandwerkerEinreichungPruefung({
   const uebernommen = hwSt === 'uebernommen'
   const bestaetigt = hwSt === 'bestaetigt'
   const ek = eingereicht ? ekNettoFromHwEinreichung(z) : null
-  const handwerkerName = z.handwerker?.name?.trim() || 'Handwerker'
+  const handwerkerName = z.handwerker?.name?.trim() || 'Partner'
   const gewerkName = z.gewerke?.name?.trim() || 'Gewerk'
   const hwEmail = z.handwerker?.email?.trim() || ''
   const unterlagePaths = parseHwAnhangStoragePaths(z.hw_angebot_anhang_urls, z.hw_angebot_pdf_url)
@@ -138,7 +148,7 @@ export function HandwerkerEinreichungPruefung({
     startTransition(async () => {
       const res = await getHandwerkerEinreichungPdfUrl(z.id, 'angebot', index)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       window.open(res.url, '_blank', 'noopener,noreferrer')
@@ -149,7 +159,7 @@ export function HandwerkerEinreichungPruefung({
     startTransition(async () => {
       const res = await getHandwerkerEinreichungPdfUrl(z.id, 'rechnung')
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       window.open(res.url, '_blank', 'noopener,noreferrer')
@@ -160,16 +170,16 @@ export function HandwerkerEinreichungPruefung({
     startTransition(async () => {
       const res = await bestaetigeHandwerkerEinreichung({ angebotId, zuweisungId: z.id })
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       if (res.openWizard && onAcceptWizard) {
-        toast.success('Konditionen übernommen')
+        toast.success(TOAST.konditionen_uebernommen)
         onAcceptWizard(res.openWizard)
         onRefresh()
         return
       }
-      toast.success('Konditionen übernommen')
+      toast.success(TOAST.konditionen_uebernommen)
       onRefresh()
     })
   }
@@ -183,7 +193,7 @@ export function HandwerkerEinreichungPruefung({
     if (!notizModal) return
     const text = crmNotiz.trim()
     if (!text) {
-      toast.error('Bitte eine Nachricht an den Handwerker eingeben.')
+      applyFieldErrors({ _form: TOAST.bitte_eine_nachricht_an_den_partner_eingeben })
       return
     }
     const betreff = handwerkerEinreichungAntwortBetreff(notizModal, gewerkName)
@@ -209,7 +219,7 @@ export function HandwerkerEinreichungPruefung({
   function sendAntwort() {
     if (!mailModal) return
     if (!mailModal.to.length) {
-      toast.error('Bitte mindestens eine Empfänger-Adresse unter An angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_empfaenger_adresse_unter_a })
       return
     }
     startTransition(async () => {
@@ -225,11 +235,11 @@ export function HandwerkerEinreichungPruefung({
           ? await rueckfrageHandwerkerEinreichung(payload)
           : await ablehneHandwerkerEinreichung(payload)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       const mailTeil = res.mailGesendet
-        ? ' E-Mail an den Handwerker gesendet.'
+        ? ' E-Mail an den Partner gesendet.'
         : res.mailHinweis
           ? ` Hinweis: ${res.mailHinweis}`
           : ''
@@ -245,14 +255,14 @@ export function HandwerkerEinreichungPruefung({
 
   return (
     <>
-      <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg-soft/80 p-3 space-y-2">
+      <div className="mt-3 rounded-card border border-bw-border bg-bw-bg-soft/80 p-3 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-muted">
             Eingereichtes Angebot
           </span>
           <span
             className={cn(
-              'rounded-full px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+              'rounded-pill px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
               hwStatusBadgeClass(z.hw_status)
             )}
           >
@@ -293,57 +303,58 @@ export function HandwerkerEinreichungPruefung({
         ) : null}
 
         {z.hw_crm_notiz?.trim() && !kannPruefen ? (
-          <p className="text-[length:var(--fs-meta)] text-bw-text-muted whitespace-pre-wrap rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-            <span className="font-medium text-amber-950">Deine letzte Nachricht:</span>{' '}
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted whitespace-pre-wrap rounded-field border border-status-contact-bg bg-status-contact-bg px-2 py-1.5">
+            <span className="font-medium text-status-contact-text">Deine letzte Nachricht:</span>{' '}
             {z.hw_crm_notiz.trim()}
           </p>
         ) : null}
 
         <div className="flex flex-wrap gap-2 pt-1">
           {unterlagePaths.map((_, i) => (
-            <Button
+            <MockBtn
               key={`unterlage-${i}`}
               type="button"
-              variant="secondary"
-              size="sm"
+              kind="secondary" sm
               loading={pending}
               onClick={() => openUnterlagePdf(i)}
             >
-              <Download className="mr-1 h-3.5 w-3.5" aria-hidden />
+              <MockIcon n="download" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
               {partnerHwDokumentListenName('unterlage', { index: i, total: unterlagePaths.length })}
-            </Button>
+            </MockBtn>
           ))}
 
           {hatRechnung ? (
-            <Button type="button" variant="secondary" size="sm" loading={pending} onClick={openRechnungPdf}>
+            <MockBtn type="button" kind="secondary" sm loading={pending} onClick={openRechnungPdf}>
+<<<<<<< Updated upstream
+              <MockIcon n="download" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
+=======
               <Download className="mr-1 h-3.5 w-3.5" aria-hidden />
+>>>>>>> Stashed changes
               {partnerHwDokumentListenName('rechnung')}
-            </Button>
+            </MockBtn>
           ) : null}
 
           {kannPruefen ? (
             <>
-              <Button type="button" variant="primary" size="sm" loading={pending} onClick={bestaetigen}>
+              <MockBtn type="button" kind="primary" sm loading={pending} onClick={bestaetigen}>
                 Bestätigen
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="secondary"
-                size="sm"
+                kind="secondary" sm
                 loading={pending}
                 onClick={() => openAntwortSchritt('rueckfrage')}
               >
                 Rückfrage
-              </Button>
-              <Button
+              </MockBtn>
+              <MockBtn
                 type="button"
-                variant="danger"
-                size="sm"
+                kind="danger" sm
                 loading={pending}
                 onClick={() => openAntwortSchritt('abgelehnt')}
               >
                 Ablehnen
-              </Button>
+              </MockBtn>
             </>
           ) : null}
 
@@ -354,7 +365,7 @@ export function HandwerkerEinreichungPruefung({
           ) : null}
 
           {bestaetigt ? (
-            <p className="w-full rounded-md border border-violet-200 bg-violet-50 px-2 py-1.5 text-[length:var(--fs-meta)] text-violet-950">
+            <p className="w-full rounded-field border border-status-new-bg bg-status-new-bg px-2 py-1.5 text-[length:var(--fs-meta)] text-status-new-text">
               Konditionen im CRM übernommen — <span className="font-medium">Partner muss im Portal noch bestätigen</span>{' '}
               (Tab Anfragen). Danach wechselt der Vorgang zu Angebote.
             </p>
@@ -362,67 +373,69 @@ export function HandwerkerEinreichungPruefung({
         </div>
       </div>
 
-      <Modal
+      <EditorSheet
         open={notizModal != null}
         onClose={() => setNotizModal(null)}
+<<<<<<< Updated upstream
+        title={notizModal === 'rueckfrage' ? 'Rückfrage an Partner' : 'Angebot ablehnen'}
+        secondary={{ label: 'Abbrechen', onClick: () => setNotizModal(null) }}
+        primary={{ label: 'Weiter zur E-Mail', onClick: weiterZurMail }}
+=======
         title={notizModal === 'rueckfrage' ? 'Rückfrage an Handwerker' : 'Angebot ablehnen'}
         footer={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => setNotizModal(null)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setNotizModal(null)}>
               Abbrechen
-            </Button>
-            <Button type="button" variant="primary" onClick={weiterZurMail}>
+            </MockBtn>
+            <MockBtn type="button" kind="primary" onClick={weiterZurMail}>
               Weiter zur E-Mail
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
-        <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                <p className="mb-3 text-[length:var(--fs-text)] text-bw-text-muted">
           Dieser Text wird im Partner-Portal angezeigt und in der E-Mail an{' '}
           <span className="font-medium text-bw-text">{handwerkerName}</span> mitgeschickt.
         </p>
-        <Textarea
-          label={notizModal === 'rueckfrage' ? 'Rückfrage / Hinweis' : 'Grund der Ablehnung'}
-          value={crmNotiz}
-          onChange={(e) => setCrmNotiz(e.target.value)}
-          rows={5}
-          required
-          placeholder={
-            notizModal === 'rueckfrage'
+        <MockField label={notizModal === 'rueckfrage' ? 'Rückfrage / Hinweis' : 'Grund der Ablehnung'} required><RichTextEditor value={typeof (crmNotiz) === 'string' ? (crmNotiz) : ''} onChange={(__v) => setCrmNotiz(__v)} placeholder={notizModal === 'rueckfrage'
               ? 'z. B. Bitte Position X nochmal mit Material Y kalkulieren …'
-              : 'z. B. Preis liegt deutlich über unserem Budget …'
-          }
-        />
-      </Modal>
+              : 'z. B. Preis liegt deutlich über unserem Budget …'} minHeight={120} aria-label={notizModal === 'rueckfrage' ? 'Rückfrage / Hinweis' : 'Grund der Ablehnung'} /></MockField>
+      </EditorSheet>
 
-      <Modal
+      <EditorSheet
         open={!!mailModal}
         onClose={() => setMailModal(null)}
         title={`E-Mail an ${handwerkerName}`}
         size="lg"
+<<<<<<< Updated upstream
+        secondary={{ label: 'Abbrechen', onClick: () => setMailModal(null) }}
+        primary={{
+          label: 'Senden & Status aktualisieren',
+          onClick: sendAntwort,
+          busy: pending,
+        }}
+=======
         footer={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => setMailModal(null)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setMailModal(null)}>
               Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={sendAntwort}>
+            </MockBtn>
+            <MockBtn type="button" kind="primary" loading={pending} onClick={sendAntwort}>
               Senden & Status aktualisieren
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         {mailModal ? (
           <div className="space-y-3">
             <p className="text-[length:var(--fs-text)] text-bw-text-muted">
               Gewerk: <span className="font-medium text-bw-text">{gewerkName}</span>
             </p>
-            <Input
-              label="Betreff"
-              value={mailModal.betreff}
-              onChange={(e) =>
-                setMailModal((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))
-              }
-            />
+            <MockField label="Betreff"><MockInput value={mailModal.betreff} onChange={(e) =>
+                setMailModal((prev) => (prev ? { ...prev, betreff: e.target.value } : prev))} /></MockField>
             <EmailPillsField
               label="An"
               required
@@ -447,12 +460,12 @@ export function HandwerkerEinreichungPruefung({
             <iframe
               title="Partner-Mail Vorschau"
               sandbox="allow-same-origin"
-              className="h-[280px] w-full rounded-lg border border-bw-border bg-white"
+              className="h-[280px] w-full rounded-card border border-bw-border bg-white"
               srcDoc={mailModal.html}
             />
           </div>
         ) : null}
-      </Modal>
+      </EditorSheet>
     </>
   )
 }

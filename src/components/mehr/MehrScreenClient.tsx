@@ -1,22 +1,15 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { createClient } from '@/lib/supabase'
 import { MEHR_TILE_NAV } from '@/lib/nav-config'
-import { confirmAction } from '@/components/ui/confirm-action'
-
-const ICON_MAP: Record<string, string> = {
-  Kunden: 'users',
-  Handwerker: 'tool',
-  Kalender: 'calendar',
-  Einstellungen: 'settings',
-  'KI Analytics': 'sparkles',
-}
 
 export function MehrScreenClient({
   userName = 'Beran Bärenwald',
@@ -31,7 +24,7 @@ export function MehrScreenClient({
   const [logoutLoading, setLogoutLoading] = useState(false)
 
   function handleLogout() {
-    confirmAction({
+    openActionConfirm({
       title: 'Wirklich abmelden?',
       body: 'Du wirst aus dem CRM ausgeloggt.',
       confirmLabel: 'Abmelden',
@@ -44,7 +37,7 @@ export function MehrScreenClient({
           const supabase = createClient()
           await supabase.auth.signOut({ scope: 'local' })
           router.replace('/login')
-          router.refresh()
+          afterServerActionRefresh()
         } finally {
           setLogoutLoading(false)
         }
@@ -69,7 +62,7 @@ export function MehrScreenClient({
         {MEHR_TILE_NAV.map((it) => (
           <Link key={it.href} href={it.href} className="mehr-tile">
             <div className="mehr-tile-icon">
-              <MockIcon ctx="default" n={ICON_MAP[it.label] ?? 'dots'} size={24} />
+              <MockIcon ctx="default" n={it.iconName} size={24} />
             </div>
             <div className="mehr-tile-label">{it.label}</div>
             <div className="mehr-tile-desc">{it.desc}</div>
@@ -77,14 +70,9 @@ export function MehrScreenClient({
         ))}
       </div>
 
-      <button
-        type="button"
-        className="mehr-logout"
-        disabled={logoutLoading}
-        onClick={() => void handleLogout()}
-      >
+      <MockBtn className="mehr-logout" type="button" disabled={logoutLoading} onClick={() => void handleLogout()}>
         {logoutLoading ? 'Abmelden…' : 'Abmelden'}
-      </button>
+      </MockBtn>
     </div>
   )
 }

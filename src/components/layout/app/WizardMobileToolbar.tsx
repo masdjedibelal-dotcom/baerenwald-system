@@ -1,7 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
 import { AppFlowStepDots } from '@/components/layout/app/AppFlowScreen'
 
 type WizardMobileToolbarProps = {
@@ -24,14 +25,9 @@ export function WizardMobileToolbar({
 }: WizardMobileToolbarProps) {
   return (
     <div className="wizard-mobile-toolbar md:hidden">
-      <button
-        type="button"
-        className="btn ghost sm wizard-mobile-toolbar__close shrink-0"
-        onClick={onClose}
-        aria-label="Schließen"
-      >
-        <X className="h-4 w-4" />
-      </button>
+      <MockBtn kind="ghost" sm className="wizard-mobile-toolbar__close shrink-0" type="button" onClick={onClose} aria-label="Schließen">
+        <MockIcon n="x" ctx="default" className="h-4 w-4" />
+      </MockBtn>
       <div className="wizard-mobile-toolbar__center min-w-0">
         <AppFlowStepDots total={totalSteps} current={currentStep} compact />
         {stepLabel ? <span className="sr-only">{stepLabel}</span> : null}

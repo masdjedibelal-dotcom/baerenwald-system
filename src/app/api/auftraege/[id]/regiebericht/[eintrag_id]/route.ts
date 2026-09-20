@@ -1,7 +1,11 @@
+import { logDbError } from '@/lib/errors/log-db-error'
+import { formatDatum } from '@/lib/utils'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { renderRegieberichtPdfBuffer } from '@/lib/pdf/regiebericht-pdf'
+import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
+import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import type { FormularEintrag, FormularTemplate, Kunde } from '@/lib/types'
 
 export async function GET(
@@ -16,12 +20,13 @@ export async function GET(
     return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
   }
 
-  const { data: auf } = await supabase.from('auftraege').select('id').eq('id', params.id).maybeSingle()
+  const {data: auf, error: error1} = await supabase.from('auftraege').select('id').eq('id', params.id).maybeSingle()
+  if (error1) logDbError('app/api/auftraege/[id]/regiebericht/[eintrag_id]/route:auftraege', error1)
   if (!auf) {
     return NextResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 })
   }
 
-  const { data: raw, error } = await supabaseAdmin
+  const { data: raw, error: error2 } = await supabaseAdmin
     .from('formular_eintraege')
     .select(
       `
@@ -35,9 +40,10 @@ export async function GET(
     .eq('id', params.eintrag_id)
     .eq('auftrag_id', params.id)
     .maybeSingle()
+  if (error2) logDbError('app/api/auftraege/[id]/regiebericht/[eintrag_id]/route:formular_eintraege', error2)
 
-  if (error || !raw) {
-    return NextResponse.json({ error: error?.message ?? 'Eintrag nicht gefunden' }, { status: 404 })
+  if (error2 || !raw) {
+    return NextResponse.json({ error: error2?.message ?? 'Eintrag nicht gefunden' }, { status: 404 })
   }
 
   const eintrag = raw as FormularEintrag & {
@@ -75,17 +81,20 @@ export async function GET(
   const mwst = netto * 0.19
   const brutto = netto + mwst
 
-  const datumFormular = str(daten.datum) || new Date().toLocaleDateString('de-DE')
+  const datumFormular = str(daten.datum) || formatDatum(new Date().toISOString())
   const beschreibung = str(daten.beschreibung)
   const grund = str(daten.grund)
   const materialBezeichnung = str(daten.material_bezeichnung)
 
-  const auftraggeberName = 'Bärenwald München'
-  const auftraggeberAdresse = 'München'
+  const firm = await fetchFirmenEinstellungen(supabase)
+  const firmenname = firm.firmenname?.trim() || 'Bärenwald München'
+  const auftraggeberName = firmenname
+  const auftraggeberAdresse = firmZeileAdresse(firm) || 'München'
 
   try {
     const buffer = Buffer.from(
       await renderRegieberichtPdfBuffer({
+        firmenname,
         auftragIdShort: params.id.slice(0, 8).toUpperCase(),
         datumFormular,
         kundeBaustelle: kunde,
@@ -107,7 +116,7 @@ export async function GET(
         fotoUrls: (eintrag.foto_urls ?? []).filter(Boolean),
         unterschriftKunde: eintrag.unterschrift_kunde ?? null,
         unterschriftAt: eintrag.unterschrift_at
-          ? new Date(eintrag.unterschrift_at).toLocaleDateString('de-DE')
+          ? formatDatum(eintrag.unterschrift_at)
           : null,
       })
     )

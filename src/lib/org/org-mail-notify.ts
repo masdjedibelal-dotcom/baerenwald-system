@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
@@ -6,9 +7,11 @@ import {
   mailOrgNeueMeldung,
 } from '@/lib/email/meldung-mail-templates'
 import { sendInternNotifyEmail } from '@/lib/angebote/emails'
+import { buildInternSubject } from '@/lib/mail/build-subject'
 import { sendMail } from '@/lib/mail-service'
 import { buildPortalLoginLink } from '@/lib/portal-utils'
 import { sendCrmPushToStaff } from '@/lib/push/send'
+import { safeVoidNotify } from '@/lib/errors/safe-void-notify'
 
 function funnelField(funnelDaten: unknown, key: string): string | null {
   if (!funnelDaten || typeof funnelDaten !== 'object') return null
@@ -49,6 +52,7 @@ export async function notifyInterneNeueMeldung(
     )
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-mail-notify:leads', error)
 
   if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden.' }
 
@@ -128,14 +132,17 @@ export async function notifyInterneNeueMeldung(
     html: tpl.html,
   })
 
-  // Best-effort Push (kein Mail): Fire-and-forget bewusst — Glocke/Mail sind die Quelle der Wahrheit.
-  void sendCrmPushToStaff({
-    typ: vonHm ? 'hm_befund_freigabe' : 'neue_anfrage',
-    title: pushTitle,
-    body: pushBody,
-    url: `/anfragen/${id}`,
-    tag: vonHm ? `hm-befund-${id}` : `org-meldung-${id}`,
-  }).catch((e) => console.warn('[notifyInterneNeueMeldung] push', e))
+  // Best-effort Push (kein Mail): Fire-and-forget — Glocke/Mail sind die Quelle der Wahrheit.
+  safeVoidNotify(
+    'notifyInterneNeueMeldung:push',
+    sendCrmPushToStaff({
+      typ: vonHm ? 'hm_befund_freigabe' : 'neue_anfrage',
+      title: pushTitle,
+      body: pushBody,
+      url: `/anfragen/${id}`,
+      tag: vonHm ? `hm-befund-${id}` : `org-meldung-${id}`,
+    })
+  )
 
   return { ok: true }
 }
@@ -155,6 +162,7 @@ export async function notifyOrgFreigabeErgebnis(input: {
     .select('id, auftraggeber_kunde_id, kunde_objekt_id, kunde_id')
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-mail-notify:leads', error)
 
   if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden.' }
 
@@ -162,11 +170,12 @@ export async function notifyOrgFreigabeErgebnis(input: {
   if (!orgId) {
     const kid = (lead as { kunde_id?: string | null }).kunde_id?.trim()
     if (kid) {
-      const { data: k } = await supabaseAdmin
+      const { data: k, error } = await supabaseAdmin
         .from('kunden')
         .select('id, portal_modus')
         .eq('id', kid)
         .maybeSingle()
+      if (error) logDbError('lib/org/org-mail-notify:kunden', error)
       if ((k as { portal_modus?: string } | null)?.portal_modus === 'organisation') orgId = kid
     }
   }
@@ -186,7 +195,6 @@ export async function notifyOrgFreigabeErgebnis(input: {
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ])
-
   const orgName =
     (org as { org_anzeigename?: string } | null)?.org_anzeigename?.trim() ||
     (org as { name?: string } | null)?.name?.trim() ||
@@ -213,16 +221,25 @@ export async function notifyOrgFreigabeErgebnis(input: {
       ? `${orgName} hat „${objektTitel}“ freigegeben.`
       : `${orgName} hat die Freigabe für „${objektTitel}“ abgelehnt.`)
 
-  // Best-effort Push (kein Mail): Fire-and-forget bewusst — Timeline/Mail tragen.
-  void sendCrmPushToStaff({
-    typ: 'angebot_entscheidung',
-    title: freigabeTitle,
-    body: freigabeBody,
-    url: `/anfragen/${leadId}`,
-    tag: `org-freigabe-${leadId}`,
-  }).catch((e) => console.warn('[notifyOrgFreigabeErgebnis] push', e))
+  // Best-effort Push (kein Mail): Fire-and-forget — Timeline/Mail tragen.
+  safeVoidNotify(
+    'notifyOrgFreigabeErgebnis:push',
+    sendCrmPushToStaff({
+      typ: 'angebot_entscheidung',
+      title: freigabeTitle,
+      body: freigabeBody,
+      url: `/anfragen/${leadId}`,
+      tag: `org-freigabe-${leadId}`,
+    })
+  )
 
-  const intern = await sendInternNotifyEmail({ subject: tpl.betreff, html: tpl.html })
+  const intern = await sendInternNotifyEmail({
+    subject: buildInternSubject({
+      objekt: objektTitel,
+      ereignis: input.aktion === 'freigegeben' ? 'Freigabe freigegeben' : 'Freigabe abgelehnt',
+    }),
+    html: tpl.html,
+  })
   if (!intern.ok) {
     console.warn('[notifyOrgFreigabeErgebnis] interne Mail:', intern.message)
   }
@@ -246,16 +263,17 @@ export async function notifyOrgFreigabeErgebnis(input: {
   // Nach HV-Angebots-Freigabe: Auftrag automatisch aus dem zugestellten Angebot
   if (input.aktion === 'freigegeben') {
     try {
-      const { data: existingAuf } = await supabaseAdmin
+      const { data: existingAuf, error } = await supabaseAdmin
         .from('auftraege')
         .select('id')
         .eq('lead_id', leadId)
         .neq('status', 'storniert')
         .limit(1)
         .maybeSingle()
+      if (error) logDbError('lib/org/org-mail-notify:auftraege', error)
 
       if (!existingAuf?.id) {
-        const { data: ang } = await supabaseAdmin
+        const { data: ang, error } = await supabaseAdmin
           .from('angebote')
           .select('id, status, status_einfach, gesendet_am, gesendet_kunde_at, pdf_url')
           .eq('lead_id', leadId)
@@ -263,6 +281,7 @@ export async function notifyOrgFreigabeErgebnis(input: {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
+        if (error) logDbError('lib/org/org-mail-notify:angebote', error)
 
         const statusEinfach = String(ang?.status_einfach ?? '')
           .trim()
@@ -329,6 +348,7 @@ export async function notifyAngebotEntscheidung(input: {
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-mail-notify:leads', error)
 
   if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden.' }
 
@@ -374,16 +394,25 @@ export async function notifyAngebotEntscheidung(input: {
       ? `${entscheidenderName} hat das Angebot für „${objektTitel}“ angenommen.`
       : `${entscheidenderName} hat das Angebot für „${objektTitel}“ abgelehnt.`)
 
-  // Best-effort Push (kein Mail): Fire-and-forget bewusst.
-  void sendCrmPushToStaff({
-    typ: 'angebot_entscheidung',
-    title,
-    body,
-    url: `/anfragen/${leadId}`,
-    tag: `angebot-entscheidung-${leadId}`,
-  }).catch((e) => console.warn('[notifyAngebotEntscheidung] push', e))
+  // Best-effort Push (kein Mail): Fire-and-forget.
+  safeVoidNotify(
+    'notifyAngebotEntscheidung:push',
+    sendCrmPushToStaff({
+      typ: 'angebot_entscheidung',
+      title,
+      body,
+      url: `/anfragen/${leadId}`,
+      tag: `angebot-entscheidung-${leadId}`,
+    })
+  )
 
-  const intern = await sendInternNotifyEmail({ subject: tpl.betreff, html: tpl.html })
+  const intern = await sendInternNotifyEmail({
+    subject: buildInternSubject({
+      objekt: objektTitel,
+      ereignis: input.aktion === 'angenommen' ? 'Angebot angenommen' : 'Angebot abgelehnt',
+    }),
+    html: tpl.html,
+  })
   if (!intern.ok) {
     console.warn('[notifyAngebotEntscheidung] interne Mail:', intern.message)
   }

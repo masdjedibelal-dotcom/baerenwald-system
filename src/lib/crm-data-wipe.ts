@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isLegacyDemoLead } from '@/lib/legacy-demo-data'
 
@@ -6,6 +7,7 @@ const SENTINEL = '00000000-0000-0000-0000-000000000001'
 /** Alle Zeilen einer Tabelle mit UUID-Spalte `id` löschen. */
 async function wipeTable(admin: SupabaseClient, table: string): Promise<string | null> {
   const { error } = await admin.from(table).delete().neq('id', SENTINEL)
+  if (error) logDbError('lib/crm-data-wipe:query', error)
   if (error) return `${table}: ${error.message}`
   return null
 }
@@ -38,7 +40,7 @@ const TRANSACTIONAL_TABLES = [
 
 /**
  * Löscht CRM-Transaktionsdaten (Leads, Aufträge, Kunden, …).
- * Stammdaten (Gewerke, Handwerker, Formular-Vorlagen, Einstellungen) bleiben erhalten.
+ * Stammdaten (Gewerke, Partner, Formular-Vorlagen, Einstellungen) bleiben erhalten.
  * Es werden keine Ersatz-/Demo-Datensätze angelegt.
  */
 export async function wipeCrmTransactionalData(
@@ -79,6 +81,7 @@ export async function purgeLegacyDemoRecords(
     .select(
       'id, kunde_id, kontakt_email, kontakt_name, kontakt_telefon, notizen, funnel_daten, kunden!kunde_id(email, name)'
     )
+  if (loadErr) logDbError('lib/crm-data-wipe:leads', loadErr)
 
   if (loadErr) {
     return { ok: false, message: loadErr.message }
@@ -91,7 +94,8 @@ export async function purgeLegacyDemoRecords(
   )
 
   if (!leadIds.length && !kundeIdsFromLeads.length) {
-    const { data: kundenRows } = await admin.from('kunden').select('id, name, email')
+    const { data: kundenRows, error } = await admin.from('kunden').select('id, name, email')
+    if (error) logDbError('lib/crm-data-wipe:kunden', error)
     const demoKundenOnly = (kundenRows ?? []).filter((k) =>
       isLegacyDemoLead({
         kontakt_email: k.email,
@@ -111,6 +115,7 @@ export async function purgeLegacyDemoRecords(
         'id',
         demoKundenOnly.map((k) => k.id)
       )
+    if (kErr) logDbError('lib/crm-data-wipe:kunden', kErr)
     if (kErr) return { ok: false, message: `kunden: ${kErr.message}` }
     return { ok: true, deletedLeads: 0, deletedKunden: demoKundenOnly.length }
   }
@@ -119,21 +124,25 @@ export async function purgeLegacyDemoRecords(
 
   if (leadIds.length) {
     const { error: angErr } = await admin.from('angebote').delete().in('lead_id', leadIds)
+    if (angErr) logDbError('lib/crm-data-wipe:angebote', angErr)
     if (angErr) errors.push(`angebote: ${angErr.message}`)
 
     const { error: leadErr } = await admin.from('leads').delete().in('id', leadIds)
+    if (leadErr) logDbError('lib/crm-data-wipe:leads', leadErr)
     if (leadErr) errors.push(`leads: ${leadErr.message}`)
   }
 
   let deletedKunden = 0
   for (const kid of kundeIdsFromLeads) {
-    const { count } = await admin
+    const {count, error } = await admin
       .from('leads')
       .select('id', { count: 'exact', head: true })
       .eq('kunde_id', kid)
+    if (error) logDbError('lib/crm-data-wipe:leads', error)
     if ((count ?? 0) > 0) continue
 
-    const { data: kunde } = await admin.from('kunden').select('id, name, email').eq('id', kid).maybeSingle()
+    const { data: kunde, error: error2 } = await admin.from('kunden').select('id, name, email').eq('id', kid).maybeSingle()
+    if (error2) logDbError('lib/crm-data-wipe:kunden', error2)
     if (!kunde || !isLegacyDemoLead({
       kontakt_email: kunde.email,
       kontakt_name: kunde.name,
@@ -145,6 +154,7 @@ export async function purgeLegacyDemoRecords(
     }
 
     const { error: kDel } = await admin.from('kunden').delete().eq('id', kid)
+    if (kDel) logDbError('lib/crm-data-wipe:kunden', kDel)
     if (kDel) errors.push(`kunden ${kid}: ${kDel.message}`)
     else deletedKunden += 1
   }

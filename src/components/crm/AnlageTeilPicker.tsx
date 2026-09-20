@@ -1,10 +1,11 @@
 'use client'
+import { EMPTY } from '@/lib/crm-labels'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { PickerSheet } from '@/components/surfaces/PickerSheet'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockField } from '@/components/mock-ui/MockForm'
 import {
   createObjektAnlage,
   fetchObjektAnlagenForPicker,
@@ -20,6 +21,7 @@ import { OBJEKT_ANLAGE_STATUS_LABELS } from '@/lib/objektakte/labels'
 import type { ObjektAnlage } from '@/lib/objektakte/types'
 import type { Gewerk } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 export function AnlageTeilPicker({
   kundeId,
@@ -97,6 +99,14 @@ export function AnlageTeilPicker({
 
   function speichernNeu() {
     if (!kundeId?.trim() || !kundeObjektId?.trim()) return
+    if (!formState.bezeichnung.trim()) {
+      setCreateErr('Bezeichnung ist Pflicht.')
+      return
+    }
+    if (!formState.gewerkId) {
+      setCreateErr('Gewerk ist Pflicht.')
+      return
+    }
     setCreateErr(null)
     startTransition(async () => {
       const r = await createObjektAnlage(kundeId, kundeObjektId, anlageInputFromFormState(formState))
@@ -108,7 +118,7 @@ export function AnlageTeilPicker({
       onChange(r.anlage.id)
       setCreateOpen(false)
       setPickerOpen(false)
-      toast.success('Anlage angelegt')
+      toast.success(TOAST.anlage_angelegt)
     })
   }
 
@@ -118,27 +128,22 @@ export function AnlageTeilPicker({
     <>
       <MockField label="Anlage / Teil" hint="Optional — nur bei gewähltem Objekt">
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="sel sel--choice text-left"
-            disabled={disabled}
-            onClick={() => setPickerOpen(true)}
-          >
-            {selected?.bezeichnung ?? 'Keine Anlage gewählt'}
-          </button>
+          <MockBtn className="sel sel--choice text-left" type="button" disabled={disabled} onClick={() => setPickerOpen(true)}>
+            {selected?.bezeichnung ?? EMPTY.anlageGewaehlt}
+          </MockBtn>
           {value ? (
             <MockBtn
               sm
               kind="ghost"
               icon="x"
               disabled={disabled}
-              title="Zuordnung entfernen"
+              title="Zuordnung löschen"
               onClick={() => onChange(null)}
             />
           ) : null}
         </div>
         {selectedGarantie ? (
-          <p style={{ margin: '6px 0 0', color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
+          <p style={{ margin: '0.3750remrem 0 0', color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
             {selectedGarantie}
           </p>
         ) : null}
@@ -150,13 +155,7 @@ export function AnlageTeilPicker({
         title="Anlage / Teil"
         onNeu={disabled ? undefined : openCreate}
         search={
-          <input
-            className="input"
-            value={suche}
-            onChange={(e) => setSuche(e.target.value)}
-            placeholder="Suchen …"
-            aria-label="Anlagen suchen"
-          />
+          <MockInput value={suche} onChange={(e) => setSuche(e.target.value)} placeholder="Suchen …" aria-label="Anlagen suchen" />
         }
       >
         {loading ? (
@@ -167,7 +166,7 @@ export function AnlageTeilPicker({
           <p style={{ margin: 0, color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
             {anlagen.length === 0
               ? 'Noch keine Anlagen am Objekt — über + anlegen.'
-              : 'Keine Treffer.'}
+              : EMPTY.treffer}
           </p>
         ) : (
           <ul className="picker-sheet__list">
@@ -175,22 +174,17 @@ export function AnlageTeilPicker({
               const garantie = formatAnlageGarantieHint(a.garantie_bis)
               return (
                 <li key={a.id}>
-                  <button
-                    type="button"
-                    className="picker-sheet__item"
-                    data-selected={a.id === value ? true : undefined}
-                    onClick={() => {
+                  <MockBtn className="picker-sheet__item" type="button" data-selected={a.id === value ? true : undefined} onClick={() => {
                       onChange(a.id)
                       setPickerOpen(false)
-                    }}
-                  >
+                    }}>
                     <span className="picker-sheet__item-title">{a.bezeichnung}</span>
                     <span className="picker-sheet__item-meta">
                       {[a.gewerke?.name, a.standort?.trim(), garantie]
                         .filter(Boolean)
                         .join(' · ') || '—'}
                     </span>
-                  </button>
+                  </MockBtn>
                 </li>
               )
             })}
@@ -204,7 +198,7 @@ export function AnlageTeilPicker({
         title="Neue Anlage"
         context="canvas"
         onConfirm={speichernNeu}
-        confirmDisabled={pending || !formState.bezeichnung.trim() || !formState.gewerkId}
+        confirmDisabled={pending}
         confirmBusy={pending}
       >
         {kundeId ? (

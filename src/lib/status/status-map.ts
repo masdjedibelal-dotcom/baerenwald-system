@@ -46,7 +46,7 @@ export const ANFRAGE_STATUS_MAP = {
 export const ANGEBOT_STATUS_MAP = {
   entwurf: { label: 'Entwurf' },
   gesendet_handwerker: { label: 'An Partner gesendet', shortLabel: 'An Partner' },
-  handwerker_akzeptiert: { label: 'Partner akzeptiert', shortLabel: 'Akzeptiert' },
+  handwerker_akzeptiert: { label: 'Angenommen', shortLabel: 'Angenommen' },
   gesendet_kunde: { label: 'Gesendet', shortLabel: 'Gesendet' },
   gesendet: { label: 'Gesendet' },
   angenommen: { label: 'Angenommen' },

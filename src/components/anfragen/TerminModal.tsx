@@ -1,9 +1,16 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { useEffect, useState } from 'react'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import {
   insertKalenderTermin,
   loadCrmTeamFuerTermin,
@@ -21,6 +28,8 @@ import {
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import { KALENDER_TYP_LABEL } from '@/lib/kalender-styles'
 import type { KalenderTermin } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 const TYP_OPTIONS: { value: KalenderTermin['typ']; label: string }[] = [
   { value: 'besichtigung', label: KALENDER_TYP_LABEL.besichtigung },
@@ -75,6 +84,7 @@ export function TerminModal({
   const initialAdresse = (defaultAdresse?.trim() || defaultPlz?.trim() || '').trim()
   const mailOff =
     defaultMailOff === true || (defaultMailOff == null && isHvKanal(leadKanal))
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [typ, setTyp] = useState<KalenderTermin['typ']>(typFixed ?? 'besichtigung')
   const [datum, setDatum] = useState('')
   const [von, setVon] = useState('')
@@ -95,11 +105,12 @@ export function TerminModal({
     setAdresse((defaultAdresse?.trim() || defaultPlz?.trim() || '').trim())
     setMailToggle(!(defaultMailOff === true || (defaultMailOff == null && isHvKanal(leadKanal))))
     setMailDraft(null)
+    clearFieldErrors()
     setTeamLoading(true)
     void loadCrmTeamFuerTermin()
       .then((list) => setTeam(list))
       .finally(() => setTeamLoading(false))
-  }, [open, defaultAdresse, defaultPlz, defaultMailOff, leadKanal])
+  }, [open, defaultAdresse, defaultPlz, defaultMailOff, leadKanal, clearFieldErrors])
 
   function reset() {
     setTyp('besichtigung')
@@ -110,19 +121,20 @@ export function TerminModal({
     setNotiz('')
     setMitarbeiterId('')
     setMailToggle(!(defaultMailOff === true || (defaultMailOff == null && isHvKanal(leadKanal))))
+    clearFieldErrors()
   }
 
   async function save(sendMail: boolean) {
     if (!datum.trim()) {
-      toast.error('Bitte Datum wählen.')
+      applyFieldErrors({ datum: 'Bitte Datum wählen.' })
       return
     }
     if (istBesichtigung && !mitarbeiterId.trim()) {
-      toast.error('Bitte Mitarbeiter für den Vor-Ort-Termin wählen.')
+      applyFieldErrors({ mitarbeiterId: 'Bitte Mitarbeiter für den Vor-Ort-Termin wählen.' })
       return
     }
     if (sendMail && mailToggle && kontaktEmail?.trim() && istBesichtigung && !mitarbeiterId.trim()) {
-      toast.error('Für die Bestätigungs-Mail ist ein Mitarbeiter nötig.')
+      applyFieldErrors({ mitarbeiterId: TOAST.fuer_die_bestaetigungs_mail_ist_ein_mitarbeiter })
       return
     }
 
@@ -131,7 +143,7 @@ export function TerminModal({
     if (istBesichtigung) {
       if (!von.trim()) {
         setSaving(false)
-        toast.error('Bitte Uhrzeit wählen.')
+        applyFieldErrors({ von: 'Bitte Uhrzeit wählen.' })
         return
       }
       const res = await saveLeadTerminVereinbart({
@@ -153,7 +165,7 @@ export function TerminModal({
       })
       if (!res.ok) {
         setSaving(false)
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setSaving(false)
@@ -178,11 +190,11 @@ export function TerminModal({
       })
       if (!res.ok) {
         setSaving(false)
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setSaving(false)
-      toast.success('Termin gespeichert.')
+      toast.success(TOAST.termin_gespeichert_2)
     }
 
     reset()
@@ -194,58 +206,93 @@ export function TerminModal({
 
   const formBody = (
     <>
+      {fieldErrors._form ? (
+        <p className="field-error mb-3" role="alert">
+          {fieldErrors._form}
+        </p>
+      ) : null}
       <div className="form-grid-2 grid gap-3 md:grid-cols-2">
         {typFixed ? null : (
           <label className="md:col-span-1">
             <span className="input-label">Typ</span>
-            <select className="input" value={typ} onChange={(e) => setTyp(e.target.value as KalenderTermin['typ'])}>
+            <MockSelect value={typ} onChange={(e) => setTyp(e.target.value as KalenderTermin['typ'])}>
               {TYP_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </label>
         )}
-        <label className="md:col-span-2">
-          <span className="input-label">Datum</span>
-          <DateInput size="sm" value={datum} onChange={(e) => setDatum(e.target.value)} required />
-        </label>
+        <MockField label="Datum" required full name="datum" error={fieldErrors.datum} className="md:col-span-2">
+          <DateInput
+            size="sm"
+            value={datum}
+            onChange={(e) => {
+              clearField('datum')
+              setDatum(e.target.value)
+            }}
+            required
+          />
+        </MockField>
         <div className="md:col-span-2">
           <FilterRangeRow
             title="Uhrzeit"
             className="!mb-0"
             von={
-              <TimeInput size="sm" value={von} onChange={(e) => setVon(e.target.value)} />
+              <TimeInput
+                size="sm"
+                value={von}
+                onChange={(e) => {
+                  clearField('von')
+                  setVon(e.target.value)
+                }}
+                aria-invalid={Boolean(fieldErrors.von)}
+              />
             }
             bis={
               <TimeInput size="sm" value={bis} onChange={(e) => setBis(e.target.value)} />
             }
           />
+          {fieldErrors.von ? (
+            <p className="field-error" role="alert">
+              {fieldErrors.von}
+            </p>
+          ) : null}
         </div>
         <label className="md:col-span-2">
           <span className="input-label">Adresse</span>
-          <input type="text" className="input" value={adresse} onChange={(e) => setAdresse(e.target.value)} />
+          <MockInput type="text" value={adresse} onChange={(e) => setAdresse(e.target.value)} />
         </label>
         {istBesichtigung ? (
-          <TerminMitarbeiterSelect
-            team={team}
-            value={mitarbeiterId}
-            onChange={setMitarbeiterId}
-            loading={teamLoading}
-            required
-          />
+          <div className="md:col-span-2" data-field="mitarbeiterId">
+            <TerminMitarbeiterSelect
+              team={team}
+              value={mitarbeiterId}
+              onChange={(v) => {
+                clearField('mitarbeiterId')
+                setMitarbeiterId(v)
+              }}
+              loading={teamLoading}
+              required
+            />
+            {fieldErrors.mitarbeiterId ? (
+              <p className="field-error" role="alert">
+                {fieldErrors.mitarbeiterId}
+              </p>
+            ) : null}
+          </div>
         ) : null}
         <label className="md:col-span-2">
           <span className="input-label">Notiz</span>
-          <Textarea rows={3} value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="Notiz…" />
+          <RichTextEditor value={typeof (notiz) === 'string' ? (notiz) : ''} onChange={(__v) => setNotiz(__v)} placeholder="Notiz…" minHeight={120} aria-label="Notiz…" />
         </label>
       </div>
 
       {istBesichtigung ? (
         <div className="mt-4 space-y-3">
           <label className="flex cursor-pointer items-center gap-2 text-[length:var(--fs-text)]">
-            <input type="checkbox" checked={mailToggle} onChange={(e) => setMailToggle(e.target.checked)} />
+            <MockCheckbox checked={mailToggle} onChange={(e) => setMailToggle(e.target.checked)} />
             Bestätigungs-Mail an Kunden ({kontaktEmail ?? 'keine E-Mail'})
           </label>
           <TerminBestaetigungMailEditor
@@ -269,17 +316,17 @@ export function TerminModal({
 
   const formFooter = (
     <div className="flex flex-wrap justify-end gap-2">
-      <Button type="button" variant="secondary" loading={saving} onClick={() => void save(false)}>
+      <MockBtn type="button" kind="secondary" loading={saving} onClick={() => void save(false)}>
         Ohne Mail
-      </Button>
+      </MockBtn>
       {istBesichtigung && kontaktEmail?.trim() ? (
-        <Button type="button" variant="primary" loading={saving} onClick={() => void save(true)}>
+        <MockBtn type="button" kind="primary" loading={saving} onClick={() => void save(true)}>
           Speichern + Mail
-        </Button>
+        </MockBtn>
       ) : (
-        <Button type="button" variant="primary" loading={saving} onClick={() => void save(false)}>
+        <MockBtn type="button" kind="primary" loading={saving} onClick={() => void save(false)}>
           Speichern
-        </Button>
+        </MockBtn>
       )}
     </div>
   )

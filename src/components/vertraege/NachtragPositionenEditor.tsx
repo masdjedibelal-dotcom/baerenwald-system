@@ -1,8 +1,14 @@
 'use client'
 
+<<<<<<< Updated upstream
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+=======
 import { Plus, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
+>>>>>>> Stashed changes
 import type { NachtragPositionDraft } from '@/lib/vertraege/types'
 
 function neuePosition(gewerkName: string): NachtragPositionDraft {
@@ -46,7 +52,7 @@ export function NachtragPositionenEditor({
       </p>
 
       {positionen.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-bw-border bg-bw-bg-soft p-4 text-sm text-bw-text-muted">
+        <p className="rounded-card border border-dashed border-bw-border bg-bw-bg-soft p-4 text-sm text-bw-text-muted">
           Noch keine Positionen — füge eine Ergänzungsleistung hinzu.
         </p>
       ) : (
@@ -54,65 +60,39 @@ export function NachtragPositionenEditor({
           {positionen.map((p) => (
             <li
               key={p.id}
-              className="rounded-lg border border-bw-border bg-bw-bg-soft/50 p-3 space-y-3"
+              className="rounded-card border border-bw-border bg-bw-bg-soft/50 p-3 space-y-3"
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-bw-text-muted">
                   {p.quelle === 'neu' ? 'Neue Leistung' : 'Bestehende Position'}
                 </span>
-                <button
-                  type="button"
-                  className="rounded p-1 text-bw-text-muted hover:bg-bw-hover hover:text-red-600"
-                  onClick={() => remove(p.id)}
-                  aria-label="Position entfernen"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <MockBtn className="rounded-button p-1 text-bw-text-muted hover:bg-bw-hover hover:text-danger" type="button" onClick={() => remove(p.id)} aria-label="Position löschen">
+                  <MockIcon n="trash" ctx="default" className="h-4 w-4" />
+                </MockBtn>
               </div>
-              <Input
-                label="Leistung"
-                value={p.leistung_name}
-                onChange={(e) => update(p.id, { leistung_name: e.target.value })}
-              />
+              <MockField label="Leistung"><MockInput value={p.leistung_name} onChange={(e) => update(p.id, { leistung_name: e.target.value })} /></MockField>
               <div className="grid gap-3 sm:grid-cols-3">
-                <Input
-                  label="Menge"
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={p.menge ?? ''}
-                  onChange={(e) =>
-                    update(p.id, { menge: e.target.value ? Number(e.target.value) : null })
-                  }
-                />
-                <Input
-                  label="Einheit"
-                  value={p.einheit ?? ''}
-                  onChange={(e) => update(p.id, { einheit: e.target.value || null })}
-                  placeholder="m², Pauschal, h …"
-                />
-                <Input
-                  label="Preis Partner netto (€)"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={p.preis_partner ?? ''}
-                  onChange={(e) =>
+                <MockField label="Menge"><MockInput type="number" min={0} step="any" value={p.menge ?? ''} onChange={(e) =>
+                    update(p.id, { menge: e.target.value ? Number(e.target.value) : null })} /></MockField>
+                <MockField label="Einheit"><MockInput value={p.einheit ?? ''} onChange={(e) => update(p.id, { einheit: e.target.value || null })} placeholder="m², Pauschal, h …" /></MockField>
+                <MockField label="Preis Partner netto (€)"><MockInput type="number" min={0} step="0.01" value={p.preis_partner ?? ''} onChange={(e) =>
                     update(p.id, {
                       preis_partner: e.target.value ? Number(e.target.value) : null,
-                    })
-                  }
-                />
+                    })} /></MockField>
               </div>
             </li>
           ))}
         </ul>
       )}
 
-      <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={add}>
+      <MockBtn type="button" kind="secondary" sm className="gap-1.5" onClick={add}>
+<<<<<<< Updated upstream
+        <MockIcon n="plus" ctx="default" className="h-4 w-4" aria-hidden />
+=======
         <Plus className="h-4 w-4" aria-hidden />
+>>>>>>> Stashed changes
         Position hinzufügen
-      </Button>
+      </MockBtn>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import {
   notifyPartnerUnified,
   partnerOffenLink,
@@ -21,29 +22,31 @@ export async function syncEingangsrechnungUeberwiesen(input: {
   let angebotId: string | null = null
 
   if (ahId) {
-    const { data: ah } = await supabaseAdmin
+    const { data: ah, error } = await supabaseAdmin
       .from('angebot_handwerker')
       .select('id, handwerker_id, angebot_id')
       .eq('id', ahId)
       .maybeSingle()
+    if (error) logDbError('lib/rechnungen/sync-eingangsrechnung-ueberwiesen:angebot_handwerker', error)
     if (ah) {
       if (!handwerkerId) handwerkerId = String(ah.handwerker_id ?? '').trim() || null
       angebotId = String(ah.angebot_id ?? '').trim() || null
     }
-    await supabaseAdmin
+    const { error: __dbErr1 } = await supabaseAdmin
       .from('angebot_handwerker')
       .update({
         hw_rechnung_status: 'bezahlt',
         hw_rechnung_bezahlt_at: now,
       })
       .eq('id', ahId)
+    if (__dbErr1) logDbError('lib/rechnungen/sync-eingangsrechnung-ueberwiesen:angebot_handwerker', __dbErr1)
   }
 
   if (!handwerkerId) return { partnerNotified: false }
 
   let auftragId = input.auftragId?.trim() || null
   if (!auftragId && angebotId) {
-    const { data: auf } = await supabaseAdmin
+    const { data: auf, error } = await supabaseAdmin
       .from('auftraege')
       .select('id, titel')
       .eq('angebot_id', angebotId)
@@ -51,16 +54,18 @@ export async function syncEingangsrechnungUeberwiesen(input: {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('lib/rechnungen/sync-eingangsrechnung-ueberwiesen:auftraege', error)
     auftragId = auf?.id ? String(auf.id) : null
   }
 
   let projektName = input.rechnungsnummer?.trim() || 'Rechnung'
   if (auftragId) {
-    const { data: auf } = await supabaseAdmin
+    const { data: auf, error } = await supabaseAdmin
       .from('auftraege')
       .select('titel')
       .eq('id', auftragId)
       .maybeSingle()
+    if (error) logDbError('lib/rechnungen/sync-eingangsrechnung-ueberwiesen:auftraege', error)
     const t = (auf?.titel as string | null)?.trim()
     if (t) projektName = t
   }

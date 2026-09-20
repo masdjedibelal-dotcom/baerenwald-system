@@ -151,16 +151,16 @@ export function handwerkerSendenBlockierHinweis(
     if (partnerMsg && list.length > 0) return partnerMsg
   }
   if (!list.length) {
-    return 'Bitte zuerst Handwerker zuweisen und Partner-Angebot einholen.'
+    return 'Bitte zuerst Partner zuweisen und Partner-Angebot einholen.'
   }
   if (!handwerkerAnfrageErledigt(list)) {
-    return 'Bitte zuerst alle Handwerker anfragen (Partner-Mail oder Link).'
+    return 'Bitte zuerst alle Partner anfragen (Partner-Mail oder Link).'
   }
   if (!handwerkerEinreichungErledigt(list)) {
-    return 'Es fehlt noch mindestens ein Handwerker-Angebot oder eine Rechnung.'
+    return 'Es fehlt noch mindestens ein Partner-Angebot oder eine Rechnung.'
   }
   if (!handwerkerFreigabeErledigt(list)) {
     return 'Bitte Partner-Einreichung im Angebot mit „Bestätigen & Partner informieren“ abschließen.'
   }
-  return 'Handwerker-Schritte noch offen.'
+  return 'Partner-Schritte noch offen.'
 }

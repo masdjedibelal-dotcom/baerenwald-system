@@ -1,6 +1,7 @@
 'use client'
 
-import { Check, Copy, ImageIcon, Loader2 } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useState } from 'react'
 import type { KiEmpfehlungRow } from '@/lib/ki-hub/types'
 
@@ -68,9 +69,9 @@ export function ContentCard({ empfehlung, onMarkDone }: Props) {
   }
 
   return (
-    <article className="rounded-xl border border-bw-border border-l-4 border-l-[#2E7D52] bg-bw-card p-4 shadow-sm">
+    <article className="rounded-sheet border border-bw-border border-l-4 border-l-bw-primary bg-surface p-4 shadow-sm">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+        <p className="text-fs-caption font-semibold uppercase tracking-wider text-muted">
           {plattform} · Marketing
         </p>
         <h3 className="mt-1 text-sm font-semibold text-bw-text">{empfehlung.titel}</h3>
@@ -80,69 +81,57 @@ export function ContentCard({ empfehlung, onMarkDone }: Props) {
       </div>
 
       {text ? (
-        <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-sm text-bw-text whitespace-pre-wrap">
+        <div className="mt-3 rounded-card border border-bw-border bg-bw-bg px-3 py-2 text-sm text-bw-text whitespace-pre-wrap">
           {text}
         </div>
       ) : null}
 
       {hashtags.length > 0 ? (
-        <p className="mt-2 text-xs text-[#2E7D52]">
+        <p className="mt-2 text-xs text-bw-primary">
           {hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ')}
         </p>
       ) : null}
 
       {bildPrompt ? (
-        <p className="mt-2 rounded-lg bg-bw-bg px-3 py-2 text-xs text-muted">
+        <p className="mt-2 rounded-card bg-bw-bg px-3 py-2 text-xs text-muted">
           <span className="font-medium text-bw-text">Bild-Prompt:</span> {bildPrompt}
         </p>
       ) : null}
 
       {bildUrl ? (
-        <div className="mt-3 overflow-hidden rounded-lg border border-bw-border">
+        <div className="mt-3 overflow-hidden rounded-card border border-bw-border">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={bildUrl} alt="Generiertes Marketing-Bild" className="max-h-80 w-full object-cover" />
         </div>
       ) : null}
 
       {error ? (
-        <p className="mt-2 text-xs text-red-700">{error}</p>
+        <p className="mt-2 text-xs text-danger">{error}</p>
       ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {text ? (
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className="inline-flex items-center gap-1 rounded-lg border border-bw-border bg-white px-3 py-1.5 text-xs font-medium hover:bg-bw-bg"
-          >
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          <MockBtn className="inline-flex items-center gap-1 rounded-button border border-bw-border bg-white px-3 py-1.5 text-xs font-medium hover:bg-bw-bg" type="button" onClick={() => void handleCopy()}>
+            {copied ? <MockIcon n="check" ctx="default" className="h-3.5 w-3.5" /> : <MockIcon n="copy" ctx="default" className="h-3.5 w-3.5" />}
             {copied ? 'Kopiert' : 'Text kopieren'}
-          </button>
+          </MockBtn>
         ) : null}
         {bildPrompt ? (
-          <button
+          <MockBtn
             type="button"
+            kind="primary"
+            sm
+            loading={generating}
             onClick={() => void handleGenerate()}
-            disabled={generating}
-            className="inline-flex items-center gap-1 rounded-lg bg-[#2E7D52] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
-            {generating ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <ImageIcon className="h-3.5 w-3.5" />
-            )}
+            {!generating ? <MockIcon n="photo" ctx="default" className="h-3.5 w-3.5" /> : null}
             {generating ? 'Generiert…' : bildUrl ? 'Neu generieren' : 'Bild generieren'}
-          </button>
+          </MockBtn>
         ) : null}
-        <button
-          type="button"
-          onClick={() => void handleDone()}
-          disabled={doneLoading}
-          className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
-        >
-          <Check className="h-3.5 w-3.5" />
+        <MockBtn className="inline-flex items-center gap-1 rounded-button border border-status-order-bg bg-status-order-bg px-3 py-1.5 text-xs font-medium text-status-order-text hover:bg-status-order-bg disabled:opacity-50" type="button" onClick={() => void handleDone()} disabled={doneLoading}>
+          <MockIcon n="check" ctx="default" className="h-3.5 w-3.5" />
           Erledigt
-        </button>
+        </MockBtn>
       </div>
     </article>
   )

@@ -1,8 +1,8 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockProp } from '@/components/mock-ui/MockProp'
+import type { ReactNode } from 'react'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
 import { formatDatum } from '@/lib/utils'
 

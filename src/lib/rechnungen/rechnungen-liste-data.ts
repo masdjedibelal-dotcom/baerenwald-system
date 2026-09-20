@@ -1,4 +1,6 @@
-import { crmRlsFixHint, withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { createClient } from '@/lib/supabase-server'
+import { logDbError } from '@/lib/errors/log-db-error'
+import { crmRlsFixHint } from '@/lib/kunden/kunden-db'
 import type { RechnungListeZeile } from '@/lib/types'
 
 export const RECHNUNGEN_LISTE_SELECT = `
@@ -25,9 +27,7 @@ export async function loadRechnungenListe(): Promise<{
   error: string | null
   rlsHint: string | null
 }> {
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db.from('rechnungen').select(RECHNUNGEN_LISTE_SELECT).order('created_at', { ascending: false })
-  )
+  const { data, error } = await (() => { const db = createClient(); return db.from('rechnungen').select(RECHNUNGEN_LISTE_SELECT).order('created_at', { ascending: false }) })()
 
   if (error) {
     return {

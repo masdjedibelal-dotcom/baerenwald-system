@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { MockBtn } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
+import { useState } from 'react'
 import { DateInput } from '@/components/ui/DateInput'
 import { cn } from '@/lib/utils'
 
@@ -43,22 +44,12 @@ export function LeistungszeitraumFields({
       <div className="wizard-zahlung-lz__head">
         <span className="wizard-zahlung-lz__label">Leistungszeitraum</span>
         <div className="seg" role="group" aria-label="Leistungszeitraum-Modus">
-          <button
-            type="button"
-            className={modus === 'zeitraum' ? 'on' : undefined}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setModusSafe('zeitraum')}
-          >
+          <MockBtn className={modus === 'zeitraum' ? 'on' : undefined} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setModusSafe('zeitraum')}>
             Zeitraum
-          </button>
-          <button
-            type="button"
-            className={modus === 'tag' ? 'on' : undefined}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setModusSafe('tag')}
-          >
+          </MockBtn>
+          <MockBtn className={modus === 'tag' ? 'on' : undefined} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setModusSafe('tag')}>
             Ein Tag
-          </button>
+          </MockBtn>
         </div>
       </div>
       {hint ? <p className="wizard-zahlung-lz__hint">{hint}</p> : null}

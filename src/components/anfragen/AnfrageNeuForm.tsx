@@ -1,5 +1,10 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
@@ -564,7 +569,7 @@ export function AnfrageNeuForm({
       return
     }
 
-    router.refresh()
+    afterServerActionRefresh()
     if (onSuccess) {
       onSuccess(outId)
       return
@@ -603,148 +608,69 @@ export function AnfrageNeuForm({
           ) : null}
           {firmaPflicht ? (
             <Field label={istHausverwaltung ? 'Firma *' : 'Firma / Name *'}>
-              <input
-                className="input"
-                name="firma"
-                value={firmaName}
-                onChange={(e) => setFirmaName(e.target.value)}
-                required
-                autoComplete="organization"
-              />
+              <MockInput name="firma" value={firmaName} onChange={(e) => setFirmaName(e.target.value)} required autoComplete="organization" />
             </Field>
           ) : null}
           {firmaPflicht ? (
             <div className="form-grid-2 grid gap-3 md:grid-cols-2">
               <Field label="Vorname (Ansprechpartner)">
-                <input
-                  className="input"
-                  name="vorname"
-                  value={vorname}
-                  onChange={(e) => setVorname(e.target.value)}
-                  autoComplete="given-name"
-                />
+                <MockInput name="vorname" value={vorname} onChange={(e) => setVorname(e.target.value)} autoComplete="given-name" />
               </Field>
               <Field label="Nachname (Ansprechpartner)">
-                <input
-                  className="input"
-                  name="nachname"
-                  value={nachname}
-                  onChange={(e) => setNachname(e.target.value)}
-                  autoComplete="family-name"
-                />
+                <MockInput name="nachname" value={nachname} onChange={(e) => setNachname(e.target.value)} autoComplete="family-name" />
               </Field>
             </div>
           ) : null}
           {!firmaPflicht ? (
             <div className="form-grid-2 grid gap-3 md:grid-cols-2">
               <Field label="Vorname">
-                <input
-                  className="input"
-                  name="vorname"
-                  value={vorname}
-                  onChange={(e) => setVorname(e.target.value)}
-                  autoComplete="given-name"
-                />
+                <MockInput name="vorname" value={vorname} onChange={(e) => setVorname(e.target.value)} autoComplete="given-name" />
               </Field>
               <Field label="Nachname">
-                <input
-                  className="input"
-                  name="nachname"
-                  value={nachname}
-                  onChange={(e) => setNachname(e.target.value)}
-                  autoComplete="family-name"
-                />
+                <MockInput name="nachname" value={nachname} onChange={(e) => setNachname(e.target.value)} autoComplete="family-name" />
               </Field>
             </div>
           ) : null}
           <Field label="E-Mail" hint="Mindestens E-Mail oder Telefon">
-            <input
-              className="input"
-              name="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
+            <MockInput name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
           </Field>
           <Field label="Telefon">
-            <input
-              className="input"
-              name="telefon"
-              type="tel"
-              value={telefon}
-              onChange={(e) => setTelefon(e.target.value)}
-              autoComplete="tel"
-            />
+            <MockInput name="telefon" type="tel" value={telefon} onChange={(e) => setTelefon(e.target.value)} autoComplete="tel" />
           </Field>
           <div className="form-grid-2 grid gap-3 md:grid-cols-2">
             <Field label="Straße">
-              <input
-                className="input"
-                name="strasse"
-                value={strasse}
-                onChange={(e) => setStrasse(e.target.value)}
-                autoComplete="street-address"
-              />
+              <MockInput name="strasse" value={strasse} onChange={(e) => setStrasse(e.target.value)} autoComplete="street-address" />
             </Field>
             <Field label="Hausnummer">
-              <input
-                className="input"
-                name="hausnummer"
-                value={hausnummer}
-                onChange={(e) => setHausnummer(e.target.value)}
-              />
+              <MockInput name="hausnummer" value={hausnummer} onChange={(e) => setHausnummer(e.target.value)} />
             </Field>
           </div>
           <div className="form-grid-2 grid gap-3 md:grid-cols-2">
             <Field label="PLZ">
-              <input
-                className="input"
-                name="plz"
-                value={plz}
-                onChange={(e) => setPlz(e.target.value.slice(0, 5))}
-                inputMode="numeric"
-                maxLength={5}
-              />
+              <MockInput name="plz" value={plz} onChange={(e) => setPlz(e.target.value.slice(0, 5))} inputMode="numeric" maxLength={5} />
             </Field>
             <Field label="Ort">
-              <input
-                className="input"
-                name="ort"
-                value={ort}
-                onChange={(e) => setOrt(e.target.value)}
-                autoComplete="address-level2"
-              />
+              <MockInput name="ort" value={ort} onChange={(e) => setOrt(e.target.value)} autoComplete="address-level2" />
             </Field>
           </div>
           <Field label="Kundentyp">
-            <select
-              className="input"
-              name="kundentyp"
-              value={kundentyp}
-              onChange={(e) => setKundentyp(e.target.value)}
-            >
+            <MockSelect name="kundentyp" value={kundentyp} onChange={(e) => setKundentyp(e.target.value)}>
               <option value="">Bitte wählen</option>
               {KUNDENTYP_OPTIONS.map((k) => (
                 <option key={k.value} value={k.value}>
                   {k.label}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </Field>
           <Field label="Kanal">
-            <select
-              className="input"
-              name="kanal"
-              value={kanal}
-              onChange={(e) => setKanal(e.target.value)}
-            >
+            <MockSelect name="kanal" value={kanal} onChange={(e) => setKanal(e.target.value)}>
               {Object.entries(KANAL_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </Field>
         </div>
       </Card>
@@ -783,8 +709,7 @@ export function AnfrageNeuForm({
               <div className="flex flex-col">
                 {verfuegbareBereiche.map((b) => (
                   <label key={b.value} className="checkbox-row">
-                    <input
-                      type="checkbox"
+                    <MockCheckbox
                       checked={bereiche.includes(b.value)}
                       onChange={(e) => toggleBereich(b.value, e.target.checked)}
                     />
@@ -795,9 +720,8 @@ export function AnfrageNeuForm({
             </div>
           ) : null}
 
-          <label className="checkbox-row mt-4 rounded-lg border border-bw-border bg-bw-surface px-3 py-3">
-            <input
-              type="checkbox"
+          <label className="checkbox-row mt-4 rounded-card border border-bw-border bg-bw-surface px-3 py-3">
+            <MockCheckbox
               checked={istBauprojekt}
               onChange={(e) => {
                 setBauprojektManuell(true)
@@ -830,11 +754,7 @@ export function AnfrageNeuForm({
                 if (!config) return null
                 return (
                   <Field key={key} label={config.frage}>
-                    <select
-                      className="input"
-                      name={`fachdetail-${key}`}
-                      value={fachdetails[key] ?? ''}
-                      onChange={(e) => {
+                    <MockSelect name={`fachdetail-${key}`} value={fachdetails[key] ?? ''} onChange={(e) => {
                         const v = e.target.value
                         setFachdetails((prev) => {
                           const next = { ...prev }
@@ -842,15 +762,14 @@ export function AnfrageNeuForm({
                           else next[key] = v
                           return next
                         })
-                      }}
-                    >
+                      }}>
                       <option value="">Bitte wählen</option>
                       {config.optionen.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}
                         </option>
                       ))}
-                    </select>
+                    </MockSelect>
                   </Field>
                 )
               })
@@ -858,65 +777,45 @@ export function AnfrageNeuForm({
 
             {bereiche.includes('bad') ? (
               <Field label="Ausstattung Bad">
-                <select
-                  className="input"
-                  name="badAusstattung"
-                  value={badAusstattung}
-                  onChange={(e) => setBadAusstattung(e.target.value)}
-                >
+                <MockSelect name="badAusstattung" value={badAusstattung} onChange={(e) => setBadAusstattung(e.target.value)}>
                   <option value="">Bitte wählen</option>
                   <option value="standard">Standard</option>
                   <option value="komfort">Komfort</option>
                   <option value="gehoben">Gehoben</option>
-                </select>
+                </MockSelect>
               </Field>
             ) : null}
 
             {situation === 'erneuern' ? (
               <Field label="Aktueller Zustand">
-                <select
-                  className="input"
-                  name="zustand"
-                  value={zustand}
-                  onChange={(e) => setZustand(e.target.value)}
-                >
+                <MockSelect name="zustand" value={zustand} onChange={(e) => setZustand(e.target.value)}>
                   <option value="">Bitte wählen</option>
                   <option value="gut">Gepflegt</option>
                   <option value="maessig">Normale Abnutzung</option>
                   <option value="schlecht">Sanierungsbedürftig</option>
-                </select>
+                </MockSelect>
               </Field>
             ) : null}
 
             {situation === 'kaputt' || situation === 'notfall' ? (
               <>
                 <Field label="Dringlichkeit">
-                  <select
-                    className="input"
-                    name="dringlichkeit"
-                    value={dringlichkeit}
-                    onChange={(e) => setDringlichkeit(e.target.value)}
-                  >
+                  <MockSelect name="dringlichkeit" value={dringlichkeit} onChange={(e) => setDringlichkeit(e.target.value)}>
                     <option value="">Bitte wählen</option>
                     <option value="sofort">Sofort (Notfall)</option>
                     <option value="heute">Heute noch</option>
                     <option value="diese_woche">Diese Woche</option>
                     <option value="naechste_woche">Nächste Woche</option>
                     <option value="flexibel">Flexibel</option>
-                  </select>
+                  </MockSelect>
                 </Field>
                 <Field label="Zugänglichkeit">
-                  <select
-                    className="input"
-                    name="zugaenglichkeit"
-                    value={zugaenglichkeit}
-                    onChange={(e) => setZugaenglichkeit(e.target.value)}
-                  >
+                  <MockSelect name="zugaenglichkeit" value={zugaenglichkeit} onChange={(e) => setZugaenglichkeit(e.target.value)}>
                     <option value="">Bitte wählen</option>
                     <option value="sichtbar_zugaenglich">Sichtbar & zugänglich</option>
                     <option value="schwer_zugaenglich">Schwer zugänglich</option>
                     <option value="nicht_sichtbar">Nicht sichtbar</option>
-                  </select>
+                  </MockSelect>
                 </Field>
               </>
             ) : null}
@@ -929,13 +828,7 @@ export function AnfrageNeuForm({
                 return (
                   <Field key={bereich} label={groessePropLabel(bereich)}>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        className="input min-w-0 flex-1"
-                        name={`groesse-${bereich}`}
-                        value={groessen[bereich] ?? ''}
-                        onChange={(e) => {
+                      <MockInput type="number" min={0} className="min-w-0 flex-1" name={`groesse-${bereich}`} value={groessen[bereich] ?? ''} onChange={(e) => {
                           const raw = e.target.value
                           setGroessen((prev) => {
                             const next = { ...prev }
@@ -947,24 +840,17 @@ export function AnfrageNeuForm({
                             if (Number.isFinite(n) && n >= 0) next[bereich] = n
                             return next
                           })
-                        }}
-                        placeholder="0"
-                      />
-                      <select
-                        className="input shrink-0"
-                        value={groessenEinheiten[bereich] ?? defaultGroesseEinheit(bereich)}
-                        onChange={(e) => {
+                        }} placeholder="0" />
+                      <MockSelect className="shrink-0" value={groessenEinheiten[bereich] ?? defaultGroesseEinheit(bereich)} onChange={(e) => {
                           const val = e.target.value
                           setGroessenEinheiten((prev) => ({ ...prev, [bereich]: val }))
-                        }}
-                        aria-label={`Einheit ${groessePropLabel(bereich)}`}
-                      >
+                        }} aria-label={`Einheit ${groessePropLabel(bereich)}`}>
                         {GROESSEN_EINHEITEN.map((u) => (
                           <option key={u} value={u}>
                             {groesseEinheitLabel(u)}
                           </option>
                         ))}
-                      </select>
+                      </MockSelect>
                     </div>
                     {g.hinweis ? <p className="form-field-hint">{g.hinweis}</p> : null}
                   </Field>
@@ -977,12 +863,7 @@ export function AnfrageNeuForm({
       <Card title="Zeitraum & Preis">
         <div className="space-y-4">
           <Field label="Wann soll es losgehen?">
-            <select
-              className="input"
-              name="zeitraum"
-              value={zeitraum}
-              onChange={(e) => setZeitraum(e.target.value)}
-            >
+            <MockSelect name="zeitraum" value={zeitraum} onChange={(e) => setZeitraum(e.target.value)}>
               <option value="">Bitte wählen</option>
               <option value="sofort">Sofort</option>
               <option value="diese_woche">Diese Woche</option>
@@ -991,34 +872,18 @@ export function AnfrageNeuForm({
               <option value="drei_monate">1–3 Monate</option>
               <option value="sechs_monate">3–6 Monate</option>
               <option value="offen">Noch offen</option>
-            </select>
+            </MockSelect>
           </Field>
 
           <Field label="Preisrahmen (optional)">
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <span className="mb-1 block text-[length:var(--fs-meta)] text-bw-text-muted">Von (€)</span>
-                <input
-                  type="number"
-                  min={0}
-                  className="input"
-                  name="budgetMin"
-                  value={budgetMin}
-                  onChange={(e) => setBudgetMin(e.target.value)}
-                  placeholder="0"
-                />
+                <MockInput type="number" min={0} name="budgetMin" value={budgetMin} onChange={(e) => setBudgetMin(e.target.value)} placeholder="0" />
               </div>
               <div>
                 <span className="mb-1 block text-[length:var(--fs-meta)] text-bw-text-muted">Bis (€)</span>
-                <input
-                  type="number"
-                  min={0}
-                  className="input"
-                  name="budgetMax"
-                  value={budgetMax}
-                  onChange={(e) => setBudgetMax(e.target.value)}
-                  placeholder="0"
-                />
+                <MockInput type="number" min={0} name="budgetMax" value={budgetMax} onChange={(e) => setBudgetMax(e.target.value)} placeholder="0" />
               </div>
             </div>
           </Field>
@@ -1047,11 +912,10 @@ export function AnfrageNeuForm({
       </Card>
 
       {!isBearbeiten ? (
-        <div className="rounded-lg border border-bw-border bg-bw-surface px-3 py-3">
+        <div className="rounded-card border border-bw-border bg-bw-surface px-3 py-3">
           {email.trim() ? (
             <label className="flex cursor-pointer items-start gap-2 text-[length:var(--fs-text)]">
-              <input
-                type="checkbox"
+              <MockCheckbox
                 className="mt-0.5"
                 checked={bestaetigungsmailSenden}
                 onChange={(e) => setBestaetigungsmailSenden(e.target.checked)}
@@ -1072,7 +936,7 @@ export function AnfrageNeuForm({
       ) : null}
 
       {error ? (
-        <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)] text-danger">
+        <p className="rounded-card border border-danger/30 bg-danger/5 px-3 py-2 text-[length:var(--fs-text)] text-danger">
           {error}
         </p>
       ) : null}
@@ -1097,29 +961,25 @@ export function AnfrageNeuForm({
       {showFooter ? (
         <div
           className={cn(
-            'flex shrink-0 items-center justify-end gap-2 border-t border-bw-border bg-bw-card pt-4',
+            'flex shrink-0 items-center justify-end gap-2 border-t border-bw-border bg-surface pt-4',
             isModal ? 'sticky bottom-0 z-10 -mx-6 mt-2 px-6 pb-4' : 'mt-2'
           )}
           style={
             isModal ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined
           }
         >
-          <button type="button" onClick={handleCancel} className="btn ghost sm">
+          <MockBtn kind="ghost" sm type="button" onClick={handleCancel}>
             Abbrechen
-          </button>
-          <button
+          </MockBtn>
+          <MockBtn
             type="submit"
-            disabled={loading || !isValid}
-            className="btn primary sm inline-flex items-center justify-center gap-2"
+            kind="primary"
+            sm
+            loading={loading}
+            disabled={!isValid}
           >
-            {loading ? (
-              <span
-                className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
-                aria-hidden
-              />
-            ) : null}
             {isBearbeiten ? 'Speichern' : 'Anfrage speichern'}
-          </button>
+          </MockBtn>
         </div>
       ) : null}
     </form>

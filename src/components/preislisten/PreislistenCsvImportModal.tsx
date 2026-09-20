@@ -1,10 +1,15 @@
 'use client'
-
+import { MockBtn, MockTable } from '@/components/mock-ui'
+import { MockField, MockSelect } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useMemo, useState } from 'react'
 import Papa from 'papaparse'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
+>>>>>>> Stashed changes
 import type { PreislistenImportMapping, PreislistenImportResponse } from '@/lib/preislisten-import'
 
 const MAP_FIELDS: { key: keyof PreislistenImportMapping; label: string }[] = [
@@ -126,9 +131,9 @@ export function PreislistenCsvImportModal({ open, onClose, onDone }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="CSV-Import" size="lg">
+    <EditorSheet open={open} onClose={handleClose} title="CSV-Import" size="lg">
       {err ? (
-        <p className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{err}</p>
+        <p className="mb-3 rounded-card border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{err}</p>
       ) : null}
 
       <div className="max-h-[55vh] space-y-4 overflow-y-auto">
@@ -145,8 +150,7 @@ export function PreislistenCsvImportModal({ open, onClose, onDone }: Props) {
         {previewRows.length > 0 ? (
           <div>
             <p className="mb-2 text-sm font-medium text-ink">Vorschau (erste 5 Zeilen)</p>
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full min-w-[480px] border-collapse text-left text-xs">
+            <MockTable wrapClassName="overflow-x-auto rounded-card border border-border" className="w-full min-w-[480px] border-collapse text-left text-xs">
                 <thead>
                   <tr className="border-b border-border bg-canvas text-muted">
                     {headers.map((h) => (
@@ -167,36 +171,36 @@ export function PreislistenCsvImportModal({ open, onClose, onDone }: Props) {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+            </MockTable>
           </div>
         ) : null}
 
         {headers.length > 0 ? (
-          <div className="space-y-3 rounded-lg border border-border bg-canvas/40 p-3">
+          <div className="space-y-3 rounded-card border border-border bg-canvas/40 p-3">
             <p className="text-sm font-medium text-ink">Spalten-Mapping</p>
             {MAP_FIELDS.map(({ key, label }) => (
-              <Select
-                key={key}
-                label={label}
-                name={`map-${key}`}
-                value={mapping[key] ?? ''}
-                onChange={(e) => setMapping((prev) => ({ ...prev, [key]: e.target.value }))}
-                options={headerOptions}
-              />
+              <MockField key={key} label={label}>
+                <MockSelect name={`map-${key}`} id={`map-${key}`} value={mapping[key] ?? ''} onChange={(e) => setMapping((prev) => ({ ...prev, [key]: e.target.value }))}>
+                  {headerOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </MockSelect>
+              </MockField>
             ))}
           </div>
         ) : null}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" onClick={handleClose} disabled={busy}>
+        <MockBtn type="button" kind="secondary" onClick={handleClose} disabled={busy}>
           Abbrechen
-        </Button>
-        <Button type="button" variant="primary" onClick={() => void runImport()} disabled={busy || !file}>
+        </MockBtn>
+        <MockBtn type="button" kind="primary" onClick={() => void runImport()} disabled={busy || !file}>
           {busy ? 'Importiere…' : 'Importieren'}
-        </Button>
+        </MockBtn>
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

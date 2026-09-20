@@ -1,23 +1,23 @@
 'use client'
-import { useTransition } from '@/components/ui/action-busy'
-
-import { useEffect, useMemo, useState } from 'react'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockBtn } from '@/components/mock-ui'
 import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
-import { MockModal } from '@/components/mock-ui/MockModal'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { useTransition } from '@/components/ui/action-busy'
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { useEffect, useMemo, useState } from 'react'
 import { LIST } from '@/lib/crm-labels'
 import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { Input } from '@/components/ui/Input'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import {
   createObjektKontakt,
   deleteObjektKontakt,
+  restoreObjektKontakt,
   updateObjektKontakt,
 } from '@/app/actions/objektakte-actions'
 import {
@@ -29,6 +29,8 @@ import type { EntityMenuItem } from '@/lib/entity-menu'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { TOAST } from '@/lib/copy'
+import { deleteWithUndo } from '@/lib/ui/delete-with-undo'
 
 const KONTAKT_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) 44px'
 
@@ -171,7 +173,7 @@ export function ObjektKontakteSection({
               : k
           )
         )
-        toast.success('Kontakt gespeichert')
+        toast.success(TOAST.kontakt_gespeichert)
       } else {
         const r = await createObjektKontakt(kundeId, objektId, payload)
         if (!r.ok) {
@@ -179,7 +181,7 @@ export function ObjektKontakteSection({
           return
         }
         setListe((prev) => [...prev, r.kontakt])
-        toast.success('Kontakt angelegt')
+        toast.success(TOAST.kontakt_angelegt)
       }
       setDirty(false)
       setModalOpen(false)
@@ -204,56 +206,87 @@ export function ObjektKontakteSection({
   async function runBulkDelete() {
     if (!selectedRows.length || bulkDeletePending) return
     setBulkDeletePending(true)
-    try {
-      const failed: string[] = []
-      for (const k of selectedRows) {
-        const r = await deleteObjektKontakt(kundeId, objektId, k.id)
-        if (!r.ok) {
-          failed.push(k.name)
-          continue
+    const snapshot = selectedRows
+    const ids = new Set(snapshot.map((k) => k.id))
+    setBulkDeleteOpen(false)
+    setSelected({})
+    deleteWithUndo({
+      key: `objekt-kontakte-bulk:${[...ids].sort().join(',')}`,
+      removeOptimistic: () =>
+        setListe((prev) => prev.filter((x) => !ids.has(x.id))),
+      restoreOptimistic: () =>
+        setListe((prev) => {
+          const have = new Set(prev.map((x) => x.id))
+          return [...snapshot.filter((s) => !have.has(s.id)), ...prev]
+        }),
+      commitImmediate: true,
+      commit: async () => {
+        const failed: string[] = []
+        for (const k of snapshot) {
+          const r = await deleteObjektKontakt(kundeId, objektId, k.id)
+          if (!r.ok) failed.push(k.name)
         }
-        setListe((prev) => prev.filter((x) => x.id !== k.id))
-      }
-      setSelected({})
-      setBulkDeleteOpen(false)
-      if (failed.length) {
-        toast.error(
-          failed.length === 1
-            ? `„${failed[0]}“ konnte nicht gelöscht werden.`
-            : `${failed.length} Kontakte konnten nicht gelöscht werden.`
-        )
-      } else {
-        toast.success(
-          selectedRows.length === 1 ? 'Kontakt gelöscht' : `${selectedRows.length} Kontakte gelöscht`
-        )
-      }
-      onChanged()
-    } finally {
-      setBulkDeletePending(false)
-    }
+        if (failed.length) {
+          toast.error(
+            failed.length === 1
+              ? `„${failed[0]}“ konnte nicht gelöscht werden.`
+              : `${failed.length} Kontakte konnten nicht gelöscht werden.`
+          )
+        }
+        onChanged()
+      },
+      restore: async () => {
+        for (const k of snapshot) {
+          await restoreObjektKontakt(kundeId, objektId, k.id)
+        }
+        onChanged()
+      },
+      message: TOAST.geloescht,
+    })
+    setBulkDeletePending(false)
   }
 
   async function runSingleDelete() {
     if (!deleteTarget || deletePending) return
-    setDeletePending(true)
-    try {
-      const r = await deleteObjektKontakt(kundeId, objektId, deleteTarget.id)
-      if (!r.ok) {
-        toast.error(r.message)
-        return
-      }
-      setListe((prev) => prev.filter((x) => x.id !== deleteTarget.id))
-      setDeleteTarget(null)
-      setSelected((prev) => {
-        const next = { ...prev }
-        delete next[deleteTarget.id]
-        return next
-      })
-      toast.success('Kontakt gelöscht')
-      onChanged()
-    } finally {
-      setDeletePending(false)
-    }
+    const target = deleteTarget
+    setDeleteTarget(null)
+    setDeletePending(false)
+    setSelected((prev) => {
+      const next = { ...prev }
+      delete next[target.id]
+      return next
+    })
+    scheduleKontaktDelete(target)
+  }
+
+  function scheduleKontaktDelete(target: ObjektKontakt) {
+    deleteWithUndo({
+      key: `objekt-kontakt:${target.id}`,
+      removeOptimistic: () =>
+        setListe((prev) => prev.filter((x) => x.id !== target.id)),
+      restoreOptimistic: () =>
+        setListe((prev) =>
+          prev.some((x) => x.id === target.id) ? prev : [...prev, target]
+        ),
+      commitImmediate: true,
+      commit: async () => {
+        const r = await deleteObjektKontakt(kundeId, objektId, target.id)
+        if (!r.ok) {
+          toast.systemError(r)
+          setListe((prev) =>
+            prev.some((x) => x.id === target.id) ? prev : [...prev, target]
+          )
+          return
+        }
+        onChanged()
+      },
+      restore: async () => {
+        const r = await restoreObjektKontakt(kundeId, objektId, target.id)
+        if (!r.ok) toast.systemError(r)
+        else onChanged()
+      },
+      message: TOAST.geloescht,
+    })
   }
 
   function kontaktRowMenu(k: ObjektKontakt): EntityMenuItem[] {
@@ -268,7 +301,7 @@ export function ObjektKontakteSection({
         icon: 'trash',
         label: 'Löschen',
         danger: true,
-        onClick: () => setDeleteTarget(k),
+        onClick: () => scheduleKontaktDelete(k),
       },
     ]
   }
@@ -292,11 +325,7 @@ export function ObjektKontakteSection({
           onToggle={() => toggleSel(k.id)}
           title={`${k.name} auswählen`}
         />
-        <button
-          type="button"
-          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
-          onClick={() => openBearbeiten(k)}
-        >
+        <MockBtn className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'} type="button" onClick={() => openBearbeiten(k)}>
           {isMobile ? (
             <>
               <div className="ap-mobile-card__top">
@@ -320,7 +349,7 @@ export function ObjektKontakteSection({
               <span className="ap-list__dim">{kontaktZeile}</span>
             </>
           )}
-        </button>
+        </MockBtn>
         <div
           className="row-actions always"
           onClick={(e) => e.stopPropagation()}
@@ -379,32 +408,20 @@ export function ObjektKontakteSection({
         )}
       </MockCard>
 
-      <MockModal
+      <ConfirmPopup
         open={bulkDeleteOpen}
         onClose={() => {
           if (!bulkDeletePending) setBulkDeleteOpen(false)
         }}
-        icon="trash"
         title={selectedCount === 1 ? 'Kontakt löschen?' : `${selectedCount} Kontakte löschen?`}
-        sub="Dauerhaft entfernen."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
-              onClick={() => void runBulkDelete()}
-            >
-              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={bulkDeletePending}
+        confirmLabel={bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runBulkDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Dauerhaft entfernen.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {bulkDeletePending
             ? 'Bitte warten…'
@@ -412,40 +429,28 @@ export function ObjektKontakteSection({
               ? `„${selectedRows[0]?.name ?? 'Kontakt'}“ wird unwiderruflich gelöscht.`
               : `${selectedCount} ausgewählte Kontakte werden unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
-      <MockModal
+      <ConfirmPopup
         open={Boolean(deleteTarget)}
         onClose={() => {
           if (!deletePending) setDeleteTarget(null)
         }}
-        icon="trash"
         title="Kontakt löschen?"
-        sub="Dauerhaft entfernen."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={deletePending ? undefined : 'trash'}
-              disabled={deletePending}
-              onClick={() => void runSingleDelete()}
-            >
-              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={deletePending}
+        confirmLabel={deletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runSingleDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Dauerhaft entfernen.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {deletePending
             ? 'Bitte warten…'
             : `„${deleteTarget?.name ?? 'Kontakt'}“ wird unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
       <EditorSheet
         open={modalOpen}
@@ -457,52 +462,24 @@ export function ObjektKontakteSection({
         onConfirm={speichern}
       >
         <div className="space-y-3">
-          <Select
-            label="Rolle"
-            name="rolle"
-            value={rolle}
-            onChange={(e) => {
+          <Combobox label="Rolle" id="rolle" name="rolle" options={ROLLE_OPTIONS} value={rolle == null ? '' : String(rolle)} placeholder="Auswählen…" onChange={(next) => {
               setDirty(true)
-              setRolle(e.target.value as ObjektKontaktRolle)
-            }}
-            options={ROLLE_OPTIONS}
-          />
-          <Input
-            label="Name"
-            value={name}
-            onChange={(e) => {
+              setRolle(next as ObjektKontaktRolle)
+            }} />
+          <MockField label="Name" required><MockInput value={name} onChange={(e) => {
               setDirty(true)
               setName(e.target.value)
-            }}
-            required
-          />
-          <Input
-            label="Telefon"
-            value={telefon}
-            onChange={(e) => {
+            }} required /></MockField>
+          <MockField label="Telefon"><MockInput type="tel" value={telefon} onChange={(e) => {
               setDirty(true)
               setTelefon(e.target.value)
-            }}
-            type="tel"
-          />
-          <Input
-            label="E-Mail"
-            value={email}
-            onChange={(e) => {
+            }} /></MockField>
+          <MockField label="E-Mail"><MockInput type="email" value={email} onChange={(e) => {
               setDirty(true)
               setEmail(e.target.value)
-            }}
-            type="email"
-          />
-          <Textarea
-            label="Notiz"
-            value={notiz}
-            onChange={(e) => {
-              setDirty(true)
-              setNotiz(e.target.value)
-            }}
-            rows={3}
-          />
+            }} /></MockField>
+          <MockField label="Notiz"><RichTextEditor value={typeof (notiz) === 'string' ? (notiz) : ''} onChange={(__v) => {setDirty(true)
+              setNotiz(__v)}} minHeight={120} aria-label="Notiz" /></MockField>
           {err ? <p className="text-[length:var(--fs-text)] text-danger">{err}</p> : null}
         </div>
       </EditorSheet>

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -25,6 +26,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { error: upErr } = await supabaseAdmin.storage
     .from('buergschaften')
     .upload(path, buf, { contentType: file.type || 'application/pdf', upsert: true })
+  if (upErr) logDbError('app/api/auftraege/[id]/buergschaften/upload/route:buergschaften', upErr)
 
   if (upErr) {
     return NextResponse.json({ error: upErr.message }, { status: 500 })

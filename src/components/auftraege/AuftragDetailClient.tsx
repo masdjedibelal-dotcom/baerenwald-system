@@ -1,4 +1,15 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import {
+  DetailShell,
+  EntityDetailLayout,
+  type DetailShellGroup,
+} from '@/components/layout/EntityDetailLayout'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -6,10 +17,7 @@ import { primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
-import { DetailShell, type DetailShellGroup } from '@/components/mock-ui/DetailShell'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
 import { AuftragAbschliessenSheet } from '@/components/auftraege/AuftragAbschliessenSheet'
@@ -51,7 +59,6 @@ import type {
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import { ClientOnly } from '@/components/ui/ClientOnly'
-import { confirmAction } from '@/components/ui/confirm-action'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
@@ -97,6 +104,7 @@ import {
   loadNachtragAngebotBootstrap,
 } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
+import { TOAST } from '@/lib/copy'
 
 const AngebotWizard = dynamic(
   () => import('@/components/angebote/AngebotWizard').then((mod) => ({ default: mod.AngebotWizard })),
@@ -130,10 +138,10 @@ function AuftragNotizenPanel({
     startTransition(async () => {
       const r = await updateAuftragNotizen(auftragId, val)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Notizen gespeichert')
+      toast.success(TOAST.notizen_gespeichert)
       onSaved()
     })
   }
@@ -142,65 +150,37 @@ function AuftragNotizenPanel({
 
   if (isMobile) {
     return (
-      <div className="card">
-        <div className="card-h">
-          <div className="card-title title">
-            <MockIcon ctx="emphasis" n="messages" size={16} />
-            Notizen
-          </div>
-        </div>
-        <div className="card-b">
-          {text ? (
-            <p className="akte-notiz-readonly whitespace-pre-wrap text-[length:var(--fs-text)] text-bw-text">
-              {text}
-            </p>
-          ) : (
-            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
-              Noch keine Notizen. Über „Notiz“ oben hinzufügen.
-            </p>
-          )}
-        </div>
-      </div>
+      <MockCard title="Notizen" icon="messages">
+        {text ? (
+          <p className="akte-notiz-readonly whitespace-pre-wrap text-[length:var(--fs-text)] text-bw-text">
+            {text}
+          </p>
+        ) : (
+          <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+            Noch keine Notizen. Über „Notiz“ oben hinzufügen.
+          </p>
+        )}
+      </MockCard>
     )
   }
 
   return (
-    <div className="card">
-      <div className="card-h">
-        <div className="card-title title">
-          <MockIcon ctx="emphasis" n="messages" size={16} />
-          Notizen
-        </div>
+    <MockCard
+      title="Notizen"
+      icon="messages"
+      actions={
         <div className="inline-edit-actions">
-          <button
-            type="button"
-            className="btn ghost sm"
-            disabled={pending || val === initial}
-            onClick={() => setVal(initial)}
-          >
+          <MockBtn kind="ghost" sm type="button" disabled={pending || val === initial} onClick={() => setVal(initial)}>
             Abbrechen
-          </button>
-          <button
-            type="button"
-            className="btn primary sm"
-            disabled={pending || val === initial}
-            onClick={speichern}
-          >
+          </MockBtn>
+          <MockBtn kind="primary" sm type="button" disabled={pending || val === initial} onClick={speichern}>
             Speichern
-          </button>
+          </MockBtn>
         </div>
-      </div>
-      <div className="card-b">
-        <textarea
-          className="input ta"
-          rows={8}
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          placeholder="Interne Notizen zum Auftrag…"
-          disabled={pending}
-        />
-      </div>
-    </div>
+      }
+    >
+      <MockTextarea className="ta" rows={8} value={val} onChange={(e) => setVal(e.target.value)} placeholder="Interne Notizen zum Auftrag…" disabled={pending} />
+    </MockCard>
   )
 }
 
@@ -448,17 +428,17 @@ export function AuftragDetailClient({
 
   const openAngebotKorrektur = useCallback(() => {
     if (!detail.angebot_id) {
-      toast.error('Kein verknüpftes Angebot.')
+      toast.error(TOAST.kein_verknuepftes_angebot)
       return
     }
     if (!detail.lead_id) {
-      toast.error('Keine Anfrage verknüpft')
+      toast.error(TOAST.keine_anfrage_verknuepft)
       return
     }
     startTransition(async () => {
       const res = await loadAngebotKorrekturWizardBootstrap(detail.id)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setAngebotKorrekturBootstrap(res.bootstrap)
@@ -470,20 +450,20 @@ export function AuftragDetailClient({
 
   const openNachtragAngebot = useCallback(() => {
     if (!detail.angebot_id || !detail.lead_id) {
-      toast.error('Nachtrag braucht verknüpftes Angebot und Anfrage.')
+      toast.error(TOAST.nachtrag_braucht_verknuepftes_angebot_und_anfrag)
       return
     }
     startTransition(async () => {
       const res = await loadNachtragAngebotBootstrap(detail.id)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setAngebotKorrekturBootstrap(res.bootstrap)
       setAngebotKorrekturLead(res.lead)
       setAngebotKorrekturKey((k) => k + 1)
       setAngebotKorrekturOpen(true)
-      toast.info('Nachtrag — Auftrag unverändert')
+      toast.info(TOAST.nachtrag_auftrag_unveraendert)
     })
   }, [detail.angebot_id, detail.id, detail.lead_id])
 
@@ -543,7 +523,7 @@ export function AuftragDetailClient({
           parentVertragId,
         })
         if (!res.ok) {
-          toast.error(res.message)
+          toast.systemError(res)
           return
         }
         openVertragWizard(res.bootstrap)
@@ -554,7 +534,7 @@ export function AuftragDetailClient({
 
   const openNachtragErstellen = useCallback(() => {
     if (!hauptvertraegeFuerNachtrag.length) {
-      toast.error('Zuerst einen Nachunternehmervertrag mit PDF anlegen.')
+      toast.error(TOAST.zuerst_einen_nachunternehmervertrag_mit_pdf_anle)
       return
     }
     if (hauptvertraegeFuerNachtrag.length === 1) {
@@ -581,7 +561,7 @@ export function AuftragDetailClient({
               return
             }
           }
-          toast.error(res.message)
+          toast.systemError(res)
           return
         }
         openRechnungWizard(res.bootstrap)
@@ -772,7 +752,7 @@ export function AuftragDetailClient({
             v: auftragDatumRange || (detail.created_at ? formatDatum(detail.created_at) : '—'),
           },
           { k: 'Status', v: auftragStatus.label },
-          ...(handwerkerKurz ? [{ k: 'Handwerker', v: handwerkerKurz }] : []),
+          ...(handwerkerKurz ? [{ k: 'Partner', v: handwerkerKurz }] : []),
           {
             k: 'Leistungen',
             v: positionenAktiv.length
@@ -930,21 +910,21 @@ export function AuftragDetailClient({
         if (modus === 'storno_neu') {
           const korr = await korrigiereRechnung(rechnungId)
           if (!korr.ok) {
-            toast.error(korr.message)
+            toast.systemError(korr)
             return
           }
           if (korr.mode === 'storno_neu') {
             targetId = korr.neuId
-            toast.success('Korrektur-Entwurf angelegt — bitte prüfen und versenden')
+            toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ver)
           }
         } else if (modus === 'gesperrt') {
-          toast.error('Diese Rechnung kann nicht mehr bearbeitet werden.')
+          toast.error(TOAST.diese_rechnung_kann_nicht_mehr_bearbeitet_werden)
           return
         }
 
         const res = await loadRechnungWizardBootstrap(targetId, detail.id)
         if (!res.ok) {
-          toast.error(res.message)
+          toast.systemError(res)
           return
         }
         openRechnungWizard(res.bootstrap)
@@ -957,7 +937,7 @@ export function AuftragDetailClient({
     (rechnungId: string) => {
       const row = rechnungenListe.find((r) => r.id === rechnungId)
       const nr = row?.rechnungsnummer?.trim()
-      confirmAction({
+      openActionConfirm({
         title: 'Rechnung wirklich versenden?',
         body: nr
           ? `${nr} wird per E-Mail an den Kunden gesendet.`
@@ -968,10 +948,10 @@ export function AuftragDetailClient({
         onConfirm: async () => {
           const r = await sendRechnung(rechnungId)
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             return
           }
-          toast.success('Rechnung gesendet')
+          toast.success(TOAST.rechnung_gesendet)
           refresh()
         },
       })
@@ -993,7 +973,7 @@ export function AuftragDetailClient({
           notifyKunde: Boolean(kundeEmail),
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           return
         }
         toast.success(
@@ -1389,7 +1369,7 @@ export function AuftragDetailClient({
             }
             const fallback = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
             if (!fallback.ok) {
-              toast.error(res.message)
+              toast.systemError(res)
               return
             }
             openRechnungWizard(fallback.bootstrap)

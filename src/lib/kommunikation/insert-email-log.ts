@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 const EXTENDED_COLUMNS = [
@@ -80,6 +81,7 @@ export async function insertEmailLogRow(
   let lastError: string | null = null
   for (const attempt of attempts) {
     const { data, error } = await supabaseAdmin.from('email_log').insert(attempt).select('id').single()
+    if (error) logDbError('lib/kommunikation/insert-email-log:email_log', error)
     if (!error) {
       return { id: (data?.id as string) ?? null, error: null }
     }

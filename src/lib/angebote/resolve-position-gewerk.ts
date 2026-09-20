@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   istFreitextPosition,
@@ -86,7 +87,6 @@ async function batchLookupGewerkIdsByLeistungId(
       .select('id, katalog_positionen(gewerk_id)')
       .in('id', unique),
   ])
-
   for (const row of plRows ?? []) {
     const gid = String(row.gewerk_id ?? '').trim()
     if (gid) map.set(String(row.id), gid)

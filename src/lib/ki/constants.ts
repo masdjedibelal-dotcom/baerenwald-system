@@ -7,9 +7,9 @@ export const KI_BEREICHE = {
   produkte: 'Standardpakete & Kombinationen',
   gewerke: 'Auftragsablauf je Gewerk',
   ausfuehrung: 'Ausführung Eigen & Fremd',
-  handwerker: 'Handwerker Routing',
+  handwerker: 'Partner Routing',
   dauer: 'Baustelle & Abnahme',
-  bewertungen: 'Handwerker-Bewertungen',
+  bewertungen: 'Partner-Bewertungen',
 } as const
 
 export type KiBereich = keyof typeof KI_BEREICHE

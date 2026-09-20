@@ -1,13 +1,21 @@
 'use client'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { crmManuelleHandwerkerEinreichung } from '@/app/(dashboard)/angebote/actions'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 export function HandwerkerEinreichungManuellModal({
   open,
@@ -26,6 +34,7 @@ export function HandwerkerEinreichungManuellModal({
   gewerkName: string
   onSaved: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const [preisNetto, setPreisNetto] = useState('')
   const [preisBrutto, setPreisBrutto] = useState('')
@@ -42,7 +51,7 @@ export function HandwerkerEinreichungManuellModal({
 
   function speichern() {
     if (!pdf) {
-      toast.error('Bitte ein Angebots-PDF auswählen.')
+      applyFieldErrors({ _form: TOAST.bitte_ein_angebots_pdf_auswaehlen })
       return
     }
     const fd = new FormData()
@@ -56,52 +65,49 @@ export function HandwerkerEinreichungManuellModal({
     startTransition(async () => {
       const res = await crmManuelleHandwerkerEinreichung(fd)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
-      toast.success('Handwerker-Angebot manuell erfasst')
+      toast.success(TOAST.partner_angebot_manuell_erfasst)
       onSaved()
       resetAndClose()
     })
   }
 
   return (
-    <Modal
+    <EditorSheet
       open={open}
       onClose={resetAndClose}
       title="Angebot manuell erfassen"
       size="md"
+<<<<<<< Updated upstream
+      secondary={{ label: 'Abbrechen', onClick: resetAndClose, disabled: pending }}
+      primary={{
+        label: 'Speichern',
+        onClick: speichern,
+        busy: pending,
+      }}
+=======
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={resetAndClose} disabled={pending}>
+          <MockBtn type="button" kind="secondary" onClick={resetAndClose} disabled={pending}>
             Abbrechen
-          </Button>
-          <Button type="button" variant="primary" loading={pending} onClick={speichern}>
+          </MockBtn>
+          <MockBtn type="button" kind="primary" loading={pending} onClick={speichern}>
             Speichern
-          </Button>
+          </MockBtn>
         </div>
       }
+>>>>>>> Stashed changes
     >
-      <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              <p className="mb-4 text-[length:var(--fs-text)] text-bw-text-muted">
         {handwerkerName} · {gewerkName}. Wie eine Portal-Einreichung: Preis, PDF und Status
         „eingereicht“. Danach im Angebot mit „Bestätigen & Partner informieren“ abschließen.
       </p>
       <div className="space-y-3">
-        <Input
-          label="Preis netto (€)"
-          required
-          value={preisNetto}
-          onChange={(e) => setPreisNetto(e.target.value)}
-          inputMode="decimal"
-          placeholder="z. B. 4500"
-        />
-        <Input
-          label="Preis brutto (€, optional)"
-          value={preisBrutto}
-          onChange={(e) => setPreisBrutto(e.target.value)}
-          inputMode="decimal"
-          placeholder="z. B. 5355"
-        />
+        <MockField label="Preis netto (€)" required><MockInput required value={preisNetto} onChange={(e) => setPreisNetto(e.target.value)} inputMode="decimal" placeholder="z. B. 4500" /></MockField>
+        <MockField label="Preis brutto (€, optional)"><MockInput value={preisBrutto} onChange={(e) => setPreisBrutto(e.target.value)} inputMode="decimal" placeholder="z. B. 5355" /></MockField>
         <label className="block text-[length:var(--fs-text)]">
           <span className="mb-1 block font-medium text-bw-text">Angebots-PDF</span>
           <input
@@ -111,14 +117,8 @@ export function HandwerkerEinreichungManuellModal({
             onChange={(e) => setPdf(e.target.files?.[0] ?? null)}
           />
         </label>
-        <Textarea
-          label="Interne Notiz (optional)"
-          rows={2}
-          value={notiz}
-          onChange={(e) => setNotiz(e.target.value)}
-          placeholder="z. B. per E-Mail erhalten am …"
-        />
+        <MockField label="Interne Notiz (optional)"><RichTextEditor value={typeof (notiz) === 'string' ? (notiz) : ''} onChange={(__v) => setNotiz(__v)} placeholder="z. B. per E-Mail erhalten am …" minHeight={120} aria-label="Interne Notiz (optional)" /></MockField>
       </div>
-    </Modal>
+    </EditorSheet>
   )
 }

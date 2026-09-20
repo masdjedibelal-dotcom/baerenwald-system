@@ -1,10 +1,10 @@
 'use client'
 
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
 import { useEffect, useRef, useState } from 'react'
-import { Input } from '@/components/ui/Input'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
-import { Textarea } from '@/components/ui/Textarea'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { previewBesichtigungTerminMail } from '@/app/actions/mails'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
@@ -140,7 +140,9 @@ export function TerminBestaetigungMailEditor({
 
   if (!kontaktEmail.trim()) {
     return (
-      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">Keine E-Mail beim Kontakt — Bestätigung nur im Kalender.</p>
+      <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+        Beim Kontakt fehlt eine E-Mail — Bestätigung nur im Kalender.
+      </p>
     )
   }
 
@@ -153,17 +155,17 @@ export function TerminBestaetigungMailEditor({
   const draft = value ?? emptyDraft(kontaktEmail)
 
   return (
-    <div className="space-y-3 rounded-lg border border-bw-border bg-bw-bg p-3">
+    <div className="space-y-3 rounded-card border border-bw-border bg-bw-bg p-3">
       <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
         Terminbestätigung an den Kunden. Betreff, Empfänger und Text vor dem Versand prüfen.
       </p>
       {!hatMitarbeiter ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[length:var(--fs-meta)] text-amber-950">
+        <p className="rounded-field border border-status-contact-bg bg-status-contact-bg px-2.5 py-2 text-[length:var(--fs-meta)] text-status-contact-text">
           Noch kein Vor-Ort-Mitarbeiter gewählt — die Vorschau zeigt Termin ohne Kollegen-Block. Zum
           Speichern und Versand ist die Auswahl oben Pflicht.
         </p>
       ) : null}
-      {error ? <p className="text-[length:var(--fs-meta)] text-red-600">{error}</p> : null}
+      {error ? <p className="text-[length:var(--fs-meta)] text-danger">{error}</p> : null}
       <KiAssistFieldLabel
         label="Betreff"
         value={draft.betreff}
@@ -171,11 +173,7 @@ export function TerminBestaetigungMailEditor({
         extraHint={`Terminbestätigung an ${kontaktName || 'Kunde'}.`}
         multiline={false}
       >
-        <Input
-          value={draft.betreff}
-          onChange={(e) => onChange({ ...draft, betreff: e.target.value })}
-          placeholder={loading ? 'Wird geladen…' : undefined}
-        />
+        <MockInput value={draft.betreff} onChange={(e) => onChange({ ...draft, betreff: e.target.value })} placeholder={loading ? 'Wird geladen…' : undefined} />
       </KiAssistFieldLabel>
       <EmailPillsField
         label="An"
@@ -197,13 +195,7 @@ export function TerminBestaetigungMailEditor({
         onApply={(text) => onChange({ ...draft, bodyText: text })}
         extraHint={`Terminbestätigung Mailtext. Marker „${TERMIN_MAIL_AUTO_MARKER}“ belassen.`}
       >
-        <Textarea
-          rows={8}
-          value={draft.bodyText}
-          onChange={(e) => onChange({ ...draft, bodyText: e.target.value })}
-          disabled={loading && !draft.bodyText}
-          placeholder={loading ? 'Text wird geladen…' : undefined}
-        />
+        <RichTextEditor value={typeof (draft.bodyText) === 'string' ? (draft.bodyText) : ''} onChange={(__v) => onChange({ ...draft, bodyText: __v })} disabled={loading && !draft.bodyText} placeholder={loading ? 'Text wird geladen…' : undefined} minHeight={192} aria-label={loading ? 'Text wird geladen…' : undefined} />
       </KiAssistFieldLabel>
       <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
         Die Zeile „{TERMIN_MAIL_AUTO_MARKER}“ nicht löschen — danach kommen Datum, Ort und der

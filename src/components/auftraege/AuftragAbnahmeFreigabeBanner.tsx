@@ -1,10 +1,16 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { useCallback, useEffect, useState } from 'react'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   ablehnenAbnahmeprotokoll,
@@ -13,6 +19,7 @@ import {
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import type { AbnahmeHwFreigabeZeile } from '@/lib/auftraege/abnahme-freigabe'
 import { formatDatum, formatDatumZeit } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 type PendingAction =
   | { kind: 'freigeben'; zeile: AbnahmeHwFreigabeZeile }
@@ -69,7 +76,7 @@ export function AuftragAbnahmeFreigabeBanner({
       .run('Abnahme wird freigegeben…', async () => {
         const r = await freigebenAbnahmeprotokoll(zeile.protokollId!, auftragId)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
         toast.success(
@@ -98,10 +105,10 @@ export function AuftragAbnahmeFreigabeBanner({
           notiz: ablehnNotiz.trim() || null,
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Abgelehnt — Handwerker kann erneut abschließen.')
+        toast.success(TOAST.abgelehnt_partner_kann_erneut_abschliessen)
         setAction(null)
         setAblehnNotiz('')
         reload()
@@ -119,7 +126,7 @@ export function AuftragAbnahmeFreigabeBanner({
     <>
       <div className="abnahme-freigabe-banner" role="region" aria-label="Abnahme zur Freigabe">
         <p className="abnahme-freigabe-banner__lead">
-          Handwerker hat den Auftrag abgeschlossen — Abnahme prüfen
+          Partner hat den Auftrag abgeschlossen — Abnahme prüfen
         </p>
 
         <ul className="abnahme-freigabe-banner__list">
@@ -153,7 +160,7 @@ export function AuftragAbnahmeFreigabeBanner({
                         : ''}
                     </li>
                   ) : (
-                    <li>Keine offenen Mängel</li>
+                    <li>Offene Mängel: keine</li>
                   )}
                   {z.unterzeichnerHw ? <li>Unterschrift HW: {z.unterzeichnerHw}</li> : null}
                   {z.unterzeichnerKunde ? (
@@ -177,9 +184,8 @@ export function AuftragAbnahmeFreigabeBanner({
               </div>
               {!disabled ? (
                 <div className="abnahme-freigabe-banner__actions">
-                  <Button
-                    variant="primary"
-                    size="sm"
+                  <MockBtn
+                    kind="primary" sm
                     disabled={pending}
                     onClick={() => {
                       setAblehnNotiz('')
@@ -187,10 +193,9 @@ export function AuftragAbnahmeFreigabeBanner({
                     }}
                   >
                     Abgenommen
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
+                  </MockBtn>
+                  <MockBtn
+                    kind="secondary" sm
                     disabled={pending}
                     onClick={() => {
                       setAblehnNotiz('')
@@ -198,7 +203,7 @@ export function AuftragAbnahmeFreigabeBanner({
                     }}
                   >
                     Abgelehnt
-                  </Button>
+                  </MockBtn>
                 </div>
               ) : null}
             </li>
@@ -227,15 +232,10 @@ export function AuftragAbnahmeFreigabeBanner({
             <p className="text-[length:var(--fs-text)] text-[var(--text)]">
               {action.kind === 'freigeben'
                 ? `Abnahme von ${action.zeile.handwerkerName} freigeben?`
-                : `Abnahme von ${action.zeile.handwerkerName} ablehnen? Der Handwerker kann danach erneut abschließen.`}
+                : `Abnahme von ${action.zeile.handwerkerName} ablehnen? Der Partner kann danach erneut abschließen.`}
             </p>
             {action.kind === 'ablehnen' ? (
-              <Textarea
-                label="Notiz für den Handwerker (optional)"
-                value={ablehnNotiz}
-                onChange={(e) => setAblehnNotiz(e.target.value)}
-                rows={3}
-              />
+              <MockField label="Notiz für den Partner (optional)"><RichTextEditor value={typeof (ablehnNotiz) === 'string' ? (ablehnNotiz) : ''} onChange={(__v) => setAblehnNotiz(__v)} minHeight={120} aria-label="Notiz für den Partner (optional)" /></MockField>
             ) : null}
           </div>
         ) : null}

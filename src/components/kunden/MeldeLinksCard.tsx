@@ -1,11 +1,11 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState } from 'react'
 import { saveKundeMeldeLegalUrls } from '@/app/actions/kunden-organisation'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockField } from '@/components/mock-ui/MockForm'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   normalizeOrgHttpUrl,
   orgMeldeLegalUrlsReady,
@@ -14,6 +14,8 @@ import {
 import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { DOC, LIST } from '@/lib/crm-labels'
 import { toast } from '@/components/ui/app-toast'
+import { C } from '@/lib/tokens/colors'
+import { TOAST } from '@/lib/copy'
 
 /**
  * Legal-URLs (Impressum/Datenschutz) inline bearbeiten + Melde-Link / QR / Aushang.
@@ -82,7 +84,7 @@ export function MeldeLinksCard({
       QRCode.toDataURL(meldeLink, {
         width: 360,
         margin: 2,
-        color: { dark: '#1A3D2B', light: '#FFFFFF' },
+        color: { dark: C.greenDark, light: C.white },
       }).then((url) => {
         if (!cancelled) setQrDataUrl(url)
       })
@@ -102,7 +104,7 @@ export function MeldeLinksCard({
       })
       if (!res.ok) {
         setErr(res.message)
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setSavedImpressum(res.impressum_url)
@@ -113,7 +115,7 @@ export function MeldeLinksCard({
         impressum_url: res.impressum_url,
         datenschutz_url: res.datenschutz_url,
       })
-      toast.success('Links gespeichert')
+      toast.success(TOAST.links_gespeichert)
     } finally {
       setSaving(false)
     }
@@ -125,8 +127,8 @@ export function MeldeLinksCard({
       return
     }
     void navigator.clipboard.writeText(meldeLink).then(
-      () => toast.success('Melde-Link kopiert'),
-      () => toast.error('Kopieren fehlgeschlagen')
+      () => toast.success(TOAST.melde_link_kopiert),
+      () => toast.error(TOAST.kopieren_fehlgeschlagen)
     )
   }
 
@@ -136,7 +138,7 @@ export function MeldeLinksCard({
       return
     }
     if (!qrDataUrl) {
-      toast.error('QR-Code noch nicht bereit')
+      toast.error(TOAST.qr_code_noch_nicht_bereit)
       return
     }
     const a = document.createElement('a')
@@ -152,7 +154,7 @@ export function MeldeLinksCard({
     <MockCard
       title="Links"
       icon="link"
-      className="objekte-links-card"
+      className="objekte-links"
       actions={
         <MockBtn sm kind="primary" disabled={saving || !dirty} onClick={() => void speichern()}>
           {saving ? `${LIST.speichern}…` : LIST.speichern}
@@ -161,48 +163,32 @@ export function MeldeLinksCard({
     >
       <div className="space-y-3" style={{ marginBottom: 12 }}>
         <MockField label="Impressum-URL (Mieter)" required full>
-          <input
-            className="input"
-            type="url"
-            inputMode="url"
-            autoComplete="url"
-            placeholder="www.ihre-verwaltung.de/impressum"
-            value={impressum}
-            onChange={(e) => {
+          <MockInput type="url" inputMode="url" autoComplete="url" placeholder="www.ihre-verwaltung.de/impressum" value={impressum} onChange={(e) => {
               setImpressum(e.target.value)
               setErr(null)
-            }}
-          />
+            }} />
         </MockField>
         <MockField label="Datenschutz-URL (Mieter)" required full>
-          <input
-            className="input"
-            type="url"
-            inputMode="url"
-            autoComplete="url"
-            placeholder="www.ihre-verwaltung.de/datenschutz"
-            value={datenschutz}
-            onChange={(e) => {
+          <MockInput type="url" inputMode="url" autoComplete="url" placeholder="www.ihre-verwaltung.de/datenschutz" value={datenschutz} onChange={(e) => {
               setDatenschutz(e.target.value)
               setErr(null)
-            }}
-          />
+            }} />
         </MockField>
         {err ? (
-          <p className="text-[12px] font-semibold text-red-700" role="alert">
+          <p className="text-fs-meta font-semibold text-danger" role="alert">
             {err}
           </p>
         ) : !legalReady ? (
-          <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--text-3)', margin: 0 }}>
+          <p className="text-fs-text leading-relaxed" style={{ color: 'var(--text-3)', margin: 0 }}>
             Beide Links speichern — danach sind Melde-Link, QR und Aushang verfügbar.
           </p>
         ) : null}
       </div>
 
       {legalReady ? (
-        <div className="objekte-links-card__row">
-          <div className="objekte-links-card__linkbox">
-            <span className="objekte-links-card__url" title={meldeLink}>
+        <div className="objekte-links__row">
+          <div className="objekte-links__linkbox">
+            <span className="objekte-links__url" title={meldeLink}>
               {meldeLink}
             </span>
             <MockBtn sm kind="ghost" icon="copy" title="Link kopieren" onClick={kopieren} />
@@ -210,7 +196,7 @@ export function MeldeLinksCard({
         </div>
       ) : null}
 
-      <div className="objekte-links-card__actions">
+      <div className="objekte-links__actions">
         <MockBtn
           sm
           kind="secondary"

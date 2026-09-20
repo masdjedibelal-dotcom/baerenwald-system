@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
 
 import { sendAngebotToKunde } from '@/app/(dashboard)/angebote/actions'
@@ -10,6 +11,7 @@ import { copilotAlertAlreadySent, recordCopilotAlert } from '@/lib/copilot/alert
 import { sendTelegram } from '@/lib/copilot/telegram'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AngebotPosition, LeadStatus } from '@/lib/types'
+import { writeLeadStatus } from '@/lib/status/write-lead-status'
 
 function escapeIlike(q: string): string {
   return q.replace(/[%_\\]/g, '\\$&')
@@ -39,7 +41,8 @@ export async function resolveKundeId(input: {
   if (!raw) return { error: 'kunde_id oder suche erforderlich' }
 
   if (isUuid(raw)) {
-    const { data } = await supabaseAdmin.from('kunden').select('id, name').eq('id', raw).maybeSingle()
+    const { data, error } = await supabaseAdmin.from('kunden').select('id, name').eq('id', raw).maybeSingle()
+    if (error) logDbError('lib/copilot/crm-actions:kunden', error)
     if (data) return { id: data.id, name: data.name }
     return { error: 'Kunde nicht gefunden' }
   }
@@ -109,6 +112,7 @@ export async function getTermine(von: string, bis: string) {
     .lte('datum', bisDate)
     .order('datum', { ascending: true })
     .order('uhrzeit_von', { ascending: true, nullsFirst: false })
+  if (error) logDbError('lib/copilot/crm-actions:kalender_termine', error)
   if (error) throw error
   return data ?? []
 }
@@ -140,7 +144,7 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
   if (allowed.has('lead')) {
     tasks.push(
       (async () => {
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('leads')
           .select('id, kontakt_name, kontakt_email, status, plz')
           .or(
@@ -148,6 +152,7 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
           )
           .order('created_at', { ascending: false })
           .limit(8)
+        if (error) logDbError('lib/copilot/crm-actions:leads', error)
         for (const row of data ?? []) {
           hits.push({
             typ: 'lead',
@@ -164,7 +169,7 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
   if (allowed.has('kunde')) {
     tasks.push(
       (async () => {
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('kunden')
           .select('id, name, email, telefon, plz, kundennummer')
           .or(
@@ -172,6 +177,7 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
           )
           .order('created_at', { ascending: false })
           .limit(8)
+        if (error) logDbError('lib/copilot/crm-actions:kunden', error)
         for (const row of data ?? []) {
           hits.push({
             typ: 'kunde',
@@ -187,7 +193,7 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
   if (allowed.has('angebot')) {
     tasks.push(
       (async () => {
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('angebote')
           .select(
             `
@@ -198,6 +204,7 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
           .or(`angebotsnr.ilike.${pattern},leistungsumfang.ilike.${pattern}`)
           .order('created_at', { ascending: false })
           .limit(8)
+        if (error) logDbError('lib/copilot/crm-actions:angebote', error)
         for (const row of data ?? []) {
           const lead = Array.isArray(row.leads) ? row.leads[0] : row.leads
           const kundeRaw = lead?.kunden as { name?: string } | { name?: string }[] | null | undefined
@@ -217,12 +224,13 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
   if (allowed.has('termin')) {
     tasks.push(
       (async () => {
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('kalender_termine')
           .select('id, titel, datum, uhrzeit_von, adresse')
           .or(`titel.ilike.${pattern},adresse.ilike.${pattern},beschreibung.ilike.${pattern}`)
           .order('datum', { ascending: false })
           .limit(8)
+        if (error) logDbError('lib/copilot/crm-actions:kalender_termine', error)
         for (const row of data ?? []) {
           hits.push({
             typ: 'termin',
@@ -240,12 +248,13 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
   if (allowed.has('rechnung')) {
     tasks.push(
       (async () => {
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('rechnungen')
           .select('id, rechnungsnummer, brutto, status, kunden(name)')
           .ilike('rechnungsnummer', pattern)
           .order('created_at', { ascending: false })
           .limit(8)
+        if (error) logDbError('lib/copilot/crm-actions:rechnungen', error)
         for (const row of data ?? []) {
           const kunde = Array.isArray(row.kunden) ? row.kunden[0] : row.kunden
           hits.push({
@@ -263,12 +272,13 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
   if (allowed.has('auftrag')) {
     tasks.push(
       (async () => {
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('auftraege')
           .select('id, titel, status, kunden(name)')
           .or(`titel.ilike.${pattern}`)
           .order('created_at', { ascending: false })
           .limit(8)
+        if (error) logDbError('lib/copilot/crm-actions:auftraege', error)
         for (const row of data ?? []) {
           const kunde = Array.isArray(row.kunden) ? row.kunden[0] : row.kunden
           hits.push({
@@ -286,12 +296,13 @@ export async function searchCrm(query: string, types?: string[]): Promise<CrmSea
   if (allowed.has('todo')) {
     tasks.push(
       (async () => {
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('todos')
           .select('id, titel, prioritaet, faellig_am, erledigt')
           .ilike('titel', pattern)
           .order('created_at', { ascending: false })
           .limit(8)
+        if (error) logDbError('lib/copilot/crm-actions:todos', error)
         for (const row of data ?? []) {
           hits.push({
             typ: 'todo',
@@ -326,6 +337,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         )
         .eq('id', id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-actions:leads', error)
       if (error) throw error
       return data ?? { error: 'Lead nicht gefunden' }
     }
@@ -341,6 +353,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         .select('id, name, email, telefon, typ, plz, ort, adresse, notizen, kundennummer, created_at')
         .eq('id', kundeId)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-actions:kunden', error)
       if (error) throw error
       return data ?? { error: 'Kunde nicht gefunden' }
     }
@@ -358,6 +371,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         )
         .eq('id', id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-actions:angebote', error)
       if (error) throw error
       if (!data) return { error: 'Angebot nicht gefunden' }
       const pos = Array.isArray(data.positionen) ? data.positionen : []
@@ -381,6 +395,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         )
         .eq('id', id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-actions:kalender_termine', error)
       if (error) throw error
       return data ?? { error: 'Termin nicht gefunden' }
     }
@@ -396,6 +411,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         )
         .eq('id', id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-actions:rechnungen', error)
       if (error) throw error
       if (!data) return { error: 'Rechnung nicht gefunden' }
       return {
@@ -425,6 +441,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         )
         .eq('id', id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-actions:auftraege', error)
       if (error) throw error
       if (!data) return { error: 'Auftrag nicht gefunden' }
       return {
@@ -446,6 +463,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
         )
         .eq('id', id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/crm-actions:todos', error)
       if (error) throw error
       return data ?? { error: 'To-do nicht gefunden' }
     }
@@ -482,6 +500,7 @@ export async function createKundeCopilot(input: {
     })
     .select('id, name')
     .single()
+  if (error) logDbError('lib/copilot/crm-actions:kunden', error)
   if (error) throw error
   return data
 }
@@ -522,11 +541,12 @@ export async function createAngebotEntwurfCopilot(input: {
   }
 
   if (!kundeId && leadId) {
-    const { data: lead } = await supabaseAdmin
+    const { data: lead, error } = await supabaseAdmin
       .from('leads')
       .select('kunde_id, auftraggeber_kunde_id, kontakt_name, kontakt_email, kontakt_telefon, kundentyp')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('lib/copilot/crm-actions:leads', error)
     if (!lead) throw new Error('Lead nicht gefunden')
     kundeId = leadVertragsKundeId(lead) ?? lead.kunde_id
     if (!kundeId) {
@@ -536,7 +556,8 @@ export async function createAngebotEntwurfCopilot(input: {
         telefon: lead.kontakt_telefon ?? undefined,
       })
       kundeId = kunde.id as string
-      await supabaseAdmin.from('leads').update({ kunde_id: kundeId }).eq('id', leadId)
+      const { error: __dbErr1 } = await supabaseAdmin.from('leads').update({ kunde_id: kundeId }).eq('id', leadId)
+      if (__dbErr1) logDbError('lib/copilot/crm-actions:leads', __dbErr1)
     }
   }
 
@@ -553,21 +574,23 @@ export async function createAngebotEntwurfCopilot(input: {
 
   let kundeTyp: string | null = null
   let leadKundentyp: string | null = null
-  const { data: kundeRow } = await supabaseAdmin.from('kunden').select('typ').eq('id', kundeId).maybeSingle()
+  const { data: kundeRow, error } = await supabaseAdmin.from('kunden').select('typ').eq('id', kundeId).maybeSingle()
+  if (error) logDbError('lib/copilot/crm-actions:kunden', error)
   kundeTyp = (kundeRow as { typ?: string } | null)?.typ ?? null
   if (leadId) {
-    const { data: leadRow } = await supabaseAdmin
+    const { data: leadRow, error } = await supabaseAdmin
       .from('leads')
       .select('kundentyp, status')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('lib/copilot/crm-actions:leads', error)
     leadKundentyp = (leadRow as { kundentyp?: string } | null)?.kundentyp ?? null
   }
   const zahlungsbedingungen = defaultAngebotZahlungsbedingungen(
     resolveAngebotKundeTyp(kundeTyp, leadKundentyp)
   )
 
-  const { data: row, error } = await supabaseAdmin
+  const { data: row, error: error2 } = await supabaseAdmin
     .from('angebote')
     .insert({
       lead_id: leadId,
@@ -589,21 +612,21 @@ export async function createAngebotEntwurfCopilot(input: {
     })
     .select('id, angebotsnr, gesamt_min')
     .single()
+  if (error2) logDbError('lib/copilot/crm-actions:angebote', error2)
 
-  if (error) throw error
+  if (error2) throw error2
 
   if (leadId) {
-    const { data: leadStatus } = await supabaseAdmin
+    const { data: leadStatus, error } = await supabaseAdmin
       .from('leads')
       .select('status')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('lib/copilot/crm-actions:leads', error)
     const ls = (leadStatus?.status ?? 'neu') as LeadStatus
     if (['neu', 'kontaktiert', 'termin'].includes(ls)) {
-      await supabaseAdmin
-        .from('leads')
-        .update({ status: 'angebot', updated_at: new Date().toISOString() })
-        .eq('id', leadId)
+      const { error: __dbErr2 } = await writeLeadStatus(supabaseAdmin, leadId, 'angebot')
+      if (__dbErr2) logDbError('lib/copilot/crm-actions:leads', __dbErr2)
     }
   }
 
@@ -619,7 +642,8 @@ export async function resolveAngebotId(input: {
   const direct = input.angebot_id?.trim()
   if (direct) {
     if (isUuid(direct)) {
-      const { data } = await supabaseAdmin.from('angebote').select('id, angebotsnr').eq('id', direct).maybeSingle()
+      const { data, error } = await supabaseAdmin.from('angebote').select('id, angebotsnr').eq('id', direct).maybeSingle()
+      if (error) logDbError('lib/copilot/crm-actions:angebote', error)
       if (data) return { id: data.id, angebotsnr: data.angebotsnr }
     }
     const byNr = await supabaseAdmin
@@ -636,7 +660,8 @@ export async function resolveAngebotId(input: {
   if (!suche) return { error: 'angebot_id oder suche erforderlich' }
 
   if (isUuid(suche)) {
-    const { data } = await supabaseAdmin.from('angebote').select('id, angebotsnr').eq('id', suche).maybeSingle()
+    const { data, error } = await supabaseAdmin.from('angebote').select('id, angebotsnr').eq('id', suche).maybeSingle()
+    if (error) logDbError('lib/copilot/crm-actions:angebote', error)
     if (data) return { id: data.id, angebotsnr: data.angebotsnr }
   }
 
@@ -661,13 +686,14 @@ export async function resolveAngebotId(input: {
 
   const kundeHits = await searchCrm(suche, ['kunde'])
   if (kundeHits.length === 1) {
-    const { data: byKunde } = await supabaseAdmin
+    const { data: byKunde, error } = await supabaseAdmin
       .from('angebote')
       .select('id, angebotsnr')
       .eq('kunde_id', kundeHits[0].id)
       .in('status_einfach', ['entwurf', 'gesendet'])
       .order('created_at', { ascending: false })
       .limit(3)
+    if (error) logDbError('lib/copilot/crm-actions:angebote', error)
     if (byKunde?.length === 1) {
       return { id: byKunde[0].id, angebotsnr: byKunde[0].angebotsnr }
     }
@@ -685,12 +711,13 @@ export async function resolveAngebotId(input: {
 
   const leadHits = await searchCrm(suche, ['lead'])
   if (leadHits.length === 1) {
-    const { data: byLead } = await supabaseAdmin
+    const { data: byLead, error } = await supabaseAdmin
       .from('angebote')
       .select('id, angebotsnr')
       .eq('lead_id', leadHits[0].id)
       .order('created_at', { ascending: false })
       .limit(3)
+    if (error) logDbError('lib/copilot/crm-actions:angebote', error)
     if (byLead?.length === 1) {
       return { id: byLead[0].id, angebotsnr: byLead[0].angebotsnr }
     }
@@ -730,6 +757,7 @@ export async function previewSendAngebot(angebotId: string) {
     )
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('lib/copilot/crm-actions:angebote', error)
   if (error) throw error
   if (!data) return { error: 'Angebot nicht gefunden' }
 
@@ -792,6 +820,7 @@ export async function notifyNewLeadAlert(leadId: string): Promise<{ sent: boolea
     .select('id, kontakt_name, kontakt_email, kontakt_telefon, situation, bereiche, plz, preis_min, preis_max, status, kanal')
     .eq('id', leadId)
     .maybeSingle()
+  if (error) logDbError('lib/copilot/crm-actions:leads', error)
   if (error) throw error
   if (!lead || lead.status !== 'neu') {
     return { sent: false, reason: 'Lead nicht neu oder nicht gefunden' }

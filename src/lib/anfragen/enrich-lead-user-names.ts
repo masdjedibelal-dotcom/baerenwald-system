@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { LeadDetail } from '@/lib/types'
 
@@ -15,10 +16,11 @@ export async function enrichLeadDetailUserNames(
   }
   if (!userIds.size) return lead
 
-  const { data: profiles } = await supabase
+  const { data: profiles, error } = await supabase
     .from('user_profiles')
     .select('id, name')
     .in('id', Array.from(userIds))
+  if (error) logDbError('lib/anfragen/enrich-lead-user-names:user_profiles', error)
 
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.name as string]))
 

@@ -1,7 +1,7 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
+import type { ReactNode } from 'react'
 import { fachbegriff, type FachbegriffKey } from '@/lib/crm/fachbegriffe'
 import { cn } from '@/lib/utils'
 

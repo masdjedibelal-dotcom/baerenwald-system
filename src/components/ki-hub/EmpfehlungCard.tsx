@@ -1,16 +1,17 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import Link from 'next/link'
-import { Check, Copy, ExternalLink, Mail, X } from 'lucide-react'
 import { useState } from 'react'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { crmHref, KI_DEPTH_ANCHOR, parseAktionPayload } from '@/lib/ki-hub/deep-links'
 import type { KiEmpfehlungRow } from '@/lib/ki-hub/types'
 
 const PRIO_STYLES: Record<string, string> = {
-  kritisch: 'border-l-red-500 bg-red-50/50',
+  kritisch: 'border-l-red-500 bg-status-cancel-bg/50',
   hoch: 'border-l-amber-500',
-  mittel: 'border-l-[#2E7D52]',
+  mittel: 'border-l-bw-primary',
   info: 'border-l-gray-300',
 }
 
@@ -138,11 +139,11 @@ export function EmpfehlungCard({ empfehlung, onMarkDone, onOpenDepth }: Props) {
   return (
     <>
       <article
-        className={`rounded-xl border border-bw-border border-l-4 bg-bw-card p-4 shadow-sm ${border}`}
+        className={`rounded-sheet border border-bw-border border-l-4 bg-surface p-4 shadow-sm ${border}`}
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+            <p className="text-fs-caption font-semibold uppercase tracking-wider text-muted">
               {empfehlung.prioritaet} · {empfehlung.bereich}
             </p>
             <h3 className="mt-1 text-sm font-semibold text-bw-text">{empfehlung.titel}</h3>
@@ -154,7 +155,7 @@ export function EmpfehlungCard({ empfehlung, onMarkDone, onOpenDepth }: Props) {
         ) : null}
 
         {contentText ? (
-          <div className="mt-3 rounded-lg border border-bw-border bg-bw-bg px-3 py-2 text-sm text-bw-text whitespace-pre-wrap">
+          <div className="mt-3 rounded-card border border-bw-border bg-bw-bg px-3 py-2 text-sm text-bw-text whitespace-pre-wrap">
             {empfehlung.content?.betreff ? (
               <p className="mb-1 text-xs font-medium text-muted">
                 Betreff: {empfehlung.content.betreff}
@@ -166,43 +167,30 @@ export function EmpfehlungCard({ empfehlung, onMarkDone, onOpenDepth }: Props) {
 
         <div className="mt-3 flex flex-wrap gap-2">
           {contentText || empfehlung.beschreibung ? (
-            <button
-              type="button"
-              onClick={() => void handleCopy()}
-              className="inline-flex items-center gap-1 rounded-lg border border-bw-border bg-white px-3 py-1.5 text-xs font-medium hover:bg-bw-bg"
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            <MockBtn className="inline-flex items-center gap-1 rounded-button border border-bw-border bg-white px-3 py-1.5 text-xs font-medium hover:bg-bw-bg" type="button" onClick={() => void handleCopy()}>
+              {copied ? <MockIcon n="check" ctx="default" className="h-3.5 w-3.5" /> : <MockIcon n="copy" ctx="default" className="h-3.5 w-3.5" />}
               {copied ? 'Kopiert' : 'Kopieren'}
-            </button>
+            </MockBtn>
           ) : null}
           {showMail ? (
-            <button
-              type="button"
-              onClick={() => void handleMailPreview()}
-              disabled={mailLoading}
-              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-900 hover:bg-blue-100 disabled:opacity-50"
-            >
-              <Mail className="h-3.5 w-3.5" />
+            <MockBtn className="inline-flex items-center gap-1 rounded-button border border-status-new-bg bg-status-new-bg px-3 py-1.5 text-xs font-medium text-status-new-text hover:bg-status-new-bg disabled:opacity-50" type="button" onClick={() => void handleMailPreview()} disabled={mailLoading}>
+              <MockIcon n="mail" ctx="default" className="h-3.5 w-3.5" />
               Mail senden
-            </button>
+            </MockBtn>
           ) : null}
           {crmPath && payload.anchor === KI_DEPTH_ANCHOR && !payload.path ? (
-            <button
-              type="button"
-              onClick={handleCrmClick}
-              className="inline-flex items-center gap-1 rounded-lg bg-bw-primary px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
+            <MockBtn className="inline-flex items-center gap-1 rounded-button bg-bw-primary px-3 py-1.5 text-xs font-medium text-white hover:opacity-90" type="button" onClick={handleCrmClick}>
+              <MockIcon n="external-link" ctx="default" className="h-3.5 w-3.5" />
               Analysen öffnen
-            </button>
+            </MockBtn>
           ) : null}
           {crmPath && (payload.path || payload.anchor !== KI_DEPTH_ANCHOR) ? (
             <Link
               href={crmPath}
               onClick={payload.anchor === KI_DEPTH_ANCHOR ? handleCrmClick : undefined}
-              className="inline-flex items-center gap-1 rounded-lg bg-bw-primary px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+              className="inline-flex items-center gap-1 rounded-card bg-bw-primary px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <MockIcon n="external-link" ctx="default" className="h-3.5 w-3.5" />
               Im CRM öffnen
             </Link>
           ) : null}
@@ -211,39 +199,30 @@ export function EmpfehlungCard({ empfehlung, onMarkDone, onOpenDepth }: Props) {
               href={externalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-lg border border-bw-border px-3 py-1.5 text-xs font-medium hover:bg-bw-bg"
+              className="inline-flex items-center gap-1 rounded-card border border-bw-border px-3 py-1.5 text-xs font-medium hover:bg-bw-bg"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <MockIcon n="external-link" ctx="default" className="h-3.5 w-3.5" />
               Link öffnen
             </a>
           ) : null}
-          <button
-            type="button"
-            onClick={() => void handleDone()}
-            disabled={doneLoading}
-            className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
-          >
-            <Check className="h-3.5 w-3.5" />
+          <MockBtn className="inline-flex items-center gap-1 rounded-button border border-status-order-bg bg-status-order-bg px-3 py-1.5 text-xs font-medium text-status-order-text hover:bg-status-order-bg disabled:opacity-50" type="button" onClick={() => void handleDone()} disabled={doneLoading}>
+            <MockIcon n="check" ctx="default" className="h-3.5 w-3.5" />
             Erledigt
-          </button>
+          </MockBtn>
         </div>
         {mailError && !mailOpen ? (
-          <p className="mt-2 text-xs text-red-700">{mailError}</p>
+          <p className="mt-2 text-xs text-danger">{mailError}</p>
         ) : null}
       </article>
 
       {mailOpen ? (
         <div className="z-modal fixed inset-0 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-bw-border bg-white p-5 shadow-xl">
+          <div className="w-full max-w-md rounded-sheet border border-bw-border bg-white p-5 shadow-xl">
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-sm font-semibold text-bw-text">Mail-Vorschau</h3>
-              <button
-                type="button"
-                onClick={() => setMailOpen(false)}
-                className="rounded p-1 hover:bg-bw-bg"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <MockBtn className="rounded-button p-1 hover:bg-bw-bg" type="button" onClick={() => setMailOpen(false)}>
+                <MockIcon n="x" ctx="default" className="h-4 w-4" />
+              </MockBtn>
             </div>
             <dl className="mt-3 space-y-2 text-sm">
               <div>
@@ -256,28 +235,19 @@ export function EmpfehlungCard({ empfehlung, onMarkDone, onOpenDepth }: Props) {
               </div>
               <div>
                 <dt className="text-xs text-muted">Text</dt>
-                <dd className="whitespace-pre-wrap rounded-lg bg-bw-bg p-2 text-xs">
+                <dd className="whitespace-pre-wrap rounded-card bg-bw-bg p-2 text-xs">
                   {mailPreview?.text_vorschau}
                 </dd>
               </div>
             </dl>
-            {mailError ? <p className="mt-2 text-xs text-red-700">{mailError}</p> : null}
+            {mailError ? <p className="mt-2 text-xs text-danger">{mailError}</p> : null}
             <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setMailOpen(false)}
-                className="rounded-lg border border-bw-border px-3 py-1.5 text-xs font-medium"
-              >
+              <MockBtn className="rounded-button border border-bw-border px-3 py-1.5 text-xs font-medium" type="button" onClick={() => setMailOpen(false)}>
                 Abbrechen
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleMailSend()}
-                disabled={mailLoading}
-                className="rounded-lg bg-bw-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-              >
+              </MockBtn>
+              <MockBtn className="rounded-button bg-bw-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" type="button" onClick={() => void handleMailSend()} disabled={mailLoading}>
                 {mailLoading ? 'Sendet…' : 'Jetzt senden'}
-              </button>
+              </MockBtn>
             </div>
           </div>
         </div>

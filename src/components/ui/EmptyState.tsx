@@ -1,7 +1,7 @@
 'use client'
 
 import type { LucideIcon } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 
 interface EmptyStateProps {
@@ -23,9 +23,9 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
       hint={description}
       action={
         action ? (
-          <Button variant="primary" type="button" onClick={action.onClick}>
+          <MockBtn kind="primary" type="button" onClick={action.onClick}>
             {action.label}
-          </Button>
+          </MockBtn>
         ) : undefined
       }
     />

@@ -1,12 +1,14 @@
 'use client'
+
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 import {
@@ -47,6 +49,7 @@ import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import type { StatusTone } from '@/lib/status/status-tone'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { TOAST } from '@/lib/copy'
 
 export type RechnungErstellenOpts = {
   zeileId?: string
@@ -491,17 +494,17 @@ export function VorgangZahlungTab({
 
   function speichern(next: Zahlungsplan) {
     if (!auftragId) {
-      toast.error('Kein Auftrag — Plan nur am Angebot speicherbar.')
+      toast.error(TOAST.kein_auftrag_plan_nur_am_angebot_speicherbar)
       return
     }
     if (!next.zeilen.length) {
-      toast.error('Mindestens eine Abschlagszeile erforderlich.')
+      toast.error(TOAST.mindestens_eine_abschlagszeile_erforderlich)
       return
     }
     startTransition(async () => {
       const res = await saveAuftragZahlungsplan(auftragId, next)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setPlan(next)
@@ -517,7 +520,7 @@ export function VorgangZahlungTab({
       }
       toast.success(teile.length ? `Plan gespeichert · ${teile.join(' · ')}` : 'Plan gespeichert')
       onRefresh?.()
-      router.refresh()
+      afterServerActionRefresh()
     })
   }
 
@@ -535,15 +538,15 @@ export function VorgangZahlungTab({
       if (modus === 'storno_neu') {
         const korr = await korrigiereRechnung(rechnungId)
         if (!korr.ok) {
-          toast.error(korr.message)
+          toast.systemError(korr)
           return
         }
         if (korr.mode === 'storno_neu') {
           targetId = korr.neuId
-          toast.success('Korrektur-Entwurf angelegt — bitte prüfen und versenden')
+          toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ver)
         }
       } else if (modus === 'gesperrt') {
-        toast.error('Diese Rechnung kann nicht mehr bearbeitet werden.')
+        toast.error(TOAST.diese_rechnung_kann_nicht_mehr_bearbeitet_werden)
         return
       }
 
@@ -553,7 +556,7 @@ export function VorgangZahlungTab({
       if (boot.ok && onOpenWizard) {
         onOpenWizard(boot.bootstrap)
       } else if (!boot.ok) {
-        toast.error(boot.message)
+        toast.systemError(boot)
       } else {
         router.push(`/rechnungen/${targetId}?tab=leistungen`)
       }

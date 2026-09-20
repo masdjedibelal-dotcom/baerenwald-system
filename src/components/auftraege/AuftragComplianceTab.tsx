@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Shield } from 'lucide-react'
-import { Accordion } from '@/components/ui/Accordion'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { useMemo } from 'react'
+import { Accordion } from '@/components/ui/Accordion'
 import { AuftragPartnerCompliancePanel } from '@/components/auftraege/AuftragPartnerCompliancePanel'
 import { sammleAuftragCompliancePartner } from '@/lib/auftraege/auftrag-compliance-partners'
 import { gewerkSlugsAusPositionen } from '@/lib/handwerker/compliance-partner-profile'
@@ -21,16 +21,16 @@ function partnerFortschrittBadge(
   if (offenPruefung > 0) {
     return {
       label: `${offenPruefung} in Prüfung`,
-      className: 'border-amber-200 bg-amber-50 text-amber-900' }
+      className: 'border-status-contact-bg bg-status-contact-bg text-status-contact-text' }
   }
   if (fortschritt.pflicht > 0 && fortschritt.erfuellt < fortschritt.pflicht) {
     return {
       label: `${fortschritt.erfuellt}/${fortschritt.pflicht} Pflicht`,
-      className: 'border-red-200 bg-red-50 text-red-800' }
+      className: 'border-status-cancel-bg bg-status-cancel-bg text-status-cancel-text' }
   }
   return {
     label: fortschritt.pflicht > 0 ? 'Vollständig' : `${fortschritt.gesamt} Nachweise`,
-    className: 'border-emerald-200 bg-emerald-50 text-emerald-800' }
+    className: 'border-status-order-bg bg-status-order-bg text-status-order-text' }
 }
 export function zaehleAuftragComplianceOffen(
   detail: AuftragDetail,
@@ -95,7 +95,7 @@ export function AuftragComplianceTab({
       <MockEmpty
         icon="tool"
         title="Keine Partner zugewiesen"
-        hint="Weise unter Positionen Handwerker zu — dann erscheinen hier die Compliance-Nachweise je Partner."
+        hint="Weise unter Positionen Partner zu — dann erscheinen hier die Compliance-Nachweise je Partner."
       />
     )
   }
@@ -103,7 +103,7 @@ export function AuftragComplianceTab({
   return (
     <div className="space-y-4 pb-4">
       <div className="flex items-start gap-3">
-        <Shield className="mt-0.5 h-5 w-5 shrink-0 text-bw-primary" aria-hidden />
+        <MockIcon n="shield-check" ctx="default" className="mt-0.5 h-5 w-5 shrink-0 text-bw-primary" aria-hidden />
         <div>
           <h2 className="text-[length:var(--fs-title)] font-semibold text-bw-text">Compliance-Nachweise</h2>
           <p className="text-[length:var(--fs-text)] text-bw-text-muted">
@@ -139,11 +139,11 @@ export function AuftragComplianceTab({
               key={partner.handwerkerId}
               title={title}
               defaultOpen={index === 0}
-              className="rounded-xl border border-bw-border bg-bw-card"
+              className="rounded-sheet border border-bw-border bg-surface"
               action={
                 <span
                   className={cn(
-                    'rounded-full border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
+                    'rounded-pill border px-2 py-0.5 text-[length:var(--fs-meta)] font-medium',
                     badge.className
                   )}
                 >

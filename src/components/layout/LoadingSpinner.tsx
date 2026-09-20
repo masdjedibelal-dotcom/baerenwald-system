@@ -14,7 +14,7 @@ export function LoadingSpinner({
       role="status"
       aria-label={label}
       className={cn(
-        'inline-block h-8 w-8 animate-spin rounded-full border-2',
+        'inline-block h-8 w-8 animate-spin rounded-pill border-2',
         tone === 'inverted'
           ? 'border-white/35 border-t-white'
           : 'border-border border-t-primary',

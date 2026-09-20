@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 
 export type EmailLogDetail = {
@@ -33,6 +34,7 @@ export async function loadEmailLogDetail(
     )
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/email-log/actions:email_log', error)
 
   if (error) return { ok: false, message: error.message }
   if (!data) return { ok: false, message: 'E-Mail nicht gefunden' }

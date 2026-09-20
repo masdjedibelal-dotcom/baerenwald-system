@@ -11,7 +11,7 @@ export const AUFTRAG_HW_STATUS_OPTIONS: { value: AuftragHandwerkerZuweisungStatu
   { value: 'ausstehend', label: 'Ausstehend' },
   { value: 'angefragt', label: 'Angeschrieben' },
   { value: 'warten', label: 'Warten auf Antwort' },
-  { value: 'akzeptiert', label: 'Akzeptiert' },
+  { value: 'akzeptiert', label: 'Angenommen' },
   { value: 'abgelehnt', label: 'Abgelehnt' },
   { value: 'zugewiesen', label: 'Zugewiesen' },
   { value: 'ersetzt', label: 'Ersetzt' },
@@ -19,7 +19,7 @@ export const AUFTRAG_HW_STATUS_OPTIONS: { value: AuftragHandwerkerZuweisungStatu
 
 export function auftragHwStatusLabel(status: string | null | undefined): string {
   const v = (status ?? 'ausstehend').toLowerCase()
-  if (v === 'bestaetigt' || v === 'angenommen') return 'Akzeptiert'
+  if (v === 'bestaetigt' || v === 'angenommen') return 'Angenommen'
   if (v === 'erledigt') return 'Erledigt'
   return AUFTRAG_HW_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? status ?? 'Ausstehend'
 }
@@ -33,11 +33,11 @@ export function auftragHwStatusBadgeClass(status: string | null | undefined): st
     v === 'bestaetigt' ||
     v === 'erledigt'
   ) {
-    return 'bg-emerald-100 text-emerald-900'
+    return 'bg-status-order-bg text-status-order-text'
   }
-  if (v === 'abgelehnt') return 'bg-red-100 text-red-900'
+  if (v === 'abgelehnt') return 'bg-status-cancel-bg text-status-cancel-text'
   if (v === 'ersetzt') return 'bg-bw-hover text-bw-text-muted line-through'
-  if (v === 'angefragt') return 'bg-blue-100 text-blue-900'
-  if (v === 'warten') return 'bg-amber-100 text-amber-950'
+  if (v === 'angefragt') return 'bg-status-new-bg text-status-new-text'
+  if (v === 'warten') return 'bg-status-contact-bg text-status-contact-text'
   return 'bg-bw-hover text-bw-text-muted'
 }

@@ -1,8 +1,10 @@
 'use client'
 
+import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { C } from '@/lib/tokens/colors'
+
 import { useCallback, useEffect, useState } from 'react'
-import { MockModal } from '@/components/mock-ui/MockModal'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
@@ -12,6 +14,9 @@ import {
   sendKundenPortalLinkMail,
 } from '@/app/actions/mails'
 import { parseEmailTokens } from '@/lib/email-recipients'
+import { TOAST } from '@/lib/copy'
+import { defaultPortalInviteBetreff } from '@/lib/portal-utils'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 /**
  * Modal „Kundenportal-Link versenden“:
@@ -32,6 +37,7 @@ export function KundenportalLinkVersendenModal({
   /** Nach erfolgreichem Versand (z. B. Stammdaten-Portal-Zeile → „eingeladen“) */
   onSent?: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [mailTo, setMailTo] = useState<string[]>([])
@@ -44,7 +50,7 @@ export function KundenportalLinkVersendenModal({
 
   const loadDraft = useCallback(async () => {
     if (!kundeId?.trim()) {
-      toast.error('Kein Kunde verknüpft — Portal-Link nicht möglich.')
+      toast.error(TOAST.kein_kunde_verknuepft_portal_link_nicht_moeglich)
       onClose()
       return
     }
@@ -52,7 +58,7 @@ export function KundenportalLinkVersendenModal({
     const draft = await getKundenPortalMailDraft(kundeId)
     setLoading(false)
     if (!draft.ok) {
-      toast.error(draft.message)
+      toast.systemError(draft)
       onClose()
       return
     }
@@ -90,11 +96,11 @@ export function KundenportalLinkVersendenModal({
 
   async function handleSend() {
     if (!kundeId?.trim()) {
-      toast.error('Kein Kunde verknüpft.')
+      toast.error(TOAST.kein_kunde_verknuepft)
       return
     }
     if (!mailTo.length) {
-      toast.error('Bitte mindestens eine Empfänger-Adresse angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_eine_empfaenger_adresse_angeben })
       return
     }
     setSending(true)
@@ -102,46 +108,36 @@ export function KundenportalLinkVersendenModal({
       kundeId,
       to: mailTo[0]!,
       cc: [...mailCc, ...mailTo.slice(1)],
-      betreff: betreff.trim() || 'Dein Zugang zu MeinBärenwald',
+      betreff: betreff.trim() || defaultPortalInviteBetreff('du'),
       text,
       anrede,
     })
     setSending(false)
     if (!res.ok) {
-      toast.error(res.message)
+      toast.systemError(res)
       return
     }
-    toast.success('Kundenportal-Link versendet')
+    toast.success(TOAST.kundenportal_link_versendet)
     onSent?.()
     onClose()
   }
 
   return (
-    <MockModal
+    <EditorSheet
       open={open}
       onClose={onClose}
-      icon="send"
       title="Kundenportal-Link versenden"
-      sub="Einladung mit Login-Link und Vorschau"
-      footer={
-        <>
-          <MockBtn sm kind="ghost" onClick={onClose} disabled={sending}>
-            Abbrechen
-          </MockBtn>
-          <div style={{ flex: 1 }} />
-          <MockBtn
-            sm
-            kind="primary"
-            icon="send"
-            disabled={sending || loading || !mailTo.length}
-            onClick={() => void handleSend()}
-          >
-            {sending ? 'Wird gesendet…' : 'Versenden'}
-          </MockBtn>
-        </>
-      }
+      subtitle="Einladung mit Login-Link und Vorschau"
+      secondary={{ label: 'Abbrechen', onClick: onClose, disabled: sending, kind: 'ghost' }}
+      primary={{
+        label: sending ? 'Wird gesendet…' : 'Versenden',
+        onClick: () => void handleSend(),
+        disabled: sending || loading || !mailTo.length,
+        busy: sending,
+      }}
     >
-      {loading ? (
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+              {loading ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
           Vorschau wird geladen…
         </div>
@@ -171,12 +167,7 @@ export function KundenportalLinkVersendenModal({
             required
             disabled={sending}
           >
-            <input
-              className="txt"
-              value={betreff}
-              onChange={(e) => setBetreff(e.target.value)}
-              disabled={sending}
-            />
+            <MockInput className="txt" value={betreff} onChange={(e) => setBetreff(e.target.value)} disabled={sending} />
           </KiAssistFieldLabel>
           <KiAssistFieldLabel
             label="Text"
@@ -185,13 +176,7 @@ export function KundenportalLinkVersendenModal({
             extraHint="Portal-Einladungsmail an den Kunden."
             disabled={sending}
           >
-            <textarea
-              className="ta"
-              rows={5}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={sending}
-            />
+            <MockTextarea className="ta" rows={5} value={text} onChange={(e) => setText(e.target.value)} disabled={sending} />
           </KiAssistFieldLabel>
           <div>
             <div className="field-label" style={{ marginBottom: 6 }}>
@@ -204,9 +189,9 @@ export function KundenportalLinkVersendenModal({
               style={{
                 width: '100%',
                 height: 280,
-                border: '0.5px solid var(--border)',
+                border: '0.0.3125remrem solid var(--border)',
                 borderRadius: 8,
-                background: '#fff',
+                background: C.white,
               }}
             />
           </div>
@@ -215,7 +200,7 @@ export function KundenportalLinkVersendenModal({
               <div className="field-label" style={{ marginBottom: 6 }}>
                 Portal-Login
               </div>
-              <input className="txt" value={portalLink} readOnly />
+              <MockInput className="txt" value={portalLink} readOnly />
               <p className="field-hint" style={{ marginTop: 6 }}>
                 Button in der Mail führt auf diese Adresse.
               </p>
@@ -223,6 +208,6 @@ export function KundenportalLinkVersendenModal({
           ) : null}
         </div>
       )}
-    </MockModal>
+    </EditorSheet>
   )
 }

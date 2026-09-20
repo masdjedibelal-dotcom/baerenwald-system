@@ -1,5 +1,6 @@
 'use client'
 
+import { MockSelect } from '@/components/mock-ui/MockForm'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 
 type Props = {
@@ -16,13 +17,7 @@ export function TerminMitarbeiterSelect({ team, value, onChange, loading, requir
       <span className="input-label">
         Vor-Ort Mitarbeiter{required ? ' *' : ''}
       </span>
-      <select
-        className="input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={loading}
-        required={required}
-      >
+      <MockSelect value={value} onChange={(e) => onChange(e.target.value)} disabled={loading} required={required}>
         <option value="">{loading ? 'Laden…' : 'Bitte wählen…'}</option>
         {team.map((m) => (
           <option key={m.id} value={m.id}>
@@ -30,7 +25,7 @@ export function TerminMitarbeiterSelect({ team, value, onChange, loading, requir
             {m.telefon ? ` · ${m.telefon}` : ''}
           </option>
         ))}
-      </select>
+      </MockSelect>
     </label>
   )
 }

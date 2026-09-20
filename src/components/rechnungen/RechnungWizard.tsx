@@ -1,25 +1,29 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { C } from '@/lib/tokens/colors'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockField, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockSegment } from '@/components/mock-ui/MockSegment'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { buildSubject } from '@/lib/mail/build-subject'
+import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Check, FileText, Send } from 'lucide-react'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   MetaCrowButton,
   TotBand,
 } from '@/components/angebote/AngebotWizardCanvasMeta'
-import { MockField } from '@/components/mock-ui/MockForm'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { DateInput } from '@/components/ui/DateInput'
-import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
-import { confirmAction } from '@/components/ui/confirm-action'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
@@ -118,17 +122,20 @@ import {
   faelligAmFromZahlfrist,
   formatDateDeYmd,
   patchZahlungsbedingungenMitZahlfrist,
+  ZAHLFRIST_SEG_OPTIONS,
   type ZahlfristSeg,
   zahlfristSegFromFaelligAm,
 } from '@/lib/zahlfrist'
-import { MockZahlfristSeg } from '@/components/mock-ui/MockZahlfristSeg'
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
+import { COPY_BUTTON, TOAST } from '@/lib/copy'
+import type { DocCanvasGap, DocCanvasSection } from '@/lib/surfaces/document-canvas-chrome'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type Rechnungsart = 'abschlag' | 'schluss'
 
 const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = [
-  { name: '30 / 40 / 30', build: zahlungsplanVorlage30_40_30 },
+{ name: '30 / 40 / 30', build: zahlungsplanVorlage30_40_30 },
   { name: '50 / 50', build: zahlungsplanVorlage50_50 },
   { name: 'Anzahlung 30% + Rest', build: zahlungsplanVorlage30_70 },
 ]
@@ -186,6 +193,7 @@ export function RechnungWizard({
   onClose: () => void
   onDone?: (rechnungId: string) => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const router = useRouter()
   const firm = firmProp ?? defaultFirmenEinstellungen()
   const [kunde, setKunde] = useState(bootstrap.kunde)
@@ -368,7 +376,7 @@ export function RechnungWizard({
     bootstrap.rechnungId
   )
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
-  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
   const [ustg13bHilfeOpen, setUstg13bHilfeOpen] = useState(false)
   const [hintsOpen, setHintsOpen] = useState(true)
   const savedSnapshotRef = useRef<string | null>(null)
@@ -584,9 +592,11 @@ export function RechnungWizard({
   const istKorrekturVersand = Boolean(korrekturKontext)
   /** Materielle Korrektur an gesendeter RE → Storno-Gutschrift + neue RE. */
   const istKorrekturMitStorno = istKorrekturVersand
-  const defaultBetreff = istKorrekturVersand
-    ? `Korrektur · ${previewNr} · ${rTitel}`
-    : `${previewNr} · ${rTitel}`
+  const defaultBetreff = buildSubject({
+    objekt: rTitel,
+    ereignis: istKorrekturVersand ? 'Korrektur' : 'Rechnung',
+    nummer: previewNr !== 'Rechnung' ? previewNr : undefined,
+  })
   const defaultMailEinleitung = istKorrekturMitStorno
     ? defaultRechnungKorrekturMitStornoMailEinleitung('sie', {
         originalNr: korrekturKontext?.originalNr,
@@ -616,18 +626,18 @@ export function RechnungWizard({
     if (step === 1) {
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       if (!artikel.length) {
-        toast.error('Noch keine Position')
+        toast.error(TOAST.noch_keine_position)
       }
     }
     if (step === 2 && hasPlan && !planOk) {
-      toast.error('Plan anpassen (100 %)')
+      toast.error(TOAST.plan_anpassen_100)
     }
     const next = step === 2 ? 4 : Math.min(4, step + 1)
     const enteringVersand = next === 4
     if (enteringVersand) {
       const id = await persistDraft()
       if (!id) {
-        toast.error('Entwurf prüfen')
+        toast.error(TOAST.entwurf_pruefen)
       }
       if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
       if (!einleitung.trim()) {
@@ -733,7 +743,7 @@ export function RechnungWizard({
 
   function enablePlan() {
     if (!hatAuftrag) {
-      toast.error('Abschlagspläne sind nur mit Auftrag möglich.')
+      toast.error(TOAST.abschlagsplaene_sind_nur_mit_auftrag_moeglich)
       return
     }
     setPlanEditorOpen(true)
@@ -764,15 +774,15 @@ export function RechnungWizard({
       const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
       const silent = opts?.silent === true
       if (!artikel.length) {
-        if (!silent) toast.error('Mindestens eine Position erforderlich.')
+        if (!silent) toast.error(TOAST.mindestens_eine_position_erforderlich)
         return null
       }
       if (artikel.some((z) => !z.bezeichnung.trim())) {
-        if (!silent) toast.error('Bitte bei allen Positionen eine Bezeichnung eintragen.')
+        if (!silent) applyFieldErrors({ _form: TOAST.bitte_bei_allen_positionen_eine_bezeichnung_eint })
         return null
       }
       if (!kundeId?.trim()) {
-        if (!silent) toast.error('Kein Kunde verknüpft.')
+        if (!silent) toast.error(TOAST.kein_kunde_verknuepft)
         return null
       }
       const nextMeta = buildMetaForSave()
@@ -806,7 +816,7 @@ export function RechnungWizard({
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
         if (!res?.ok) {
-          if (!silent) toast.error(res?.message || 'Speichern fehlgeschlagen.')
+          if (!silent) toast.systemError(res, 'ui', 'Speichern fehlgeschlagen.')
           return null
         }
         const switched = Boolean(
@@ -823,7 +833,7 @@ export function RechnungWizard({
             materialFingerprint: '',
             istErsatzEntwurf: true,
           })
-          toast.success('Storno angelegt — Korrektur gespeichert (noch nicht versendet)')
+          toast.success(TOAST.storno_angelegt_korrektur_gespeichert_noch_nicht)
         } else if (opts?.notify) {
           toast.autoSaved({ label: 'Entwurf' })
         }
@@ -831,10 +841,11 @@ export function RechnungWizard({
         setMeta(nextMeta)
         savedSnapshotRef.current = draftSnapshot
         setDraftDirty(false)
+        setLastSavedAt(Date.now())
         return res.rechnungId
       } catch (e) {
         if (!silent) {
-          toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+          toast.systemError(e, 'ui', 'Speichern fehlgeschlagen.')
         }
         return null
       } finally {
@@ -879,16 +890,16 @@ export function RechnungWizard({
   }): Promise<string | null> => {
     const silent = opts?.silent === true
     if (!bootstrap.auftragId?.trim()) {
-      if (!silent) toast.error('Abschlagsrechnungen sind nur mit Auftrag möglich.')
+      if (!silent) toast.error(TOAST.abschlagsrechnungen_sind_nur_mit_auftrag_moeglic)
       return null
     }
     if (!kundeId?.trim()) {
-      if (!silent) toast.error('Kein Kunde verknüpft.')
+      if (!silent) toast.error(TOAST.kein_kunde_verknuepft)
       return null
     }
     if (!planOk) {
       if (!silent) {
-        toast.error('Plan anpassen (100 %)')
+        toast.error(TOAST.plan_anpassen_100)
       }
       return null
     }
@@ -898,7 +909,7 @@ export function RechnungWizard({
     try {
       const planSave = await saveAuftragZahlungsplan(bootstrap.auftragId, plan)
       if (!planSave?.ok) {
-        if (!silent) toast.error(planSave?.message || 'Zahlungsplan speichern fehlgeschlagen.')
+        if (!silent) toast.systemError(planSave, 'ui', 'Zahlungsplan speichern fehlgeschlagen.')
         return null
       }
       const res = await createAllAbschlagRechnungenFromWizard({
@@ -916,7 +927,7 @@ export function RechnungWizard({
         wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
       })
       if (!res?.ok) {
-        if (!silent) toast.error(res?.message || 'Abschläge anlegen fehlgeschlagen.')
+        if (!silent) toast.systemError(res, 'ui', 'Abschläge anlegen fehlgeschlagen.')
         return null
       }
       setAbschlagRechnungen(res.rechnungen)
@@ -928,12 +939,13 @@ export function RechnungWizard({
       setMeta(nextMeta)
       savedSnapshotRef.current = draftSnapshot
       setDraftDirty(false)
+      setLastSavedAt(Date.now())
       if (opts?.notify) toast.autoSaved({ label: 'Entwurf' })
       if (korrekturSession) korrekturSessionKeptRef.current = true
       return res.versandRechnungId
     } catch (e) {
       if (!silent) {
-        toast.error(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.')
+        toast.systemError(e, 'ui', 'Speichern fehlgeschlagen.')
       }
       return null
     } finally {
@@ -967,7 +979,7 @@ export function RechnungWizard({
   }): Promise<string | null> {
     if (hasPlan && !hatAuftrag) {
       if (!opts?.silent) {
-        toast.error('Abschlag nur mit Auftrag')
+        toast.error(TOAST.abschlag_nur_mit_auftrag)
       }
       return null
     }
@@ -999,7 +1011,6 @@ export function RechnungWizard({
     if (korrekturSession) korrekturSessionKeptRef.current = true
     onDone?.(id)
     onClose()
-    router.refresh()
   }
 
   async function rollbackKorrekturSessionIfNeeded() {
@@ -1011,31 +1022,30 @@ export function RechnungWizard({
       originalStatus: korrekturSession.originalStatus,
     })
     if (!r.ok) {
-      toast.error(r.message || 'Korrektur-Abbruch fehlgeschlagen')
+      toast.systemError(r, 'ui', 'Korrektur-Abbruch fehlgeschlagen')
       return
     }
-    toast.info('Korrektur verworfen — kein Entwurf gespeichert')
+    toast.info(TOAST.korrektur_verworfen_kein_entwurf_gespeichert)
   }
 
   async function closeWizardClean() {
-    setCloseConfirmOpen(false)
     setKundeEditOpen(false)
     setPlanEditorOpen(false)
     setSheet(null)
     await rollbackKorrekturSessionIfNeeded()
     onClose()
-    router.refresh()
+    afterServerActionRefresh()
   }
 
   async function handleFinish(sendMail: boolean) {
     if (hasPlan && !planOk) {
-      toast.error('Plan anpassen (100 %)')
+      toast.error(TOAST.plan_anpassen_100)
       return
     }
     if (sendMail) {
       const to = mailTo.filter((e) => isValidEmail(e))
       if (!to.length) {
-        toast.error('Keine Kunden-E-Mail — bitte unter Versand ergänzen.')
+        toast.error(TOAST.keine_kunden_e_mail_bitte_unter_versand_ergaenze)
         setSheet('versand')
         return
       }
@@ -1059,14 +1069,14 @@ export function RechnungWizard({
         meta: nextMeta,
       })
       if (!sync?.ok) {
-        toast.error(sync?.message || 'Meta speichern fehlgeschlagen.')
+        toast.systemError(sync, 'ui', 'Meta speichern fehlgeschlagen.')
         return
       }
 
       if (!sendMail) {
         const res = await finalizeRechnungWizardWithoutMail(id)
         if (!res?.ok) {
-          toast.error(res?.message || 'Speichern fehlgeschlagen.')
+          toast.systemError(res, 'ui', 'Speichern fehlgeschlagen.')
           return
         }
         toast.success(
@@ -1089,7 +1099,7 @@ export function RechnungWizard({
         ),
       })
       if (!res?.ok) {
-        toast.error(res?.message || 'Versand fehlgeschlagen.')
+        toast.systemError(res, 'ui', 'Versand fehlgeschlagen.')
         return
       }
       toast.success(
@@ -1102,7 +1112,7 @@ export function RechnungWizard({
       setPlanEditorOpen(false)
       finishAndLeave(id)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen.')
+      toast.systemError(e, 'ui', 'Erstellen fehlgeschlagen.')
     } finally {
       setSaving(false)
     }
@@ -1111,25 +1121,15 @@ export function RechnungWizard({
   async function handleSaveDraftAndClose() {
     if (saving) return
     if (hasPlan && !planOk) {
-      toast.error('Plan anpassen (100 %)')
+      toast.error(TOAST.plan_anpassen_100)
       return
     }
     const id = await persistDraft({ manageBusy: true, notify: true })
     if (!id) return
-    setCloseConfirmOpen(false)
     setKundeEditOpen(false)
     setPlanEditorOpen(false)
     setSheet(null)
     finishAndLeave(id)
-  }
-
-  function handleRequestClose() {
-    if (saving || previewLoading) return
-    if (!draftDirty) {
-      void closeWizardClean()
-      return
-    }
-    setCloseConfirmOpen(true)
   }
 
   async function handleWeiter() {
@@ -1137,7 +1137,7 @@ export function RechnungWizard({
     try {
       await goNextStep()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Weiter fehlgeschlagen.')
+      toast.systemError(e, 'ui', 'Weiter fehlgeschlagen.')
     }
   }
 
@@ -1244,11 +1244,7 @@ export function RechnungWizard({
         Steuerliche Hinweise
       </div>
       <div className="rw-tax__list">
-        <button
-          type="button"
-          className={cn('rw-tax__opt', meta.hinweis_35a && 'on')}
-          onClick={() => setMeta((m) => ({ ...m, hinweis_35a: !m.hinweis_35a }))}
-        >
+        <MockBtn className={cn('rw-tax__opt', meta.hinweis_35a && 'on')} type="button" onClick={() => setMeta((m) => ({ ...m, hinweis_35a: !m.hinweis_35a }))}>
           <span className="rw-tax__check" aria-hidden>
             {meta.hinweis_35a ? <MockIcon ctx="btn" n="check" size={12} /> : null}
           </span>
@@ -1262,14 +1258,9 @@ export function RechnungWizard({
                 : 'Lohnkostenanteil für haushaltsnahe Handwerkerleistungen'}
             </span>
           </span>
-        </button>
-        <button
-          type="button"
-          className={cn('rw-tax__opt', meta.reverse_charge_13b && 'on')}
-          onClick={() =>
-            setMeta((m) => ({ ...m, reverse_charge_13b: !m.reverse_charge_13b }))
-          }
-        >
+        </MockBtn>
+        <MockBtn className={cn('rw-tax__opt', meta.reverse_charge_13b && 'on')} type="button" onClick={() =>
+            setMeta((m) => ({ ...m, reverse_charge_13b: !m.reverse_charge_13b }))}>
           <span className="rw-tax__check" aria-hidden>
             {meta.reverse_charge_13b ? (
               <MockIcon ctx="btn" n="check" size={12} />
@@ -1284,46 +1275,48 @@ export function RechnungWizard({
               Steuerschuldnerschaft des Leistungsempfängers
             </span>
           </span>
-        </button>
+        </MockBtn>
       </div>
     </div>
   )
 
   const documentColumn = (
     <div className="dc-doc flex flex-col gap-4">
-      <PosBoard
-        title={
-          rechnungTitel.trim() ||
-          (hasPlan && selRate?.titel?.trim()) ||
-          (istDirektrechnung ? 'Rechnung' : auftragLabel) ||
-          'Rechnung'
-        }
-        positionen={posBoardLines}
-        onChange={abschlagNurVersand ? undefined : onPosBoardChange}
-        showUst
-        showTotals={false}
-        gewerke={gewerkNamen}
-        preislisten={abschlagNurVersand ? undefined : preislisten}
-        headerAction={
-          abschlagNurVersand ? (
-            <span
-              className="text-muted"
-              style={{ fontSize: 'var(--fs-meta)', maxWidth: 280, textAlign: 'right' }}
-            >
-              Betrag aus Abschlagsplan — Positionen nicht änderbar
-            </span>
-          ) : undefined
-        }
-        badgeOf={(p) =>
-          p.regieSchein
-            ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
-            : p.kind === 'freitext'
-              ? { kind: 'neutral', icon: 'align-left', label: 'Freitext' }
-              : p.kind === 'nachlass'
-                ? { kind: 'warn', icon: 'percent', label: 'Nachlass' }
-                : null
-        }
-      />
+      <div data-doc-section="positionen">
+        <PosBoard
+          title={
+            rechnungTitel.trim() ||
+            (hasPlan && selRate?.titel?.trim()) ||
+            (istDirektrechnung ? 'Rechnung' : auftragLabel) ||
+            'Rechnung'
+          }
+          positionen={posBoardLines}
+          onChange={abschlagNurVersand ? undefined : onPosBoardChange}
+          showUst
+          showTotals={false}
+          gewerke={gewerkNamen}
+          preislisten={abschlagNurVersand ? undefined : preislisten}
+          headerAction={
+            abschlagNurVersand ? (
+              <span
+                className="text-muted"
+                style={{ fontSize: 'var(--fs-meta)', maxWidth: 280, textAlign: 'right' }}
+              >
+                Betrag aus Abschlagsplan — Positionen nicht änderbar
+              </span>
+            ) : undefined
+          }
+          badgeOf={(p) =>
+            p.regieSchein
+              ? { kind: 'warn', icon: 'paperclip', label: 'Regieschein' }
+              : p.kind === 'freitext'
+                ? { kind: 'neutral', icon: 'align-left', label: 'Freitext' }
+                : p.kind === 'nachlass'
+                  ? { kind: 'warn', icon: 'percent', label: 'Nachlass' }
+                  : null
+          }
+        />
+      </div>
 
       <TotBand
         className="totband--green"
@@ -1372,16 +1365,19 @@ export function RechnungWizard({
       <MetaCrowButton
         label="Kunde"
         value={kundeCrowValue}
+        sectionId="kunde"
         onClick={() => setSheet('kunde')}
       />
       <MetaCrowButton
         label="Dokument"
         value={dokumentCrowValue}
+        sectionId="dokument"
         onClick={() => setSheet('dokument')}
       />
       <MetaCrowButton
         label="Zahlung"
         value={zahlplanCrowValue}
+        sectionId="zahlung"
         onClick={() => setSheet('zahlung')}
       />
       {abschlussHint?.showBlock ? (
@@ -1394,6 +1390,7 @@ export function RechnungWizard({
       <MetaCrowButton
         label="Versand"
         value={versandCrowValue}
+        sectionId="versand"
         onClick={() => setSheet('versand')}
       />
     </div>
@@ -1401,7 +1398,7 @@ export function RechnungWizard({
 
   function requestVersenden() {
     if (saving) return
-    confirmAction({
+    openActionConfirm({
       title: istKorrekturMitStorno
         ? 'Korrektur mit Storno wirklich versenden?'
         : istKorrekturVersand
@@ -1423,44 +1420,48 @@ export function RechnungWizard({
     })
   }
 
+  const hatLeistungszeile = zeilen.some(
+    (z) => z.typ === 'artikel' && z.bezeichnung.trim()
+  )
+  const kundeComplete = Boolean(kundeId?.trim()) || Boolean(kundeCrowValue?.trim())
+  const zahlungComplete = hasPlan
+    ? planOk
+    : zahlfrist !== 'datum' || Boolean(zahlfristDatum.trim())
+  const versandComplete =
+    mailTo.some((e) => isValidEmail(e)) || Boolean(kundeEmail && isValidEmail(kundeEmail))
+
+  const canvasSections: DocCanvasSection[] = [
+    { id: 'kunde', label: 'Kunde', complete: kundeComplete },
+    { id: 'positionen', label: 'Positionen', complete: hatLeistungszeile },
+    { id: 'zahlung', label: 'Zahlung', complete: zahlungComplete },
+    { id: 'versand', label: 'Versand', complete: versandComplete },
+  ]
+
+  function getRechnungSendGaps(): DocCanvasGap[] {
+    const gaps: DocCanvasGap[] = []
+    if (!kundeId?.trim()) gaps.push({ id: 'kunde', label: 'Kunde' })
+    if (!hatLeistungszeile) gaps.push({ id: 'positionen', label: 'mindestens 1 Position' })
+    if (hasPlan && !planOk) gaps.push({ id: 'zahlung', label: 'Zahlungsplan' })
+    else if (!hasPlan && zahlfrist === 'datum' && !zahlfristDatum.trim()) {
+      gaps.push({ id: 'zahlung', label: 'Zahlungsziel' })
+    }
+    if (!versandComplete) gaps.push({ id: 'versand', label: 'E-Mail' })
+    return gaps
+  }
+
   const headerEnd = (
-    <>
-      <button
-        type="button"
-        className="editor-sheet__icon-btn"
-        disabled={saving || previewLoading}
-        onClick={() => {
-          void openVorschauSheet()
-        }}
-        aria-label="Vorschau"
-        title="Vorschau"
-      >
-        <FileText className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-      </button>
-      <button
-        type="button"
-        className="editor-sheet__icon-btn"
-        disabled={saving}
-        onClick={requestVersenden}
-        aria-label={istKorrekturVersand ? 'Korrektur versenden' : 'Rechnung versenden'}
-        title={istKorrekturVersand ? 'Korrektur versenden' : 'Rechnung versenden'}
-      >
-        <Send className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-      </button>
-      <button
-        type="button"
-        className={cn('editor-sheet__confirm', saving && 'opacity-50')}
-        disabled={saving}
-        onClick={() => {
-          if (saving || (hasPlan && !planOk)) return
-          void handleFinish(false)
-        }}
-        aria-label={saving ? 'Speichern…' : 'Als Entwurf speichern'}
-        title={saving ? 'Speichern…' : 'Als Entwurf speichern'}
-      >
-        <Check className="h-5 w-5" strokeWidth={ACTION_ICON_STROKE} aria-hidden />
-      </button>
-    </>
+    <MockBtn
+      className="editor-sheet__icon-btn"
+      type="button"
+      disabled={saving || previewLoading}
+      onClick={() => {
+        void openVorschauSheet()
+      }}
+      aria-label="Vorschau"
+      title="Vorschau"
+    >
+      <MockIcon n="file-text" ctx="row" className="h-5 w-5" aria-hidden />
+    </MockBtn>
   )
 
   const closeSheet = () => {
@@ -1473,7 +1474,12 @@ export function RechnungWizard({
       <DocumentCanvas
         title={wizardTitel}
         subtitle={wizardSubtitle}
-        onClose={handleRequestClose}
+        onClose={() => {
+          void closeWizardClean()
+        }}
+        onSaveDraftClose={() => {
+          void handleSaveDraftAndClose()
+        }}
         headerEnd={headerEnd}
         busy={saving}
         busyLabel="Bitte warten…"
@@ -1482,6 +1488,22 @@ export function RechnungWizard({
         className="wizard-flow"
         manageHistory={false}
         draftDirty={draftDirty}
+        lastSavedAt={lastSavedAt}
+        sections={canvasSections}
+        draftAction={{
+          onClick: () => {
+            if (saving || (hasPlan && !planOk)) return
+            void handleFinish(false)
+          },
+          busy: saving,
+          disabled: hasPlan && !planOk,
+        }}
+        primaryAction={{
+          label: COPY_BUTTON.rechnungErstellen,
+          onClick: requestVersenden,
+          busy: saving,
+          getGaps: getRechnungSendGaps,
+        }}
       />
 
       <EditorSheet
@@ -1494,17 +1516,13 @@ export function RechnungWizard({
         }
         headerEnd={
           kunde ? (
-            <button
-              type="button"
-              className="editor-sheet__confirm-text"
-              onClick={() => setKundeEditOpen(true)}
-            >
+            <MockBtn className="editor-sheet__confirm-text" type="button" onClick={() => setKundeEditOpen(true)}>
               Bearbeiten
-            </button>
+            </MockBtn>
           ) : null
         }
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="gfc">
           <div className="gfc-row">
@@ -1518,10 +1536,7 @@ export function RechnungWizard({
             </div>
           ) : null}
           <MockField label="Ansprechpartner" full>
-            <select
-              className="sel sel--choice"
-              value={ansprechpartnerId ?? ''}
-              onChange={(e) => {
+            <MockSelect className="sel sel--choice" value={ansprechpartnerId ?? ''} onChange={(e) => {
                 const next = e.target.value.trim() || null
                 const prevKontakt = kundeEmail
                 setAnsprechpartnerId(next)
@@ -1536,9 +1551,7 @@ export function RechnungWizard({
                   return []
                 })
                 setDraftDirty(true)
-              }}
-              disabled={!kundeId}
-            >
+              }} disabled={!kundeId}>
               <option value="">Hauptansprechpartner</option>
               {apRows.map((ap) => (
                 <option key={ap.id} value={ap.id}>
@@ -1548,7 +1561,7 @@ export function RechnungWizard({
                   {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </MockField>
           <KundenVersandEmailField
             apRows={apRows}
@@ -1650,9 +1663,11 @@ export function RechnungWizard({
         title="Dokument"
         context="canvas"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="form-grid form-grid--sheet">
+        {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+        
           <SheetEditableField
             label="Rechnungsnummer"
             value={rechnungsnummer}
@@ -1685,13 +1700,18 @@ export function RechnungWizard({
         title="Zahlung"
         context="canvas"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="form-grid form-grid--sheet">
           <div className="full">
             <MockField label="Zahlungsziel" full>
               <div className="space-y-2">
-                <MockZahlfristSeg value={zahlfrist} onChange={(v) => applyZahlfrist(v)} />
+                <MockSegment
+                  value={zahlfrist}
+                  onChange={(v) => applyZahlfrist(v)}
+                  options={ZAHLFRIST_SEG_OPTIONS}
+                  aria-label="Zahlfrist"
+                />
                 {zahlfrist === 'datum' ? (
                   <DateInput
                     size="sm"
@@ -1729,19 +1749,19 @@ export function RechnungWizard({
             />
           </div>
           {!hatAuftrag ? (
-            <div className="full card" style={{ padding: 16 }}>
+            <MockCard className="full" flush style={{ padding: 16 }}>
               <div style={{ fontSize: 'var(--fs-text)', fontWeight: 600 }}>
                 Direktrechnung ohne Auftrag
               </div>
               <p
                 className="text-[length:var(--fs-meta)] leading-relaxed"
-                style={{ color: 'var(--text-3)', margin: '6px 0 0' }}
+                style={{ color: 'var(--text-3)', margin: '0.3750remrem 0 0' }}
               >
                 Abschlagspläne sind nur mit Auftrag möglich.
               </p>
-            </div>
+            </MockCard>
           ) : !hasPlan ? (
-            <div className="full card" style={{ padding: 20 }}>
+            <MockCard className="full" flush style={{ padding: 20 }}>
               <div className="zahlplan-empty">
                 <MockIcon ctx="empty" n="calculator" size={26} />
                 <div className="zahlplan-empty__title">Noch kein Abschlagsplan</div>
@@ -1752,14 +1772,14 @@ export function RechnungWizard({
                   Abschlagsplan hinzufügen
                 </MockBtn>
               </div>
-            </div>
+            </MockCard>
           ) : (
             <div className="full">
               {rateLocked && selBerechnet ? (
                 <div
                   style={{
-                    padding: '12px 14px',
-                    border: '1px solid var(--green)',
+                    padding: '0.75rem 0.8750remrem',
+                    border: '0.0625remrem solid var(--green)',
                     background: 'var(--green-50)',
                     borderRadius: 8,
                     marginBottom: 12,
@@ -1787,59 +1807,45 @@ export function RechnungWizard({
                       Vorlage:
                     </span>
                     {PLAN_PRESETS.map((p) => (
-                      <button
-                        key={p.name}
-                        type="button"
-                        className={cn(
+                      <MockBtn className={cn(
                           'zahlplan-preset-chip',
                           matchingPlanPresetName(plan) === p.name && 'is-on'
-                        )}
-                        onClick={() => {
+                        )} key={p.name} type="button" onClick={() => {
                           const next = p.build()
                           setPlan(next)
                           setAktivRate(next.zeilen[0]?.id ?? null)
-                        }}
-                      >
+                        }}>
                         {p.name}
-                      </button>
+                      </MockBtn>
                     ))}
-                    <button
-                      type="button"
-                      className={cn(
+                    <MockBtn className={cn(
                         'zahlplan-preset-chip',
                         hasPlan && !matchingPlanPresetName(plan) && 'is-on'
-                      )}
-                      onClick={() => setPlanEditorOpen(true)}
-                    >
+                      )} type="button" onClick={() => setPlanEditorOpen(true)}>
                       Individuell
-                    </button>
+                    </MockBtn>
                     <MockBtn sm kind="ghost" onClick={clearPlan}>
-                      Entfernen
+                      Löschen
                     </MockBtn>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {planKontext.zeilen.map((z) => {
                       const on = aktivRate === z.id
                       return (
-                        <button
-                          key={z.id}
-                          type="button"
-                          onClick={() => {
+                        <MockBtn key={z.id} type="button" onClick={() => {
                             setAktivRate(z.id)
                             setRechnungsart(z.istSchluss ? 'schluss' : 'abschlag')
-                          }}
-                          style={{
+                          }} style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: 10,
-                            padding: '10px 12px',
-                            border: `1px solid ${on ? 'var(--green)' : 'var(--border)'}`,
+                            padding: '0.6250remrem 0.75rem',
+                            border: `0.0625remrem solid ${on ? 'var(--green)' : 'var(--border)'}`,
                             background: on ? 'var(--green-50)' : 'var(--card)',
                             borderRadius: 8,
                             cursor: 'pointer',
                             textAlign: 'left',
-                          }}
-                        >
+                          }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 'var(--fs-text)', fontWeight: 500 }}>
                               {z.titel}
@@ -1851,7 +1857,7 @@ export function RechnungWizard({
                           <b style={{ fontVariantNumeric: 'tabular-nums' }}>
                             {formatEurBetrag(z.brutto)}
                           </b>
-                        </button>
+                        </MockBtn>
                       )
                     })}
                   </div>
@@ -1885,7 +1891,7 @@ export function RechnungWizard({
         context="canvas"
         size="lg"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <RechnungWizardPdfPreview
           rechnungId={vorschauRechnungId}
@@ -1900,7 +1906,7 @@ export function RechnungWizard({
         title="Abschlussbericht"
         context="canvas"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="form-grid form-grid--sheet">
           <div className="full" style={{ display: 'grid', gap: 12 }}>
@@ -1908,7 +1914,7 @@ export function RechnungWizard({
               style={{
                 margin: 0,
                 fontSize: 'var(--fs-meta)',
-                color: 'var(--bw-text-muted, #6b7280)',
+                color: 'var(--bw-text-muted, ${C.gray500})',
               }}
             >
               Dokumentationsbericht (Leistungen, Bautagebuch, Abnahme, Fotos) —{' '}
@@ -1927,7 +1933,7 @@ export function RechnungWizard({
                   void createAbschlussberichtPdf(aid)
                     .then((r) => {
                       if (!r?.ok) {
-                        toast.error(r?.message || 'Abschlussbericht fehlgeschlagen.')
+                        toast.systemError(r, 'ui', 'Abschlussbericht fehlgeschlagen.')
                         return
                       }
                       setAbschlussHint({
@@ -1936,7 +1942,7 @@ export function RechnungWizard({
                         berichtUrl: r.publicUrl,
                       })
                       setAbschlussMitVersand(true)
-                      toast.success('Abschlussbericht erstellt')
+                      toast.success(TOAST.abschlussbericht_erstellt)
                     })
                     .finally(() => setAbschlussBusy(false))
                 }}
@@ -1957,8 +1963,7 @@ export function RechnungWizard({
                 fontSize: 'var(--fs-text)',
               }}
             >
-              <input
-                type="checkbox"
+              <MockCheckbox
                 className="mt-0.5"
                 checked={abschlussMitVersand}
                 disabled={saving}
@@ -1971,7 +1976,7 @@ export function RechnungWizard({
                     display: 'block',
                     marginTop: 2,
                     fontSize: 'var(--fs-meta)',
-                    color: 'var(--bw-text-muted, #6b7280)',
+                    color: 'var(--bw-text-muted, ${C.gray500})',
                   }}
                 >
                   Ja = Abschlussbericht zusätzlich zur Endabrechnung / Rechnung. Nein = nur die
@@ -1982,11 +1987,11 @@ export function RechnungWizard({
             <div
               className="full"
               style={{
-                border: '1px solid var(--bw-border, #e5e7eb)',
+                border: '0.0625remrem solid var(--bw-border, ${C.gray200})',
                 borderRadius: 10,
                 overflow: 'hidden',
                 minHeight: 280,
-                background: 'var(--bw-bg, #f9fafb)',
+                background: 'var(--bw-bg, ${C.gray50})',
               }}
             >
               {abschlussHint?.berichtUrl ? (
@@ -2001,7 +2006,7 @@ export function RechnungWizard({
                     padding: 24,
                     textAlign: 'center',
                     fontSize: 'var(--fs-meta)',
-                    color: 'var(--bw-text-muted, #6b7280)',
+                    color: 'var(--bw-text-muted, ${C.gray500})',
                   }}
                 >
                   Noch keine Vorschau — zuerst PDF erzeugen.
@@ -2018,7 +2023,7 @@ export function RechnungWizard({
         title={istKorrekturVersand ? 'Korrektur versenden' : 'Versand'}
         context="canvas"
         onConfirm={closeSheet}
-        confirmLabel="Übernehmen"
+        confirmLabel="Speichern"
       >
         <div className="form-grid form-grid--sheet">
           <EmailPillsField
@@ -2073,24 +2078,6 @@ export function RechnungWizard({
         </div>
       </EditorSheet>
 
-      <ConfirmPopup
-        open={closeConfirmOpen}
-        onClose={() => setCloseConfirmOpen(false)}
-        title="Änderungen speichern?"
-        cancelLabel="Weiter bearbeiten"
-        discardLabel="Beenden ohne Speichern"
-        saveDraftLabel="Als Entwurf speichern"
-        danger
-        onConfirm={() => {
-          void closeWizardClean()
-        }}
-        onSaveDraft={() => {
-          void handleSaveDraftAndClose()
-        }}
-      >
-        Ungespeicherte Eingaben gehen sonst verloren.
-      </ConfirmPopup>
-
       <Ustg13bHilfeSheet
         open={ustg13bHilfeOpen}
         onClose={() => setUstg13bHilfeOpen(false)}
@@ -2103,14 +2090,17 @@ export function RechnungWizard({
     artGateOpen ? (
       <EditorSheet
         open
-        onClose={onClose}
+        dirty={draftDirty}
+        onClose={() => {
+          void closeWizardClean()
+        }}
         title="Art der Leistung"
         context="canvas"
         manageHistory={false}
       >
         <p
           style={{
-            margin: '0 0 14px',
+            margin: '0 0 0.8750remrem',
             fontSize: 'var(--fs-meta)',
             color: 'var(--text-3)',
             lineHeight: 1.45,
@@ -2120,65 +2110,49 @@ export function RechnungWizard({
           Winterdienst oder Hausmeisterservice.
         </p>
         <div className="doctype-row doctype-row--stack">
-          <button
-            type="button"
-            className="doctype-radio-opt doctype-radio-opt--block"
-            onClick={() => {
+          <MockBtn className="doctype-radio-opt doctype-radio-opt--block" type="button" onClick={() => {
               setWiederkehr({ ist_wiederkehrend: false, wiederkehr_turnus: null })
               setArtGateOpen(false)
-            }}
-          >
+            }}>
             <span className="dot" />
             <span className="doctype-radio-opt__copy">
               <span className="lbl">Einmalig</span>
               <span className="hint">Projekt oder einmaliger Auftrag</span>
             </span>
-          </button>
-          <button
-            type="button"
-            className={
-              wiederkehr.ist_wiederkehrend
+          </MockBtn>
+          <MockBtn className={wiederkehr.ist_wiederkehrend
                 ? 'doctype-radio-opt doctype-radio-opt--block on'
-                : 'doctype-radio-opt doctype-radio-opt--block'
-            }
-            onClick={() =>
+                : 'doctype-radio-opt doctype-radio-opt--block'} type="button" onClick={() =>
               setWiederkehr({
                 ist_wiederkehrend: true,
                 wiederkehr_turnus: wiederkehr.wiederkehr_turnus ?? 'monatlich',
-              })
-            }
-          >
+              })}>
             <span className="dot" />
             <span className="doctype-radio-opt__copy">
               <span className="lbl">Wiederkehrend</span>
               <span className="hint">Wartung, Winterdienst, Pflege — Bestand</span>
             </span>
-          </button>
+          </MockBtn>
         </div>
         {wiederkehr.ist_wiederkehrend ? (
           <div style={{ marginTop: 14, display: 'grid', gap: 12 }}>
             <label className="field">
               <span className="field-label">Zeitintervall</span>
-              <select
-                className="sel"
-                value={wiederkehr.wiederkehr_turnus ?? 'monatlich'}
-                onChange={(e) =>
+              <MockSelect className="sel" value={wiederkehr.wiederkehr_turnus ?? 'monatlich'} onChange={(e) =>
                   setWiederkehr({
                     ist_wiederkehrend: true,
                     wiederkehr_turnus: e.target.value as WiederkehrTurnus,
-                  })
-                }
-              >
+                  })}>
                 {WIEDERKEHR_TURNUS_VALUES.map((v) => (
                   <option key={v} value={v}>
                     {WIEDERKEHR_TURNUS_LABELS[v]}
                   </option>
                 ))}
-              </select>
+              </MockSelect>
             </label>
-            <button type="button" className="btn primary" onClick={() => setArtGateOpen(false)}>
+            <MockBtn kind="primary" type="button" onClick={() => setArtGateOpen(false)}>
               Weiter
-            </button>
+            </MockBtn>
           </div>
         ) : null}
       </EditorSheet>

@@ -1,7 +1,7 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface ListCardProps {
@@ -60,7 +60,7 @@ export function ListCard({
             {tags?.map((tag, i) => (
               <span
                 key={`${tag}-${i}`}
-                className="rounded-full bg-bw-hover px-2 py-0.5 text-xs text-bw-text-muted"
+                className="rounded-pill bg-bw-hover px-2 py-0.5 text-xs text-bw-text-muted"
               >
                 {tag}
               </span>
@@ -74,7 +74,7 @@ export function ListCard({
           {actions}
         </div>
       ) : onClick ? (
-        <ChevronRight className="h-4 w-4 flex-shrink-0 text-bw-border" aria-hidden />
+        <MockIcon n="chevron-right" ctx="default" className="h-4 w-4 flex-shrink-0 text-bw-border" aria-hidden />
       ) : null}
     </div>
   )

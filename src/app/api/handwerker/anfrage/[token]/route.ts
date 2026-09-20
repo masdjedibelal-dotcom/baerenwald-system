@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
@@ -10,7 +11,7 @@ export async function GET(_req: Request, { params }: { params: { token: string }
     return NextResponse.json({ ok: false, error: 'Token fehlt' }, { status: 400 })
   }
 
-  const { data: row, error } = await supabaseAdmin
+  const { data: row, error: error1 } = await supabaseAdmin
     .from('angebot_handwerker')
     .select(
       `
@@ -31,8 +32,9 @@ export async function GET(_req: Request, { params }: { params: { token: string }
     )
     .eq('token', token)
     .maybeSingle()
+  if (error1) logDbError('app/api/handwerker/anfrage/[token]/route:angebot_handwerker', error1)
 
-  if (error || !row) {
+  if (error1 || !row) {
     return NextResponse.json({ ok: false, error: 'ungueltig' }, { status: 404 })
   }
 
@@ -60,7 +62,8 @@ export async function GET(_req: Request, { params }: { params: { token: string }
   const ort = kunde?.ort?.trim() || '—'
   const zeitraum = leads?.zeitraum?.trim() || ''
 
-  const { data: einRows } = await supabaseAdmin.from('einstellungen').select('key, value')
+  const {data: einRows, error: error2} = await supabaseAdmin.from('einstellungen').select('key, value')
+  if (error2) logDbError('app/api/handwerker/anfrage/[token]/route:einstellungen', error2)
   const map = new Map((einRows ?? []).map((x) => [x.key as string, String(x.value ?? '')]))
   const firmaTelefon = map.get('telefon')?.trim() || ''
   const firmaEmail = map.get('email')?.trim() || 'info@baerenwaldmuenchen.de'
@@ -93,7 +96,7 @@ export async function GET(_req: Request, { params }: { params: { token: string }
   if (st === 'akzeptiert') antwort = 'akzeptiert'
   if (st === 'abgelehnt') antwort = 'abgelehnt'
 
-  const handwerkerName = hw?.name?.trim() || 'Handwerkerin'
+  const handwerkerName = hw?.name?.trim() || 'Partnerin'
   const ansprechTelefon = hw?.telefon?.trim() || firmaTelefon
 
   // Nach Antwort: reduziertes Payload (kein Kontakt-Mail, keine Positions-/Standort-Details)

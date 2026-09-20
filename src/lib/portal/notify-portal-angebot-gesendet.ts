@@ -4,11 +4,13 @@
  * wenn PARTNER_INTERNAL_API_SECRET fehlt oder das Portal offline ist.
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { C } from '@/lib/tokens/colors'
 
 const ANGEBOT_NOTIF_VISUAL = {
-  iconBg: '#E4ECF7',
-  iconFg: '#1F4FA8',
+  iconBg: C.blueBg,
+  iconFg: C.blueTx,
   iconGlyph: '📄',
 } as const
 
@@ -21,7 +23,7 @@ async function hasRecentHvNotif(opts: {
   leadId: string
 }): Promise<boolean> {
   const since = new Date(Date.now() - 15 * 60 * 1000).toISOString()
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('hv_notifications')
     .select('id')
     .eq('kunde_id', opts.kundeId)
@@ -29,6 +31,7 @@ async function hasRecentHvNotif(opts: {
     .ilike('link', `%${opts.leadId}%`)
     .gte('created_at', since)
     .limit(1)
+  if (error) logDbError('lib/portal/notify-portal-angebot-gesendet:hv_notifications', error)
   return (data ?? []).length > 0
 }
 
@@ -36,7 +39,7 @@ async function hasUnreadPortalNotif(opts: {
   empfaengerUserId: string
   leadId: string
 }): Promise<boolean> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('portal_notifications')
     .select('id')
     .eq('empfaenger_user_id', opts.empfaengerUserId)
@@ -44,6 +47,7 @@ async function hasUnreadPortalNotif(opts: {
     .eq('typ', 'angebot')
     .eq('gelesen', false)
     .limit(1)
+  if (error) logDbError('lib/portal/notify-portal-angebot-gesendet:portal_notifications', error)
   return (data ?? []).length > 0
 }
 
@@ -60,6 +64,7 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
     .select('id, kunde_id, auftraggeber_kunde_id, situation, kontakt_name')
     .eq('id', trimmed)
     .maybeSingle()
+  if (leadErr) logDbError('lib/portal/notify-portal-angebot-gesendet:leads', leadErr)
 
   if (leadErr) {
     console.warn('[notifyPortalAngebotGesendetFromCrm] lead:', leadErr.message)
@@ -67,7 +72,7 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
   }
   if (!lead?.id) return
 
-  const { data: angebot } = await supabaseAdmin
+  const { data: angebot, error: error2 } = await supabaseAdmin
     .from('angebote')
     .select(
       'id, angebotsnr, leistungsumfang, status_einfach, status, gesendet_am, gesendet_kunde_at, pdf_url, gesamt_fix, gesamt_max, notizen'
@@ -77,6 +82,7 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error2) logDbError('lib/portal/notify-portal-angebot-gesendet:angebote', error2)
 
   const gesendetAm = String(angebot?.gesendet_am ?? '').trim()
   const gesendetKundeAt = String(angebot?.gesendet_kunde_at ?? '').trim()
@@ -134,6 +140,7 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
       body,
       link: portalPath,
     })
+    if (error) logDbError('lib/portal/notify-portal-angebot-gesendet:hv_notifications', error)
     if (error) {
       console.warn('[notifyPortalAngebotGesendetFromCrm] hv_notifications:', error.message)
     } else {
@@ -165,6 +172,7 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
       icon_fg: ANGEBOT_NOTIF_VISUAL.iconFg,
       icon_glyph: ANGEBOT_NOTIF_VISUAL.iconGlyph,
     })
+    if (error) logDbError('lib/portal/notify-portal-angebot-gesendet:portal_notifications', error)
     if (error) {
       console.warn(
         '[notifyPortalAngebotGesendetFromCrm] portal_notifications:',
@@ -188,11 +196,12 @@ export async function notifyPortalAngebotGesendetFromCrm(leadId: string): Promis
   }
 
   if (portalKundeId) {
-    const { data: kunde } = await supabaseAdmin
+    const { data: kunde, error } = await supabaseAdmin
       .from('kunden')
       .select('auth_user_id, portal_modus')
       .eq('id', portalKundeId)
       .maybeSingle()
+    if (error) logDbError('lib/portal/notify-portal-angebot-gesendet:kunden', error)
 
     const authUserId = String(kunde?.auth_user_id ?? '').trim()
     const modus = String(kunde?.portal_modus ?? '')

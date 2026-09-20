@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { syncAuftragIstBauprojekt } from '@/lib/auftraege/sync-auftrag-ist-bauprojekt'
 import { syncAuftragFortschrittFromPositionen } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
@@ -15,6 +21,7 @@ async function assertAuftrag(auftragId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet', supabase: null }
   const { data, error } = await supabase.from('auftraege').select('id').eq('id', auftragId).maybeSingle()
+  if (error) logDbError('app/auftraege/auftrag-posboard-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden', supabase: null }
   return { ok: true as const, supabase }
 }
@@ -85,6 +92,7 @@ export async function replaceAuftragPositionenFromPosBoard(
     .from('auftrag_positionen')
     .select('*')
     .eq('auftrag_id', auftragId)
+  if (loadErr) logDbError('app/auftraege/auftrag-posboard-actions:auftrag_positionen', loadErr)
 
   if (loadErr) return { ok: false, message: loadErr.message }
 
@@ -105,10 +113,12 @@ export async function replaceAuftragPositionenFromPosBoard(
         .update(row)
         .eq('id', line.id)
         .eq('auftrag_id', auftragId)
+      if (error) logDbError('app/auftraege/auftrag-posboard-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
     } else {
       // id weglassen → Postgres generiert UUID (Client-IDs wie `p-…` sind ungültig)
       const { error } = await supabase.from('auftrag_positionen').insert(row)
+      if (error) logDbError('app/auftraege/auftrag-posboard-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
     }
   }
@@ -123,6 +133,7 @@ export async function replaceAuftragPositionenFromPosBoard(
         .update({ aenderung_typ: 'entfernt' })
         .eq('id', id)
         .eq('auftrag_id', auftragId)
+      if (error) logDbError('app/auftraege/auftrag-posboard-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
     } else {
       const { error } = await supabase
@@ -130,6 +141,7 @@ export async function replaceAuftragPositionenFromPosBoard(
         .delete()
         .eq('id', id)
         .eq('auftrag_id', auftragId)
+      if (error) logDbError('app/auftraege/auftrag-posboard-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
     }
   }
@@ -137,8 +149,6 @@ export async function replaceAuftragPositionenFromPosBoard(
   await syncAuftragIstBauprojekt(auftragId)
   await syncAuftragFortschrittFromPositionen(auftragId)
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath('/auftraege')
-  revalidatePath('/vorgaenge')
+  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }

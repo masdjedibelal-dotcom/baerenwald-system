@@ -1,10 +1,11 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BrandLogo } from '@/components/brand/BrandLogo'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { SIDEBAR_NAV_GROUPS, navItemIsActive } from '@/lib/nav-config'
 import { cn } from '@/lib/utils'
 
@@ -62,20 +63,13 @@ export function Sidebar({
           </div>
           <span className="sidebar-brandname">Bärenwald</span>
         </Link>
-        <button
-          type="button"
-          className="sidebar-toggle"
-          title={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'}
-          aria-label={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'}
-          aria-expanded={expanded}
-          onClick={toggleExpanded}
-        >
+        <MockBtn className="sidebar-toggle" type="button" title={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'} aria-label={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'} aria-expanded={expanded} onClick={toggleExpanded}>
           <MockIcon
             ctx="sidebar"
             n={expanded ? 'layout-sidebar-left-collapse' : 'layout-sidebar-left-expand'}
             size={18}
           />
-        </button>
+        </MockBtn>
       </div>
 
       <div className="sidebar-nav">

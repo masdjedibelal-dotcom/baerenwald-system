@@ -1,10 +1,11 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { EMPTY } from '@/lib/crm-labels'
+import { MockBtn, MockChip, MockTable } from '@/components/mock-ui'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eye } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { FilterChips } from '@/components/ui/FilterChips'
 import { EmailLogPreviewModal } from '@/components/email/EmailLogPreviewModal'
 import {
   loadKommunikationListe,
@@ -15,7 +16,7 @@ import {
   kommunikationMailAbsender,
   kommunikationMailArt,
   kommunikationMailArtLabel,
-  type KommunikationMailFilter,
+  type MailListeArtFilter,
 } from '@/lib/kommunikation/mail-liste-helpers'
 import type { KommunikationListeZeile } from '@/lib/kommunikation/types'
 import type { ReactNode } from 'react'
@@ -37,7 +38,7 @@ export function KommunikationCard({
   const [pending, startTransition] = useTransition()
   const [rows, setRows] = useState<KommunikationListeZeile[]>([])
   const [previewId, setPreviewId] = useState<string | null>(null)
-  const [mailFilter, setMailFilter] = useState<KommunikationMailFilter>('alle')
+  const [mailFilter, setMailFilter] = useState<MailListeArtFilter>('alle')
 
   const filterKey = [
     filter.kundeId ?? '',
@@ -92,15 +93,24 @@ export function KommunikationCard({
       <Card collapsible title="Kommunikation" className={className} flush bodyClassName="p-0">
         {toolbar ? <div className="border-b border-bw-border px-4 py-3">{toolbar}</div> : null}
         <div className="space-y-3 px-4 py-3">
-          <FilterChips
-            options={[
-              { label: 'Alle', value: 'alle', count: counts.alle || undefined },
-              { label: 'System', value: 'system', count: counts.system || undefined },
-              { label: 'Direkt', value: 'direkt', count: counts.direkt || undefined },
-            ]}
-            selected={[mailFilter]}
-            onChange={(values) => setMailFilter((values[0] as KommunikationMailFilter) ?? 'alle')}
-          />
+          <div className="chiprow">
+            {(
+              [
+                { label: 'Alle', value: 'alle' as const, count: counts.alle || undefined },
+                { label: 'System', value: 'system' as const, count: counts.system || undefined },
+                { label: 'Direkt', value: 'direkt' as const, count: counts.direkt || undefined },
+              ] as const
+            ).map((opt) => (
+              <MockChip
+                key={opt.value}
+                active={mailFilter === opt.value}
+                count={opt.count}
+                onClick={() => setMailFilter(opt.value)}
+              >
+                {opt.label}
+              </MockChip>
+            ))}
+          </div>
         </div>
 
         {pending && rows.length === 0 ? (
@@ -109,13 +119,12 @@ export function KommunikationCard({
           <p className="px-4 pb-6 text-sm text-bw-text-muted">
             {ausgehend.length === 0
               ? 'Noch keine ausgehenden E-Mails an den Kunden protokolliert.'
-              : 'Keine E-Mails für diesen Filter.'}
+              : EMPTY.emailsFilter}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-[13px]">
+          <MockTable wrapClassName="overflow-x-auto" className="w-full min-w-[520px] text-left text-fs-text">
               <thead>
-                <tr className="border-y border-bw-border bg-bw-bg text-[11px] font-semibold uppercase tracking-wide text-bw-text-muted">
+                <tr className="border-y border-bw-border bg-bw-bg text-fs-caption font-semibold uppercase tracking-wide text-bw-text-muted">
                   <th className="px-4 py-2 font-semibold">Betreff</th>
                   <th className="hidden px-3 py-2 font-semibold sm:table-cell">Absender</th>
                   <th className="px-3 py-2 font-semibold">Art</th>
@@ -139,8 +148,8 @@ export function KommunikationCard({
                           {absender} · {formatDatumZeit(row.created_at)}
                         </p>
                         {row.status === 'fehler' ? (
-                          <span className="mt-1 inline-block rounded bg-red-100 px-1.5 text-[10px] text-red-800">
-                            Fehler
+                          <span className="mt-1 inline-block rounded-card bg-status-cancel-bg px-1.5 text-fs-caption text-status-cancel-text">
+                            Fehlgeschlagen
                           </span>
                         ) : null}
                       </td>
@@ -150,10 +159,10 @@ export function KommunikationCard({
                       <td className="px-3 py-2.5">
                         <span
                           className={cn(
-                            'inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium',
+                            'inline-flex rounded-pill px-2 py-0.5 text-fs-caption font-medium',
                             art === 'system'
                               ? 'bg-bw-bg text-bw-text-muted'
-                              : 'bg-[#EAF3DE] text-[#1A3D2B]'
+                              : 'bg-bw-green-bg text-bw-dark'
                           )}
                         >
                           {kommunikationMailArtLabel(art)}
@@ -163,22 +172,16 @@ export function KommunikationCard({
                         {formatDatumZeit(row.created_at)}
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewId(row.id)}
-                          className="btn ghost sm inline-flex gap-1 px-2"
-                          aria-label="E-Mail ansehen"
-                        >
-                          <Eye className="h-3.5 w-3.5" aria-hidden />
+                        <MockBtn kind="ghost" sm className="inline-flex gap-1 px-2" type="button" onClick={() => setPreviewId(row.id)} aria-label="E-Mail ansehen">
+                          <MockIcon n="eye" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                           <span className="hidden sm:inline">Ansehen</span>
-                        </button>
+                        </MockBtn>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
-            </table>
-          </div>
+            </MockTable>
         )}
       </Card>
 

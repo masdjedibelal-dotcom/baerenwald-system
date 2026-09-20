@@ -60,7 +60,10 @@ export async function POST(req: Request) {
         ziel_bild_url: zielUrl,
         gewerk: body.gewerk,
       }),
-      analyzeInspirationImage(zielUrl).catch(() => null),
+      analyzeInspirationImage(zielUrl).catch((err) => {
+        console.error('[api/visualize/analyze] analyzeInspirationImage', err)
+        return null
+      }),
     ])
     await updateKiVisualisierung(sessionId, {
       analysierter_prompt: prompt,

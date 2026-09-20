@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -15,13 +17,13 @@ export function DashedAddCard({
   className?: string
 }) {
   return (
-    <button type="button" className={cn('dashed-add-card', className)} onClick={onClick}>
-      <span className="dashed-add-card__plus" aria-hidden>
+    <MockBtn className={cn('dashed-add', className)} type="button" onClick={onClick}>
+      <span className="dashed-add__plus" aria-hidden>
         +
       </span>
-      <span className="dashed-add-card__label">{label}</span>
-      {secondary ? <span className="dashed-add-card__secondary">{secondary}</span> : null}
-    </button>
+      <span className="dashed-add__label">{label}</span>
+      {secondary ? <span className="dashed-add__secondary">{secondary}</span> : null}
+    </MockBtn>
   )
 }
 
@@ -32,7 +34,11 @@ export function GroupedFieldCard({
   children: ReactNode
   className?: string
 }) {
-  return <div className={cn('grouped-field-card', className)}>{children}</div>
+  return (
+    <MockCard className={cn('grouped-field', className)} flush>
+      {children}
+    </MockCard>
+  )
 }
 
 export function GroupedFieldRow({
@@ -46,10 +52,10 @@ export function GroupedFieldRow({
 }) {
   if (onClick) {
     return (
-      <button type="button" className="grouped-field-row" onClick={onClick}>
+      <MockBtn className="grouped-field-row" type="button" onClick={onClick}>
         <span className="grouped-field-row__label">{label}</span>
         <span className="grouped-field-row__value">{children}</span>
-      </button>
+      </MockBtn>
     )
   }
   return (
@@ -69,12 +75,12 @@ export function AddRowList({
     <div className="add-row-list">
       <p className="add-row-list__heading">hinzufügen</p>
       {items.map((it) => (
-        <button key={it.label} type="button" className="add-row-list__row" onClick={it.onClick}>
+        <MockBtn className="add-row-list__row" key={it.label} type="button" onClick={it.onClick}>
           <span className="add-row-list__plus" aria-hidden>
             +
           </span>
           {it.label}
-        </button>
+        </MockBtn>
       ))}
     </div>
   )
@@ -109,17 +115,10 @@ export function DocActionBar({
   return (
     <div className={cn('doc-action-bar', className)} role="toolbar" aria-label="Dokument">
       {actions.map((a) => (
-        <button
-          key={a.id}
-          type="button"
-          className={cn('doc-action-bar__btn', a.danger && 'doc-action-bar__btn--danger')}
-          onClick={a.onClick}
-          aria-label={a.label}
-          title={a.label}
-        >
+        <MockBtn className={cn('doc-action-bar__btn', a.danger && 'doc-action-bar__btn--danger')} key={a.id} type="button" onClick={a.onClick} aria-label={a.label} title={a.label}>
           {a.icon}
           <span className="doc-action-bar__lbl">{a.label}</span>
-        </button>
+        </MockBtn>
       ))}
     </div>
   )

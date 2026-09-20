@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { getEntity } from '@/lib/copilot/crm-actions'
 import { readCrmDocument } from '@/lib/copilot/read-document'
 import { listTodosCopilot } from '@/lib/copilot/todo-copilot'
@@ -58,6 +59,7 @@ export async function buildEntityPageSnapshot(pathname: string): Promise<string 
         )
         .eq('id', ent.id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/entity-snapshot:auftraege', error)
       if (error || !data) return null
       const todos = await listTodosCopilot({ auftrag_id: ent.id, limit: 10 })
       return [
@@ -98,13 +100,14 @@ export async function buildEntityPageSnapshot(pathname: string): Promise<string 
     }
 
     if (ent.typ === 'handwerker') {
-      const { data } = await supabaseAdmin
+      const { data, error } = await supabaseAdmin
         .from('handwerker')
         .select('id, name, firma, email, telefon, status, gewerke')
         .eq('id', ent.id)
         .maybeSingle()
+      if (error) logDbError('lib/copilot/entity-snapshot:handwerker', error)
       if (!data) return null
-      return [`ENTITY-SNAPSHOT · Handwerker ${ent.id}`, truncateJson(data)].join('\n')
+      return [`ENTITY-SNAPSHOT · Partner ${ent.id}`, truncateJson(data)].join('\n')
     }
   } catch (e) {
     console.error('buildEntityPageSnapshot', e)

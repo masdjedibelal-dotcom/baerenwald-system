@@ -1,7 +1,6 @@
 'use client'
 
 import { MetaTag } from '@/components/mock-ui/MetaTag'
-
 const LABELS: Record<string, string> = {
   privat: 'Privat',
   eigentuemer: 'Privat',
@@ -21,7 +20,7 @@ export function kundenAvatarClass(typ: string): string {
   if (t === 'gewerbe') return 'bg-bw-mid text-white'
   if (t === 'hausverwaltung' || t === 'verwaltung') return 'bg-bw-mid text-white'
   if (t === 'sonstiges') return 'bg-bw-mid text-white'
-  return 'bg-emerald-600 text-white'
+  return 'bg-bw-success text-white'
 }
 
 export function kundenInitialen(name: string): string {

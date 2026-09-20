@@ -3,8 +3,9 @@
  * Zeiterfassung · Tätigkeiten · Material · Fotos · Soll/Ist · §35a
  */
 
+import { formatEuro, formatDatum } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
 import {
-  ANGEBOT_PDF_BOTTOM_MARGIN_MM,
   buildAngebotPdfFooterTemplate,
   type AngebotHtmlInput,
 } from '@/lib/templates/angebot-template'
@@ -15,12 +16,17 @@ import {
 } from '@/lib/auftraege/bericht-datenquelle'
 import { formatRegieSollIst } from '@/lib/auftraege/regie-display'
 import { formatHinweis35aRechnung } from '@/lib/rechnung-berechnung'
-import { formatDatum } from '@/lib/utils'
+import {
+  pdfAbsenderFromReportFirm,
+  pdfKopfHtml,
+  pdfReportShell,
+  pdfTitelzeileHtml,
+} from '@/lib/pdf/chrome'
 
-const ACCENT = '#1A3D2B'
-const MUTED = '#6B7280'
-const BORDER = '#D1D5DB'
-const TINT = '#F3F7F4'
+const ACCENT = C.greenDark
+const MUTED = C.gray500
+const BORDER = C.gray300
+const TINT = C.greenTint
 
 export type RegieberichtLebenszyklusHtmlInput = {
   firmen_logo_url?: string | null
@@ -45,21 +51,6 @@ export type RegieberichtLebenszyklusHtmlInput = {
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-function euro(n: number): string {
-  return (
-    n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-  )
-}
-
-function logoKopf(p: RegieberichtLebenszyklusHtmlInput): string {
-  const src = p.firmen_logo_url?.trim()
-  if (!src || /^file:/i.test(src)) return ''
-  if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
-  return `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid ${ACCENT};">
-    <img src="${src.replace(/"/g, '&quot;')}" alt="${esc(p.firmenname)}" style="height:64px;width:auto;max-width:280px;object-fit:contain;display:block;" />
-  </div>`
 }
 
 function section(title: string): string {
@@ -104,8 +95,8 @@ function materialTable(data: BerichtDatenquelle): string {
       (m) => `<tr>
       <td style="padding:5px 8px;border:1px solid ${BORDER};font-size:9pt;">${esc(m.bezeichnung)}</td>
       <td style="padding:5px 8px;border:1px solid ${BORDER};font-size:9pt;text-align:right;">${m.menge}</td>
-      <td style="padding:5px 8px;border:1px solid ${BORDER};font-size:9pt;text-align:right;">${euro(m.einzelpreis)}</td>
-      <td style="padding:5px 8px;border:1px solid ${BORDER};font-size:9pt;text-align:right;">${euro(m.gesamt)}</td>
+      <td style="padding:5px 8px;border:1px solid ${BORDER};font-size:9pt;text-align:right;">${formatEuro(m.einzelpreis)}</td>
+      <td style="padding:5px 8px;border:1px solid ${BORDER};font-size:9pt;text-align:right;">${formatEuro(m.gesamt)}</td>
     </tr>`
     )
     .join('')
@@ -166,15 +157,24 @@ function footerInput(p: RegieberichtLebenszyklusHtmlInput): AngebotHtmlInput {
 
 export function buildRegieberichtLebenszyklusHtml(p: RegieberichtLebenszyklusHtmlInput): string {
   const d = p.data
+  const heute = formatDatum(new Date().toISOString().slice(0, 10))
   const taetigkeiten = d.eintraege
     .map((e) => (e.beschreibung || e.beschreibung_roh || '').trim())
     .filter(Boolean)
   const uniqueTaet = Array.from(new Set(taetigkeiten))
 
   const body = `
-    ${logoKopf(p)}
-    <h1 style="font-size:17pt;font-weight:700;margin:0 0 4px;color:${ACCENT};">REGIEBERICHT</h1>
-    <p style="font-size:10pt;color:${MUTED};margin:0 0 12px;">Auftrag ${esc(d.auftragId.slice(0, 8))} · ${esc(formatDatum(new Date().toISOString().slice(0, 10)))}</p>
+    ${pdfKopfHtml({
+      variant: 'bw-kunde',
+      absender: pdfAbsenderFromReportFirm(p),
+    })}
+    ${pdfTitelzeileHtml({
+      dokumentTyp: 'Regiebericht',
+      objektOderAdresse: d.projektTitel,
+      datum: heute,
+      accent: ACCENT,
+    })}
+    <p style="font-size:10pt;color:${MUTED};margin:0 0 12px;">Auftrag ${esc(d.auftragId.slice(0, 8))} · ${esc(heute)}</p>
     <p style="font-size:10pt;margin:0 0 2px;"><strong>Projekt:</strong> ${esc(d.projektTitel)}</p>
     <p style="font-size:10pt;margin:0 0 2px;"><strong>Auftraggeber:</strong> ${esc(d.auftraggeberName)}</p>
     <p style="font-size:10pt;margin:0 0 2px;"><strong>Adresse:</strong> ${esc(d.projektAdresse)}</p>
@@ -199,10 +199,10 @@ export function buildRegieberichtLebenszyklusHtml(p: RegieberichtLebenszyklusHtm
     ${fotosGrid(d)}
 
     ${section('Kosten')}
-    <p style="font-size:10pt;margin:0 0 2px;">Lohn (netto): ${euro(p.lohnNetto)} · Satz ${euro(p.stundensatz)}/h</p>
-    <p style="font-size:10pt;margin:0 0 2px;">Material (netto): ${euro(p.materialNetto)}</p>
-    <p style="font-size:10pt;margin:0 0 2px;">MwSt 19 %: ${euro(p.mwst)}</p>
-    <p style="font-size:11pt;font-weight:700;margin:6px 0 0;">Brutto: ${euro(p.brutto)}</p>
+    <p style="font-size:10pt;margin:0 0 2px;">Lohn (netto): ${formatEuro(p.lohnNetto)} · Satz ${formatEuro(p.stundensatz)}/h</p>
+    <p style="font-size:10pt;margin:0 0 2px;">Material (netto): ${formatEuro(p.materialNetto)}</p>
+    <p style="font-size:10pt;margin:0 0 2px;">MwSt 19 %: ${formatEuro(p.mwst)}</p>
+    <p style="font-size:11pt;font-weight:700;margin:6px 0 0;">Brutto: ${formatEuro(p.brutto)}</p>
 
     ${
       p.hinweis35a && p.lohnNetto > 0
@@ -212,18 +212,15 @@ export function buildRegieberichtLebenszyklusHtml(p: RegieberichtLebenszyklusHtm
     <p style="margin:12px 0 0;font-size:8.5pt;color:${MUTED};line-height:1.45;">Mit der Unterschrift des Auftraggebers werden die aufgeführten Zusatzleistungen anerkannt und Bestandteil des Auftrags.</p>
   `
 
-  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"/><title>Regiebericht</title>
-<style>@page{size:A4;margin:12mm 12mm ${ANGEBOT_PDF_BOTTOM_MARGIN_MM}mm 12mm;}body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#111;}</style>
-</head><body>${body}</body></html>`
+  return pdfReportShell({ title: 'Regiebericht', bodyHtml: body })
 }
 
 export function buildRegieberichtLebenszyklusPdfFooterTemplate(
   p: RegieberichtLebenszyklusHtmlInput
 ): string {
-  return buildAngebotPdfFooterTemplate(footerInput(p)).replace(
-    '</span>',
-    ' · Regiebericht</span>'
-  )
+  return buildAngebotPdfFooterTemplate(footerInput(p), {
+    seitenZusatz: 'Regiebericht',
+  })
 }
 
 /** Hilfs-Export für Soll/Ist-Berechnung in Actions */

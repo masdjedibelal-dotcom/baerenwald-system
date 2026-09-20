@@ -3,11 +3,13 @@
  * (HV-Glocke + Privatkunden-Portal), analog Angebot gesendet.
  */
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { C } from '@/lib/tokens/colors'
 
 const AUFTRAG_NOTIF_VISUAL = {
-  iconBg: '#E8F0E4',
-  iconFg: '#2F5D3A',
+  iconBg: C.greenTint3,
+  iconFg: C.greenDeep2,
   iconGlyph: '✅',
 } as const
 
@@ -20,7 +22,7 @@ async function hasRecentHvNotif(opts: {
   leadId: string
 }): Promise<boolean> {
   const since = new Date(Date.now() - 15 * 60 * 1000).toISOString()
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('hv_notifications')
     .select('id')
     .eq('kunde_id', opts.kundeId)
@@ -28,6 +30,7 @@ async function hasRecentHvNotif(opts: {
     .ilike('link', `%${opts.leadId}%`)
     .gte('created_at', since)
     .limit(1)
+  if (error) logDbError('lib/portal/notify-portal-auftrag-bestaetigt:hv_notifications', error)
   return (data ?? []).length > 0
 }
 
@@ -35,7 +38,7 @@ async function hasUnreadPortalNotif(opts: {
   empfaengerUserId: string
   leadId: string
 }): Promise<boolean> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('portal_notifications')
     .select('id')
     .eq('empfaenger_user_id', opts.empfaengerUserId)
@@ -43,6 +46,7 @@ async function hasUnreadPortalNotif(opts: {
     .eq('typ', 'auftrag')
     .eq('gelesen', false)
     .limit(1)
+  if (error) logDbError('lib/portal/notify-portal-auftrag-bestaetigt:portal_notifications', error)
   return (data ?? []).length > 0
 }
 
@@ -63,6 +67,7 @@ export async function notifyPortalAuftragBestaetigtFromCrm(input: {
     .select('id, kunde_id, auftraggeber_kunde_id, situation, melder_einheit')
     .eq('id', leadId)
     .maybeSingle()
+  if (leadErr) logDbError('lib/portal/notify-portal-auftrag-bestaetigt:leads', leadErr)
 
   if (leadErr) {
     console.warn('[notifyPortalAuftragBestaetigtFromCrm] lead:', leadErr.message)
@@ -73,11 +78,12 @@ export async function notifyPortalAuftragBestaetigtFromCrm(input: {
   let auftragTitel = String(input.titel ?? '').trim()
   const auftragId = String(input.auftragId ?? '').trim()
   if (!auftragTitel && auftragId) {
-    const { data: auf } = await supabaseAdmin
+    const { data: auf, error } = await supabaseAdmin
       .from('auftraege')
       .select('titel')
       .eq('id', auftragId)
       .maybeSingle()
+    if (error) logDbError('lib/portal/notify-portal-auftrag-bestaetigt:auftraege', error)
     auftragTitel = String(auf?.titel ?? '').trim()
   }
 
@@ -103,6 +109,7 @@ export async function notifyPortalAuftragBestaetigtFromCrm(input: {
       body,
       link: portalPath,
     })
+    if (error) logDbError('lib/portal/notify-portal-auftrag-bestaetigt:hv_notifications', error)
     if (error) {
       console.warn('[notifyPortalAuftragBestaetigtFromCrm] hv_notifications:', error.message)
     } else {
@@ -134,6 +141,7 @@ export async function notifyPortalAuftragBestaetigtFromCrm(input: {
       icon_fg: AUFTRAG_NOTIF_VISUAL.iconFg,
       icon_glyph: AUFTRAG_NOTIF_VISUAL.iconGlyph,
     })
+    if (error) logDbError('lib/portal/notify-portal-auftrag-bestaetigt:portal_notifications', error)
     if (error) {
       console.warn(
         '[notifyPortalAuftragBestaetigtFromCrm] portal_notifications:',
@@ -157,11 +165,12 @@ export async function notifyPortalAuftragBestaetigtFromCrm(input: {
   }
 
   if (portalKundeId) {
-    const { data: kunde } = await supabaseAdmin
+    const { data: kunde, error } = await supabaseAdmin
       .from('kunden')
       .select('auth_user_id, portal_modus')
       .eq('id', portalKundeId)
       .maybeSingle()
+    if (error) logDbError('lib/portal/notify-portal-auftrag-bestaetigt:kunden', error)
 
     const authUserId = String(kunde?.auth_user_id ?? '').trim()
     const modus = String(kunde?.portal_modus ?? '')

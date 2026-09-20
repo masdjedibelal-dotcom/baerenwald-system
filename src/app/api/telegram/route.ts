@@ -228,7 +228,10 @@ export async function POST(req: Request) {
     const msg = formatCopilotError(e)
     await sendTelegram(
       `❌ <b>Copilot-Fehler:</b> ${msg.slice(0, 450)}\n\n🧹 Chat hängt? Schick <code>/reset</code> oder <code>neustart</code> — dann neu anfangen.`
-    ).catch(() => undefined)
+    ).catch((err) => {
+      console.error('[api/telegram] sendTelegram error-reply', err)
+      return undefined
+    })
   }
 
   return Response.json({ ok: true })

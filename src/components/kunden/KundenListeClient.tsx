@@ -1,18 +1,15 @@
 'use client'
 
+import { ListBulkBar, MockBtn, MockChip, MockEmpty, MockIcon, MockPager, MockSortHead } from '@/components/mock-ui'
+import { MockEntityRowMenu, MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
+
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  MockBtn,
-  MockChip,
-  MockEmpty,
-  MockIcon,
-  MockModal,
-  MockPager,
-  MockSortHead,
-  ListBulkBar,
-} from '@/components/mock-ui'
-import { MockField } from '@/components/mock-ui/MockForm'
+import { buildListReturnUrl } from '@/lib/list-return-url'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
@@ -30,16 +27,16 @@ import {
 import { cn } from '@/lib/utils'
 import { deleteKunde, mergeKunden } from '@/app/actions/kunden'
 import { KundenMergeAssistentSheet } from '@/components/kunden/KundenMergeAssistentSheet'
+<<<<<<< Updated upstream
+=======
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 
@@ -63,13 +60,13 @@ const KUNDEN_COLS: ResizableColDef[] = [
   { id: 'menu', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
 ]
 
-type TypListenFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
+type KundenTypFilter = 'alle' | 'privat' | 'gewerbe' | 'hausverwaltung'
 type SortCol = 'name' | 'typ' | 'telefon' | 'email'
 
 /** Listen-Filter-Bucket: Legacy-Typen (z. B. eigentuemer) → Privat. */
 function kundeTypFilterBucket(
   typ: string | null | undefined
-): Exclude<TypListenFilter, 'alle'> {
+): Exclude<KundenTypFilter, 'alle'> {
   const t = (typ || '').toLowerCase()
   if (t === 'gewerbe') return 'gewerbe'
   if (t === 'hausverwaltung' || t === 'verwaltung') return 'hausverwaltung'
@@ -108,7 +105,7 @@ export function KundenListeClient({
   const searchParams = useSearchParams()
   const { exportToCSV } = useExport()
 
-  const [typFilter, setTypFilter] = useState<TypListenFilter>('alle')
+  const [typFilter, setTypFilter] = useState<KundenTypFilter>('alle')
   const [query, setQuery] = useState('')
   const [fName, setFName] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
@@ -127,6 +124,25 @@ export function KundenListeClient({
       openFabCreate('kunde')
     }
   }, [searchParams, router])
+
+  useEffect(() => {
+    const qParam = searchParams.get('q')
+    if (qParam !== null) setQuery(qParam)
+  }, [searchParams])
+
+  useEffect(() => {
+    const current = searchParams.get('q') ?? ''
+    if (current === query) return
+    const t = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (query.trim()) params.set('q', query.trim())
+      else params.delete('q')
+      params.delete('neu')
+      const qs = params.toString()
+      router.replace(qs ? `/kunden?${qs}` : '/kunden', { scroll: false })
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [query, router, searchParams])
 
   const typCounts = useMemo(() => {
     let privat = 0
@@ -248,7 +264,7 @@ export function KundenListeClient({
       toast.success(okCount === 1 ? 'Kunde gelöscht' : `${okCount} Kunden gelöscht`, {
         id: loadingId,
       })
-      router.refresh()
+      afterServerActionRefresh()
     } else {
       toast.error(lastErr ?? 'Löschen fehlgeschlagen', { id: loadingId })
     }
@@ -276,7 +292,12 @@ export function KundenListeClient({
   } = useListPage(filtered, 12, paginationResetKey)
 
   function openDetail(id: string) {
-    router.push(`/kunden/${id}`)
+    const params = new URLSearchParams(searchParams.toString())
+    if (query.trim()) params.set('q', query.trim())
+    else params.delete('q')
+    const qs = params.toString()
+    const listReturn = qs ? `/kunden?${qs}` : '/kunden'
+    router.push(buildListReturnUrl(listReturn, `/kunden/${id}`))
   }
 
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
@@ -300,39 +321,17 @@ export function KundenListeClient({
     setSelected(n)
   }
 
-  const filterFooter = (
-    <div className="sheet-footer-actions">
-      <MockBtn kind="ghost" onClick={resetFilters}>
-        Zurücksetzen
-      </MockBtn>
-      <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
-        Anwenden ({filtered.length})
-      </MockBtn>
-    </div>
-  )
-
   const filterFields = (
     <>
       <div className="form-section-h">Suche</div>
       <div className="input" style={{ marginBottom: 16 }}>
         <MockIcon ctx="default" n="search" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Name, Telefon, E-Mail…"
-          autoFocus={!isMobile}
-        />
+        <MockInput type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, Telefon, E-Mail…" autoFocus={!isMobile} />
       </div>
       <div className="form-grid" style={{ marginBottom: 16 }}>
         <MockField label="Name">
           <div className="input">
-            <input
-              type="text"
-              value={fName}
-              onChange={(e) => setFName(e.target.value)}
-              placeholder="Name enthält…"
-            />
+            <MockInput type="text" value={fName} onChange={(e) => setFName(e.target.value)} placeholder="Name enthält…" />
           </div>
         </MockField>
       </div>
@@ -377,7 +376,7 @@ export function KundenListeClient({
               </MockChip>
             ))}
           </div>
-          <ListbarActionsMenu
+          <MockListbarChrome
             title="Listen-Aktionen"
             activeHint={activeFilterCount}
             items={[
@@ -443,7 +442,7 @@ export function KundenListeClient({
       <KundenMergeAssistentSheet
         open={mergeAssistentOpen}
         onClose={() => setMergeAssistentOpen(false)}
-        onMerged={() => router.refresh()}
+        onMerged={() => afterServerActionRefresh()}
       />
 
       {isMobile ? (
@@ -452,34 +451,32 @@ export function KundenListeClient({
           onClose={() => setFilterOpen(false)}
           title="Filter & Suchen"
           headerEnd={
-            <button
-              type="button"
-              className="mobile-filter-sheet__reset"
-              onClick={resetFilters}
-              disabled={!activeFilterCount}
-            >
+            <MockBtn className="mobile-filter-sheet__reset" type="button" onClick={resetFilters} disabled={!activeFilterCount}>
               Zurücksetzen
-            </button>
+            </MockBtn>
           }
           footer={
-            <button type="button" className="btn primary" onClick={() => setFilterOpen(false)}>
+            <MockBtn kind="primary" type="button" onClick={() => setFilterOpen(false)}>
               Anwenden ({filtered.length})
-            </button>
+            </MockBtn>
           }
         >
           {filterFields}
         </MobileListFilterSheet>
       ) : (
-        <MockModal
+        <EditorSheet
           open={filterOpen}
           onClose={() => setFilterOpen(false)}
-          icon="filter"
           title="Filter & Suchen"
-          sub="Kunden eingrenzen"
-          footer={filterFooter}
+          subtitle="Kunden eingrenzen"
+          secondary={{ label: 'Zurücksetzen', onClick: resetFilters, kind: 'ghost' }}
+          primary={{
+            label: `Anwenden (${filtered.length})`,
+            onClick: () => setFilterOpen(false),
+          }}
         >
           {filterFields}
-        </MockModal>
+        </EditorSheet>
       )}
 
       {selectedCount > 0 ? (
@@ -504,32 +501,20 @@ export function KundenListeClient({
         />
       ) : null}
 
-      <MockModal
+      <ConfirmPopup
         open={bulkDeleteOpen}
         onClose={() => {
           if (!bulkDeletePending) setBulkDeleteOpen(false)
         }}
-        icon="trash"
         title={selectedCount === 1 ? 'Kunde löschen?' : `${selectedCount} Kunden löschen?`}
-        sub="Inkl. aller Vorgänge und Rechnungen — dauerhaft entfernen."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
-              onClick={() => void runBulkDelete()}
-            >
-              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={bulkDeletePending}
+        confirmLabel={bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runBulkDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Inkl. aller Vorgänge und Rechnungen — dauerhaft entfernen.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {bulkDeletePending
             ? 'Bitte warten…'
@@ -537,9 +522,9 @@ export function KundenListeClient({
               ? 'Der ausgewählte Kunde wird unwiderruflich gelöscht — inklusive aller Vorgänge und Rechnungen.'
               : `${selectedCount} ausgewählte Kunden werden unwiderruflich gelöscht — inklusive aller Vorgänge und Rechnungen.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
-      <PullToRefresh onRefresh={() => router.refresh()}>
+      <PullToRefresh onRefresh={() => afterServerActionRefresh()}>
       <div
         className="listcard listcard--scroll listcard--cols vg-selectmode"
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
@@ -769,17 +754,40 @@ export function KundenListeClient({
         />
       )}
 
-      <Modal
+      <ConfirmPopup
         open={mergeListOpen && Boolean(listMergePair)}
-        onClose={() => setMergeListOpen(false)}
+        onClose={() => {
+          if (!listMergePending) setMergeListOpen(false)
+        }}
         title="Kunden zusammenführen"
+<<<<<<< Updated upstream
+        busy={listMergePending}
+        confirmLabel={listMergePending ? 'Wird zusammengeführt…' : 'Zusammenführen'}
+        onConfirm={() => {
+          if (!listMergePair) return
+          const [survivor, merge] = listMergePair
+          setListMergePending(true)
+          void mergeKunden(survivor.id, merge.id).then((res) => {
+            setListMergePending(false)
+            if (!res.ok) {
+              toast.systemError(res)
+              return
+            }
+            toast.success(res.message)
+            setMergeListOpen(false)
+            setSelected({})
+            router.push(`/kunden/${survivor.id}`)
+            afterServerActionRefresh()
+          })
+        }}
+=======
         size="sm"
         footer={
           <div className="flex w-full justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setMergeListOpen(false)}>
+            <MockBtn type="button" kind="secondary" onClick={() => setMergeListOpen(false)}>
               Abbrechen
-            </Button>
-            <Button
+            </MockBtn>
+            <MockBtn kind="primary"
               type="button"
               loading={listMergePending}
               onClick={() => {
@@ -801,9 +809,10 @@ export function KundenListeClient({
               }}
             >
               Zusammenführen
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         {listMergePair ? (
           <p className="text-[length:var(--fs-text)] text-bw-text">
@@ -813,7 +822,7 @@ export function KundenListeClient({
             erhalten.)
           </p>
         ) : null}
-      </Modal>
+      </ConfirmPopup>
     </div>
   )
 }

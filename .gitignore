@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+coverage/
+.turbo/
+out/
+dist/
+playwright-report/
+test-results/
+*.log
+
+# Lokales Chromium für PDF (npm run setup:chrome) — nie committen (>100MB)
+chrome-headless-shell/

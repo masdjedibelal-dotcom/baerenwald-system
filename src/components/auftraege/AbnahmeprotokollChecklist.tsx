@@ -1,6 +1,11 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn, MockDragHandle } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockSegment } from '@/components/mock-ui/MockSegment'
 import { useEffect, useMemo, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { DateInput } from '@/components/ui/DateInput'
 import {
   DndContext,
   closestCenter,
@@ -18,6 +23,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
+<<<<<<< Updated upstream
+=======
   Camera,
   ChevronDown,
   ChevronUp,
@@ -25,9 +32,10 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import {
+>>>>>>> Stashed changes
   ABNAHME_GEWERK_OHNE,
   abnahmeGewerkLabel,
   bereinigeAbnahmeLeistungName,
@@ -71,18 +79,11 @@ function EditableNameField({
   }, [value])
 
   return (
-    <Input
-      label={label}
-      placeholder={placeholder}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
+    <MockField label={label}><MockInput placeholder={placeholder} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => {
         const next = draft.trim() || fallback
         setDraft(next)
         if (next !== value) onCommit(next)
-      }}
-      className={className}
-    />
+      }} className={`input ${className ?? ''}`.trim()} /></MockField>
   )
 }
 
@@ -92,50 +93,8 @@ const ABNAHME_STATUS_OPTS: { s: AbnahmePunktStatus; label: string; cls: string }
   { s: 'offen', label: 'Offen', cls: 'abnahme-st-offen' },
 ]
 
-function StatusToggle({
-  value,
-  onChange,
-}: {
-  value: AbnahmePunktStatus
-  onChange: (s: AbnahmePunktStatus) => void
-}) {
-  return (
-    <div
-      className="pos-segmented abnahme-status-segmented flex w-full"
-      role="group"
-      aria-label="Prüfstatus"
-    >
-      {ABNAHME_STATUS_OPTS.map(({ s, label, cls }) => (
-        <button
-          key={s}
-          type="button"
-          className={cn(
-            'pos-segmented__btn abnahme-status-segmented__btn flex-1 text-center',
-            cls,
-            value === s && 'pos-segmented__btn--active'
-          )}
-          aria-pressed={value === s}
-          onClick={() => onChange(s)}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function DragHandle(props: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      type="button"
-      className="btn ghost sm cursor-grab touch-none text-bw-text-muted active:cursor-grabbing"
-      title="Ziehen zum Sortieren"
-      aria-label="Ziehen zum Sortieren"
-      {...props}
-    >
-      <GripVertical className="h-4 w-4" aria-hidden />
-    </button>
-  )
+  return <MockDragHandle className="btn ghost sm" {...props} />
 }
 
 function SortableItem({
@@ -174,34 +133,20 @@ function LeistungNotizen({
     <div className="mt-2 space-y-2">
       {notizen.map((n, i) => (
         <div key={i} className="flex items-start gap-1.5">
-          <Input
-            placeholder="Notiz zur Leistung…"
-            value={n}
-            onChange={(e) => {
+          <MockInput placeholder="Notiz zur Leistung…" value={n} onChange={(e) => {
               const next = [...notizen]
               next[i] = e.target.value
               onChange(next)
-            }}
-            className="flex-1"
-          />
-          <button
-            type="button"
-            className="shrink-0 rounded-md p-1.5 text-bw-text-muted hover:bg-bw-hover hover:text-red-600"
-            title="Notiz löschen"
-            onClick={() => onChange(notizen.filter((_, j) => j !== i))}
-          >
-            <Trash2 className="h-4 w-4" aria-hidden />
-          </button>
+            }} className="flex-1" />
+          <MockBtn className="shrink-0 rounded-button p-1.5 text-bw-text-muted hover:bg-bw-hover hover:text-danger" type="button" title="Notiz löschen" onClick={() => onChange(notizen.filter((_, j) => j !== i))}>
+            <MockIcon n="trash" ctx="default" className="h-4 w-4" aria-hidden />
+          </MockBtn>
         </div>
       ))}
-      <button
-        type="button"
-        className="inline-flex items-center gap-1 text-[length:var(--fs-text)] font-medium text-bw-primary hover:underline"
-        onClick={() => onChange([...notizen, ''])}
-      >
-        <Plus className="h-3.5 w-3.5" aria-hidden />
+      <MockBtn className="inline-flex items-center gap-1 text-[length:var(--fs-text)] font-medium text-bw-primary hover:underline" type="button" onClick={() => onChange([...notizen, ''])}>
+        <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" aria-hidden />
         Notiz hinzufügen
-      </button>
+      </MockBtn>
     </div>
   )
 }
@@ -251,24 +196,12 @@ function EditLeistungRow({
           <div className="mb-2 flex items-start gap-1">
             <DragHandle {...handleProps} />
             <div className="pos-reorder shrink-0" aria-label="Reihenfolge Position">
-              <button
-                type="button"
-                className="btn ghost sm pos-reorder-btn"
-                title="Position nach oben"
-                disabled={leistungIndex <= 0}
-                onClick={() => onMoveLeistung('up')}
-              >
-                <ChevronUp className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                className="btn ghost sm pos-reorder-btn"
-                title="Position nach unten"
-                disabled={leistungIndex >= leistungCount - 1}
-                onClick={() => onMoveLeistung('down')}
-              >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </button>
+              <MockBtn kind="ghost" sm className="pos-reorder-btn" type="button" title="Position nach oben" disabled={leistungIndex <= 0} onClick={() => onMoveLeistung('up')}>
+                <MockIcon n="chevron-up" ctx="default" className="h-3.5 w-3.5" />
+              </MockBtn>
+              <MockBtn kind="ghost" sm className="pos-reorder-btn" type="button" title="Position nach unten" disabled={leistungIndex >= leistungCount - 1} onClick={() => onMoveLeistung('down')}>
+                <MockIcon n="chevron-down" ctx="default" className="h-3.5 w-3.5" />
+              </MockBtn>
             </div>
             <EditableNameField
               placeholder="Titel / Position…"
@@ -285,26 +218,15 @@ function EditLeistungRow({
                 {leistung.punkte.map((p) => (
                   <SortableItem key={p.id} id={p.id}>
                     {({ handleProps: bulletHandle }) => (
-                      <li className="abnahme-punkt-card flex w-full flex-col gap-2">
+                      <li className="abnahme-punkt flex w-full flex-col gap-2">
                         <div className="flex w-full items-start gap-2">
                           <DragHandle {...bulletHandle} />
-                          <Input
-                            placeholder="Checkpunkt / Beschreibung…"
-                            value={p.beschreibung}
-                            onChange={(e) => onPatchPunkt(p.id, { beschreibung: e.target.value })}
-                            className="min-w-0 flex-1"
-                          />
-                          <button
-                            type="button"
-                            className="shrink-0 rounded-md p-2.5 text-bw-text-muted hover:bg-bw-hover hover:text-red-600"
-                            title="Punkt entfernen"
-                            aria-label="Punkt entfernen"
-                            onClick={() => onRemovePunkt(p.id)}
-                          >
-                            <Trash2 className="h-4 w-4" aria-hidden />
-                          </button>
+                          <MockInput placeholder="Checkpunkt / Beschreibung…" value={p.beschreibung} onChange={(e) => onPatchPunkt(p.id, { beschreibung: e.target.value })} className="min-w-0 flex-1" />
+                          <MockBtn className="shrink-0 rounded-button p-2.5 text-bw-text-muted hover:bg-bw-hover hover:text-danger" type="button" title="Punkt löschen" aria-label="Punkt löschen" onClick={() => onRemovePunkt(p.id)}>
+                            <MockIcon n="trash" ctx="default" className="h-4 w-4" aria-hidden />
+                          </MockBtn>
                         </div>
-                        <StatusToggle
+                        <MockSegment
                           value={p.status}
                           onChange={(s) =>
                             onPatchPunkt(p.id, {
@@ -312,25 +234,23 @@ function EditLeistungRow({
                               mangel_frist: s === 'mangel' ? p.mangel_frist ?? null : null,
                             })
                           }
+                          options={ABNAHME_STATUS_OPTS.map(({ s, label, cls }) => ({
+                            value: s,
+                            label,
+                            className: cls,
+                          }))}
+                          className="pos-segmented abnahme-status-segmented flex w-full"
+                          buttonClassName="pos-segmented__btn abnahme-status-segmented__btn flex-1 text-center"
+                          activeClassName="pos-segmented__btn--active"
+                          aria-label="Prüfstatus"
                         />
                         {p.status === 'mangel' ? (
-                          <div className="ml-8 space-y-2 rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] p-2.5">
-                            <Input
-                              label="Mangel-Beschreibung (PDF)"
-                              value={p.notiz ?? ''}
-                              onChange={(e) => onPatchPunkt(p.id, { notiz: e.target.value })}
-                              placeholder={p.beschreibung || 'Was ist mangelhaft?'}
-                            />
-                            <Input
-                              label="Beseitigung bis"
-                              type="date"
-                              value={p.mangel_frist?.slice(0, 10) ?? ''}
-                              onChange={(e) =>
+                          <div className="ml-8 space-y-2 rounded-card border border-[var(--border)] bg-[var(--bg-soft)] p-2.5">
+                            <MockField label="Mangel-Beschreibung (PDF)"><MockInput value={p.notiz ?? ''} onChange={(e) => onPatchPunkt(p.id, { notiz: e.target.value })} placeholder={p.beschreibung || 'Was ist mangelhaft?'} /></MockField>
+                            <MockField label="Beseitigung bis"><DateInput value={p.mangel_frist?.slice(0, 10) ?? ''} onChange={(e) =>
                                 onPatchPunkt(p.id, {
                                   mangel_frist: e.target.value.trim() || null,
-                                })
-                              }
-                            />
+                                })} /></MockField>
                           </div>
                         ) : null}
                       </li>
@@ -343,10 +263,14 @@ function EditLeistungRow({
 
           <LeistungNotizen notizen={notizenFuerLeistung(leistung.punkte)} onChange={onNotizen} />
 
-          <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={onAddBullet}>
+          <MockBtn type="button" kind="ghost" sm className="mt-2" onClick={onAddBullet}>
+<<<<<<< Updated upstream
+            <MockIcon n="plus" ctx="default" className="mr-1 h-3.5 w-3.5" aria-hidden />
+=======
             <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
+>>>>>>> Stashed changes
             Checkpunkt
-          </Button>
+          </MockBtn>
         </div>
       )}
     </SortableItem>
@@ -401,7 +325,7 @@ function EditGewerkSection({
   return (
     <SortableItem
       id={`gewerk:${block.gewerk}`}
-      className="overflow-hidden rounded-lg border border-bw-border bg-bw-card"
+      className="overflow-hidden rounded-card border border-bw-border bg-surface"
     >
       {({ handleProps }) => (
         <>
@@ -409,28 +333,14 @@ function EditGewerkSection({
             <DragHandle {...handleProps} />
             {blockCount > 1 ? (
               <div className="pos-reorder shrink-0" aria-label="Reihenfolge Gewerk">
-                <button
-                  type="button"
-                  className="btn ghost sm pos-reorder-btn"
-                  title="Gewerk nach oben"
-                  disabled={blockIndex <= 0}
-                  onClick={() =>
-                    onChangePunkte(reorderAbnahmeGewerkBlocks(punkte, blockIndex, blockIndex - 1))
-                  }
-                >
-                  <ChevronUp className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost sm pos-reorder-btn"
-                  title="Gewerk nach unten"
-                  disabled={blockIndex >= blockCount - 1}
-                  onClick={() =>
-                    onChangePunkte(reorderAbnahmeGewerkBlocks(punkte, blockIndex, blockIndex + 1))
-                  }
-                >
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
+                <MockBtn kind="ghost" sm className="pos-reorder-btn" type="button" title="Gewerk nach oben" disabled={blockIndex <= 0} onClick={() =>
+                    onChangePunkte(reorderAbnahmeGewerkBlocks(punkte, blockIndex, blockIndex - 1))}>
+                  <MockIcon n="chevron-up" ctx="default" className="h-3.5 w-3.5" />
+                </MockBtn>
+                <MockBtn kind="ghost" sm className="pos-reorder-btn" type="button" title="Gewerk nach unten" disabled={blockIndex >= blockCount - 1} onClick={() =>
+                    onChangePunkte(reorderAbnahmeGewerkBlocks(punkte, blockIndex, blockIndex + 1))}>
+                  <MockIcon n="chevron-down" ctx="default" className="h-3.5 w-3.5" />
+                </MockBtn>
               </div>
             ) : null}
             <EditableNameField
@@ -442,14 +352,9 @@ function EditGewerkSection({
               className="min-w-0 flex-1"
             />
             {isEmpty ? (
-              <button
-                type="button"
-                className="btn ghost sm shrink-0"
-                title="Leeren Gewerk-Abschnitt entfernen"
-                onClick={removeEmptyBlock}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <MockBtn kind="ghost" sm className="shrink-0" type="button" title="Leeren Gewerk-Abschnitt löschen" onClick={removeEmptyBlock}>
+                <MockIcon n="trash" ctx="default" className="h-4 w-4" />
+              </MockBtn>
             ) : null}
           </div>
 
@@ -496,21 +401,16 @@ function EditGewerkSection({
           </DndContext>
 
           <div className="border-t border-bw-border px-3 py-2">
-            <button
-              type="button"
-              className="pos-add-btn w-full justify-start"
-              onClick={() =>
-                onChangePunkte([...punkte, neueAbnahmeLeistungUnterGewerk(block.gewerk)])
-              }
-            >
+            <MockBtn fullWidth className="pos-add-btn justify-start" type="button" onClick={() =>
+                onChangePunkte([...punkte, neueAbnahmeLeistungUnterGewerk(block.gewerk)])}>
               <span className="icon-wrap">
-                <Plus className="h-4 w-4" />
+                <MockIcon n="plus" ctx="default" className="h-4 w-4" />
               </span>
               <span className="lbl-block">
                 <span>Position hinzufügen</span>
                 <span className="sub">Leistung / Checkpunkt unter {block.gewerk}</span>
               </span>
-            </button>
+            </MockBtn>
           </div>
         </>
       )}
@@ -540,7 +440,7 @@ function VorortView({
       {blocks.map((block) => (
         <div
           key={block.gewerk}
-          className="overflow-hidden rounded-lg border border-bw-border bg-bw-card"
+          className="overflow-hidden rounded-card border border-bw-border bg-surface"
         >
           <div className="border-b border-bw-border bg-bw-hover/80 px-3 py-2">
             <p className="text-[length:var(--fs-text)] font-semibold text-bw-primary">{block.gewerk}</p>
@@ -558,14 +458,14 @@ function VorortView({
                     <li
                       key={p.id}
                       className={cn(
-                        'abnahme-punkt-card flex flex-col gap-3 p-3',
-                        p.status === 'mangel' && 'border-red-200 bg-red-50/50'
+                        'abnahme-punkt flex flex-col gap-3 p-3',
+                        p.status === 'mangel' && 'border-status-cancel-bg bg-status-cancel-bg/50'
                       )}
                     >
                       <p className="min-w-0 text-[length:var(--fs-text)] font-medium leading-snug text-bw-text">
                         {p.beschreibung?.trim() || '—'}
                       </p>
-                      <StatusToggle
+                      <MockSegment
                         value={p.status}
                         onChange={(s) =>
                           patchPunkt(p.id, {
@@ -573,25 +473,23 @@ function VorortView({
                             mangel_frist: s === 'mangel' ? p.mangel_frist ?? null : null,
                           })
                         }
+                        options={ABNAHME_STATUS_OPTS.map(({ s, label, cls }) => ({
+                          value: s,
+                          label,
+                          className: cls,
+                        }))}
+                        className="pos-segmented abnahme-status-segmented flex w-full"
+                        buttonClassName="pos-segmented__btn abnahme-status-segmented__btn flex-1 text-center"
+                        activeClassName="pos-segmented__btn--active"
+                        aria-label="Prüfstatus"
                       />
                       {p.status === 'mangel' ? (
                         <div className="space-y-2">
-                          <Input
-                            label="Mangel-Beschreibung (PDF)"
-                            value={p.notiz ?? ''}
-                            onChange={(e) => patchPunkt(p.id, { notiz: e.target.value })}
-                            placeholder={p.beschreibung || 'Was ist mangelhaft?'}
-                          />
-                          <Input
-                            label="Beseitigung bis"
-                            type="date"
-                            value={p.mangel_frist?.slice(0, 10) ?? ''}
-                            onChange={(e) =>
+                          <MockField label="Mangel-Beschreibung (PDF)"><MockInput value={p.notiz ?? ''} onChange={(e) => patchPunkt(p.id, { notiz: e.target.value })} placeholder={p.beschreibung || 'Was ist mangelhaft?'} /></MockField>
+                          <MockField label="Beseitigung bis"><DateInput value={p.mangel_frist?.slice(0, 10) ?? ''} onChange={(e) =>
                               patchPunkt(p.id, {
                                 mangel_frist: e.target.value.trim() || null,
-                              })
-                            }
-                          />
+                              })} /></MockField>
                         </div>
                       ) : null}
                       {(p.foto_urls ?? []).length > 0 ? (
@@ -605,16 +503,15 @@ function VorortView({
                         </div>
                       ) : null}
                       {onFotoClick ? (
-                        <Button
+                        <MockBtn
                           type="button"
-                          variant="secondary"
-                          size="sm"
+                          kind="secondary" sm
                           disabled={uploading}
                           onClick={() => onFotoClick(p.id)}
                         >
-                          <Camera className="mr-1 h-3 w-3" aria-hidden />
+                          <MockIcon n="photo" ctx="default" className="mr-1 h-3 w-3" aria-hidden />
                           Foto
-                        </Button>
+                        </MockBtn>
                       ) : null}
                     </li>
                   ))}
@@ -694,7 +591,7 @@ export function AbnahmeprotokollChecklist({
       </p>
 
       {blocks.length === 0 ? (
-        <div className="pos-empty rounded-lg border border-bw-border bg-bw-card px-4 py-6 text-center">
+        <div className="pos-empty rounded-card border border-bw-border bg-surface px-4 py-6 text-center">
           <p className="font-medium text-bw-text-mid">Noch keine Leistungen</p>
           <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">
             Unten ein Gewerk hinzufügen oder ohne Gewerk starten.
@@ -721,44 +618,31 @@ export function AbnahmeprotokollChecklist({
 
       <div className="pos-gewerk-add-row">
         <span className="pos-gewerk-add-label">Gewerk hinzufügen</span>
-        <select
-          className="input"
-          value={addGewerkId}
-          onChange={(e) => setAddGewerkId(e.target.value)}
-          aria-label="Gewerk auswählen"
-        >
+        <MockSelect value={addGewerkId} onChange={(e) => setAddGewerkId(e.target.value)} aria-label="Gewerk auswählen">
           <option value="">Gewerk wählen…</option>
           {unusedGewerke.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
             </option>
           ))}
-        </select>
-        <button
-          type="button"
-          className="btn ghost sm gap-1"
-          disabled={!addGewerkId}
-          onClick={addGewerkFromCatalog}
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden />
+        </MockSelect>
+        <MockBtn kind="ghost" sm className="gap-1" type="button" disabled={!addGewerkId} onClick={addGewerkFromCatalog}>
+          <MockIcon n="plus" ctx="default" className="h-3.5 w-3.5" aria-hidden />
           Abschnitt
-        </button>
+        </MockBtn>
       </div>
 
       <div className="pos-add-row">
-        <button type="button" className="pos-add-btn" onClick={addOhneGewerk}>
+        <MockBtn className="pos-add-btn" type="button" onClick={addOhneGewerk}>
           <span className="icon-wrap">
-            <Plus className="h-4 w-4" />
+            <MockIcon n="plus" ctx="default" className="h-4 w-4" />
           </span>
           <span className="lbl-block">
             <span>Ohne Gewerk</span>
             <span className="sub">Freie Position / Abschnitt</span>
           </span>
-        </button>
-        <button
-          type="button"
-          className="pos-add-btn"
-          onClick={() => {
+        </MockBtn>
+        <MockBtn className="pos-add-btn" type="button" onClick={() => {
             const target = blocks[blocks.length - 1]?.gewerk
             onChange([
               ...punkte,
@@ -766,10 +650,9 @@ export function AbnahmeprotokollChecklist({
                 ? neueAbnahmeLeistungUnterGewerk(target)
                 : neuerAbnahmePunktFreitext(ABNAHME_GEWERK_OHNE),
             ])
-          }}
-        >
+          }}>
           <span className="icon-wrap">
-            <Plus className="h-4 w-4" />
+            <MockIcon n="plus" ctx="default" className="h-4 w-4" />
           </span>
           <span className="lbl-block">
             <span>Position hinzufügen</span>
@@ -777,7 +660,7 @@ export function AbnahmeprotokollChecklist({
               {blocks.length ? `unter ${blocks[blocks.length - 1]!.gewerk}` : 'neuen Abschnitt'}
             </span>
           </span>
-        </button>
+        </MockBtn>
       </div>
     </div>
   )

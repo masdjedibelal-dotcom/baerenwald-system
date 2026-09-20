@@ -387,7 +387,10 @@ async function launchLocalBrowser(
   })
   const proc = browser.process()
   if (proc && proc.exitCode != null) {
-    await browser.close().catch(() => undefined)
+    await browser.close().catch((err) => {
+      console.error('[angebote/render-angebot-html-pdf] browser.close (early exit)', err)
+      return undefined
+    })
     throw new Error(`Browser-Prozess beendet (code ${proc.exitCode})`)
   }
   return browser
@@ -485,7 +488,10 @@ export async function renderHtmlToPdfBuffer(
     const page = await browser.newPage()
     await page.setViewport({ width: 794, height: 1123 })
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 90_000 })
-    await page.evaluate(() => document.fonts?.ready).catch(() => undefined)
+    await page.evaluate(() => document.fonts?.ready).catch((err) => {
+      console.error('[angebote/render-angebot-html-pdf] fonts.ready', err)
+      return undefined
+    })
     await page
       .evaluate(async () => {
         const imgs = Array.from(document.images)
@@ -503,12 +509,18 @@ export async function renderHtmlToPdfBuffer(
           )
         )
       })
-      .catch(() => undefined)
+      .catch((err) => {
+        console.error('[angebote/render-angebot-html-pdf] wait images', err)
+        return undefined
+      })
 
     // Fotos still verkleinern — sonst bläht Chromium das PDF mit Originalauflösung auf
     await page
       .evaluate(compressPageImagesForPdf, { maxEdge: 960, quality: 0.72 })
-      .catch(() => undefined)
+      .catch((err) => {
+        console.error('[angebote/render-angebot-html-pdf] compress images', err)
+        return undefined
+      })
 
     const pdf = await page.pdf(puppeteerPdfOptions(pdfOptions))
     return Buffer.from(pdf)
@@ -518,6 +530,10 @@ export async function renderHtmlToPdfBuffer(
       `PDF-Erzeugung fehlgeschlagen (${raw}). ${launchErrorHint(isHeadlessShell, executablePath)}`
     )
   } finally {
-    if (browser) await browser.close().catch(() => undefined)
+    if (browser)
+      await browser.close().catch((err) => {
+        console.error('[angebote/render-angebot-html-pdf] browser.close', err)
+        return undefined
+      })
   }
 }

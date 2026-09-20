@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 /** Werte für `auftrag_timeline.typ` */
@@ -68,6 +69,7 @@ export async function insertAuftragTimelineEvent(input: {
     .insert(row as typeof base & { email_log_id?: string })
     .select('id')
     .single()
+  if (error) logDbError('lib/auftraege/timeline:auftrag_timeline', error)
   if (error) {
     if (emailLogId && /email_log_id/i.test(error.message)) {
       const retry = await supabaseAdmin.from('auftrag_timeline').insert(base).select('id').single()

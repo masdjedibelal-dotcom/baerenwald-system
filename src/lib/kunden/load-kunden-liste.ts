@@ -1,4 +1,4 @@
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { istHvPortalRollenKunde } from '@/lib/kunde-stammdaten'
 import { berechneKundeGesamtumsatz } from '@/lib/kunden/kunde-umsatz'
 import { createClient } from '@/lib/supabase-server'
@@ -21,27 +21,23 @@ export async function loadKundenListe(): Promise<KundeListeZeile[]> {
 }
 
 async function loadKundenListeInner(): Promise<KundeListeZeile[]> {
-  const kundenRes = await withCrmReadFallback(async (db) =>
-    db
+  const kundenRes = await (() => { const db = createClient(); return db
       .from('kunden')
       .select(
         'id, name, vorname, nachname, email, telefon, ort, typ, portal_modus, org_anzeigename, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
       )
       .order('created_at', { ascending: false })
-      .limit(500)
-  )
+      .limit(500) })()
   if (kundenRes.error) {
     // Ältere DBs ohne portal_modus / org_anzeigename
     if (/portal_modus|org_anzeigename/i.test(kundenRes.error.message)) {
-      const retry = await withCrmReadFallback(async (db) =>
-        db
+      const retry = await (() => { const db = createClient(); return db
           .from('kunden')
           .select(
             'id, name, vorname, nachname, email, telefon, ort, typ, created_at, gesamt_umsatz, letzte_aktivitaet, auth_user_id'
           )
           .order('created_at', { ascending: false })
-          .limit(500)
-      )
+          .limit(500) })()
       if (retry.error) {
         console.warn('loadKundenListe', retry.error.message)
         return []

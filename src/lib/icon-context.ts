@@ -2,6 +2,7 @@
  * Icon-Farb-Kontexte — binden Mock-Icons an --icon-*-Tokens in globals.css.
  * Jede MockIcon-Instanz braucht ctx (Build-Check).
  */
+import { C } from '@/lib/tokens/colors'
 export const ICON_CONTEXTS = [
   /** Allgemein / Toolbar / Suche — --icon-default (--text-3) */
   'default',
@@ -29,8 +30,8 @@ export function iconCtxClass(ctx: IconContext): string {
 
 /** Token-Referenz für Doku / Audit */
 export const ICON_CONTEXT_TOKENS: Record<IconContext, string> = {
-  default: '--icon-default → --text-3 (#6a746f)',
-  nav: '--icon-nav → --text-2 (#404a45); active → --icon-nav-active',
+  default: `--icon-default → --text-3 (${C.text3})`,
+  nav: `--icon-nav → --text-2 (${C.text2}); active → --icon-nav-active`,
   tab: '--icon-nav; active → --icon-active (--green)',
   sidebar: '--icon-sidebar; in Nav → inherit (weiß/gedämpft)',
   row: '--icon-row → --text-3; hover → --icon-row-hover',

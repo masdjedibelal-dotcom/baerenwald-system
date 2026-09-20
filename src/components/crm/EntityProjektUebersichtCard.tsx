@@ -1,4 +1,7 @@
 'use client'
+import { DateInput } from '@/components/ui/DateInput'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -7,6 +10,7 @@ import { toast } from '@/components/ui/app-toast'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
 import { formatDatum, cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 export type ProjektUebersichtExtraRow = {
   label: string
@@ -105,10 +109,10 @@ export function EntityProjektUebersichtCard({
     startTransition(async () => {
       const r = await onSave(draft)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Details gespeichert')
+      toast.success(TOAST.details_gespeichert)
       setEditing(false)
     })
   }
@@ -130,12 +134,7 @@ export function EntityProjektUebersichtCard({
           editing={can('titel')}
           value={draft.titel.trim() || '—'}
         >
-          <input
-            className="input"
-            value={draft.titel}
-            onChange={(e) => patch({ titel: e.target.value })}
-            autoFocus={can('titel')}
-          />
+          <MockInput value={draft.titel} onChange={(e) => patch({ titel: e.target.value })} autoFocus={can('titel')} />
         </InlineEditField>
 
         {(editing && editableFields.includes('beschreibung')) || draft.beschreibung.trim() ? (
@@ -146,12 +145,7 @@ export function EntityProjektUebersichtCard({
               onApply={(text) => patch({ beschreibung: text })}
               extraHint="Projektbeschreibung (kundensichtbar)."
             >
-              <textarea
-                className="input ta ta--long"
-                rows={14}
-                value={draft.beschreibung}
-                onChange={(e) => patch({ beschreibung: e.target.value })}
-              />
+              <MockTextarea className="ta ta--long" rows={14} value={draft.beschreibung} onChange={(e) => patch({ beschreibung: e.target.value })} />
             </KiAssistFieldLabel>
           ) : (
             <InlineEditField
@@ -180,22 +174,12 @@ export function EntityProjektUebersichtCard({
             <>
               {editableFields.includes('startDatum') ? (
                 <InlineEditField label="Start" editing value={draft.startDatum || '—'}>
-                  <input
-                    className="input"
-                    type="date"
-                    value={draft.startDatum}
-                    onChange={(e) => patch({ startDatum: e.target.value })}
-                  />
+                  <DateInput value={draft.startDatum} onChange={(e) => patch({ startDatum: e.target.value })} />
                 </InlineEditField>
               ) : null}
               {editableFields.includes('endDatum') ? (
                 <InlineEditField label="Ende" editing value={draft.endDatum || '—'}>
-                  <input
-                    className="input"
-                    type="date"
-                    value={draft.endDatum}
-                    onChange={(e) => patch({ endDatum: e.target.value })}
-                  />
+                  <DateInput value={draft.endDatum} onChange={(e) => patch({ endDatum: e.target.value })} />
                 </InlineEditField>
               ) : null}
             </>
@@ -217,9 +201,8 @@ export function EntityProjektUebersichtCard({
             value={draft.istBauprojekt ? 'Ja' : 'Nein'}
           >
             <label className={cn('flex cursor-pointer items-start gap-2 text-[length:var(--fs-text)]')}>
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 rounded border-bw-border"
+              <MockCheckbox
+                className="mt-0.5 h-4 w-4 rounded-card border-bw-border"
                 checked={draft.istBauprojekt}
                 onChange={(e) => patch({ istBauprojekt: e.target.checked })}
               />

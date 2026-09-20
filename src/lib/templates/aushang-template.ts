@@ -3,7 +3,8 @@
  * Kompakt für A4 mit Standard-PDF-Rändern (eine Druckseite).
  */
 
-const GOLD = '#C4A35A'
+import { C } from '@/lib/tokens/colors'
+const GOLD = C.accentGold3
 
 export type AushangHtmlInput = {
   orgName: string
@@ -33,7 +34,7 @@ function hexOr(primary: string | null | undefined, fallback: string): string {
 }
 
 export function buildAushangHtml(p: AushangHtmlInput): string {
-  const primary = hexOr(p.primaryColor, '#363B41')
+  const primary = hexOr(p.primaryColor, C.grayNeutral7)
   const org = (p.orgName || 'Hausverwaltung').trim()
   const sub = (p.orgSub || 'Mieter-Service').trim()
   const objekt = (p.objektTitel || 'Objekt').trim()
@@ -44,12 +45,12 @@ export function buildAushangHtml(p: AushangHtmlInput): string {
   const logoHtml =
     logo && (logo.startsWith('data:') || /^https?:\/\//i.test(logo))
       ? `<img src="${logo.replace(/"/g, '&quot;')}" alt="" style="height:40px;width:auto;max-width:140px;object-fit:contain;display:block;margin-bottom:8px;" />`
-      : `<div style="width:40px;height:40px;border-radius:6px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font-size:14pt;font-weight:700;color:#fff;margin-bottom:8px;">${esc(org.slice(0, 2).toUpperCase())}</div>`
+      : `<div style="width:40px;height:40px;border-radius:6px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font-size:14pt;font-weight:700;color:${C.white};margin-bottom:8px;">${esc(org.slice(0, 2).toUpperCase())}</div>`
 
   const qr = p.qrDataUrl?.trim()
   const qrHtml = qr
-    ? `<img src="${qr.replace(/"/g, '&quot;')}" alt="QR-Code Melde-Link" style="width:128px;height:128px;display:block;background:#fff;padding:6px;border-radius:4px;" />`
-    : `<div style="width:128px;height:128px;background:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8pt;color:#666;text-align:center;padding:8px;">QR-Code</div>`
+    ? `<img src="${qr.replace(/"/g, '&quot;')}" alt="QR-Code Melde-Link" style="width:128px;height:128px;display:block;background:${C.white};padding:6px;border-radius:4px;" />`
+    : `<div style="width:128px;height:128px;background:${C.white};border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8pt;color:${C.grayNeutral3};text-align:center;padding:8px;">QR-Code</div>`
 
   const steps = [
     ['01', 'Scannen', 'Handy-Kamera auf den QR-Code halten — die Meldeseite öffnet sich sofort.'],
@@ -62,11 +63,11 @@ export function buildAushangHtml(p: AushangHtmlInput): string {
   @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 10pt; }
+  body { font-family: Arial, Helvetica, sans-serif; color: ${C.gray900}; font-size: 10pt; }
 </style>
 </head><body>
   <div style="max-height: 270mm; overflow: hidden;">
-    <header style="background:${primary};color:#fff;padding:18px 20px 16px;border-radius:4px;">
+    <header style="background:${primary};color:${C.white};padding:18px 20px 16px;border-radius:4px;">
       ${logoHtml}
       <div style="font-size:9pt;opacity:0.9;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:4px;">${esc(org)} · ${esc(sub)}</div>
       <div style="font-size:8pt;color:${GOLD};font-weight:700;letter-spacing:0.1em;margin-bottom:6px;">MIETERSERVICE</div>
@@ -82,7 +83,7 @@ export function buildAushangHtml(p: AushangHtmlInput): string {
           ${qrHtml}
         </div>
         <div style="margin-top:8px;font-size:8pt;font-weight:700;color:${primary};letter-spacing:0.06em;">EINFACH SCANNEN</div>
-        <div style="margin-top:4px;font-size:7pt;color:#555;max-width:150px;word-break:break-all;line-height:1.3;">${esc(p.meldeUrl)}</div>
+        <div style="margin-top:4px;font-size:7pt;color:${C.grayNeutral4};max-width:150px;word-break:break-all;line-height:1.3;">${esc(p.meldeUrl)}</div>
       </div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:9pt;font-weight:700;color:${primary};letter-spacing:0.08em;margin-bottom:10px;">SO FUNKTIONIERT'S</div>
@@ -92,7 +93,7 @@ export function buildAushangHtml(p: AushangHtmlInput): string {
           <div style="font-size:18pt;font-weight:700;color:${primary};line-height:1;min-width:36px;">${nr}</div>
           <div>
             <div style="font-size:11pt;font-weight:700;margin-bottom:2px;">${esc(title)}</div>
-            <div style="font-size:9pt;line-height:1.4;color:#333;">${esc(body)}</div>
+            <div style="font-size:9pt;line-height:1.4;color:${C.grayNeutral5};">${esc(body)}</div>
           </div>
         </div>`
           )
@@ -100,9 +101,9 @@ export function buildAushangHtml(p: AushangHtmlInput): string {
       </div>
     </div>
 
-    <footer style="padding:12px 4px 0;border-top:1px solid #E5E7EB;font-size:7.5pt;color:#555;line-height:1.4;display:flex;justify-content:space-between;gap:12px;">
+    <footer style="padding:12px 4px 0;border-top:1px solid ${C.gray200};font-size:7.5pt;color:${C.grayNeutral4};line-height:1.4;display:flex;justify-content:space-between;gap:12px;">
       <div><strong>Kein Smartphone?</strong><br/>Melden Sie sich bei Ihrer Hausverwaltung: ${esc(kontakt)}</div>
-      <div style="text-align:right;max-width:200px;">Datenschutz: Angaben nur zur Schadenbearbeitung. Partner: Bärenwald München.</div>
+      <div style="text-align:right;max-width:220px;">Datenschutz: Angaben nur zur Schadenbearbeitung.<br/><span style="font-size:6.5pt;color:${C.grayNeutral3};">Ein Service von Bärenwald</span></div>
     </footer>
   </div>
 </body></html>`

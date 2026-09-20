@@ -1,21 +1,23 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn } from '@/components/mock-ui'
+import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockFormSection, MockInput } from '@/components/mock-ui/MockForm'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { ConfirmPopup, openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
+import { Combobox } from '@/components/ui/Combobox'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockBtn, MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockModal } from '@/components/mock-ui/MockModal'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { LIST } from '@/lib/crm-labels'
 import { exportSimpleCsv } from '@/lib/mock-list-export'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockField, MockFormSection } from '@/components/mock-ui/MockForm'
 import {
   assignExistingEigentuemerToEinheit,
   checkPortalEmailRegistered,
@@ -29,7 +31,6 @@ import {
   updateEinheitBewohner,
   updateObjektEinheit,
 } from '@/app/actions/objektakte-actions'
-import { Select } from '@/components/ui/Select'
 import { EINHEIT_BEWOHNER_ROLLE_LABELS } from '@/lib/objektakte/labels'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import type {
@@ -40,6 +41,7 @@ import type {
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { TOAST } from '@/lib/copy'
 
 const PERSON_COLS = 'minmax(0, 1.4fr) minmax(0, 1.2fr) 44px'
 const EINHEIT_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1fr) 44px'
@@ -356,7 +358,7 @@ export function ObjektEinheitenSection({
       objektLabel,
     })
     if (!inv.ok) {
-      toast.error(inv.message)
+      toast.systemError(inv)
       return
     }
     toast.success(
@@ -387,7 +389,7 @@ export function ObjektEinheitenSection({
           setEinheitErr(r.message)
           return
         }
-        toast.success('Einheit gespeichert')
+        toast.success(TOAST.einheit_gespeichert)
       } else {
         const r = await createObjektEinheit(kundeId, objektId, {
           bezeichnung: label,
@@ -398,7 +400,7 @@ export function ObjektEinheitenSection({
           setEinheitErr(r.message)
           return
         }
-        toast.success('Einheit angelegt')
+        toast.success(TOAST.einheit_angelegt)
         setDetail(r.einheit)
       }
       setEinheitFormOpen(false)
@@ -429,7 +431,7 @@ export function ObjektEinheitenSection({
           setPersonErr(r.message)
           return
         }
-        toast.success('Eigentümer zugeordnet')
+        toast.success(TOAST.eigentuemer_zugeordnet)
         setPersonForm(null)
         onChanged()
         await maybeInvitePortal(r.bewohner.id, 'eigentuemer')
@@ -462,7 +464,7 @@ export function ObjektEinheitenSection({
           setPersonErr(r.message)
           return
         }
-        toast.success('Gespeichert')
+        toast.success(TOAST.gespeichert)
         setPersonForm(null)
         onChanged()
         await maybeInvitePortal(personForm.edit.id, rolle)
@@ -489,32 +491,32 @@ export function ObjektEinheitenSection({
   }
 
   function entfernenPerson(b: EinheitBewohner) {
-    confirmDelete(
-      `„${b.name}“ entfernen?`,
+    openDeleteConfirm(
+      `„“ löschen?`,
       async () => {
         const r = await deleteEinheitBewohner(kundeId, objektId, b.id)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Gelöscht')
+        toast.success(TOAST.geloescht)
         onChanged()
       }
     )
   }
 
-  async function confirmDeleteEinzel() {
+  async function runDeleteEinzel() {
     if (!deleteTarget || deletePending) return
     setDeletePending(true)
     try {
       const r = await deleteObjektEinheit(kundeId, objektId, deleteTarget.id)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       if (detail?.id === deleteTarget.id) setDetail(null)
       setDeleteTarget(null)
-      toast.success('Einheit gelöscht')
+      toast.success(TOAST.einheit_geloescht)
       onChanged()
     } finally {
       setDeletePending(false)
@@ -545,7 +547,7 @@ export function ObjektEinheitenSection({
         const leer = peopleFor(u.id).length === 0
         return {
           Einheit: u.bezeichnung,
-          Details: metaFor(u) || 'Keine Personen',
+          Details: metaFor(u) || 'Ohne Personen',
           Status: leer ? 'leer' : 'belegt',
         }
       })
@@ -637,7 +639,7 @@ export function ObjektEinheitenSection({
         return
       }
       if (r.code === 'already_linked' && r.linkedKundeId) {
-        toast.success('Bereits verknüpft')
+        toast.success(TOAST.bereits_verknuepft)
         setPrivatkundeTarget(null)
         router.push(`/kunden/${r.linkedKundeId}`)
         return
@@ -652,7 +654,7 @@ export function ObjektEinheitenSection({
         })
         return
       }
-      toast.error(r.message)
+      toast.systemError(r)
       setPrivatkundeTarget(null)
     })
   }
@@ -663,10 +665,10 @@ export function ObjektEinheitenSection({
     startTransition(async () => {
       const r = await linkPrivatkundeToBewohner(kundeId, objektId, b.id, existingKundeId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Mit bestehendem Kunden verknüpft')
+      toast.success(TOAST.mit_bestehendem_kunden_verknuepft)
       setPrivatkundeConflict(null)
       onChanged()
       router.push(`/kunden/${r.kundeId}`)
@@ -815,29 +817,25 @@ export function ObjektEinheitenSection({
           onToggle={() => toggleSel(u.id)}
           title={`${u.bezeichnung} auswählen`}
         />
-        <button
-          type="button"
-          className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'}
-          onClick={() => setDetail(u)}
-        >
+        <MockBtn className={isMobile ? 'ap-mobile-card__hit' : 'ap-list__hit'} type="button" onClick={() => setDetail(u)}>
           {isMobile ? (
             <>
               <div className="ap-mobile-card__top">
                 <span className="ap-mobile-card__name">{u.bezeichnung}</span>
                 <MockBadge kind={leer ? 'warten' : 'aktiv'}>{leer ? 'leer' : 'belegt'}</MockBadge>
               </div>
-              <div className="ap-mobile-card__meta">{meta || 'Keine Personen'}</div>
+              <div className="ap-mobile-card__meta">{meta || 'Ohne Personen'}</div>
             </>
           ) : (
             <>
               <span className="ap-list__name-cell">{u.bezeichnung}</span>
-              <span className="ap-list__dim">{meta || 'Keine Personen'}</span>
+              <span className="ap-list__dim">{meta || 'Ohne Personen'}</span>
               <span className="ap-list__dim">
                 <MockBadge kind={leer ? 'warten' : 'aktiv'}>{leer ? 'leer' : 'belegt'}</MockBadge>
               </span>
             </>
           )}
-        </button>
+        </MockBtn>
         <div
           className="row-actions always"
           onClick={(e) => e.stopPropagation()}
@@ -896,32 +894,20 @@ export function ObjektEinheitenSection({
         )}
       </MockCard>
 
-      <MockModal
+      <ConfirmPopup
         open={bulkDeleteOpen}
         onClose={() => {
           if (!bulkDeletePending) setBulkDeleteOpen(false)
         }}
-        icon="trash"
         title={selectedCount === 1 ? 'Einheit löschen?' : `${selectedCount} Einheiten löschen?`}
-        sub="Zugeordnete Personen werden mitgelöscht."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
-              onClick={() => void runBulkDelete()}
-            >
-              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={bulkDeletePending}
+        confirmLabel={bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runBulkDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Zugeordnete Personen werden mitgelöscht.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {bulkDeletePending
             ? 'Bitte warten…'
@@ -929,40 +915,28 @@ export function ObjektEinheitenSection({
               ? `„${selectedRows[0]?.bezeichnung ?? 'Einheit'}“ wird unwiderruflich gelöscht.`
               : `${selectedCount} ausgewählte Einheiten werden unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
-      <MockModal
+      <ConfirmPopup
         open={Boolean(deleteTarget)}
         onClose={() => {
           if (!deletePending) setDeleteTarget(null)
         }}
-        icon="trash"
         title="Einheit löschen?"
-        sub="Zugeordnete Personen werden mitgelöscht."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={deletePending} onClick={() => setDeleteTarget(null)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={deletePending ? undefined : 'trash'}
-              disabled={deletePending}
-              onClick={() => void confirmDeleteEinzel()}
-            >
-              {deletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={deletePending}
+        confirmLabel={deletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runDeleteEinzel()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Zugeordnete Personen werden mitgelöscht.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {deletePending
             ? 'Bitte warten…'
             : `„${deleteTarget?.bezeichnung ?? 'Einheit'}“ wird unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
       {/* Detail: Einheit + Personen */}
       <EditorSheet
@@ -976,13 +950,13 @@ export function ObjektEinheitenSection({
           <div className="space-y-5">
             <div>
               <div className="form-section-h">Einheit</div>
-              <p style={{ margin: '0 0 4px', fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>
+              <p style={{ margin: '0 0 0.25rem', fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}>
                 {[
                   detail.etage?.trim() ? `Etage ${detail.etage.trim()}` : null,
                   detail.wohnflaeche_m2 != null ? `${detail.wohnflaeche_m2} m²` : null,
                 ]
                   .filter(Boolean)
-                  .join(' · ') || 'Keine weiteren Angaben'}
+                  .join(' · ') || 'Ohne weitere Angaben'}
               </p>
               <div className="vgid-chips" style={{ marginTop: 8 }}>
                 <span className="vgid-chip ghost">
@@ -1010,45 +984,29 @@ export function ObjektEinheitenSection({
         dirty={einheitDirty}
         size="md"
         onConfirm={speichernEinheit}
-        confirmDisabled={pending || !bezeichnung.trim()}
+        confirmDisabled={pending}
         confirmBusy={pending}
       >
         <div className="kunde-create">
           {einheitErr ? <p className="kunde-create__err">{einheitErr}</p> : null}
           <MockFormSection title="Einheit" icon="building">
             <MockField label="Bezeichnung" required full>
-              <input
-                className="input"
-                value={bezeichnung}
-                onChange={(e) => {
+              <MockInput value={bezeichnung} onChange={(e) => {
                   setBezeichnung(e.target.value)
                   setEinheitDirty(true)
-                }}
-                placeholder="z. B. WE 12"
-              />
+                }} placeholder="z. B. WE 12" />
             </MockField>
             <MockField label="Etage (optional)" full>
-              <input
-                className="input"
-                value={etage}
-                onChange={(e) => {
+              <MockInput value={etage} onChange={(e) => {
                   setEtage(e.target.value)
                   setEinheitDirty(true)
-                }}
-                placeholder="z. B. 3. OG"
-              />
+                }} placeholder="z. B. 3. OG" />
             </MockField>
             <MockField label="Wohnfläche m² (optional)" full>
-              <input
-                className="input"
-                value={m2}
-                onChange={(e) => {
+              <MockInput value={m2} onChange={(e) => {
                   setM2(e.target.value)
                   setEinheitDirty(true)
-                }}
-                placeholder="z. B. 68"
-                inputMode="decimal"
-              />
+                }} placeholder="z. B. 68" inputMode="decimal" />
             </MockField>
           </MockFormSection>
         </div>
@@ -1069,7 +1027,7 @@ export function ObjektEinheitenSection({
         dirty={personDirty}
         size="md"
         onConfirm={speichernPerson}
-        confirmDisabled={pending || !canSavePerson}
+        confirmDisabled={pending}
         confirmBusy={pending}
         compose
         composeLabel={
@@ -1088,12 +1046,8 @@ export function ObjektEinheitenSection({
           >
             {!personForm?.edit && personForm?.rolle === 'eigentuemer' && objektEigentuemer.length > 0 ? (
               <>
-                <Select
-                  label="Eigentümer"
-                  value={eigentuemerMode === 'new' ? '__new__' : existingEigentuemerId}
-                  options={eigentuemerSelectOptions}
-                  onChange={(e) => {
-                    const v = e.target.value
+                <Combobox label="Eigentümer" options={eigentuemerSelectOptions} value={eigentuemerMode === 'new' ? '__new__' : (existingEigentuemerId ?? '')} placeholder="Auswählen…" onChange={(next) => {
+                    const v = next
                     setPersonDirty(true)
                     if (v === '__new__') {
                       setEigentuemerMode('new')
@@ -1129,8 +1083,7 @@ export function ObjektEinheitenSection({
                       setTelefon(found.telefon ?? '')
                       setSeVerwaltung(found.sondereigentum_verwaltung)
                     }
-                  }}
-                />
+                  }} />
                 <p
                   style={{
                     margin: 0,
@@ -1149,9 +1102,9 @@ export function ObjektEinheitenSection({
               <MockField label="Auswahl" full>
                 <div
                   style={{
-                    border: '1px solid var(--border)',
+                    border: '0.0625remrem solid var(--border)',
                     borderRadius: 10,
-                    padding: '12px 14px',
+                    padding: '0.75rem 0.8750remrem',
                     fontSize: 'var(--fs-text)',
                     color: 'var(--text-2)',
                   }}
@@ -1167,9 +1120,9 @@ export function ObjektEinheitenSection({
                       <>
                         <p style={{ margin: 0, fontWeight: 600, color: 'var(--text)' }}>{sel.name}</p>
                         {sel.email ? (
-                          <p style={{ margin: '4px 0 0' }}>{sel.email}</p>
+                          <p style={{ margin: 'var(--sp-row) 0 0' }}>{sel.email}</p>
                         ) : null}
-                        <p style={{ margin: '4px 0 0', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+                        <p style={{ margin: 'var(--sp-row) 0 0', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
                           Bereits: {sel.einheitLabel}
                         </p>
                       </>
@@ -1180,55 +1133,29 @@ export function ObjektEinheitenSection({
             ) : (
               <>
                 <MockField label="Vorname" required>
-                  <input
-                    className="input"
-                    value={vorname}
-                    onChange={(e) => {
+                  <MockInput value={vorname} onChange={(e) => {
                       setVorname(e.target.value)
                       setPersonDirty(true)
-                    }}
-                    placeholder="Max"
-                    autoComplete="given-name"
-                  />
+                    }} placeholder="Max" autoComplete="given-name" />
                 </MockField>
                 <MockField label="Nachname" required>
-                  <input
-                    className="input"
-                    value={nachname}
-                    onChange={(e) => {
+                  <MockInput value={nachname} onChange={(e) => {
                       setNachname(e.target.value)
                       setPersonDirty(true)
-                    }}
-                    placeholder="Mustermann"
-                    autoComplete="family-name"
-                  />
+                    }} placeholder="Mustermann" autoComplete="family-name" />
                 </MockField>
                 <MockField label="E-Mail (optional)" full>
-                  <input
-                    className="input"
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
+                  <MockInput type="email" value={email} onChange={(e) => {
                       setEmail(e.target.value)
                       setPersonDirty(true)
                       setPortalInvite(false)
-                    }}
-                    placeholder="max@example.de"
-                    autoComplete="email"
-                  />
+                    }} placeholder="max@example.de" autoComplete="email" />
                 </MockField>
                 <MockField label="Telefon (optional)" full>
-                  <input
-                    className="input"
-                    type="tel"
-                    value={telefon}
-                    onChange={(e) => {
+                  <MockInput type="tel" value={telefon} onChange={(e) => {
                       setTelefon(e.target.value)
                       setPersonDirty(true)
-                    }}
-                    placeholder="+49 …"
-                    autoComplete="tel"
-                  />
+                    }} placeholder="+49 …" autoComplete="tel" />
                 </MockField>
               </>
             )}
@@ -1252,8 +1179,7 @@ export function ObjektEinheitenSection({
                   className="flex items-start gap-2"
                   style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}
                 >
-                  <input
-                    type="checkbox"
+                  <MockCheckbox
                     checked={portalInvite}
                     onChange={(e) => {
                       setPortalInvite(e.target.checked)
@@ -1275,8 +1201,7 @@ export function ObjektEinheitenSection({
                   className="flex items-center gap-2"
                   style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)' }}
                 >
-                  <input
-                    type="checkbox"
+                  <MockCheckbox
                     checked={seVerwaltung}
                     onChange={(e) => {
                       setSeVerwaltung(e.target.checked)
@@ -1288,15 +1213,10 @@ export function ObjektEinheitenSection({
               </MockField>
             ) : !assigningExistingEigentuemer ? (
               <MockField label="Miet-Hinweis (optional)" full>
-                <input
-                  className="input"
-                  value={mieteHinweis}
-                  onChange={(e) => {
+                <MockInput value={mieteHinweis} onChange={(e) => {
                     setMieteHinweis(e.target.value)
                     setPersonDirty(true)
-                  }}
-                  placeholder="z. B. seit 2022"
-                />
+                  }} placeholder="z. B. seit 2022" />
               </MockField>
             ) : null}
           </MockFormSection>
@@ -1310,7 +1230,7 @@ export function ObjektEinheitenSection({
         crumb="Einheiten >"
         size="md"
         onConfirm={() => privatkundeTarget && anlegenPrivatkunde(privatkundeTarget)}
-        confirmDisabled={pending || !privatkundeTarget}
+        confirmDisabled={pending}
         confirmBusy={pending}
         compose
         composeLabel="Anlegen"
@@ -1335,17 +1255,15 @@ export function ObjektEinheitenSection({
         ) : null}
       </EditorSheet>
 
-      <EditorSheet
+      <ConfirmPopup
         open={Boolean(privatkundeConflict)}
-        onClose={() => setPrivatkundeConflict(null)}
+        onClose={() => {
+          if (!pending) setPrivatkundeConflict(null)
+        }}
         title="Kunde verknüpfen?"
-        crumb="Einheiten >"
-        size="md"
+        busy={pending}
+        confirmLabel={pending ? 'Wird verknüpft…' : 'Verknüpfen'}
         onConfirm={verknuepfenPrivatkunde}
-        confirmDisabled={pending || !privatkundeConflict}
-        confirmBusy={pending}
-        compose
-        composeLabel="Verknüpfen"
       >
         {privatkundeConflict ? (
           <div className="space-y-3">
@@ -1360,7 +1278,7 @@ export function ObjektEinheitenSection({
             </p>
           </div>
         ) : null}
-      </EditorSheet>
+      </ConfirmPopup>
     </>
   )
 }

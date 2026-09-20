@@ -1,6 +1,9 @@
 'use client'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
-
+import { Combobox } from '@/components/ui/Combobox'
 import { useEffect, useMemo, useState } from 'react'
 import { resolveMockIcon } from '@/lib/mock-icons'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -9,7 +12,6 @@ import {
   Ustg13bHilfeTrigger,
 } from '@/components/rechnungen/Ustg13bHilfeSheet'
 import { Accordion } from '@/components/ui/Accordion'
-import { Select } from '@/components/ui/Select'
 import { toast } from '@/components/ui/app-toast'
 import {
   assignAuftragHandwerkerGewerk,
@@ -23,6 +25,9 @@ import {
 import { cn, formatDatum } from '@/lib/utils'
 import type { HandwerkerZuweisungMailTarget } from '@/components/auftraege/HandwerkerZuweisungMailModal'
 import type { AuftragPosition } from '@/lib/types'
+import { formatEuro } from '@/lib/format/geld-datum'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 const ToolIcon = resolveMockIcon('tool')
 
@@ -85,10 +90,6 @@ function defaultPartnerBetrag(p: HandwerkerReplacePosition): number {
   return lohn + mat
 }
 
-function formatEurInput(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 function parseEurInput(raw: string): number | null {
   const t = raw.trim().replace(/\s/g, '').replace(/\./g, '').replace(',', '.')
   if (!t) return null
@@ -107,7 +108,7 @@ function HandwerkerPickRow({
   onSelect: () => void
 }) {
   return (
-    <label className="flex cursor-pointer gap-3 rounded-lg border border-bw-border p-3 hover:bg-bw-hover">
+    <label className="flex cursor-pointer gap-3 rounded-field border border-bw-border p-3 hover:bg-bw-hover">
       <input
         type="radio"
         name="hw-pick"
@@ -150,6 +151,7 @@ export function HandwerkerZuweisenModal({
   onDone: () => void
   onMailOpen: (mail: HandwerkerZuweisungMailTarget) => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useTransition()
   const [status, setStatus] = useState<AuftragHandwerkerZuweisungStatus>('angefragt')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -204,7 +206,7 @@ export function HandwerkerZuweisenModal({
     const nextBetrag: Record<string, string> = {}
     for (const p of replacePositionen) {
       nextZiel[p.id] = positionIstErledigt(p) ? 'alt' : 'neu'
-      nextBetrag[p.id] = formatEurInput(defaultPartnerBetrag(p))
+      nextBetrag[p.id] = formatEuro(defaultPartnerBetrag(p), { suffix: false })
     }
     setSplitZiel(nextZiel)
     setBetragAlt(nextBetrag)
@@ -245,15 +247,13 @@ export function HandwerkerZuweisenModal({
     return { altN, neuN, altSum }
   }, [isReplace, replacePositionen, splitZiel, betragAlt])
 
-  const canConfirmReplace =
-    Boolean(selectedId) &&
-    !loadingList &&
-    !pending &&
-    (!isReplace || !replacePositionen.length || (splitSummary?.neuN ?? 0) > 0)
-
   function zuweisen() {
     if (!scope || !selectedId) {
-      toast.error('Bitte Handwerker auswählen.')
+      applyFieldErrors({ _form: TOAST.bitte_partner_auswaehlen })
+      return
+    }
+    if (isReplace && replacePositionen.length > 0 && (splitSummary?.neuN ?? 0) === 0) {
+      applyFieldErrors({ _form: 'Bitte mindestens eine Position dem neuen Partner zuordnen.' })
       return
     }
     const hwName = selectedHw?.name ?? 'Partner'
@@ -276,7 +276,7 @@ export function HandwerkerZuweisenModal({
               })
             : undefined
         if (positionMoves && !positionMoves.some((m) => m.ziel === 'neu')) {
-          toast.error('Mindestens eine Leistung dem neuen Partner zuweisen.')
+          toast.error(TOAST.mindestens_eine_leistung_dem_neuen_partner_zuwei)
           return
         }
         const r = await replaceAuftragHandwerkerUndSenden({
@@ -287,7 +287,7 @@ export function HandwerkerZuweisenModal({
           positionMoves,
         })
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           return
         }
         const altN = positionMoves?.filter((m) => m.ziel === 'alt').length ?? 0
@@ -320,10 +320,10 @@ export function HandwerkerZuweisenModal({
               hwRechnungReverseCharge13b,
             })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Handwerker zugewiesen')
+      toast.success(TOAST.partner_zugewiesen)
       onMailOpen({
         handwerkerId: selectedId,
         handwerkerName: hwName,
@@ -337,17 +337,17 @@ export function HandwerkerZuweisenModal({
 
   const title = isReplace
     ? scope?.type === 'position'
-      ? `Handwerker bearbeiten — ${scope.position.leistung_name}`
-      : `Handwerker bearbeiten — ${gewerkName}`
+      ? `Partner bearbeiten — ${scope.position.leistung_name}`
+      : `Partner bearbeiten — ${gewerkName}`
     : scope?.type === 'position'
-      ? `Handwerker zuweisen — ${scope.position.leistung_name}`
+      ? `Partner zuweisen — ${scope.position.leistung_name}`
       : scopeLeistungenCount > 1
-        ? `Handwerker zuweisen — ${scopeLeistungenCount} Leistungen (${gewerkName})`
-        : `Handwerker zuweisen — ${gewerkName}`
+        ? `Partner zuweisen — ${scopeLeistungenCount} Leistungen (${gewerkName})`
+        : `Partner zuweisen — ${gewerkName}`
 
   const leistungenPreview =
     scope?.type === 'gewerk' && scope.leistungen.length > 0 && !isReplace ? (
-      <div className="mb-4 rounded-lg border border-bw-border bg-bw-bg-soft/50 p-3">
+      <div className="mb-4 rounded-card border border-bw-border bg-bw-bg-soft/50 p-3">
         <p className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
           {scope.leistungen.length === 1 ? 'Leistung in der Anfrage' : `${scope.leistungen.length} Leistungen in einer Anfrage`}
         </p>
@@ -372,7 +372,7 @@ export function HandwerkerZuweisenModal({
           {replacePositionen.map((p) => {
             const ziel = splitZiel[p.id] ?? 'neu'
             return (
-              <li key={p.id} className="rounded-lg border border-bw-border p-3">
+              <li key={p.id} className="rounded-card border border-bw-border p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-[length:var(--fs-text)] font-medium text-bw-text">
@@ -383,43 +383,25 @@ export function HandwerkerZuweisenModal({
                     </p>
                   </div>
                   <div className="segment-toggle" role="group" aria-label="Zuordnung">
-                    <button
-                      type="button"
-                      className={cn(
+                    <MockBtn className={cn(
                         'segment-toggle-btn',
                         ziel === 'alt' && 'segment-toggle-btn--active'
-                      )}
-                      onClick={() => setSplitZiel((s) => ({ ...s, [p.id]: 'alt' }))}
-                      disabled={pending}
-                    >
+                      )} type="button" onClick={() => setSplitZiel((s) => ({ ...s, [p.id]: 'alt' }))} disabled={pending}>
                       Beim Alten
-                    </button>
-                    <button
-                      type="button"
-                      className={cn(
+                    </MockBtn>
+                    <MockBtn className={cn(
                         'segment-toggle-btn',
                         ziel === 'neu' && 'segment-toggle-btn--active'
-                      )}
-                      onClick={() => setSplitZiel((s) => ({ ...s, [p.id]: 'neu' }))}
-                      disabled={pending}
-                    >
+                      )} type="button" onClick={() => setSplitZiel((s) => ({ ...s, [p.id]: 'neu' }))} disabled={pending}>
                       An neuen
-                    </button>
+                    </MockBtn>
                   </div>
                 </div>
                 {ziel === 'alt' ? (
                   <label className="mt-2 block text-[length:var(--fs-meta)] text-bw-text-muted">
                     Betrag beim Alten (€)
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      className="mt-1 w-full rounded-md border border-bw-border bg-bw-card px-2 py-1.5 text-[length:var(--fs-text)] text-bw-text tabular-nums"
-                      value={betragAlt[p.id] ?? ''}
-                      onChange={(e) =>
-                        setBetragAlt((b) => ({ ...b, [p.id]: e.target.value }))
-                      }
-                      disabled={pending}
-                    />
+                    <MockInput type="text" inputMode="decimal" className="mt-1 w-full rounded-field border border-bw-border bg-surface px-2 py-1.5 text-[length:var(--fs-text)] text-bw-text tabular-nums" value={betragAlt[p.id] ?? ''} onChange={(e) =>
+                        setBetragAlt((b) => ({ ...b, [p.id]: e.target.value }))} disabled={pending} />
                   </label>
                 ) : null}
               </li>
@@ -429,12 +411,12 @@ export function HandwerkerZuweisenModal({
         {splitSummary ? (
           <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
             {splitSummary.altN > 0
-              ? `${splitSummary.altN} Leistung${splitSummary.altN === 1 ? '' : 'en'} bleiben beim Alten (${formatEurInput(splitSummary.altSum)} €)`
-              : 'Keine Leistung bleibt beim Alten'}
+              ? `${splitSummary.altN} Leistung${splitSummary.altN === 1 ? '' : 'en'} bleiben beim Alten (${formatEuro(splitSummary.altSum)})`
+              : 'Beim Alten bleibt keine Leistung'}
             {' · '}
             {splitSummary.neuN > 0
               ? `${splitSummary.neuN} gehen an den neuen Partner — neu anfragen`
-              : 'Keine Leistung für den neuen Partner'}
+              : 'Neuer Partner ohne Leistung'}
           </p>
         ) : null}
       </div>
@@ -452,19 +434,19 @@ export function HandwerkerZuweisenModal({
               : `Partner für „${gewerkName}“ wählen.`}
       </p>
       {!isReplace && (
-        <Select
-          label="Status nach Zuweisung"
-          name="hw-status"
-          value={status}
-          onChange={(e) => setStatus(e.target.value as AuftragHandwerkerZuweisungStatus)}
-          options={AUFTRAG_HW_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-          className="mb-4"
-        />
+        <MockField label="Status nach Zuweisung">
+          <MockSelect name="hw-status" id="hw-status" value={status} onChange={(e) => setStatus(e.target.value as AuftragHandwerkerZuweisungStatus)} className="mb-4">
+            {AUFTRAG_HW_STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </MockSelect>
+        </MockField>
       )}
       {!isReplace && (
-        <label className="mb-4 flex cursor-pointer items-start gap-2 rounded-lg border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
-          <input
-            type="checkbox"
+        <label className="mb-4 flex cursor-pointer items-start gap-2 rounded-card border border-bw-border bg-bw-hover/30 px-3 py-2.5 text-[length:var(--fs-text)]">
+          <MockCheckbox
             className="mt-0.5"
             checked={hwRechnungReverseCharge13b}
             onChange={(e) => setHwRechnungReverseCharge13b(e.target.checked)}
@@ -494,9 +476,9 @@ export function HandwerkerZuweisenModal({
       )}
       {listErr ? <p className="mb-2 text-[length:var(--fs-text)] text-danger">{listErr}</p> : null}
       {loadingList ? (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Handwerker werden geladen…</p>
+        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Partner werden geladen…</p>
       ) : empfohlen.length === 0 && alle.length === 0 ? (
-        <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine aktiven Handwerker gefunden.</p>
+        <MockEmpty title="Keine aktiven Partner gefunden." />
       ) : (
         <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           <Accordion
@@ -506,7 +488,7 @@ export function HandwerkerZuweisenModal({
           >
             {empfohlen.length === 0 ? (
               <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-                Keine Handwerker mit diesem Gewerk in den Stammdaten — alle Partner unten.
+                Keine Partner mit diesem Gewerk in den Stammdaten — alle Partner unten.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -524,12 +506,12 @@ export function HandwerkerZuweisenModal({
             )}
           </Accordion>
           <Accordion
-            title={`Alle Handwerker${alle.length ? ` · ${alle.length}` : ''}`}
+            title={`Alle Partner${alle.length ? ` · ${alle.length}` : ''}`}
             defaultOpen={empfohlen.length === 0}
             className="hw-pick-accordion"
           >
             {alle.length === 0 ? (
-              <p className="text-[length:var(--fs-text)] text-bw-text-muted">Keine weiteren Handwerker.</p>
+              <MockEmpty title="Keine weiteren Partner." />
             ) : (
               <ul className="space-y-2">
                 {alle.map((h) => (
@@ -564,11 +546,12 @@ export function HandwerkerZuweisenModal({
         title={title}
         context="detail"
         size="lg"
-        onConfirm={canConfirmReplace ? zuweisen : undefined}
+        onConfirm={zuweisen}
         confirmBusy={pending}
-        confirmDisabled={!canConfirmReplace}
+        confirmDisabled={pending}
       >
-        {body}
+      {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+                {body}
       </EditorSheet>
       <Ustg13bHilfeSheet
         open={ustg13bHilfeOpen}

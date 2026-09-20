@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { previewRechnungKundeMail } from '@/app/(dashboard)/rechnungen/actions'
 import { mailIframeSrcDoc } from '@/lib/mail/mail-iframe-srcdoc'
+import { C } from '@/lib/tokens/colors'
 
 /** Echte Kunden-Mail wie beim Versand (gleiche Vorlage wie sendRechnung). */
 export function RechnungWizardMailPreview({
@@ -114,7 +115,7 @@ export function RechnungWizardMailPreview({
           style={{
             padding: 12,
             borderRadius: 8,
-            border: '0.5px solid var(--border)',
+            border: '0.0.3125remrem solid var(--border)',
             background: 'var(--bg-soft)',
             fontSize: 'var(--fs-text)',
             color: 'var(--text-2)',
@@ -128,10 +129,10 @@ export function RechnungWizardMailPreview({
           sandbox="allow-same-origin"
           style={{
             width: '100%',
-            height: 'min(520px, 55vh)',
-            border: '0.5px solid var(--border)',
+            height: 'min(32.5rem, 55vh)',
+            border: '0.0.3125remrem solid var(--border)',
             borderRadius: 8,
-            background: '#fff',
+            background: C.white,
           }}
           srcDoc={mailIframeSrcDoc(
             html,

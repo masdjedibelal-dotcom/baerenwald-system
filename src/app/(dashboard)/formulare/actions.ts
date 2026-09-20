@@ -1,5 +1,6 @@
 'use server'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import {
   deleteFormularTemplate as softDeleteFormularTemplate,
@@ -28,6 +29,7 @@ export async function loadFormularTemplates(): Promise<FormularTemplate[]> {
     .from('formular_templates')
     .select('*, gewerke(id, name, slug)')
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/formulare/actions:formular_templates', error)
 
   if (error || !data) return []
   return (data as FormularTemplate[]).map((row) => ({
@@ -44,7 +46,8 @@ export async function loadFormularTemplatesMitNutzung(): Promise<FormularListeZe
   if (!templates.length) return []
 
   const supabase = createClient()
-  const { data } = await supabase.from('formular_eintraege').select('template_id')
+  const { data, error } = await supabase.from('formular_eintraege').select('template_id')
+  if (error) logDbError('app/formulare/actions:formular_eintraege', error)
   const counts = new Map<string, number>()
   for (const r of data ?? []) {
     const id = (r as { template_id?: string | null }).template_id?.trim()
@@ -78,6 +81,7 @@ export async function loadFormularTemplate(id: string): Promise<FormularTemplate
     .select('*, gewerke(id, name, slug)')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/formulare/actions:formular_templates', error)
 
   if (error || !data) return null
   const row = data as FormularTemplate & { felder: unknown }

@@ -1,19 +1,19 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockPopover } from '@/components/mock-ui/MockPopover'
+import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
-import { ArrowLeft, LogOut } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
 import { TopBarSearch } from '@/components/layout/TopBarSearch'
 import { CrmNotificationsBell } from '@/components/notifications/CrmNotificationsBell'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
-import { confirmAction } from '@/components/ui/confirm-action'
 import { ROUTE_META, SECTION_LABELS, SUB_LABELS } from '@/lib/nav-config'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockPopover } from '@/components/mock-ui/MockPopover'
 import { cn } from '@/lib/utils'
 
 interface TopBarProps {
@@ -131,7 +131,7 @@ export function TopBar({ user }: TopBarProps) {
   const [logoutLoading, setLogoutLoading] = useState(false)
 
   async function handleLogout() {
-    confirmAction({
+    openActionConfirm({
       title: 'Wirklich abmelden?',
       body: 'Du wirst aus dem CRM ausgeloggt.',
       confirmLabel: 'Abmelden',
@@ -165,7 +165,7 @@ export function TopBar({ user }: TopBarProps) {
           <div className={cn('topbar-title', !title && !parents.length && 'topbar-title--empty')}>
             {parentHref ? (
               <Link href={parentHref} aria-label="Zurück" className="topbar-back">
-                <ArrowLeft className="h-5 w-5" />
+                <MockIcon n="arrow-left" ctx="default" className="h-5 w-5" />
               </Link>
             ) : null}
             {parents.map((p) =>
@@ -188,37 +188,22 @@ export function TopBar({ user }: TopBarProps) {
 
           <div className="topbar-actions">
             {cta ? (
-              <button type="button" onClick={() => router.push(cta.href)} className="btn primary sm topbar-cta">
+              <MockBtn kind="primary" sm className="topbar-cta" type="button" onClick={() => router.push(cta.href)}>
                 <MockIcon ctx="btn" n="plus" size={14} />
                 <span className="topbar-cta-label">{cta.label}</span>
-              </button>
+              </MockBtn>
             ) : null}
 
-            <button
-              type="button"
-              className={cn('btn sm btn-assistent', assistentOpen && 'is-open')}
-              aria-label="KI-Assistent öffnen"
-              aria-pressed={assistentOpen}
-              onClick={() => toggleAssistent()}
-              title="KI-Assistent"
-            >
+            <MockBtn sm className={cn('btn-assistent', assistentOpen && 'is-open')} type="button" aria-label="KI-Assistent öffnen" aria-pressed={assistentOpen} onClick={() => toggleAssistent()} title="KI-Assistent">
               <MockIcon ctx="btn" n="sparkles" size={14} />
               <span className="topbar-cta-label">KI</span>
-            </button>
+            </MockBtn>
 
             <CrmNotificationsBell />
 
-            <button
-              ref={avatarRef}
-              type="button"
-              className={cn('topbar-avatar', menuOpen && 'is-open')}
-              aria-label="Konto"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
+            <MockBtn className={cn('topbar-avatar', menuOpen && 'is-open')} ref={avatarRef} type="button" aria-label="Konto" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>
               <BrandAvatar size={28} aria-hidden />
-            </button>
+            </MockBtn>
 
             <MockPopover
               open={menuOpen}
@@ -235,22 +220,17 @@ export function TopBar({ user }: TopBarProps) {
                 </div>
               </div>
               <div className="pop-sep" />
-              <button type="button" className="pop-item" onClick={goEinstellungen}>
+              <MockBtn className="pop-item" type="button" onClick={goEinstellungen}>
                 <MockIcon ctx="btn" n="settings" size={16} />
                 <span>Einstellungen</span>
-              </button>
+              </MockBtn>
               <div className="pop-sep" />
-              <button
-                type="button"
-                className="pop-item danger"
-                disabled={logoutLoading}
-                onClick={() => {
+              <MockBtn kind="danger" className="pop-item" type="button" disabled={logoutLoading} onClick={() => {
                   void handleLogout()
-                }}
-              >
-                <LogOut className="h-4 w-4" aria-hidden />
+                }}>
+                <MockIcon n="arrow-left" ctx="default" className="h-4 w-4" aria-hidden />
                 <span>{logoutLoading ? 'Abmelden…' : 'Abmelden'}</span>
-              </button>
+              </MockBtn>
             </MockPopover>
           </div>
         </header>

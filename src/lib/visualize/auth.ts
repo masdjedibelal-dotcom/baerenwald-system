@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 
 export async function requireCrmAngebotAccess(
@@ -18,6 +19,7 @@ export async function requireCrmAngebotAccess(
   if (!user?.id) return { ok: false, status: 401, message: 'Nicht angemeldet' }
 
   const { data: angebot, error } = await supabase.from('angebote').select('id').eq('id', id).maybeSingle()
+  if (error) logDbError('lib/visualize/auth:angebote', error)
   if (error) return { ok: false, status: 500, message: error.message }
   if (!angebot) return { ok: false, status: 404, message: 'Angebot nicht gefunden' }
 

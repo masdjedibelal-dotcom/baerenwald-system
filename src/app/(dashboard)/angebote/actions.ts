@@ -1,9 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAngebotList, revalidateAngebotNeu, revalidateAuftragDetail, revalidateEinstellungenPath, revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomBytes } from 'crypto'
-import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -33,7 +36,7 @@ import {
   defaultAngebotZahlungsbedingungen,
   resolveAngebotKundeTyp,
 } from '@/lib/angebote/angebot-wizard-types'
-import { getPublicAppUrl } from '@/lib/utils'
+import { formatDatum, getPublicAppUrl } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
@@ -115,6 +118,14 @@ import { parseRechtshinweiseFromWizardMeta } from '@/lib/angebote/angebot-rechts
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { planHvFreigabeWrite, writeLeadStatus } from '@/lib/status/write-lead-status'
+import {
+  planAngebotStatusWrite,
+  writeAngebotStatus,
+  writeAngebotStatusEinfach,
+} from '@/lib/status/write-angebot-status'
+import { writeAngebotHandwerkerStatus } from '@/lib/status/write-angebot-handwerker-status'
+import { formatEuro } from '@/lib/format/geld-datum'
 
 function angebotMailSummen(
   positionen: AngebotPosition[],
@@ -168,9 +179,7 @@ const ANGEBOT_DETAIL_SELECT = `
     `
 
 async function loadAngebotDetail(id: string): Promise<AngebotDetail | null> {
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db.from('angebote').select(ANGEBOT_DETAIL_SELECT).eq('id', id).maybeSingle()
-  )
+  const { data, error } = await (() => { const db = createClient(); return db.from('angebote').select(ANGEBOT_DETAIL_SELECT).eq('id', id).maybeSingle() })()
 
   if (error || !data) return null
   const row = data as AngebotDetail
@@ -205,6 +214,7 @@ export async function loadAngebotDetailAdmin(id: string): Promise<AngebotDetail 
     )
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/angebote/actions:angebote', error)
 
   if (error || !data) return null
   const row = data as AngebotDetail
@@ -223,16 +233,14 @@ export async function searchKunden(q: string) {
   if (term.length < 2) return { kunden: [] as Kunde[] }
   const esc = term.replace(/%/g, '\\%').replace(/_/g, '\\_')
   const pattern = `%${esc}%`
-  const { data } = await withCrmReadFallback(async (db) =>
-    db
+  const { data } = await (() => { const db = createClient(); return db
       .from('kunden')
       .select('id, name, vorname, nachname, typ, email, telefon, plz, ort, strasse, hausnummer, adresse, notizen, created_at')
       .or(
         `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},email.ilike.${pattern},ort.ilike.${pattern}`
       )
       .order('name')
-      .limit(12)
-  )
+      .limit(12) })()
 
   return { kunden: (data ?? []) as Kunde[] }
 }
@@ -241,15 +249,13 @@ export async function searchKunden(q: string) {
 export async function getKundeKurz(id: string): Promise<Kunde | null> {
   const kid = id.trim()
   if (!kid) return null
-  const { data } = await withCrmReadFallback(async (db) =>
-    db
+  const { data } = await (() => { const db = createClient(); return db
       .from('kunden')
       .select(
         'id, name, vorname, nachname, typ, email, telefon, plz, ort, strasse, hausnummer, adresse, notizen, created_at'
       )
       .eq('id', kid)
-      .maybeSingle()
-  )
+      .maybeSingle() })()
   return (data as Kunde | null) ?? null
 }
 
@@ -319,8 +325,7 @@ export async function createKundeQuick(input: {
     }
   }
 
-  const { data, error } = await withCrmReadFallback(async (db) =>
-    db
+  const { data, error } = await (() => { const db = createClient(); return db
       .from('kunden')
       .insert({
         name: displayName || [v, n].filter(Boolean).join(' ') || 'Privatkunde',
@@ -335,8 +340,7 @@ export async function createKundeQuick(input: {
         notizen: null,
       })
       .select('id')
-      .single()
-  )
+      .single() })()
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Fehler' }
   return { ok: true, id: (data as { id: string }).id, via: 'kunde' }
@@ -386,16 +390,18 @@ async function zahlungsbedingungenFuerSpeichern(
 
   let kundeTyp: string | null = null
   if (input.kunde_id) {
-    const { data } = await supabase.from('kunden').select('typ').eq('id', input.kunde_id).maybeSingle()
+    const { data, error } = await supabase.from('kunden').select('typ').eq('id', input.kunde_id).maybeSingle()
+    if (error) logDbError('app/angebote/actions:kunden', error)
     kundeTyp = (data as { typ?: string | null } | null)?.typ ?? null
   }
   let leadKundentyp: string | null = null
   if (input.lead_id) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('leads')
       .select('kundentyp')
       .eq('id', input.lead_id)
       .maybeSingle()
+    if (error) logDbError('app/angebote/actions:leads', error)
     leadKundentyp = (data as { kundentyp?: string | null } | null)?.kundentyp ?? null
   }
   return defaultAngebotZahlungsbedingungen(resolveAngebotKundeTyp(kundeTyp, leadKundentyp))
@@ -430,33 +436,29 @@ async function schliesseAndereOffeneAnfragenOhneAngebot(
   const kid = kundeId?.trim()
   if (!kid) return
 
-  const { data: siblings } = await supabase
+  const { data: siblings, error } = await supabase
     .from('leads')
     .select('id, status, angebote(id)')
     .or(`kunde_id.eq.${kid},auftraggeber_kunde_id.eq.${kid}`)
     .in('status', [...LEAD_STATUS_VOR_ANGEBOT])
     .neq('id', keepLeadId)
     .limit(30)
+  if (error) logDbError('app/angebote/actions:leads', error)
 
-  const now = new Date().toISOString()
   for (const row of siblings ?? []) {
     const angs = row.angebote
     const hasAng = Array.isArray(angs) ? angs.length > 0 : Boolean(angs)
     if (hasAng) continue
-    await supabase
-      .from('leads')
-      .update({
-        status: 'abgebrochen',
-        updated_at: now,
-      })
-      .eq('id', row.id as string)
-    await supabase.from('leads_status_history').insert({
+    const { error: __dbErr1 } = await writeLeadStatus(supabase, row.id as string, 'abgebrochen')
+    if (__dbErr1) logDbError('app/angebote/actions:leads', __dbErr1)
+    const { error: __dbErr2 } = await supabase.from('leads_status_history').insert({
       lead_id: row.id as string,
       status_alt: row.status,
       status_neu: 'abgebrochen',
       user_id: null,
       notiz: 'Automatisch geschlossen — Angebot über andere Anfrage desselben Kunden.',
     })
+    if (__dbErr2) logDbError('app/angebote/actions:leads_status_history', __dbErr2)
   }
 }
 
@@ -518,6 +520,7 @@ export async function createAngebot(
     })
     .select('id')
     .single()
+  if (error) logDbError('app/angebote/actions:angebote', error)
 
   if (error || !row) {
     return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
@@ -536,7 +539,7 @@ export async function createAngebot(
   for (const z of hwZu) {
     if (!z.handwerker_id || !z.gewerk_id) continue
     if (lvHwIds.has(z.handwerker_id)) continue
-    await supabase.from('angebot_handwerker').insert({
+    const { error: __dbErr3 } = await supabase.from('angebot_handwerker').insert({
       angebot_id: id,
       gewerk_id: z.gewerk_id,
       handwerker_id: z.handwerker_id,
@@ -544,6 +547,7 @@ export async function createAngebot(
       aufgabe_notiz: z.aufgabe_notiz?.trim() || null,
       hw_rechnung_reverse_charge_13b: false,
     })
+    if (__dbErr3) logDbError('app/angebote/actions:angebot_handwerker', __dbErr3)
   }
 
   if (input.lead_id) {
@@ -551,7 +555,7 @@ export async function createAngebot(
     await markLeadAngeboteErsetzt(supabase, input.lead_id, id)
 
     if (input.ist_wiederkehrend !== undefined) {
-      await supabase
+      const { error: __dbErr4 } = await supabase
         .from('leads')
         .update({
           ist_wiederkehrend: input.ist_wiederkehrend === true,
@@ -561,31 +565,31 @@ export async function createAngebot(
               : null,
         })
         .eq('id', input.lead_id)
+      if (__dbErr4) logDbError('app/angebote/actions:leads', __dbErr4)
     }
 
     const syncLead = await syncAngebotLeistungenToLead(input.lead_id, positionen)
     if (!syncLead.ok) return syncLead
 
-    const { data: leadRow } = await supabase
+    const { data: leadRow, error } = await supabase
       .from('leads')
       .select('status')
       .eq('id', input.lead_id)
       .maybeSingle()
+    if (error) logDbError('app/angebote/actions:leads', error)
     const ls = (leadRow?.status ?? 'neu') as LeadStatus
     if (leadStatusVorAngebot(ls)) {
       if (opts?.asSystem) {
-        const now = new Date().toISOString()
-        await supabaseAdmin
-          .from('leads')
-          .update({ status: 'angebot', updated_at: now })
-          .eq('id', input.lead_id)
-        await supabaseAdmin.from('leads_status_history').insert({
+        const { error: __dbErr5 } = await writeLeadStatus(supabaseAdmin, input.lead_id, 'angebot')
+        if (__dbErr5) logDbError('app/angebote/actions:leads', __dbErr5)
+        const { error: __dbErr6 } = await supabaseAdmin.from('leads_status_history').insert({
           lead_id: input.lead_id,
           status_alt: ls,
           status_neu: 'angebot',
           user_id: null,
           notiz: 'Angebot erstellt',
         })
+        if (__dbErr6) logDbError('app/angebote/actions:leads_status_history', __dbErr6)
       } else {
         const leadUpd = await updateLeadStatus(input.lead_id, 'angebot', 'Angebot erstellt')
         if (!leadUpd.ok) return leadUpd
@@ -596,8 +600,8 @@ export async function createAngebot(
   }
 
   if (!opts?.asSystem) {
-    revalidatePath('/angebote')
-    if (input.lead_id) revalidatePath(`/anfragen/${input.lead_id}`)
+    revalidateAngebotList()
+    if (input.lead_id) revalidateLeadDetail(input.lead_id)
   }
   return { ok: true, id }
 }
@@ -613,6 +617,7 @@ export async function updateAngebotProjektFelder(
     .select('id, status')
     .eq('id', angebotId)
     .maybeSingle()
+  if (loadErr) logDbError('app/angebote/actions:angebote', loadErr)
 
   if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
   if (!angebotDarfImWizardBearbeitetWerden(current.status)) {
@@ -629,10 +634,15 @@ export async function updateAngebotProjektFelder(
     db.projektbeschreibung = patch.projektbeschreibung?.trim() || null
   }
 
-  const { error } = await supabase.from('angebote').update(db).eq('id', angebotId)
-  if (error) return { ok: false, message: error.message }
+  const { error: error2 } = await supabase.from('angebote').update(db).eq('id', angebotId)
+  if (error2) logDbError('app/angebote/actions:angebote', error2)
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateAngebotDetail(angebotId)
+=======
   revalidatePath(`/angebote/${angebotId}`)
   revalidatePath('/angebote')
+>>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -652,6 +662,7 @@ export async function updateAngebot(
     .select('id, status, varianten, gesendet_kunde_at, status_einfach, lead_id')
     .eq('id', angebotId)
     .maybeSingle()
+  if (loadErr) logDbError('app/angebote/actions:angebote', loadErr)
 
   if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
   if (!angebotStatusErlaubtImWizard(current.status, opts)) {
@@ -719,7 +730,7 @@ export async function updateAngebot(
     (await resolveVertragsKundeIdForLead(supabase, leadIdForKunde, input.kunde_id)) ??
     input.kunde_id
 
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('angebote')
     .update({
       lead_id: input.lead_id,
@@ -759,11 +770,12 @@ export async function updateAngebot(
       ...docPatch,
     })
     .eq('id', angebotId)
+  if (error2) logDbError('app/angebote/actions:angebote', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
 
   if (input.ist_wiederkehrend !== undefined && leadIdForKunde) {
-    await supabase
+    const { error: __dbErr7 } = await supabase
       .from('leads')
       .update({
         ist_wiederkehrend: input.ist_wiederkehrend === true,
@@ -773,6 +785,7 @@ export async function updateAngebot(
             : null,
       })
       .eq('id', leadIdForKunde)
+    if (__dbErr7) logDbError('app/angebote/actions:leads', __dbErr7)
   }
 
   const warBereitsGesendet = Boolean(
@@ -782,26 +795,25 @@ export async function updateAngebot(
   )
   const leadId = input.lead_id ?? (current.lead_id as string | null)
   if (leadId) {
-    const { data: leadRow } = await supabase
+    const { data: leadRow, error } = await supabase
       .from('leads')
       .select('status')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('app/angebote/actions:leads', error)
     const ls = (leadRow?.status ?? 'neu') as LeadStatus
     if (leadStatusVorAngebot(ls)) {
       if (opts?.asSystem) {
-        const now = new Date().toISOString()
-        await supabaseAdmin
-          .from('leads')
-          .update({ status: 'angebot', updated_at: now })
-          .eq('id', leadId)
-        await supabaseAdmin.from('leads_status_history').insert({
+        const { error: __dbErr8 } = await writeLeadStatus(supabaseAdmin, leadId, 'angebot')
+        if (__dbErr8) logDbError('app/angebote/actions:leads', __dbErr8)
+        const { error: __dbErr9 } = await supabaseAdmin.from('leads_status_history').insert({
           lead_id: leadId,
           status_alt: ls,
           status_neu: 'angebot',
           user_id: null,
           notiz: 'Angebot gespeichert',
         })
+        if (__dbErr9) logDbError('app/angebote/actions:leads_status_history', __dbErr9)
       } else {
         const leadUpd = await updateLeadStatus(leadId, 'angebot', 'Angebot gespeichert')
         if (!leadUpd.ok) return leadUpd
@@ -819,16 +831,17 @@ export async function updateAngebot(
       erstellt_von: user?.id ?? null,
     })
     if (!tl.ok) console.warn('[updateAngebot] timeline:', tl.message)
-    revalidatePath(`/anfragen/${leadId}`)
+    revalidateLeadDetail(leadId)
   }
 
   const variantenForHw =
     input.varianten !== undefined ? variantenNorm : parseVariantenRow(current.varianten)
 
-  const { data: prevHw } = await supabase
+  const { data: prevHw, error: error3 } = await supabase
     .from('angebot_handwerker')
     .select('gewerk_id, handwerker_id, status, aufgabe_notiz')
     .eq('angebot_id', angebotId)
+  if (error3) logDbError('app/angebote/actions:angebot_handwerker', error3)
 
   const prevHwMap = new Map<
     string,
@@ -882,9 +895,8 @@ export async function updateAngebot(
   }
 
   if (!opts?.asSystem) {
-    revalidatePath('/angebote')
-    revalidatePath(`/angebote/${angebotId}`)
-    if (leadId) revalidatePath(`/anfragen/${leadId}`)
+    revalidateAngebotDetail(angebotId)
+    if (leadId) revalidateLeadDetail(leadId)
   }
   return { ok: true }
 }
@@ -898,8 +910,9 @@ export async function updateAngebotNotizen(
     .from('angebote')
     .update({ notizen, updated_at: new Date().toISOString() })
     .eq('id', angebotId)
+  if (error) logDbError('app/angebote/actions:angebote', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath(`/angebote/${angebotId}`)
+  revalidateAngebotDetail(angebotId)
   return { ok: true }
 }
 
@@ -921,14 +934,18 @@ export async function setAngebotStatus(
   if (status === 'gesendet_handwerker') extra.gesendet_handwerker_at = now
   if (status === 'gesendet_kunde') extra.gesendet_kunde_at = now
 
+<<<<<<< Updated upstream
+  const { error } = await writeAngebotStatus(supabase, angebotId, status, extra)
+=======
   const { error } = await supabase
     .from('angebote')
     .update({ status, updated_at: now, ...extra })
     .eq('id', angebotId)
+>>>>>>> Stashed changes
+  if (error) logDbError('app/angebote/actions:angebote', error)
   if (error) return { ok: false, message: error.message }
   if (!opts?.asSystem) {
-    revalidatePath(`/angebote/${angebotId}`)
-    revalidatePath('/angebote')
+    revalidateAngebotDetail(angebotId)
   }
   return { ok: true }
 }
@@ -967,6 +984,7 @@ export async function persistPdfForAngebot(
       contentType: 'application/pdf',
       upsert: true,
     })
+  if (upErr) logDbError('app/angebote/actions:angebote-pdfs', upErr)
 
   if (upErr) {
     const raw = upErr.message ?? ''
@@ -1019,6 +1037,7 @@ export async function persistPdfForAngebot(
     .from('angebote')
     .update({ ...pdfUpdateBase, ...pdfUpdatePromote })
     .eq('id', angebotId)
+  if (dbErr) logDbError('app/angebote/actions:angebote', dbErr)
 
   if (dbErr && /positionen_portal/i.test(dbErr.message) && shouldPromote) {
     const { positionen_portal: _drop, ...promoteWithoutPortal } = pdfUpdatePromote as {
@@ -1050,7 +1069,7 @@ export async function persistPdfForAngebot(
     }
   }
 
-  if (!opts?.skipRevalidate) revalidatePath(`/angebote/${angebotId}`)
+  if (!opts?.skipRevalidate) revalidateAngebotDetail(angebotId)
   return { ok: true, buffer, publicUrl }
 }
 
@@ -1096,6 +1115,7 @@ export async function getHandwerkerEinreichungPdfUrl(
       .select('hw_rechnung_pdf_url')
       .eq('id', zuweisungId.trim())
       .maybeSingle()
+    if (error) logDbError('app/angebote/actions:angebot_handwerker', error)
     const stored = (row as { hw_rechnung_pdf_url?: string | null } | null)?.hw_rechnung_pdf_url
     if (error || !stored) return { ok: false, message: 'Keine Rechnung hinterlegt' }
     const url = await signedHandwerkerUploadUrl(String(stored))
@@ -1108,6 +1128,7 @@ export async function getHandwerkerEinreichungPdfUrl(
     .select('hw_angebot_pdf_url, hw_angebot_anhang_urls')
     .eq('id', zuweisungId.trim())
     .maybeSingle()
+  if (error) logDbError('app/angebote/actions:angebot_handwerker', error)
 
   if (error || !row) return { ok: false, message: 'Kein PDF hinterlegt' }
 
@@ -1153,10 +1174,11 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
     .eq('id', zuweisungId)
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (zErr) logDbError('app/angebote/actions:angebot_handwerker', zErr)
 
   if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
   if (!zu.hw_eingereicht_at?.trim()) {
-    return { ok: false, message: 'Noch keine Einreichung vom Handwerker' }
+    return { ok: false, message: 'Noch keine Einreichung vom Partner' }
   }
 
   const konditionen = parseHwKonditionen(zu.hw_konditionen)
@@ -1173,6 +1195,7 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
     .select('positionen')
     .eq('id', angebotId)
     .maybeSingle()
+  if (aErr) logDbError('app/angebote/actions:angebote', aErr)
 
   if (aErr || !angebotRow) return { ok: false, message: 'Angebot nicht gefunden' }
 
@@ -1203,6 +1226,7 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
     .from('angebote')
     .update({ positionen: angebotPos })
     .eq('id', angebotId)
+  if (posSaveErr) logDbError('app/angebote/actions:angebote', posSaveErr)
 
   if (posSaveErr) return { ok: false, message: posSaveErr.message }
 
@@ -1213,17 +1237,19 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
   const now = new Date().toISOString()
   let auftragAktualisiert = 0
 
-  const { data: auftrag } = await supabase
+  const { data: auftrag, error: error4 } = await supabase
     .from('auftraege')
     .select('id')
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (error4) logDbError('app/angebote/actions:auftraege', error4)
 
   if (auftrag?.id) {
     const { data: auftragPos, error: apErr } = await supabase
       .from('auftrag_positionen')
       .select('id, leistung_name, gewerk_slug, gewerk_name')
       .eq('auftrag_id', auftrag.id)
+    if (apErr) logDbError('app/angebote/actions:auftrag_positionen', apErr)
 
     if (apErr) return { ok: false, message: apErr.message }
 
@@ -1242,6 +1268,7 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
           .from('auftrag_positionen')
           .update({ preis_partner: kp.hw_netto })
           .eq('id', auftragPosId)
+        if (upErr) logDbError('app/angebote/actions:auftrag_positionen', upErr)
         if (!upErr) auftragAktualisiert++
       }
     } else if (auftragPos?.length) {
@@ -1271,31 +1298,32 @@ export async function uebernehmeHandwerkerEinreichungEk(input: {
           .from('auftrag_positionen')
           .update({ preis_partner: zeile })
           .eq('id', p.id as string)
+        if (upErr) logDbError('app/angebote/actions:auftrag_positionen', upErr)
         if (!upErr) auftragAktualisiert++
       }
     }
 
-    revalidatePath(`/auftraege/${auftrag.id}`)
-    revalidatePath('/auftraege')
+    revalidateAuftragDetail(auftrag.id)
   }
 
-  await supabaseAdmin
+  const { error: __dbErr10 } = await supabaseAdmin
     .from('angebot_handwerker')
     .update({
       hw_status: konditionen?.positionen.length ? 'bestaetigt' : 'uebernommen',
       hw_crm_antwort_at: now,
     })
     .eq('id', zu.id as string)
+  if (__dbErr10) logDbError('app/angebote/actions:angebot_handwerker', __dbErr10)
 
   if (auftrag?.id && zu.handwerker_id) {
     provisionProjektvertragFireAndForget(String(auftrag.id), String(zu.handwerker_id))
   }
 
-  revalidatePath(`/angebote/${angebotId}`)
+  revalidateAngebotDetail(angebotId)
   return { ok: true, aktualisiert: Math.max(angebotAktualisiert, auftragAktualisiert) }
 }
 
-/** CRM: Handwerker-Angebot manuell erfassen (z. B. per E-Mail/WhatsApp). */
+/** CRM: Partner-Angebot manuell erfassen (z. B. per E-Mail/WhatsApp). */
 export async function crmManuelleHandwerkerEinreichung(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -1328,6 +1356,7 @@ export async function crmManuelleHandwerkerEinreichung(
     .eq('id', zuweisungId)
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (zErr) logDbError('app/angebote/actions:angebot_handwerker', zErr)
 
   if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
   if (zu.hw_eingereicht_at?.trim()) {
@@ -1338,7 +1367,7 @@ export async function crmManuelleHandwerkerEinreichung(
   }
 
   const handwerkerId = String(zu.handwerker_id ?? '').trim()
-  if (!handwerkerId) return { ok: false, message: 'Handwerker fehlt.' }
+  if (!handwerkerId) return { ok: false, message: 'Partner fehlt.' }
 
   const upload = await uploadHwAngebotPdfFromCrm({
     handwerkerId,
@@ -1348,6 +1377,17 @@ export async function crmManuelleHandwerkerEinreichung(
   if (!upload.ok) return { ok: false, message: upload.message }
 
   const now = new Date().toISOString()
+<<<<<<< Updated upstream
+  const { error: upErr } = await writeAngebotHandwerkerStatus(supabaseAdmin, zuweisungId, 'akzeptiert', {
+    antwort_at: now,
+    hw_preis_netto: preisNetto,
+    hw_preis_brutto: preisBrutto,
+    hw_angebot_pdf_url: upload.path,
+    hw_eingereicht_at: now,
+    hw_status: 'eingereicht',
+    hw_notiz: notiz,
+  })
+=======
   const { error: upErr } = await supabaseAdmin
     .from('angebot_handwerker')
     .update({
@@ -1361,15 +1401,17 @@ export async function crmManuelleHandwerkerEinreichung(
       hw_notiz: notiz,
     })
     .eq('id', zuweisungId)
+>>>>>>> Stashed changes
+  if (upErr) logDbError('app/angebote/actions:angebot_handwerker', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 
-  revalidatePath(`/angebote/${angebotId}`)
+  revalidateAngebotDetail(angebotId)
   return { ok: true }
 }
 
 /**
- * CRM: Handwerker-Anfrage löschen (Zuweisung entfernen).
+ * CRM: Partner-Anfrage löschen (Zuweisung entfernen).
  * Erlaubt bei ausstehend/angefragt/abgelehnt/ersetzt — nicht bei Einreichung oder Übernahme.
  */
 export async function loescheHandwerkerAnfrage(input: {
@@ -1405,6 +1447,7 @@ export async function loescheHandwerkerAnfrage(input: {
     .eq('id', zuweisungId)
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (zErr) logDbError('app/angebote/actions:angebot_handwerker', zErr)
 
   if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
 
@@ -1426,6 +1469,7 @@ export async function loescheHandwerkerAnfrage(input: {
     .delete()
     .eq('id', zuweisungId)
     .eq('angebot_id', angebotId)
+  if (delErr) logDbError('app/angebote/actions:angebot_handwerker', delErr)
 
   if (delErr) return { ok: false, message: delErr.message }
 
@@ -1440,19 +1484,18 @@ export async function loescheHandwerkerAnfrage(input: {
       typ: 'handwerker',
       titel: (zu as { ohne_lv?: boolean | null }).ohne_lv
         ? 'LV-Anfrage gelöscht'
-        : 'Handwerker-Anfrage gelöscht',
-      beschreibung: `${(hw as { name?: string } | null)?.name?.trim() || 'Handwerker'} · ${(gw as { name?: string } | null)?.name?.trim() || 'Gewerk'}`,
+        : 'Partner-Anfrage gelöscht',
+      beschreibung: `${(hw as { name?: string } | null)?.name?.trim() || 'Partner'} · ${(gw as { name?: string } | null)?.name?.trim() || 'Gewerk'}`,
     })
   }
 
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
-  if (leadId) revalidatePath(`/anfragen/${leadId}`)
+  revalidateAngebotDetail(angebotId)
+  if (leadId) revalidateLeadDetail(leadId)
   return { ok: true }
 }
 
 /**
- * CRM: Handwerker-Anfrage im Namen des Partners annehmen (kanonisch status → akzeptiert).
+ * CRM: Partner-Anfrage im Namen des Partners annehmen (kanonisch status → akzeptiert).
  * Parallele Anfragen zum selben Gewerk → ersetzt; Timeline + Intern-Mail wie Token/Portal.
  */
 export async function crmBestaetigeHandwerkerAnfrage(input: {
@@ -1482,13 +1525,12 @@ export async function crmBestaetigeHandwerkerAnfrage(input: {
   })
   if (!r.ok) return { ok: false, message: r.message }
 
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
+  revalidateAngebotDetail(angebotId)
   return { ok: true }
 }
 
 /**
- * CRM-Bestätigung: vereinbarten Preis übernehmen (Einkaufspreis + ggf. Auftrag), Mail an Handwerker.
+ * CRM-Bestätigung: vereinbarten Preis übernehmen (Einkaufspreis + ggf. Auftrag), Mail an Partner.
  * Bei vorhandenem Auftrag: Rückgabe für Nachunternehmervertrag-Wizard (Unterlagen + PDF).
  */
 export async function bestaetigeHandwerkerEinreichung(input: {
@@ -1524,6 +1566,7 @@ export async function bestaetigeHandwerkerEinreichung(input: {
     .eq('id', zuweisungId)
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (zErr) logDbError('app/angebote/actions:angebot_handwerker', zErr)
 
   if (zErr || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
   if (!zu.hw_eingereicht_at?.trim()) {
@@ -1541,18 +1584,20 @@ export async function bestaetigeHandwerkerEinreichung(input: {
     }
   }
 
-  const { data: zuDetail } = await supabaseAdmin
+  const { data: zuDetail, error: error2 } = await supabaseAdmin
     .from('angebot_handwerker')
     .select('hw_konditionen')
     .eq('id', zuweisungId)
     .maybeSingle()
+  if (error2) logDbError('app/angebote/actions:angebot_handwerker', error2)
   const hatKonditionen = Boolean(parseHwKonditionen(zuDetail?.hw_konditionen)?.positionen.length)
 
-  const { data: auftrag } = await supabase
+  const { data: auftrag, error: error3 } = await supabase
     .from('auftraege')
     .select('id')
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (error3) logDbError('app/angebote/actions:auftraege', error3)
 
   let aktualisiert = 0
   const uebernahmeRes = await uebernehmeHandwerkerEinreichungEk({ angebotId, zuweisungId })
@@ -1566,19 +1611,21 @@ export async function bestaetigeHandwerkerEinreichung(input: {
   const mailHinweis = mail.ok ? undefined : mail.error
 
   if (auftrag?.id) {
-    const { data: zuHw } = await supabaseAdmin
+    const { data: zuHw, error } = await supabaseAdmin
       .from('angebot_handwerker')
       .select('handwerker_id, gewerk_id')
       .eq('id', zuweisungId)
       .maybeSingle()
+    if (error) logDbError('app/angebote/actions:angebot_handwerker', error)
 
     if (zuHw?.handwerker_id && zuHw?.gewerk_id) {
-      const { data: existingAh } = await supabaseAdmin
+      const { data: existingAh, error } = await supabaseAdmin
         .from('auftrag_handwerker')
         .select('id')
         .eq('auftrag_id', auftrag.id)
         .eq('handwerker_id', zuHw.handwerker_id)
         .maybeSingle()
+      if (error) logDbError('app/angebote/actions:auftrag_handwerker', error)
 
       if (!existingAh?.id) {
         const { error: ahErr } = await supabaseAdmin.from('auftrag_handwerker').insert({
@@ -1587,6 +1634,7 @@ export async function bestaetigeHandwerkerEinreichung(input: {
           gewerk_id: zuHw.gewerk_id,
           status: 'zugewiesen',
         })
+        if (ahErr) logDbError('app/angebote/actions:auftrag_handwerker', ahErr)
         if (ahErr) {
           console.warn('[bestaetigeHandwerkerEinreichung] auftrag_handwerker:', ahErr.message)
         }
@@ -1630,7 +1678,7 @@ export async function openHandwerkerAcceptWizard(input: {
   return loadHandwerkerAcceptWizardBootstrap(input)
 }
 
-async function loadHandwerkerEinreichungZuweisung(
+async function loadPartnerEinreichungZuweisung(
   angebotId: string,
   zuweisungId: string
 ): Promise<
@@ -1661,10 +1709,11 @@ async function loadHandwerkerEinreichungZuweisung(
     .eq('id', zuweisungId)
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/actions:angebot_handwerker', error)
 
   if (error || !zu) return { ok: false, message: 'Zuweisung nicht gefunden' }
   if (!zu.hw_eingereicht_at?.trim()) {
-    return { ok: false, message: 'Noch keine Einreichung vom Handwerker.' }
+    return { ok: false, message: 'Noch keine Einreichung vom Partner.' }
   }
   const hwSt = (zu.hw_status ?? '').toLowerCase()
   if (hwSt !== 'eingereicht') {
@@ -1688,7 +1737,7 @@ async function loadHandwerkerEinreichungZuweisung(
   }
 }
 
-/** CRM: Rückfrage zur Handwerker-Einreichung — Partner sieht Text im Portal und kann erneut einreichen. */
+/** CRM: Rückfrage zur Partner-Einreichung — Partner sieht Text im Portal und kann erneut einreichen. */
 export async function rueckfrageHandwerkerEinreichung(input: {
   angebotId: string
   zuweisungId: string
@@ -1706,9 +1755,9 @@ export async function rueckfrageHandwerkerEinreichung(input: {
   if (!user) return { ok: false, message: 'Nicht angemeldet' }
 
   const crmNotiz = input.crmNotiz.trim()
-  if (!crmNotiz) return { ok: false, message: 'Bitte eine Nachricht an den Handwerker eingeben.' }
+  if (!crmNotiz) return { ok: false, message: 'Bitte eine Nachricht an den Partner eingeben.' }
 
-  const loaded = await loadHandwerkerEinreichungZuweisung(input.angebotId.trim(), input.zuweisungId.trim())
+  const loaded = await loadPartnerEinreichungZuweisung(input.angebotId.trim(), input.zuweisungId.trim())
   if (!loaded.ok) return loaded
 
   const now = new Date().toISOString()
@@ -1721,6 +1770,7 @@ export async function rueckfrageHandwerkerEinreichung(input: {
     })
     .eq('id', loaded.row.id)
     .eq('hw_status', 'eingereicht')
+  if (upErr) logDbError('app/angebote/actions:angebot_handwerker', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 
@@ -1732,7 +1782,7 @@ export async function rueckfrageHandwerkerEinreichung(input: {
     cc: input.cc?.filter(Boolean),
   })
 
-  revalidatePath(`/angebote/${input.angebotId.trim()}`)
+  revalidateAngebotDetail(input.angebotId.trim())
   return {
     ok: true,
     mailGesendet: mail.ok,
@@ -1740,7 +1790,7 @@ export async function rueckfrageHandwerkerEinreichung(input: {
   }
 }
 
-/** CRM: Handwerker-Einreichung ablehnen — Partner kann neues Angebot einreichen. */
+/** CRM: Partner-Einreichung ablehnen — Partner kann neues Angebot einreichen. */
 export async function ablehneHandwerkerEinreichung(input: {
   angebotId: string
   zuweisungId: string
@@ -1755,9 +1805,9 @@ export async function ablehneHandwerkerEinreichung(input: {
   if (!gate.ok) return { ok: false, message: gate.message }
 
   const crmNotiz = input.crmNotiz.trim()
-  if (!crmNotiz) return { ok: false, message: 'Bitte einen Grund für den Handwerker eingeben.' }
+  if (!crmNotiz) return { ok: false, message: 'Bitte einen Grund für den Partner eingeben.' }
 
-  const loaded = await loadHandwerkerEinreichungZuweisung(input.angebotId.trim(), input.zuweisungId.trim())
+  const loaded = await loadPartnerEinreichungZuweisung(input.angebotId.trim(), input.zuweisungId.trim())
   if (!loaded.ok) return loaded
 
   const now = new Date().toISOString()
@@ -1770,6 +1820,7 @@ export async function ablehneHandwerkerEinreichung(input: {
     })
     .eq('id', loaded.row.id)
     .eq('hw_status', 'eingereicht')
+  if (upErr) logDbError('app/angebote/actions:angebot_handwerker', upErr)
 
   if (upErr) return { ok: false, message: upErr.message }
 
@@ -1781,7 +1832,7 @@ export async function ablehneHandwerkerEinreichung(input: {
     cc: input.cc?.filter(Boolean),
   })
 
-  revalidatePath(`/angebote/${input.angebotId.trim()}`)
+  revalidateAngebotDetail(input.angebotId.trim())
   return {
     ok: true,
     mailGesendet: mail.ok,
@@ -1789,7 +1840,7 @@ export async function ablehneHandwerkerEinreichung(input: {
   }
 }
 
-export async function acceptHandwerker(angebotId: string) {
+export async function acceptPartner(angebotId: string) {
   return setAngebotStatus(angebotId, 'handwerker_akzeptiert')
 }
 
@@ -1803,7 +1854,7 @@ export async function sendAngebotToKunde(
     asSystem?: boolean
     /** Status kunde_akzeptiert / angenommen beibehalten (Korrektur aus Auftrag) */
     statusBeibehalten?: boolean
-    /** Handwerker-Pipeline nicht erneut prüfen (Korrektur) */
+    /** Partner-Pipeline nicht erneut prüfen (Korrektur) */
     skipHandwerkerGate?: boolean
   }
 ) {
@@ -1877,6 +1928,7 @@ export async function sendAngebotToKunde(
   const now = new Date().toISOString()
   async function updateNachVersand(payload: Record<string, unknown>) {
     let { error } = await supabase.from('angebote').update(payload).eq('id', angebotId)
+    if (error) logDbError('app/angebote/actions:angebote', error)
     if (error && /positionen_portal/i.test(error.message)) {
       const { positionen_portal: _drop, ...rest } = payload
       ;({ error } = await supabase.from('angebote').update(rest).eq('id', angebotId))
@@ -1924,11 +1976,12 @@ export async function sendAngebotToKunde(
       if (!freigabeSync.ok) {
         console.warn('[sendAngebotToKunde] syncAngebotMitOrgFreigabe:', freigabeSync.message)
       } else {
-        const { data: leadFresh } = await supabaseAdmin
+        const { data: leadFresh, error } = await supabaseAdmin
           .from('leads')
           .select('org_freigabe_status, freigabe_bypass_grund')
           .eq('id', detail.lead_id)
           .maybeSingle()
+        if (error) logDbError('app/angebote/actions:leads', error)
         if (detail.leads && typeof detail.leads === 'object' && leadFresh) {
           const leadPatch = detail.leads as {
             org_freigabe_status?: string | null
@@ -1958,13 +2011,13 @@ export async function sendAngebotToKunde(
     firmMail
   )
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
-  const gueltigFallback = new Date(
-    Date.now() + gueltigTage * 24 * 60 * 60 * 1000
-  ).toLocaleDateString('de-DE')
+  const gueltigFallback = formatDatum(
+    new Date(Date.now() + gueltigTage * 24 * 60 * 60 * 1000).toISOString()
+  )
   const gueltig = detail.gueltig_bis
     ? (() => {
         try {
-          return new Date(detail.gueltig_bis as string).toLocaleDateString('de-DE')
+          return formatDatum(String(detail.gueltig_bis))
         } catch {
           return gueltigFallback
         }
@@ -2003,7 +2056,7 @@ export async function sendAngebotToKunde(
     ? {
         betreff:
           betreffOverride ||
-          angebotMailBetreff(anrede, angebotNr, branding.firmenname),
+          angebotMailBetreff(leistungsumfang, angebotNr),
         html: buildAngebotMail(
           {
             ...kundenAnrede,
@@ -2074,7 +2127,7 @@ export async function sendAngebotToKunde(
       erstellt_von: user?.id ?? null,
     })
     if (!tl.ok) console.warn('[sendAngebotToKunde] timeline:', tl.message)
-    revalidatePath(`/anfragen/${detail.lead_id}`)
+    revalidateLeadDetail(detail.lead_id)
   }
 
   // Nach Versand: Portal-Glocke + Dokumente (pdf_url bereits gesetzt).
@@ -2162,14 +2215,14 @@ async function previewAngebotKundeMailInner(input: {
   const nettoMaxAnzeige = liveNetto ?? summenMail.nettoMax
 
   const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
-  const gueltigFallback = new Date(
-    Date.now() + gueltigTage * 24 * 60 * 60 * 1000
-  ).toLocaleDateString('de-DE')
+  const gueltigFallback = formatDatum(
+    new Date(Date.now() + gueltigTage * 24 * 60 * 60 * 1000).toISOString()
+  )
   const gueltigSource = input.gueltigBis?.trim() || detail.gueltig_bis
   const gueltig = gueltigSource
     ? (() => {
         try {
-          return new Date(gueltigSource as string).toLocaleDateString('de-DE')
+          return formatDatum(String(gueltigSource))
         } catch {
           return gueltigFallback
         }
@@ -2211,7 +2264,7 @@ async function previewAngebotKundeMailInner(input: {
 
   if (angebotNr) {
     const betreff =
-      betreffOverride || angebotMailBetreff(anrede, angebotNr, branding.firmenname)
+      betreffOverride || angebotMailBetreff(leistungsumfang, angebotNr)
     const html = buildAngebotMail(
       {
         ...kundenAnrede,
@@ -2283,14 +2336,14 @@ export async function previewAngebotWizardMailLive(input: {
     const anrede = input.anrede === 'du' ? 'du' : 'sie'
     const lu = input.leistungsumfang?.trim() || 'Ihr Projekt'
     const gueltigTage = Math.max(1, parseInt(firmMail.angebot_gueltig_tage, 10) || 30)
-    const gueltigFallback = new Date(
-      Date.now() + gueltigTage * 24 * 60 * 60 * 1000
-    ).toLocaleDateString('de-DE')
+    const gueltigFallback = formatDatum(
+      new Date(Date.now() + gueltigTage * 24 * 60 * 60 * 1000).toISOString()
+    )
     const gueltigSource = input.gueltigBis?.trim()
     const gueltig = gueltigSource
       ? (() => {
           try {
-            return new Date(gueltigSource).toLocaleDateString('de-DE')
+            return formatDatum(gueltigSource)
           } catch {
             return gueltigFallback
           }
@@ -2304,7 +2357,7 @@ export async function previewAngebotWizardMailLive(input: {
     const ctaMode = input.unterSchwelleDirekt ? 'unter_schwelle_direkt' : 'annehmen'
     const betreff =
       input.betreff?.trim() ||
-      angebotMailBetreff(anrede, 'ENTWURF', branding.firmenname)
+      angebotMailBetreff(lu, 'ENTWURF')
     const html = buildAngebotMail(
       {
         name: input.kundeName?.trim() || 'Kunde',
@@ -2350,11 +2403,12 @@ export async function recordKundeAbgelehntMitDetails(
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
   const supabase = gate.db
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('angebote')
     .select('id, status, status_einfach, lead_id')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/actions:angebote', error)
   if (!row) return { ok: false, message: 'Angebot nicht gefunden' }
   const status = String(row.status ?? '').trim().toLowerCase()
   const statusEinfach = String(row.status_einfach ?? '')
@@ -2378,8 +2432,16 @@ export async function recordKundeAbgelehntMitDetails(
     input.konkurrenz_preis_eur != null && Number.isFinite(input.konkurrenz_preis_eur)
       ? Math.round(input.konkurrenz_preis_eur * 100) / 100
       : null
+<<<<<<< Updated upstream
+  const { error: error2 } = await writeAngebotStatus(supabase, angebotId, 'abgelehnt', {
+    status_einfach: 'abgelehnt',
+    ablehnung_grund: input.grund,
+    ablehnung_konkurrenz_preis: kp,
+    ablehnung_notiz: input.notiz?.trim() || null,
+  })
+=======
   const now = new Date().toISOString()
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('angebote')
     .update({
       status: 'abgelehnt' as AngebotStatus,
@@ -2390,24 +2452,22 @@ export async function recordKundeAbgelehntMitDetails(
       updated_at: now,
     })
     .eq('id', angebotId)
-  if (error) return { ok: false, message: error.message }
+>>>>>>> Stashed changes
+  if (error2) logDbError('app/angebote/actions:angebote', error2)
+  if (error2) return { ok: false, message: error2.message }
 
   const leadId = String(row.lead_id ?? '').trim()
   if (leadId) {
-    await supabaseAdmin
+    const { error: __dbErr11 } = await supabaseAdmin
       .from('leads')
-      .update({
-        org_freigabe_status: 'abgelehnt',
-        updated_at: now,
-      })
+      .update(planHvFreigabeWrite('abgelehnt'))
       .eq('id', leadId)
       .in('org_freigabe_status', ['ausstehend', 'beschluss_ausstehend', 'freigegeben'])
-    revalidatePath(`/anfragen/${leadId}`)
+    if (__dbErr11) logDbError('app/angebote/actions:leads', __dbErr11)
+    revalidateLeadDetail(leadId)
   }
 
-  revalidatePath('/angebote')
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/')
+  revalidateAngebotDetail(angebotId)
   return { ok: true }
 }
 
@@ -2415,24 +2475,34 @@ export async function schliesseLeadNachAngebotVerlust(
   angebotId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data: a } = await supabase
+  const { data: a, error } = await supabase
     .from('angebote')
     .select('lead_id, status')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/actions:angebote', error)
   if (!a?.lead_id) return { ok: false, message: 'Kein Lead mit diesem Angebot verknüpft.' }
   if (a.status !== 'abgelehnt') {
     return { ok: false, message: 'Angebot ist nicht als abgelehnt markiert.' }
   }
-  const { error } = await supabase
+<<<<<<< Updated upstream
+  const { error: error2 } = await writeLeadStatus(supabase, a.lead_id, 'abgebrochen')
+  if (error2) logDbError('app/angebote/actions:leads', error2)
+  if (error2) return { ok: false, message: error2.message }
+  revalidateLeadDetail(a.lead_id)
+  revalidateAngebotDetail(angebotId)
+=======
+  const { error: error2 } = await supabase
     .from('leads')
     .update({ status: 'abgebrochen', updated_at: new Date().toISOString() })
     .eq('id', a.lead_id)
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/angebote/actions:leads', error2)
+  if (error2) return { ok: false, message: error2.message }
   revalidatePath(`/anfragen/${a.lead_id}`)
   revalidatePath('/anfragen')
   revalidatePath(`/angebote/${angebotId}`)
   revalidatePath('/')
+>>>>>>> Stashed changes
   return { ok: true }
 }
 
@@ -2455,11 +2525,9 @@ export async function sendAngebotNachfassManuell(
     return { ok: false, message: 'Nachfass wurde bereits gesendet.' }
   }
 
-  revalidatePath(`/angebote/${angebotId}`)
-  revalidatePath('/angebote')
-  revalidatePath('/kalender')
-  revalidatePath('/')
-  if (detail.lead_id) revalidatePath(`/anfragen/${detail.lead_id}`)
+  revalidateAngebotDetail(angebotId)
+  revalidateKalender()
+  if (detail.lead_id) revalidateLeadDetail(detail.lead_id)
   return { ok: true }
 }
 
@@ -2497,12 +2565,14 @@ export async function listHandwerkerFuerGewerk(
     .select('slug')
     .eq('id', gewerkId)
     .maybeSingle()
+  if (gErr) logDbError('app/angebote/actions:gewerke', gErr)
   if (gErr || !gw?.slug) return { ok: false, message: 'Gewerk nicht gefunden' }
 
   const { data: allHw, error: hErr } = await supabase
     .from('handwerker')
     .select('id, name, firma, telefon, gewerke, aktiv')
     .eq('aktiv', true)
+  if (hErr) logDbError('app/angebote/actions:handwerker', hErr)
   if (hErr) return { ok: false, message: hErr.message }
 
   const slug = gw.slug as string
@@ -2515,10 +2585,11 @@ export async function listHandwerkerFuerGewerk(
   const lastByHw = new Map<string, string>()
   const busyIds = new Set<string>()
   if (ids.length) {
-    const { data: ah } = await supabase
+    const { data: ah, error } = await supabase
       .from('auftrag_handwerker')
       .select('handwerker_id, auftraege(created_at, status)')
       .in('handwerker_id', ids)
+    if (error) logDbError('app/angebote/actions:auftrag_handwerker', error)
     for (const row of ah ?? []) {
       const hid = row.handwerker_id as string
       const auf = row.auftraege as { created_at?: string; status?: string } | { created_at?: string; status?: string }[] | null
@@ -2558,6 +2629,7 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
     .eq('id', input.alteZuweisungId)
     .eq('angebot_id', input.angebotId)
     .maybeSingle()
+  if (zErr) logDbError('app/angebote/actions:angebot_handwerker', zErr)
 
   if (zErr || !zuAlt) return { ok: false, message: 'Zuweisung nicht gefunden' }
 
@@ -2583,30 +2655,37 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
     return { ok: false, message: 'Diese Zuweisung kann nicht mehr ersetzt werden.' }
   }
   if (zuAlt.handwerker_id === input.neuerHandwerkerId) {
-    return { ok: false, message: 'Bitte eine andere Handwerkerin auswählen.' }
+    return { ok: false, message: 'Bitte eine andere Partnerin auswählen.' }
   }
 
-  const { data: gw } = await supabase
+  const { data: gw, error: error2 } = await supabase
     .from('gewerke')
     .select('slug')
     .eq('id', zuAlt.gewerk_id)
     .maybeSingle()
-  const { data: hwNeu } = await supabase
+  if (error2) logDbError('app/angebote/actions:gewerke', error2)
+  const { data: hwNeu, error: error3 } = await supabase
     .from('handwerker')
     .select('id, gewerke, aktiv')
     .eq('id', input.neuerHandwerkerId)
     .maybeSingle()
+  if (error3) logDbError('app/angebote/actions:handwerker', error3)
 
   if (!gw?.slug || !hwNeu?.aktiv) return { ok: false, message: 'Daten ungültig' }
   const slugs = (hwNeu.gewerke as string[] | null) ?? []
   if (!slugs.includes(gw.slug as string)) {
-    return { ok: false, message: 'Handwerker deckt dieses Gewerk nicht ab.' }
+    return { ok: false, message: 'Partner deckt dieses Gewerk nicht ab.' }
   }
 
+<<<<<<< Updated upstream
+  const { error: upAlt } = await writeAngebotHandwerkerStatus(supabase, input.alteZuweisungId, 'ersetzt')
+=======
   const { error: upAlt } = await supabase
     .from('angebot_handwerker')
     .update({ status: 'ersetzt' })
     .eq('id', input.alteZuweisungId)
+>>>>>>> Stashed changes
+  if (upAlt) logDbError('app/angebote/actions:angebot_handwerker', upAlt)
   if (upAlt) return { ok: false, message: upAlt.message }
 
   const { data: inserted, error: insErr } = await supabase
@@ -2629,6 +2708,7 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
     `
     )
     .single()
+  if (insErr) logDbError('app/angebote/actions:angebot_handwerker', insErr)
 
   if (insErr || !inserted) {
     return { ok: false, message: insErr?.message ?? 'Einfügen fehlgeschlagen' }
@@ -2649,15 +2729,15 @@ export async function replaceAngebotHandwerkerUndSenden(input: {
   }
 
   /* Prozess neu: nach HW-Zusage wieder „an Partner gesendet“ */
-  await supabase
+  const patchGesendetHw = planAngebotStatusWrite('gesendet_handwerker')
+  const { error: __dbErr12 } = await supabase
     .from('angebote')
-    .update({ status: 'gesendet_handwerker' })
+    .update(patchGesendetHw)
     .eq('id', input.angebotId)
     .in('status', ['handwerker_akzeptiert', 'gesendet_handwerker'])
+  if (__dbErr12) logDbError('app/angebote/actions:angebote', __dbErr12)
 
-  revalidatePath(`/angebote/${input.angebotId}`)
-  revalidatePath('/angebote')
-  revalidatePath('/')
+  revalidateAngebotDetail(input.angebotId)
   return { ok: true }
 }
 
@@ -2699,11 +2779,12 @@ export async function createAuftragFromAngebot(
     return { ok: false, message: 'Auftrag nur nach Kundenakzept möglich.' }
   }
 
-  const { data: existingForAngebot } = await supabaseAdmin
+  const { data: existingForAngebot, error } = await supabaseAdmin
     .from('auftraege')
     .select('id')
     .eq('angebot_id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/actions:auftraege', error)
   if (existingForAngebot?.id) {
     return { ok: true, auftragId: String(existingForAngebot.id) }
   }
@@ -2717,12 +2798,13 @@ export async function createAuftragFromAngebot(
   }
 
   if (angebot.lead_id) {
-    const { data: leadAuftraege } = await supabaseAdmin
+    const { data: leadAuftraege, error } = await supabaseAdmin
       .from('auftraege')
       .select('id, angebot_id, status')
       .eq('lead_id', angebot.lead_id)
       .neq('status', 'storniert')
       .limit(10)
+    if (error) logDbError('app/angebote/actions:auftraege', error)
     const anderer = (leadAuftraege ?? []).find(
       (a) => String(a.angebot_id ?? '') !== angebotId
     )
@@ -2766,11 +2848,12 @@ export async function createAuftragFromAngebot(
   let istBauprojekt = false
   let kundeId = angebot.kunde_id
   if (angebot.lead_id) {
-    const { data: leadRow } = await supabaseAdmin
+    const { data: leadRow, error } = await supabaseAdmin
       .from('leads')
       .select('ist_bauprojekt, ist_wiederkehrend, wiederkehr_turnus, kunde_id, auftraggeber_kunde_id')
       .eq('id', angebot.lead_id)
       .maybeSingle()
+    if (error) logDbError('app/angebote/actions:leads', error)
     istBauprojekt = leadRow?.ist_bauprojekt === true
     if (leadRow) {
       kundeId = leadVertragsKundeId(leadRow) ?? angebot.kunde_id
@@ -2778,21 +2861,23 @@ export async function createAuftragFromAngebot(
   }
 
   // Bestand bevorzugt vom Angebot, sonst Lead
-  const { data: angWieder } = await supabaseAdmin
+  const { data: angWieder, error: error2 } = await supabaseAdmin
     .from('angebote')
     .select('ist_wiederkehrend, wiederkehr_turnus')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error2) logDbError('app/angebote/actions:angebote', error2)
 
   let istWiederkehrend = angWieder?.ist_wiederkehrend === true
   let wiederkehrTurnus =
     istWiederkehrend ? (angWieder?.wiederkehr_turnus as string | null) ?? null : null
   if (!istWiederkehrend && angebot.lead_id) {
-    const { data: leadW } = await supabaseAdmin
+    const { data: leadW, error } = await supabaseAdmin
       .from('leads')
       .select('ist_wiederkehrend, wiederkehr_turnus')
       .eq('id', angebot.lead_id)
       .maybeSingle()
+    if (error) logDbError('app/angebote/actions:leads', error)
     istWiederkehrend = leadW?.ist_wiederkehrend === true
     wiederkehrTurnus = istWiederkehrend
       ? (leadW?.wiederkehr_turnus as string | null) ?? null
@@ -2822,6 +2907,7 @@ export async function createAuftragFromAngebot(
     })
     .select('id, kunden_token')
     .single()
+  if (aErr) logDbError('app/angebote/actions:auftraege', aErr)
 
   if (aErr || !auftrag) return { ok: false, message: aErr?.message ?? 'Auftrag fehlgeschlagen' }
 
@@ -2950,13 +3036,9 @@ export async function createAuftragFromAngebot(
 
   if (angebot.lead_id) {
     postInsertTasks.push(
-      supabaseAdmin
-        .from('leads')
-        .update({ status: 'auftrag', updated_at: new Date().toISOString() })
-        .eq('id', angebot.lead_id)
-        .then(({ error }) => {
-          if (error) throw new Error(error.message)
-        })
+      writeLeadStatus(supabaseAdmin, angebot.lead_id, 'auftrag').then(({ error }) => {
+        if (error) throw new Error(error.message)
+      })
     )
   }
 
@@ -2995,10 +3077,7 @@ export async function createAuftragFromAngebot(
     gewerkNamen.join(', ') ||
     'Ihr Projekt'
   const summen = summenAusPositionen(pos, 19)
-  const bruttoFmt = `${summen.bruttoMin.toLocaleString('de-DE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} €`
+  const bruttoFmt = `${formatEuro(summen.bruttoMin, { suffix: false })} €`
 
   let kundeMailLogId: string | null = null
   if (sendKunde && kunde.email?.trim()) {
@@ -3146,10 +3225,10 @@ export async function createAuftragFromAngebot(
 
   await Promise.all(timelineTasks)
 
-  revalidatePath(`/auftraege/${auftragId}`)
-  revalidatePath(`/angebote/${angebotId}`)
-  if (angebot.lead_id) revalidatePath(`/anfragen/${angebot.lead_id}`)
-  revalidatePath('/kalender')
+  revalidateAuftragDetail(auftragId)
+  revalidateAngebotDetail(angebotId)
+  if (angebot.lead_id) revalidateLeadDetail(angebot.lead_id)
+  revalidateKalender()
 
   return { ok: true, auftragId }
 }
@@ -3165,11 +3244,12 @@ export async function markKundeAkzeptiert(
         await supabase.auth.getUser()
       ).data.user
 
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('angebote')
     .select('id, status, lead_id, kunden(name)')
     .eq('id', angebotId)
     .maybeSingle()
+  if (error) logDbError('app/angebote/actions:angebote', error)
   if (!row) return { ok: false, message: 'Angebot nicht gefunden' }
   if (row.status !== 'gesendet_kunde') {
     return { ok: false, message: 'Nur bei Status „Gesendet Kunde“ möglich.' }
@@ -3178,10 +3258,8 @@ export async function markKundeAkzeptiert(
   const st = await setAngebotStatus(angebotId, 'kunde_akzeptiert', { asSystem: opts?.asSystem })
   if (!st.ok) return st
 
-  await supabase
-    .from('angebote')
-    .update({ status_einfach: 'angenommen', updated_at: new Date().toISOString() })
-    .eq('id', angebotId)
+  const { error: __dbErr13 } = await writeAngebotStatusEinfach(supabase, angebotId, 'angenommen')
+  if (__dbErr13) logDbError('app/angebote/actions:angebote', __dbErr13)
 
   const leadId = row.lead_id as string | null
   if (leadId) {
@@ -3190,19 +3268,18 @@ export async function markKundeAkzeptiert(
     const kunde = row.kunden as { name?: string } | null
     const kundeName = kunde?.name?.trim() || 'Kundin/Kunde'
 
-    const { data: lead } = await supabase
+    const { data: lead, error } = await supabase
       .from('leads')
       .select('status')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('app/angebote/actions:leads', error)
 
     const leadStatus = (lead?.status ?? 'neu') as LeadStatus
     if (leadStatusVorAngebot(leadStatus)) {
       if (opts?.asSystem) {
-        await supabaseAdmin
-          .from('leads')
-          .update({ status: 'angebot', updated_at: new Date().toISOString() })
-          .eq('id', leadId)
+        const { error: __dbErr14 } = await writeLeadStatus(supabaseAdmin, leadId, 'angebot')
+        if (__dbErr14) logDbError('app/angebote/actions:leads', __dbErr14)
       } else {
         const upd = await updateLeadStatus(leadId, 'angebot', 'Angebot vom Kunden angenommen')
         if (!upd.ok) return upd
@@ -3216,15 +3293,14 @@ export async function markKundeAkzeptiert(
       beschreibung: kundeName,
       erstellt_von: user?.id ?? null,
     })
+    if (tlErr) logDbError('app/angebote/actions:lead_timeline', tlErr)
     if (tlErr) console.warn('lead_timeline angebot_angenommen:', tlErr.message)
 
     if (!opts?.asSystem) {
-      revalidatePath(`/anfragen/${leadId}`)
-      revalidatePath('/anfragen')
+      revalidateLeadDetail(leadId)
     }
   }
 
-  if (!opts?.asSystem) revalidatePath('/')
   return { ok: true }
 }
 
@@ -3264,7 +3340,7 @@ async function buildAngebotAnnahmeMail(
     return {
       gewerk: p.gewerk_name || '—',
       leistung: (p.leistung_name || p.leistung || p.beschreibung || 'Leistung').trim(),
-      preis: `${brutto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
+      preis: `${formatEuro(brutto)}`,
     }
   })
   const tpl = mailAngebotAnnahmeBestaetigung(
@@ -3316,10 +3392,7 @@ export async function previewAuftragsbestaetigungMail(input: {
     gewerkNamen.join(', ') ||
     'Ihr Projekt'
   const summen = summenAusPositionen(pos, 19)
-  const bruttoFmt = `${summen.bruttoMin.toLocaleString('de-DE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} €`
+  const bruttoFmt = `${formatEuro(summen.bruttoMin, { suffix: false })} €`
   const start = input.start_datum.trim()
   const end = input.end_datum?.trim() || addDaysIso(start, 14)
   const tpl = auftragsbestaetigungMailFromEmpfaenger({
@@ -3400,6 +3473,7 @@ export async function listAngebotVorlagen(): Promise<AngebotVorlage[]> {
     .select('*')
     .eq('aktiv', true)
     .order('name', { ascending: true })
+  if (error) logDbError('app/angebote/actions:angebot_vorlagen', error)
   if (error) {
     console.warn('listAngebotVorlagen', error.message)
     return []
@@ -3440,6 +3514,7 @@ export async function listAngebotVorlagenEinstellungen(): Promise<AngebotVorlage
     .from('angebot_vorlagen')
     .select('*')
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/angebote/actions:angebot_vorlagen', error)
   if (error) {
     console.warn('listAngebotVorlagenEinstellungen', error.message)
     return []
@@ -3475,9 +3550,10 @@ export async function saveAngebotVorlage(
     erstellt_von: user?.id ?? null,
     updated_at: new Date().toISOString(),
   })
+  if (error) logDbError('app/angebote/actions:angebot_vorlagen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/angebote/neu')
-  revalidatePath('/einstellungen/vorlagen')
+  revalidateAngebotNeu()
+  revalidateEinstellungenPath('/einstellungen/vorlagen')
   return { ok: true }
 }
 
@@ -3505,9 +3581,10 @@ export async function updateAngebotVorlage(
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
+  if (error) logDbError('app/angebote/actions:angebot_vorlagen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/angebote/neu')
-  revalidatePath('/einstellungen/vorlagen')
+  revalidateAngebotNeu()
+  revalidateEinstellungenPath('/einstellungen/vorlagen')
   return { ok: true }
 }
 
@@ -3517,22 +3594,29 @@ export async function deleteAngebot(
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { error: gate.message }
   const supabase = gate.db
-  const { data: auf } = await supabase.from('auftraege').select('id').eq('angebot_id', angebotId).maybeSingle()
+  const { data: auf, error } = await supabase.from('auftraege').select('id').eq('angebot_id', angebotId).maybeSingle()
+  if (error) logDbError('app/angebote/actions:auftraege', error)
   if (auf) {
     return {
       error: 'Angebot kann nicht gelöscht werden — es existiert bereits ein Auftrag dazu.',
     }
   }
-  const { data: ang } = await supabase.from('angebote').select('lead_id').eq('id', angebotId).maybeSingle()
+  const { data: ang, error: error2 } = await supabase.from('angebote').select('lead_id').eq('id', angebotId).maybeSingle()
+  if (error2) logDbError('app/angebote/actions:angebote', error2)
   const { error: delHw } = await supabase.from('angebot_handwerker').delete().eq('angebot_id', angebotId)
+  if (delHw) logDbError('app/angebote/actions:angebot_handwerker', delHw)
   if (delHw) return { error: delHw.message }
-  const { error } = await supabase.from('angebote').delete().eq('id', angebotId)
-  if (error) return { error: error.message }
+  const { error: error4 } = await supabase.from('angebote').delete().eq('id', angebotId)
+  if (error4) logDbError('app/angebote/actions:angebote', error4)
+  if (error4) return { error: error4.message }
+<<<<<<< Updated upstream
+  revalidateAngebotDetail(angebotId)
+=======
   revalidatePath('/angebote')
   revalidatePath(`/angebote/${angebotId}`)
+>>>>>>> Stashed changes
   const leadId = (ang as { lead_id?: string | null } | null)?.lead_id
-  if (leadId) revalidatePath(`/anfragen/${leadId}`)
-  revalidatePath('/anfragen')
+  if (leadId) revalidateLeadDetail(leadId)
   return { success: true }
 }
 
@@ -3541,9 +3625,10 @@ export async function deleteAngebotVorlage(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
   const { error } = await supabase.from('angebot_vorlagen').delete().eq('id', id)
+  if (error) logDbError('app/angebote/actions:angebot_vorlagen', error)
   if (error) return { ok: false, message: error.message }
-  revalidatePath('/einstellungen/vorlagen')
-  revalidatePath('/angebote/neu')
+  revalidateEinstellungenPath('/einstellungen/vorlagen')
+  revalidateAngebotNeu()
   return { ok: true }
 }
 
@@ -3559,10 +3644,11 @@ export async function duplicateAngebotVorlage(
     .select('*')
     .eq('id', id)
     .maybeSingle()
+  if (loadErr) logDbError('app/angebote/actions:angebot_vorlagen', loadErr)
   if (loadErr || !row) return { ok: false, message: loadErr?.message ?? 'Vorlage nicht gefunden' }
 
   const r = row as Record<string, unknown>
-  const { error } = await supabase.from('angebot_vorlagen').insert({
+  const { error: error2 } = await supabase.from('angebot_vorlagen').insert({
     name: `Kopie: ${String(r.name ?? 'Vorlage')}`,
     beschreibung: (r.beschreibung as string | null) ?? null,
     positionen: r.positionen,
@@ -3573,7 +3659,12 @@ export async function duplicateAngebotVorlage(
     erstellt_von: user?.id ?? null,
     updated_at: new Date().toISOString(),
   })
-  if (error) return { ok: false, message: error.message }
+  if (error2) logDbError('app/angebote/actions:angebot_vorlagen', error2)
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateEinstellungenPath('/einstellungen/vorlagen')
+=======
   revalidatePath('/einstellungen/vorlagen')
+>>>>>>> Stashed changes
   return { ok: true }
 }

@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type {
@@ -70,6 +71,7 @@ export async function speichereAngebotKiBeispiel(
     })
     .select('id')
     .single()
+  if (error) logDbError('lib/angebote/angebot-ki-lernen:angebot_ki_beispiele', error)
 
   if (error) {
     console.warn('[angebot-ki] beispiele speichern:', error.message)

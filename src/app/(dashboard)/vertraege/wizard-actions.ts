@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
@@ -95,10 +101,12 @@ export async function loadProjektVertragBootstrap(
     )
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/vertraege/wizard-actions:auftraege', error)
 
   if (error || !auf) return { ok: false, message: error?.message ?? 'Auftrag nicht gefunden' }
 
-  const { data: alleGewerke } = await supabase.from('gewerke').select('slug, ist_bauleistung')
+  const { data: alleGewerke, error: error2 } = await supabase.from('gewerke').select('slug, ist_bauleistung')
+  if (error2) logDbError('app/vertraege/wizard-actions:gewerke', error2)
   const positionSlugs = ((auf.auftrag_positionen ?? []) as AuftragPosition[])
     .map((p) => p.gewerk_slug?.trim())
     .filter(Boolean) as string[]
@@ -154,7 +162,7 @@ export async function loadProjektVertragBootstrap(
 
   const handwerker_optionen = Array.from(handwerkerMap.values())
   if (!handwerker_optionen.length) {
-    return { ok: false, message: 'Kein Handwerker am Auftrag zugewiesen — bitte zuerst Partner zuweisen.' }
+    return { ok: false, message: 'Kein Partner am Auftrag zugewiesen — bitte zuerst Partner zuweisen.' }
   }
 
   const gewerkMap = new Map<string, string>()
@@ -183,7 +191,8 @@ export async function loadProjektVertragBootstrap(
   let existingId: string | null = vertragId ?? null
 
   if (vertragId) {
-    const { data: v } = await supabase.from('handwerker_vertraege').select('*').eq('id', vertragId).maybeSingle()
+    const { data: v, error } = await supabase.from('handwerker_vertraege').select('*').eq('id', vertragId).maybeSingle()
+    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
     if (v) {
       const row = v as HandwerkerVertragRow
       existingNr = row.vertrags_nr
@@ -258,7 +267,7 @@ export async function loadHandwerkerAcceptWizardBootstrap(input: {
   const gewerkId = input.gewerkId.trim()
   const zuweisungId = input.zuweisungId.trim()
   if (!auftragId || !handwerkerId || !gewerkId || !zuweisungId) {
-    return { ok: false, message: 'Auftrag, Handwerker, Gewerk oder Zuweisung fehlt.' }
+    return { ok: false, message: 'Auftrag, Partner, Gewerk oder Zuweisung fehlt.' }
   }
 
   const base = await loadProjektVertragBootstrap(auftragId)
@@ -347,14 +356,19 @@ export async function loadRahmenVertragBootstrap(
 ): Promise<{ ok: true; bootstrap: RahmenVertragWizardBootstrap } | { ok: false; message: string }> {
   const supabase = createClient()
   const { data: hw, error } = await supabase.from('handwerker').select(HW_SELECT).eq('id', handwerkerId).maybeSingle()
+  if (error) logDbError('app/vertraege/wizard-actions:handwerker', error)
+<<<<<<< Updated upstream
+  if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
+=======
   if (error || !hw) return { ok: false, message: error?.message ?? 'Handwerker nicht gefunden' }
+>>>>>>> Stashed changes
 
   let existingId = vertragId ?? null
   let existingNr: string | null = null
   let notizen = ''
 
   if (!vertragId) {
-    const { data: existing } = await supabase
+    const { data: existing, error } = await supabase
       .from('handwerker_vertraege')
       .select('id, vertrags_nr, notizen')
       .eq('handwerker_id', handwerkerId)
@@ -362,13 +376,15 @@ export async function loadRahmenVertragBootstrap(
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
     if (existing) {
       existingId = existing.id as string
       existingNr = existing.vertrags_nr as string
       notizen = (existing.notizen as string) ?? ''
     }
   } else {
-    const { data: v } = await supabase.from('handwerker_vertraege').select('*').eq('id', vertragId).maybeSingle()
+    const { data: v, error } = await supabase.from('handwerker_vertraege').select('*').eq('id', vertragId).maybeSingle()
+    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
     if (v) {
       existingNr = v.vertrags_nr as string
       notizen = (v.notizen as string) ?? ''
@@ -412,7 +428,8 @@ async function upsertVertragRow(
 
   let vertrags_nr: string
   if (input.vertrag_id) {
-    const { data } = await supabase.from('handwerker_vertraege').select('vertrags_nr').eq('id', input.vertrag_id).maybeSingle()
+    const { data, error } = await supabase.from('handwerker_vertraege').select('vertrags_nr').eq('id', input.vertrag_id).maybeSingle()
+    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
     vertrags_nr = (data?.vertrags_nr as string) ?? (await nextVertragsnummer(supabase, input.typ))
   } else {
     vertrags_nr = await nextVertragsnummer(supabase, input.typ)
@@ -459,6 +476,7 @@ async function upsertVertragRow(
 
   if (input.vertrag_id) {
     const { error } = await supabase.from('handwerker_vertraege').update(patch).eq('id', input.vertrag_id)
+    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
     if (error) return { ok: false, message: error.message }
     return { ok: true, id: input.vertrag_id, vertrags_nr }
   }
@@ -468,6 +486,7 @@ async function upsertVertragRow(
     .insert({ ...patch, status: 'entwurf', created_at: now })
     .select('id, vertrags_nr')
     .single()
+  if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
   return { ok: true, id: data.id as string, vertrags_nr: data.vertrags_nr as string }
@@ -478,7 +497,7 @@ export async function saveProjektVertragDraft(payload: {
   auftrag_id: string
   meta: ProjektVertragWizardMeta
 }): Promise<{ ok: true; vertrag_id: string; vertrags_nr: string } | { ok: false; message: string }> {
-  if (!payload.meta.handwerker_id) return { ok: false, message: 'Bitte Handwerker wählen.' }
+  if (!payload.meta.handwerker_id) return { ok: false, message: 'Bitte Partner wählen.' }
   const saved = await upsertVertragRow({
     vertrag_id: payload.vertrag_id,
     typ: 'projekt',
@@ -487,7 +506,7 @@ export async function saveProjektVertragDraft(payload: {
     meta: payload.meta,
   })
   if (!saved.ok) return saved
-  revalidatePath(`/auftraege/${payload.auftrag_id}`)
+  revalidateAuftragDetail(payload.auftrag_id)
   return { ok: true, vertrag_id: saved.id, vertrags_nr: saved.vertrags_nr }
 }
 
@@ -503,13 +522,14 @@ export async function finalizeProjektVertrag(payload: {
   const pdf = await persistPdfForVertrag(draft.vertrag_id)
   if (!pdf.ok) return pdf
 
-  await supabaseAdmin
+  const { error: __dbErr1 } = await supabaseAdmin
     .from('auftrag_handwerker')
     .update({ projektvertrag_quelle: 'crm_wizard' })
     .eq('auftrag_id', payload.auftrag_id)
     .eq('handwerker_id', payload.meta.handwerker_id)
+  if (__dbErr1) logDbError('app/vertraege/wizard-actions:auftrag_handwerker', __dbErr1)
 
-  revalidatePath(`/auftraege/${payload.auftrag_id}`)
+  revalidateAuftragDetail(payload.auftrag_id)
   return {
     ok: true,
     vertrag_id: draft.vertrag_id,
@@ -531,7 +551,7 @@ export async function finalizeHandwerkerAcceptWizard(payload: {
   const auftragId = payload.auftrag_id.trim()
   const handwerkerId = payload.handwerker_id.trim()
   if (!auftragId || !handwerkerId) {
-    return { ok: false, message: 'Auftrag oder Handwerker fehlt.' }
+    return { ok: false, message: 'Auftrag oder Partner fehlt.' }
   }
 
   const slugs = Array.from(new Set(payload.compliance_slugs.map((s) => s.trim()).filter(Boolean)))
@@ -541,6 +561,7 @@ export async function finalizeHandwerkerAcceptWizard(payload: {
     .update({ compliance_pflicht_slugs: slugs })
     .eq('auftrag_id', auftragId)
     .eq('handwerker_id', handwerkerId)
+  if (slugErr) logDbError('app/vertraege/wizard-actions:auftrag_handwerker', slugErr)
 
   if (slugErr) return { ok: false, message: slugErr.message }
 
@@ -551,13 +572,14 @@ export async function finalizeHandwerkerAcceptWizard(payload: {
   })
   if (!finalized.ok) return finalized
 
-  const { data: auftrag } = await supabaseAdmin
+  const { data: auftrag, error: error2 } = await supabaseAdmin
     .from('auftraege')
     .select('angebot_id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error2) logDbError('app/vertraege/wizard-actions:auftraege', error2)
   const angebotId = (auftrag as { angebot_id?: string | null } | null)?.angebot_id
-  if (angebotId) revalidatePath(`/angebote/${angebotId}`)
+  if (angebotId) revalidateAngebotDetail(angebotId)
 
   return {
     ok: true,
@@ -598,7 +620,7 @@ export async function finalizeRahmenVertrag(payload: {
     vertrags_nr: saved.vertrags_nr,
   })
 
-  revalidatePath(`/handwerker/${payload.handwerker_id}`)
+  revalidateHandwerkerDetail(payload.handwerker_id)
   return { ok: true, vertrag_id: saved.id, vertrags_nr: saved.vertrags_nr, pdf_url: pdf.publicUrl }
 }
 
@@ -608,12 +630,13 @@ export async function loadRahmenVertraegeForHandwerker(
   const map = new Map<string, HandwerkerVertragRow>()
   if (!handwerkerIds.length) return map
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('handwerker_vertraege')
     .select('*')
     .eq('typ', 'rahmen')
     .in('handwerker_id', handwerkerIds)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
   for (const row of (data ?? []) as HandwerkerVertragRow[]) {
     if (!map.has(row.handwerker_id)) map.set(row.handwerker_id, row)
   }
@@ -624,7 +647,7 @@ export async function loadRahmenVertragForHandwerker(
   handwerkerId: string
 ): Promise<HandwerkerVertragRow | null> {
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('handwerker_vertraege')
     .select('*')
     .eq('handwerker_id', handwerkerId)
@@ -632,16 +655,18 @@ export async function loadRahmenVertragForHandwerker(
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
   return (data as HandwerkerVertragRow | null) ?? null
 }
 
 export async function listVertraegeFuerAuftrag(auftragId: string): Promise<HandwerkerVertragRow[]> {
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('handwerker_vertraege')
     .select('*')
     .eq('auftrag_id', auftragId)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
   return (data ?? []) as HandwerkerVertragRow[]
 }
 
@@ -678,6 +703,7 @@ export async function loadNachtragBootstrap(input: {
     .eq('id', parentVertragId)
     .eq('auftrag_id', auftragId)
     .maybeSingle()
+  if (parentErr) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', parentErr)
 
   if (parentErr || !parent) {
     return { ok: false, message: parentErr?.message ?? 'Ursprungsvertrag nicht gefunden.' }
@@ -700,11 +726,12 @@ export async function loadNachtragBootstrap(input: {
   let nachtragPositionen: NachtragPositionDraft[] = nachtragPositionenAusAuftrag(pos)
 
   if (input.vertragId) {
-    const { data: draft } = await supabase
+    const { data: draft, error } = await supabase
       .from('handwerker_vertraege')
       .select('nachtrag_positionen')
       .eq('id', input.vertragId)
       .maybeSingle()
+    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
     const saved = (draft as { nachtrag_positionen?: NachtragPositionDraft[] | null } | null)
       ?.nachtrag_positionen
     if (saved?.length) nachtragPositionen = saved
@@ -744,11 +771,12 @@ export async function loadNachtragBootstrap(input: {
   }
 
   if (input.vertragId) {
-    const { data: existing } = await supabase
+    const { data: existing, error } = await supabase
       .from('handwerker_vertraege')
       .select('*')
       .eq('id', input.vertragId)
       .maybeSingle()
+    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
     if (existing) {
       const row = existing as HandwerkerVertragRow
       meta.leistungsumfang = row.leistungsumfang ?? meta.leistungsumfang
@@ -801,6 +829,7 @@ async function syncNachtragPositionenToAuftrag(
         material_fix: null,
         created_at: now,
       })
+      if (error) logDbError('app/vertraege/wizard-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
     } else {
       const { error } = await supabaseAdmin
@@ -808,6 +837,7 @@ async function syncNachtragPositionenToAuftrag(
         .update(payload)
         .eq('id', p.id)
         .eq('auftrag_id', auftragId)
+      if (error) logDbError('app/vertraege/wizard-actions:auftrag_positionen', error)
       if (error) return { ok: false, message: error.message }
     }
   }
@@ -820,15 +850,16 @@ export async function saveNachtragDraft(payload: {
   parent_vertrag_id: string
   meta: ProjektVertragWizardMeta
 }): Promise<{ ok: true; vertrag_id: string; vertrags_nr: string } | { ok: false; message: string }> {
-  if (!payload.meta.handwerker_id) return { ok: false, message: 'Handwerker fehlt.' }
+  if (!payload.meta.handwerker_id) return { ok: false, message: 'Partner fehlt.' }
   if (!payload.parent_vertrag_id) return { ok: false, message: 'Ursprungsvertrag fehlt.' }
 
   const supabase = createClient()
-  const { data: parent } = await supabase
+  const { data: parent, error } = await supabase
     .from('handwerker_vertraege')
     .select('vertrags_nr, signiert_am, created_at, vertrag_vom')
     .eq('id', payload.parent_vertrag_id)
     .maybeSingle()
+  if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
 
   const parentRow = parent as HandwerkerVertragRow | null
   const bezugDatum = parentRow ? parentVertragDatum(parentRow) : null
@@ -848,7 +879,7 @@ export async function saveNachtragDraft(payload: {
     },
   })
   if (!saved.ok) return saved
-  revalidatePath(`/auftraege/${payload.auftrag_id}`)
+  revalidateAuftragDetail(payload.auftrag_id)
   return { ok: true, vertrag_id: saved.id, vertrags_nr: saved.vertrags_nr }
 }
 
@@ -887,11 +918,12 @@ export async function finalizeNachtragVertrag(payload: {
   const handwerkerId = payload.meta.handwerker_id
   syncProjektvertragStilleFireAndForget(payload.auftrag_id, handwerkerId)
 
-  const { data: auftragRow } = await supabaseAdmin
+  const { data: auftragRow, error } = await supabaseAdmin
     .from('auftraege')
     .select('titel, kunden(name)')
     .eq('id', payload.auftrag_id)
     .maybeSingle()
+  if (error) logDbError('app/vertraege/wizard-actions:auftraege', error)
   const kunde = Array.isArray(auftragRow?.kunden)
     ? auftragRow.kunden[0]
     : auftragRow?.kunden
@@ -921,7 +953,7 @@ export async function finalizeNachtragVertrag(payload: {
     aenderungTyp: 'geaendert',
   })
 
-  revalidatePath(`/auftraege/${payload.auftrag_id}`)
+  revalidateAuftragDetail(payload.auftrag_id)
   return {
     ok: true,
     vertrag_id: draft.vertrag_id,

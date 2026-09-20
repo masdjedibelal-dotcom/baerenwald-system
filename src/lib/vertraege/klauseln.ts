@@ -1,5 +1,7 @@
 /** Statische Vertragsparagraphen (Projekt-Nachunternehmervertrag) */
 
+import { COPY_ROLE } from '@/lib/copy'
+
 export type VertragParagraph = { nr: string; title: string; body: string }
 
 export const PROJEKT_NU_PARAGRAPHEN: VertragParagraph[] = [
@@ -148,7 +150,7 @@ export const RAHMEN_PARAGRAPHEN: VertragParagraph[] = [
     nr: '§10',
     title: 'Partner-Portal und elektronische Kommunikation',
     body:
-      'Der Nachunternehmer nutzt das Partner-Portal des Auftraggebers zur Pflege von Stammdaten, Nachweisen und projektbezogenen Unterlagen. Uploads, Bestätigungen und Mitteilungen über das Portal oder in Textform (E-Mail) gelten als verbindlich. Der Nachunternehmer hält seine Angaben und Nachweise aktuell.',
+      `Der Nachunternehmer nutzt das ${COPY_ROLE.partnerPortal} des Auftraggebers zur Pflege von Stammdaten, Nachweisen und projektbezogenen Unterlagen. Uploads, Bestätigungen und Mitteilungen über das Portal oder in Textform (E-Mail) gelten als verbindlich. Der Nachunternehmer hält seine Angaben und Nachweise aktuell.`,
   },
   {
     nr: '§11',

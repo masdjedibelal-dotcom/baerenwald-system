@@ -1,9 +1,11 @@
 import type { PartnerAngebotAntwortTyp } from '@/lib/partner/notify-partner-angebot-antwort'
+import { buildPartnerSubject } from '@/lib/mail/build-subject'
+import { C } from '@/lib/tokens/colors'
 
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
@@ -21,10 +23,11 @@ export function handwerkerEinreichungAntwortBetreff(
   typ: PartnerAngebotAntwortTyp,
   gewerkName: string
 ): string {
-  if (typ === 'rueckfrage') {
-    return `Rückfrage zu deinem Angebot: ${gewerkName} — Bärenwald Partner`
-  }
-  return `Angebot nicht übernommen: ${gewerkName} — Bärenwald Partner`
+  return buildPartnerSubject({
+    gewerk: gewerkName,
+    ereignis:
+      typ === 'rueckfrage' ? 'Rückfrage zu deinem Angebot' : 'Angebot nicht übernommen',
+  })
 }
 
 /** HTML-Vorschau für CRM-Modal (entspricht Partner-Portal-Mail). */
@@ -44,23 +47,23 @@ export function handwerkerEinreichungAntwortPreviewHtml(opts: {
   const portalHref = `${partnerSiteBaseUrl()}/partner/login?next=${encodeURIComponent(`/partner?section=angebote&id=${opts.anfrageId}`)}`
 
   return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;">
+<body style="margin:0;padding:0;background:${C.white};font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${C.white};">
 <tr><td align="center" style="padding:32px 16px;">
 <table width="580" cellpadding="0" cellspacing="0" role="presentation" style="max-width:580px;width:100%;">
-<tr><td style="padding:0 0 20px;border-bottom:1px solid #E5E7EB;">
-  <span style="font-size:20px;font-weight:700;color:#1A3D2B;">Bärenwald</span>
+<tr><td style="padding:0 0 20px;border-bottom:1px solid ${C.gray200};">
+  <span style="font-size:20px;font-weight:700;color:${C.greenDark};">Bärenwald</span>
 </td></tr>
 <tr><td style="padding:28px 0 20px;">
-  <h2 style="color:#2E7D52;margin:0 0 16px;font-size:20px;">${escapeHtml(titel)}</h2>
+  <h2 style="color:${C.green};margin:0 0 16px;font-size:20px;">${escapeHtml(titel)}</h2>
   <p style="margin:0 0 12px;font-size:15px;line-height:1.6;">Hallo ${escapeHtml(opts.handwerkerName)},</p>
   <p style="margin:0 0 12px;font-size:15px;line-height:1.6;">${intro}</p>
   <p style="margin:0 0 12px;font-size:14px;line-height:1.6;"><strong>${escapeHtml(opts.angebotTitel)}</strong> · ${escapeHtml(opts.gewerkName)}</p>
-  <div style="background:#EAF3DE;border-radius:8px;padding:16px 20px;margin:16px 0;">
+  <div style="background:${C.greenSoft};border-radius:8px;padding:16px 20px;margin:16px 0;">
     <p style="margin:0 0 6px;font-size:13px;font-weight:600;">Nachricht von Bärenwald</p>
     <p style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(opts.crmNotiz.trim())}</p>
   </div>
-  <a href="${escapeHtml(portalHref)}" style="display:inline-block;background:#2E7D52;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;margin:20px 0 8px;">Zum Partner-Portal</a>
+  <a href="${escapeHtml(portalHref)}" style="display:inline-block;background:${C.green};color:${C.white};text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;margin:20px 0 8px;">Zum Partner-Portal</a>
 </td></tr>
 </table>
 </td></tr>

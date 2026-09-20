@@ -1,6 +1,14 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn, MockDragHandle } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { useLocalTransition } from '@/components/ui/action-busy'
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -22,6 +30,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+<<<<<<< Updated upstream
+=======
 import {
   AlignLeft,
   Calendar,
@@ -36,13 +46,10 @@ import {
   Trash2,
   Type,
 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
-import { Input } from '@/components/ui/Input'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { FormularFelderRenderer } from '@/components/formulare/FormularFelderRenderer'
 import { FormularVorschauModal } from '@/components/formulare/FormularVorschauModal'
 import { FORMULAR_SUBTYP_OPTIONS } from '@/lib/formular-constants'
@@ -67,13 +74,13 @@ function newFieldId() {
 function feldIcon(typ: FormularFeld['typ']) {
   const c = 'h-4 w-4 shrink-0 text-bw-mid'
   const map = {
-    text: <Type className={c} aria-hidden />,
-    textarea: <AlignLeft className={c} aria-hidden />,
-    number: <Hash className={c} aria-hidden />,
-    date: <Calendar className={c} aria-hidden />,
-    checkbox: <CheckSquare className={c} aria-hidden />,
-    select: <List className={c} aria-hidden />,
-    foto: <Camera className={c} aria-hidden />,
+    text: <MockIcon n="text-caption" ctx="default" className={c} aria-hidden />,
+    textarea: <MockIcon n="list" ctx="default" className={c} aria-hidden />,
+    number: <MockIcon n="tag" ctx="default" className={c} aria-hidden />,
+    date: <MockIcon n="calendar" ctx="default" className={c} aria-hidden />,
+    checkbox: <MockIcon n="checklist" ctx="default" className={c} aria-hidden />,
+    select: <MockIcon n="list" ctx="default" className={c} aria-hidden />,
+    foto: <MockIcon n="photo" ctx="default" className={c} aria-hidden />,
   }
   return map[typ]
 }
@@ -104,17 +111,14 @@ function SortableFeldRow({
 
   return (
     <li ref={setNodeRef} style={style} className="list-none">
-      <div className="rounded-xl border border-bw-border bg-bw-card">
+      <div className="rounded-sheet border border-bw-border bg-surface">
         <div className="flex flex-wrap items-start gap-2 p-3">
-          <button
-            type="button"
+          <MockDragHandle
             className="mt-1 cursor-grab touch-none text-bw-light hover:text-bw-text"
             aria-label="Verschieben"
             {...attributes}
             {...listeners}
-          >
-            <GripVertical className="h-5 w-5" />
-          </button>
+          />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               {feldIcon(f.typ)}
@@ -126,22 +130,12 @@ function SortableFeldRow({
             </p>
           </div>
           <div className="flex gap-1">
-            <button
-              type="button"
-              className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-bw-border text-bw-mid hover:bg-bw-hover"
-              onClick={onToggleExpand}
-              aria-label="Bearbeiten"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-bw-border text-status-cancel-text hover:bg-bw-hover"
-              onClick={onRemove}
-              aria-label="Entfernen"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            <MockBtn className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-button border border-bw-border text-bw-mid hover:bg-bw-hover" type="button" onClick={onToggleExpand} aria-label="Bearbeiten">
+              <MockIcon n="pencil" ctx="default" className="h-4 w-4" />
+            </MockBtn>
+            <MockBtn className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-button border border-bw-border text-status-cancel-text hover:bg-bw-hover" type="button" onClick={onRemove} aria-label="Löschen">
+              <MockIcon n="trash" ctx="default" className="h-4 w-4" />
+            </MockBtn>
           </div>
         </div>
         {expanded ? <div className="border-t border-bw-border bg-bw-canvas/40 p-4">{childrenInline}</div> : null}
@@ -300,7 +294,7 @@ export function FormularTemplateForm({
       }
       if (isNew) router.replace(`/formulare/${res.id}/bearbeiten`)
       else {
-        router.refresh()
+        afterServerActionRefresh()
         onSaved?.()
       }
     })
@@ -308,7 +302,7 @@ export function FormularTemplateForm({
 
   function onDelete() {
     if (!initial?.id) return
-    confirmDelete(
+    openDeleteConfirm(
       'Template deaktivieren?',
       async () => {
         const res = await deleteFormularTemplate(initial.id)
@@ -325,47 +319,23 @@ export function FormularTemplateForm({
   const grundinfoCard = (
     <Card className="space-y-4 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Grundinfo</p>
-      <Input label="Name *" value={name} onChange={(e) => setName(e.target.value)} required />
-      <Select
-        label="Subtyp"
-        name="subtyp"
-        value={subtyp}
-        onChange={(e) => setSubtyp(e.target.value)}
-        options={FORMULAR_SUBTYP_OPTIONS.map((o) => ({ value: o.value as string, label: o.label }))}
-      />
-      <Select
-        label="Phase"
-        name="phase"
-        value={phase}
-        onChange={(e) => setPhase(e.target.value as NonNullable<FormularTemplate['phase']>)}
-        options={[
+      <MockField label="Name *" required><MockInput value={name} onChange={(e) => setName(e.target.value)} required /></MockField>
+      <Combobox label="Subtyp" id="subtyp" name="subtyp" options={FORMULAR_SUBTYP_OPTIONS.map((o) => ({ value: o.value as string, label: o.label }))} value={subtyp == null ? '' : String(subtyp)} placeholder="Auswählen…" onChange={(next) => { setSubtyp(next); }} />
+      <Combobox label="Phase" id="phase" name="phase" options={[
           { value: 'vorab', label: FORMULAR_PHASE_LABELS.vorab },
           { value: 'update', label: FORMULAR_PHASE_LABELS.update },
           { value: 'abnahme', label: FORMULAR_PHASE_LABELS.abnahme },
-        ]}
-      />
-      <Select
-        label="Zielgruppe"
-        name="typ"
-        value={typ}
-        onChange={(e) => setTyp(e.target.value as FormularTemplate['typ'])}
-        options={[
-          { value: 'handwerker', label: 'Handwerker' },
+        ]} value={phase == null ? '' : String(phase)} placeholder="Auswählen…" onChange={(next) => { setPhase(next as NonNullable<FormularTemplate['phase']>); }} />
+      <Combobox label="Zielgruppe" id="typ" name="typ" options={[
+          { value: 'handwerker', label: 'Partner' },
           { value: 'betreuer', label: 'Betreuer (Vor-Ort)' },
-        ]}
-      />
-      <Select
-        label="Gewerk (optional)"
-        name="gewerk"
-        value={gewerkId}
-        onChange={(e) => setGewerkId(e.target.value)}
-        options={[
+        ]} value={typ == null ? '' : String(typ)} placeholder="Auswählen…" onChange={(next) => { setTyp(next as FormularTemplate['typ']); }} />
+      <Combobox label="Gewerk (optional)" id="gewerk" name="gewerk" options={[
           { value: '', label: 'Alle Gewerke' },
           ...gewerke.filter((g) => g.aktiv).map((g) => ({ value: g.id, label: g.name })),
-        ]}
-      />
+        ]} value={gewerkId == null ? '' : String(gewerkId)} placeholder="Auswählen…" onChange={(next) => { setGewerkId(next); }} />
       <label className="flex items-center gap-2 text-sm text-bw-text">
-        <input type="checkbox" checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} />
+        <MockCheckbox checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} />
         Aktiv
       </label>
     </Card>
@@ -376,22 +346,18 @@ export function FormularTemplateForm({
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold text-bw-text">Felder</h2>
               <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className="rounded-lg border border-bw-border bg-bw-canvas px-3 py-2 text-sm text-bw-text"
-                  defaultValue=""
-                  onChange={(e) => {
+                <MockSelect className="rounded-card border border-bw-border bg-bw-canvas px-3 py-2 text-sm text-bw-text" defaultValue="" onChange={(e) => {
                     const v = e.target.value as FormularFeld['typ']
                     if (v) addFieldOfType(v)
                     e.target.value = ''
-                  }}
-                >
+                  }}>
                   <option value="">+ Feld hinzufügen…</option>
                   {TYP_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>
                   ))}
-                </select>
+                </MockSelect>
               </div>
             </div>
 
@@ -421,38 +387,21 @@ export function FormularTemplateForm({
                         }}
                         childrenInline={
                           <div className="space-y-3">
-                            <Input
-                              ref={expandedId === f.id ? labelInputRef : undefined}
-                              label="Label"
-                              value={expandedId === f.id ? flLabel : f.label}
-                              onChange={(e) => setFlLabel(e.target.value)}
-                            />
-                            <Select
-                              label="Typ"
-                              name={`ft-${f.id}`}
-                              value={expandedId === f.id ? flTyp : f.typ}
-                              onChange={(e) => setFlTyp(e.target.value as FormularFeld['typ'])}
-                              options={TYP_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-                            />
+                            <MockField label="Label"><MockInput ref={expandedId === f.id ? labelInputRef : undefined} value={expandedId === f.id ? flLabel : f.label} onChange={(e) => setFlLabel(e.target.value)} /></MockField>
+                            <Combobox label="Typ" id={`ft-${f.id}`} name={`ft-${f.id}`} options={TYP_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} value={expandedId === f.id ? flTyp : f.typ == null ? '' : String(expandedId === f.id ? flTyp : f.typ)} placeholder="Auswählen…" onChange={(next) => { setFlTyp(next as FormularFeld['typ']); }} />
                             <label className="flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
+                              <MockCheckbox
                                 checked={expandedId === f.id ? flPflicht : f.pflicht}
                                 onChange={(e) => setFlPflicht(e.target.checked)}
                               />
                               Pflichtfeld
                             </label>
                             {(expandedId === f.id ? flTyp : f.typ) === 'select' ? (
-                              <Textarea
-                                label="Optionen (eine pro Zeile)"
-                                value={expandedId === f.id ? flOpts : (f.optionen ?? []).join('\n')}
-                                onChange={(e) => setFlOpts(e.target.value)}
-                                rows={4}
-                              />
+                              <MockField label="Optionen (eine pro Zeile)"><RichTextEditor value={typeof (expandedId === f.id ? flOpts : (f.optionen ?? []).join('\n')) === 'string' ? (expandedId === f.id ? flOpts : (f.optionen ?? []).join('\n')) : ''} onChange={(__v) => setFlOpts(__v)} minHeight={120} aria-label="Optionen (eine pro Zeile)" /></MockField>
                             ) : null}
-                            <Button type="button" variant="primary" size="sm" onClick={() => saveInline(f.id)}>
+                            <MockBtn type="button" kind="primary" sm onClick={() => saveInline(f.id)}>
                               Speichern
-                            </Button>
+                            </MockBtn>
                           </div>
                         }
                       />
@@ -469,16 +418,16 @@ export function FormularTemplateForm({
       <Link href="/formulare" className="btn ghost inline-flex items-center justify-center">
         Abbrechen
       </Link>
-      <Button type="button" variant="secondary" onClick={() => setPreviewOpen(true)}>
+      <MockBtn type="button" kind="secondary" onClick={() => setPreviewOpen(true)}>
         Vorschau
-      </Button>
-      <Button type="button" variant="primary" onClick={saveAll} loading={pending}>
+      </MockBtn>
+      <MockBtn type="button" kind="primary" onClick={saveAll} loading={pending}>
         Speichern
-      </Button>
+      </MockBtn>
       {!isNew ? (
-        <Button type="button" variant="danger" onClick={onDelete} disabled={pending}>
+        <MockBtn type="button" kind="danger" onClick={onDelete} disabled={pending}>
           Deaktivieren
-        </Button>
+        </MockBtn>
       ) : null}
     </div>
   ) : null
@@ -487,42 +436,34 @@ export function FormularTemplateForm({
         <aside className="w-full shrink-0 space-y-3 xl:sticky xl:top-20 xl:w-[340px]">
           <p className="text-xs font-medium uppercase tracking-wide text-bw-light">Live-Vorschau</p>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setVorschauView('phone')}
-              className={cn(
-                'inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs',
+            <MockBtn className={cn(
+                'inline-flex flex-1 items-center justify-center gap-1 rounded-card border px-2 py-2 text-xs',
                 vorschauView === 'phone'
                   ? 'border-bw-accent bg-bw-accent text-white'
-                  : 'border-bw-border bg-bw-card text-bw-text'
-              )}
-            >
-              <Smartphone className="h-4 w-4" />
+                  : 'border-bw-border bg-surface text-bw-text'
+              )} type="button" onClick={() => setVorschauView('phone')}>
+              <MockIcon n="phone" ctx="default" className="h-4 w-4" />
               Handy
-            </button>
-            <button
-              type="button"
-              onClick={() => setVorschauView('desktop')}
-              className={cn(
-                'inline-flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs',
+            </MockBtn>
+            <MockBtn className={cn(
+                'inline-flex flex-1 items-center justify-center gap-1 rounded-card border px-2 py-2 text-xs',
                 vorschauView === 'desktop'
                   ? 'border-bw-accent bg-bw-accent text-white'
-                  : 'border-bw-border bg-bw-card text-bw-text'
-              )}
-            >
-              <Monitor className="h-4 w-4" />
+                  : 'border-bw-border bg-surface text-bw-text'
+              )} type="button" onClick={() => setVorschauView('desktop')}>
+              <MockIcon n="layout" ctx="default" className="h-4 w-4" />
               Desktop
-            </button>
+            </MockBtn>
           </div>
           <p className="text-xs text-bw-light">Vorschau — nichts wird gespeichert.</p>
           {vorschauView === 'phone' ? (
-            <div className="mx-auto w-full max-w-[320px] rounded-[2rem] border-[10px] border-zinc-900 bg-zinc-900 p-1 shadow-lg">
+            <div className="mx-auto w-full max-w-[320px] rounded-[2rem] border-[10px] border-bw-dark bg-bw-dark p-1 shadow-lg">
               <div className="max-h-[min(70vh,520px)] overflow-y-auto rounded-[1.35rem] bg-white p-3">
                 <FormularFelderRenderer felder={felder} daten={previewDaten} vorschauModus />
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-bw-border bg-bw-canvas/30 p-3">
+            <div className="rounded-sheet border border-bw-border bg-bw-canvas/30 p-3">
               <FormularFelderRenderer felder={felder} daten={previewDaten} vorschauModus />
             </div>
           )}
@@ -531,19 +472,19 @@ export function FormularTemplateForm({
 
   const embeddedFooter = embedded ? (
     <div className="flex flex-wrap gap-2 border-t border-bw-border pt-4">
-      <Button type="button" variant="secondary" onClick={() => onClose?.()}>
+      <MockBtn type="button" kind="secondary" onClick={() => onClose?.()}>
         Abbrechen
-      </Button>
-      <Button type="button" variant="secondary" onClick={() => setPreviewOpen(true)}>
+      </MockBtn>
+      <MockBtn type="button" kind="secondary" onClick={() => setPreviewOpen(true)}>
         Vorschau
-      </Button>
-      <Button type="button" variant="primary" onClick={saveAll} loading={pending}>
+      </MockBtn>
+      <MockBtn type="button" kind="primary" onClick={saveAll} loading={pending}>
         Speichern
-      </Button>
+      </MockBtn>
       {!isNew ? (
-        <Button type="button" variant="danger" onClick={onDelete} disabled={pending}>
+        <MockBtn type="button" kind="danger" onClick={onDelete} disabled={pending}>
           Deaktivieren
-        </Button>
+        </MockBtn>
       ) : null}
     </div>
   ) : null
@@ -554,9 +495,9 @@ export function FormularTemplateForm({
         <PageHeader
           action={
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
+              <MockBtn type="button" kind="secondary" sm onClick={() => setPreviewOpen(true)}>
                 Vorschau
-              </Button>
+              </MockBtn>
               <Link href="/formulare" className="text-sm font-medium text-bw-link">
                 Zur Liste
               </Link>
@@ -565,25 +506,17 @@ export function FormularTemplateForm({
         />
       ) : (
         <div className="mb-4 flex flex-wrap gap-1 border-b border-bw-border">
-          <button
-            type="button"
-            className={cn('tab', panelTab === 'felder' && 'active')}
-            onClick={() => setPanelTab('felder')}
-          >
+          <MockBtn className={cn('tab', panelTab === 'felder' && 'active')} type="button" onClick={() => setPanelTab('felder')}>
             Felder
-          </button>
-          <button
-            type="button"
-            className={cn('tab', panelTab === 'einstellungen' && 'active')}
-            onClick={() => setPanelTab('einstellungen')}
-          >
+          </MockBtn>
+          <MockBtn className={cn('tab', panelTab === 'einstellungen' && 'active')} type="button" onClick={() => setPanelTab('einstellungen')}>
             Einstellungen
-          </button>
+          </MockBtn>
         </div>
       )}
 
       {err ? (
-        <p className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{err}</p>
+        <p className="mb-3 rounded-button border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{err}</p>
       ) : null}
 
       <div className={cn('flex flex-col gap-6', !embedded && 'xl:flex-row xl:items-start')}>

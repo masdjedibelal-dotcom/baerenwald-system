@@ -1,4 +1,4 @@
-import { Shield } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { formatDatum } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import type { VersicherungStatus } from '@/lib/handwerker-versicherung'
@@ -12,7 +12,7 @@ export function VersicherungCell({
 }) {
   const iconCls = {
     ok: 'text-bw-primary',
-    warn: 'text-amber-600',
+    warn: 'text-warning',
     expired: 'text-status-cancel-text',
     missing: 'text-bw-text-muted opacity-50',
   }[status]
@@ -22,12 +22,12 @@ export function VersicherungCell({
 
   return (
     <div className="flex items-center gap-1.5" title="Betriebshaftpflichtversicherung">
-      <Shield className={cn('h-4 w-4 shrink-0', iconCls)} aria-hidden />
+      <MockIcon n="shield-check" ctx="default" className={cn('h-4 w-4 shrink-0', iconCls)} aria-hidden />
       <span
         className={cn(
           'text-xs tabular-nums',
           status === 'expired' && 'font-medium text-status-cancel-text',
-          status === 'warn' && 'font-medium text-amber-700'
+          status === 'warn' && 'font-medium text-status-contact-text'
         )}
       >
         {label}

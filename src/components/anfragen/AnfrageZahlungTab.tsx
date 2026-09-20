@@ -1,9 +1,9 @@
 'use client'
 
-import Link from 'next/link'
+import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import Link from 'next/link'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { formatDatum } from '@/lib/utils'
@@ -89,7 +89,7 @@ export function AnfrageZahlungTab({
             <li key={r.id}>
               <Link
                 href={`/rechnungen/${r.id}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] px-3 py-2.5 no-underline transition-colors hover:bg-[var(--bg-soft)]"
+                className="flex items-center justify-between gap-3 rounded-card border border-[var(--border)] px-3 py-2.5 no-underline transition-colors hover:bg-[var(--bg-soft)]"
               >
                 <div className="min-w-0">
                   <div className="truncate text-[length:var(--fs-text)] font-semibold text-[var(--text)]">

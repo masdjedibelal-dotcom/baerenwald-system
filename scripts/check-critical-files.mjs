@@ -38,7 +38,7 @@ const required = [
   'src/lib/get-mail-branding.ts',
   'src/lib/kalender-internes-todo.ts',
   'src/components/ui/Card.tsx',
-  'src/components/ui/Button.tsx',
+  'src/components/mock-ui/MockPrimitives.tsx',
   'src/components/brand/BrandLogo.tsx',
   'src/components/kalender/KalenderClient.tsx',
   'src/hooks/useIsCrmAdmin.ts',

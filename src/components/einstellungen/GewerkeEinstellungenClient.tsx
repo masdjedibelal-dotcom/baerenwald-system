@@ -1,6 +1,12 @@
 'use client'
-import { useLocalTransition } from '@/components/ui/action-busy'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
+import { MockBtn, MockDragHandle } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { useLocalTransition } from '@/components/ui/action-busy'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useState } from 'react'
 import {
   DndContext,
@@ -12,12 +18,14 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+<<<<<<< Updated upstream
+=======
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import {
   createGewerk,
   setGewerkAktiv,
@@ -34,7 +42,7 @@ import {
   normalizeGewerkAusfuehrung,
   type GewerkAusfuehrung,
 } from '@/lib/gewerke-ausfuehrung'
-import { useRouter } from 'next/navigation'
+import { TOAST } from '@/lib/copy'
 
 function SortRow({
   g,
@@ -61,110 +69,88 @@ function SortRow({
     <li
       ref={setNodeRef}
       style={style}
-      className="flex flex-wrap items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 py-2"
+      className="flex flex-wrap items-center gap-2 rounded-card border border-bw-border bg-surface px-3 py-2"
     >
-      <button
-        type="button"
+      <MockDragHandle
         className="touch-none text-bw-text-muted hover:text-bw-text"
         aria-label="Verschieben"
         {...attributes}
         {...listeners}
-      >
-        <GripVertical className="h-5 w-5" />
-      </button>
+      />
       <div className="min-w-0 flex-1">
         {editing ? (
-          <Input
-            value={name}
-            autoFocus
-            onChange={(e) => setName(e.target.value)}
-            onBlur={() => {
+          <MockInput value={name} autoFocus onChange={(e) => setName(e.target.value)} onBlur={() => {
               setEditing(false)
               if (name.trim() && name.trim() !== g.name) onRename(name.trim())
               else setName(g.name)
-            }}
-            onKeyDown={(e) => {
+            }} onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               if (e.key === 'Escape') {
                 setName(g.name)
                 setEditing(false)
               }
-            }}
-          />
+            }} />
         ) : (
-          <button
-            type="button"
-            className="text-left font-medium text-bw-text hover:underline"
-            onClick={() => setEditing(true)}
-          >
+          <MockBtn className="text-left font-medium text-bw-text hover:underline" type="button" onClick={() => setEditing(true)}>
             {g.name}
-          </button>
+          </MockBtn>
         )}
         <p className="text-xs text-bw-text-muted">{g.anzahl_leistungen} Leistungen</p>
         <div className="mt-2 flex w-full flex-col gap-3 sm:max-w-md">
           <div className="form-field">
             <span className="form-field-label">Ausführung</span>
-            <select
-              className="input w-full"
-              value={g.ausfuehrung}
-              onChange={(e) => {
+            <MockSelect className="w-full" value={g.ausfuehrung} onChange={(e) => {
                 const ausfuehrung = normalizeGewerkAusfuehrung(e.target.value)
                 onAusfuehrung({
                   ausfuehrung,
                   fachbetrieb_hinweis: ausfuehrung === 'eigen' ? null : g.fachbetrieb_hinweis,
                 })
-              }}
-            >
+              }}>
               <option value="eigen">Eigenleistung</option>
               <option value="fachbetrieb">Immer Fachbetrieb</option>
               <option value="beides">Eigen + Fachbetrieb</option>
-            </select>
+            </MockSelect>
           </div>
           {g.ausfuehrung !== 'eigen' ? (
             <div className="form-field">
               <span className="form-field-label">Fachbetrieb-Hinweis</span>
-              <Textarea
-                rows={2}
-                value={hinweisDraft}
-                placeholder="Ausführung durch zugelassenen Fachbetrieb…"
-                onChange={(e) => setHinweisDraft(e.target.value)}
-                onBlur={() => {
-                  const trimmed = hinweisDraft.trim() || null
-                  if (trimmed === (g.fachbetrieb_hinweis?.trim() || null)) return
-                  onAusfuehrung({ ausfuehrung: g.ausfuehrung, fachbetrieb_hinweis: trimmed })
-                }}
-              />
+              <RichTextEditor value={typeof (hinweisDraft) === 'string' ? (hinweisDraft) : ''} onChange={(__v) => setHinweisDraft(__v)} placeholder="Ausführung durch zugelassenen Fachbetrieb…" minHeight={120} aria-label="Ausführung durch zugelassenen Fachbetrieb…" />
             </div>
           ) : null}
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
+        <MockCheckbox
           checked={g.aktiv}
           onChange={(e) => onToggle(e.target.checked)}
         />
         aktiv
       </label>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
+      <MockBtn type="button" kind="ghost" sm onClick={() => setEditing(true)}>
+<<<<<<< Updated upstream
+        <MockIcon n="pencil" ctx="default" className="h-4 w-4" aria-hidden />
+=======
         <Pencil className="h-4 w-4" aria-hidden />
-      </Button>
-      <Button
+>>>>>>> Stashed changes
+      </MockBtn>
+      <MockBtn
         type="button"
-        variant="ghost"
-        size="sm"
+        kind="ghost" sm
         disabled={g.anzahl_leistungen > 0}
         title={g.anzahl_leistungen > 0 ? 'Zuerst Leistungen entfernen' : 'Löschen'}
         onClick={onDelete}
       >
+<<<<<<< Updated upstream
+        <MockIcon n="trash" ctx="default" className="h-4 w-4 text-status-cancel-text" aria-hidden />
+=======
         <Trash2 className="h-4 w-4 text-status-cancel-text" aria-hidden />
-      </Button>
+>>>>>>> Stashed changes
+      </MockBtn>
     </li>
   )
 }
 
 export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCount[] }) {
-  const router = useRouter()
   const [rows, setRows] = useState(initial)
   const [neuOpen, setNeuOpen] = useState(false)
   const [neuName, setNeuName] = useState('')
@@ -180,31 +166,28 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
     const next = arrayMove(rows, oldIndex, newIndex)
     const r = await reorderGewerke(next.map((x) => x.id))
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     setRows(next)
-    router.refresh()
   }
 
   async function toggle(id: string, aktiv: boolean) {
     const r = await setGewerkAktiv(id, aktiv)
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     setRows((prev) => prev.map((x) => (x.id === id ? { ...x, aktiv } : x)))
-    router.refresh()
   }
 
   async function rename(id: string, name: string) {
     const r = await updateGewerk(id, { name })
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     setRows((prev) => prev.map((x) => (x.id === id ? { ...x, name } : x)))
-    router.refresh()
   }
 
   async function patchAusfuehrung(
@@ -213,7 +196,7 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
   ) {
     const r = await updateGewerkAusfuehrung(id, patch)
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     setRows((prev) =>
@@ -230,17 +213,17 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
   }
 
   function remove(g: GewerkMitCount) {
-    confirmDelete(
+    openDeleteConfirm(
       `Gewerk „${g.name}“ löschen?`,
       async () => {
         const r = await deleteGewerkIfEmpty(g.id)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Gelöscht')
+        toast.success(TOAST.geloescht)
         setRows((prev) => prev.filter((x) => x.id !== g.id))
-        router.refresh()
+        
       }
     )
   }
@@ -248,20 +231,20 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
   function saveNeu() {
     const n = neuName.trim()
     if (!n) {
-      toast.error('Name eingeben')
+      toast.error(TOAST.name_eingeben)
       return
     }
     startTransition(async () => {
       const r = await createGewerk(n)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Gewerk angelegt')
+      toast.success(TOAST.gewerk_angelegt)
       setNeuName('')
       const fresh = await loadGewerkeEinstellungen()
       setRows(fresh)
-      router.refresh()
+      
     })
   }
 
@@ -285,19 +268,24 @@ export function GewerkeEinstellungenClient({ initial }: { initial: GewerkMitCoun
       </DndContext>
 
       {neuOpen ? (
+<<<<<<< Updated upstream
+        <div className="flex flex-wrap items-end gap-2 rounded-field border border-bw-border bg-surface p-3">
+          <MockField label="Neues Gewerk"><MockInput value={neuName} onChange={(e) => setNeuName(e.target.value)} /></MockField>
+=======
         <div className="flex flex-wrap items-end gap-2 rounded-lg border border-bw-border bg-bw-card p-3">
           <Input label="Neues Gewerk" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
-          <Button type="button" variant="ghost" onClick={() => setNeuOpen(false)}>
+>>>>>>> Stashed changes
+          <MockBtn type="button" kind="ghost" onClick={() => setNeuOpen(false)}>
             Abbrechen
-          </Button>
-          <Button type="button" variant="primary" loading={pending} onClick={() => saveNeu()}>
+          </MockBtn>
+          <MockBtn type="button" kind="primary" loading={pending} onClick={() => saveNeu()}>
             Speichern
-          </Button>
+          </MockBtn>
         </div>
       ) : (
-        <Button type="button" variant="secondary" onClick={() => setNeuOpen(true)}>
+        <MockBtn type="button" kind="secondary" onClick={() => setNeuOpen(true)}>
           + Neues Gewerk
-        </Button>
+        </MockBtn>
       )}
     </div>
   )

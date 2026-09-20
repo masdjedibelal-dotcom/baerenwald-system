@@ -1,7 +1,21 @@
 'use client'
 
-import type { MouseEvent, PointerEvent, ReactNode } from 'react'
+<<<<<<< Updated upstream
+=======
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
+>>>>>>> Stashed changes
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
 import { cn } from '@/lib/utils'
 
 export function MockChip({
@@ -34,49 +48,82 @@ export function MockChip({
   )
 }
 
-export function MockBtn({
-  kind,
-  sm,
-  icon,
-  onClick,
-  children,
-  title,
-  'aria-label': ariaLabel,
-  type = 'button',
-  disabled,
-  className,
-}: {
-  kind?: 'primary' | 'ghost' | 'secondary' | 'danger' | ''
-  sm?: boolean
-  icon?: string
-  onClick?: (e: MouseEvent<HTMLButtonElement>) => void
+export type MockBtnKind = 'primary' | 'secondary' | 'ghost' | 'danger' | ''
+export type MockBtnSize = 'sm' | 'md' | 'lg'
+
+export type MockBtnProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
   children?: ReactNode
-  title?: string
-  'aria-label'?: string
-  type?: 'button' | 'submit'
-  disabled?: boolean
-  className?: string
-}) {
+  /** Mock-API; leer/undefined → nur `.btn` (kein forced primary) */
+  kind?: MockBtnKind
+  /** Legacy `ui/Button` — mappt auf kind */
+  variant?: Exclude<MockBtnKind, ''>
+  sm?: boolean
+  size?: MockBtnSize
+  loading?: boolean
+  fullWidth?: boolean
+  icon?: string
+}
+
+export const MockBtn = forwardRef<HTMLButtonElement, MockBtnProps>(function MockBtn(
+  {
+    kind,
+    variant,
+    sm,
+    size,
+    loading = false,
+    disabled = false,
+    fullWidth = false,
+    icon,
+    onClick,
+    children,
+    title,
+    'aria-label': ariaLabel,
+    type = 'button',
+    className,
+    ...props
+  },
+  ref
+) {
+  // kind gewinnt; variant nur Legacy-Alias; weder noch → bare `.btn`
+  const resolvedKind = kind !== undefined && kind !== null ? kind : variant
+  const isSm = sm === true || size === 'sm'
+
   return (
     <button
+      ref={ref}
       type={type}
+      disabled={disabled || loading}
+      {...props}
       className={cn(
         'btn',
-        kind || '',
-        sm && 'sm',
+        resolvedKind || '',
+        isSm && 'sm',
         icon && !children && 'icon',
+        fullWidth && 'w-full',
         className
       )}
       onClick={onClick}
       title={title}
       aria-label={ariaLabel ?? (icon && !children ? title : undefined)}
-      disabled={disabled}
     >
-      {icon ? <MockIcon ctx="btn" n={icon} size={sm ? 14 : 15} /> : null}
+      {loading ? (
+        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeDasharray="30"
+            strokeDashoffset="10"
+          />
+        </svg>
+      ) : null}
+      {icon ? <MockIcon ctx="btn" n={icon} size={isSm ? 14 : 15} /> : null}
       {children}
     </button>
   )
-}
+})
 
 export function MockBadge({ kind, children }: { kind?: string; children: ReactNode }) {
   return <span className={cn('badge', kind || 'plain')}>{children}</span>

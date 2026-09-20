@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { acceptRahmenvertragFromPortal } from '@/lib/vertraege/provision-rahmenvertrag-portal'
@@ -10,7 +11,8 @@ async function portalHandwerkerId(supabase: ReturnType<typeof createClient>): Pr
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
-  const { data } = await supabase.from('handwerker').select('id').eq('auth_user_id', user.id).maybeSingle()
+  const {data, error} = await supabase.from('handwerker').select('id').eq('auth_user_id', user.id).maybeSingle()
+  if (error) logDbError('app/api/portal/rahmenvertrag/accept/route:handwerker', error)
   const id = (data?.id as string | undefined) ?? ''
   if (!id) return null
   return { id, userId: user.id }

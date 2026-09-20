@@ -1,11 +1,17 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { MockBtn } from '@/components/mock-ui'
+import { MockField, MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useLocalTransition } from '@/components/ui/action-busy'
-
 import { useMemo, useState } from 'react'
+<<<<<<< Updated upstream
+=======
 import { Mail, Send, Upload, X } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+>>>>>>> Stashed changes
 import { toast } from '@/components/ui/app-toast'
 import { createKundenUpdateAndSend } from '@/app/(dashboard)/auftraege/kunden-update-actions'
 import {
@@ -15,6 +21,8 @@ import {
 } from '@/lib/auftraege/projekt-phasen'
 import type { AuftragDetail, AuftragStatus, LeadStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
+import { useFieldErrors } from '@/lib/validation/form-schema'
 
 export function AuftragKundenUpdatePanel({
   detail,
@@ -25,6 +33,7 @@ export function AuftragKundenUpdatePanel({
   leadStatus?: LeadStatus | null
   onChanged: () => void
 }) {
+  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
@@ -58,7 +67,7 @@ export function AuftragKundenUpdatePanel({
       if (!res.ok || !json.url) throw new Error(json.error ?? 'Upload fehlgeschlagen')
       setFotos((f) => [...f, json.url!])
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Upload fehlgeschlagen')
+      toast.systemError(e, 'ui', 'Upload fehlgeschlagen')
     } finally {
       setUploading(false)
     }
@@ -66,7 +75,7 @@ export function AuftragKundenUpdatePanel({
 
   function absenden() {
     if (!titel.trim()) {
-      toast.error('Bitte einen Titel für das Update angeben.')
+      applyFieldErrors({ _form: TOAST.bitte_einen_titel_fuer_das_update_angeben })
       return
     }
     startTransition(async () => {
@@ -79,7 +88,7 @@ export function AuftragKundenUpdatePanel({
         kundeBenachrichtigen: sendMail,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
       toast.success(
@@ -96,16 +105,16 @@ export function AuftragKundenUpdatePanel({
   }
 
   return (
-    <section className="mb-8 rounded-lg border border-bw-border bg-bw-card p-4">
+    <section className="mb-8 rounded-card border border-bw-border bg-surface p-4">
       <h3 className="mb-1 flex items-center gap-2 text-[length:var(--fs-text)] font-semibold text-bw-text">
-        <Send className="h-4 w-4 text-bw-primary" aria-hidden />
+        <MockIcon n="send" ctx="default" className="h-4 w-4 text-bw-primary" aria-hidden />
         Kunden-Update erstellen
       </h3>
       <p className="mb-4 text-[length:var(--fs-meta)] text-bw-text-muted">
         Status-Update mit Fotos — erscheint auf der Kunden-Statusseite und optional per E-Mail (mit Phasen-Anzeige oben).
       </p>
 
-      <div className="mb-4 overflow-x-auto rounded-lg bg-bw-hover/60 p-3">
+      <div className="mb-4 overflow-x-auto rounded-card bg-bw-hover/60 p-3">
         <p className="mb-2 text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
           Aktuelle Phase: {auftragStatusLabelDe(detail.status)} · {PROJEKT_PHASEN[phaseIdx]}
         </p>
@@ -117,7 +126,7 @@ export function AuftragKundenUpdatePanel({
               <div key={label} className="flex flex-1 flex-col items-center text-center">
                 <span
                   className={cn(
-                    'flex h-7 w-7 items-center justify-center rounded-full border-2 text-[length:var(--fs-meta)] font-bold',
+                    'flex h-7 w-7 items-center justify-center rounded-pill border-2 text-[length:var(--fs-meta)] font-bold',
                     done && 'border-bw-primary bg-bw-primary text-white',
                     active && !done && 'border-bw-primary bg-white text-bw-dark',
                     !done && !active && 'border-bw-border text-bw-text-muted'
@@ -135,35 +144,23 @@ export function AuftragKundenUpdatePanel({
       </div>
 
       <div className="space-y-3">
-        <Input label="Update-Titel *" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z. B. Fliesenarbeiten abgeschlossen" />
-        <Textarea
-          label="Details für Kundin"
-          value={beschreibung}
-          onChange={(e) => setBeschreibung(e.target.value)}
-          long
-          plain
-          placeholder="Was wurde gemacht, was folgt als Nächstes…"
-        />
+        <MockField label="Update-Titel *"><MockInput value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z. B. Fliesenarbeiten abgeschlossen" /></MockField>
+        <MockField label="Details für Kundin"><MockTextarea value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} placeholder="Was wurde gemacht, was folgt als Nächstes…" rows={14} className="resize-y py-2 ta--long" /></MockField>
 
         <div>
           <p className="input-label">Fotos</p>
           <div className="flex flex-wrap gap-2">
             {fotos.map((url) => (
-              <div key={url} className="relative h-20 w-20 overflow-hidden rounded-lg border border-bw-border">
+              <div key={url} className="relative h-20 w-20 overflow-hidden rounded-card border border-bw-border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="h-full w-full object-cover" />
-                <button
-                  type="button"
-                  className="absolute right-0.5 top-0.5 rounded bg-black/50 p-0.5 text-white"
-                  onClick={() => setFotos((f) => f.filter((u) => u !== url))}
-                  aria-label="Entfernen"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+                <MockBtn className="absolute right-0.5 top-0.5 rounded-button bg-black/50 p-0.5 text-white" type="button" onClick={() => setFotos((f) => f.filter((u) => u !== url))} aria-label="Löschen">
+                  <MockIcon n="x" ctx="default" className="h-3 w-3" />
+                </MockBtn>
               </div>
             ))}
-            <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-bw-border text-bw-text-muted hover:bg-bw-hover">
-              <Upload className="h-5 w-5" aria-hidden />
+            <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-card border border-dashed border-bw-border text-bw-text-muted hover:bg-bw-hover">
+              <MockIcon n="upload" ctx="default" className="h-5 w-5" aria-hidden />
               <span className="mt-1 text-[length:var(--fs-meta)]">{uploading ? '…' : 'Foto'}</span>
               <input
                 type="file"
@@ -180,10 +177,10 @@ export function AuftragKundenUpdatePanel({
           </div>
         </div>
 
-        <div className="rounded-lg border border-bw-border bg-bw-hover/40 p-3 space-y-2">
+        <div className="rounded-card border border-bw-border bg-bw-hover/40 p-3 space-y-2">
           <p className="text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">E-Mail an Kundin</p>
           <label className="flex items-center gap-2 text-[length:var(--fs-text)]">
-            <input type="checkbox" checked={sendMail} onChange={(e) => setSendMail(e.target.checked)} />
+            <MockCheckbox checked={sendMail} onChange={(e) => setSendMail(e.target.checked)} />
             Kunde per E-Mail informieren
           </label>
           <label className="flex items-start gap-2 text-[length:var(--fs-text)]">
@@ -210,10 +207,14 @@ export function AuftragKundenUpdatePanel({
           </label>
         </div>
 
-        <Button type="button" variant="primary" loading={pending} onClick={absenden}>
+        <MockBtn type="button" kind="primary" loading={pending} onClick={absenden}>
+<<<<<<< Updated upstream
+          <MockIcon n="mail" ctx="default" className="mr-2 inline h-4 w-4" aria-hidden />
+=======
           <Mail className="mr-2 inline h-4 w-4" aria-hidden />
+>>>>>>> Stashed changes
           Update veröffentlichen{sendMail ? ' & senden' : ''}
-        </Button>
+        </MockBtn>
       </div>
     </section>
   )

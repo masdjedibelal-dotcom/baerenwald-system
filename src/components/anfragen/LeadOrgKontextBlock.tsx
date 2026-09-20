@@ -1,14 +1,20 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Building2, Copy, Download, Shield, User } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
 import { confirmDelete } from '@/components/ui/confirm-delete'
+>>>>>>> Stashed changes
 import {
   exportMelderAuskunft,
   loescheMelderDaten,
@@ -34,6 +40,7 @@ import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
 import { formatDatumZeit } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadDetail, OrgFreigabeLogRow } from '@/lib/types'
+import { TOAST } from '@/lib/copy'
 
 function orgFreigabeBadgeStatus(
   status: LeadDetail['org_freigabe_status']
@@ -72,7 +79,7 @@ export function LeadOrgKontextBlock({
       await navigator.clipboard.writeText(text)
       toast.success(`${label} kopiert`)
     } catch {
-      toast.error('Kopieren fehlgeschlagen')
+      toast.error(TOAST.kopieren_fehlgeschlagen)
     }
   }
 
@@ -81,7 +88,7 @@ export function LeadOrgKontextBlock({
     const r = await exportMelderAuskunft(lead.id)
     setBusy(null)
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     const blob = new Blob([r.text], { type: 'text/plain;charset=utf-8' })
@@ -91,7 +98,7 @@ export function LeadOrgKontextBlock({
     a.download = `melder-auskunft-${lead.id.slice(0, 8)}.txt`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success('Auskunft exportiert')
+    toast.success(TOAST.auskunft_exportiert)
   }
 
   function melderDatenLoeschen(kategorie: 'melder_leads_offen' | 'melder_leads_abgeschlossen' | 'melder_fotos') {
@@ -100,18 +107,18 @@ export function LeadOrgKontextBlock({
       melder_leads_offen: 'Melderdaten (vollständig)',
       melder_leads_abgeschlossen: 'Melderdaten (vollständig)',
     }
-    confirmDelete(
+    openDeleteConfirm(
       `${labels[kategorie]} löschen?`,
       async () => {
         setBusy(kategorie)
         try {
           const r = await loescheMelderDaten(lead.id, kategorie, 'betroffenenanfrage')
           if (!r.ok) {
-            toast.error(r.message)
+            toast.systemError(r)
             throw new Error(r.message)
           }
-          toast.success('Verarbeitet')
-          router.refresh()
+          toast.success(TOAST.verarbeitet)
+          afterServerActionRefresh()
         } finally {
           setBusy(null)
         }
@@ -177,7 +184,7 @@ export function LeadOrgKontextBlock({
         <Card
           title={
             <>
-              <Building2 className="inline h-4 w-4 text-bw-primary" aria-hidden /> Auftraggeber
+              <MockIcon n="building" ctx="default" className="inline h-4 w-4 text-bw-primary" aria-hidden /> Auftraggeber
             </>
           }
         >
@@ -201,14 +208,10 @@ export function LeadOrgKontextBlock({
             </div>
             {auftraggeber.org_kennung ? (
               <div className="pt-1">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 text-[length:var(--fs-meta)] text-bw-primary hover:underline"
-                  onClick={() => void kopieren(buildMeldeLink(auftraggeber.org_kennung!), 'Melde-Link')}
-                >
-                  <Copy className="h-3 w-3" aria-hidden />
+                <MockBtn className="inline-flex items-center gap-1 text-[length:var(--fs-meta)] text-bw-primary hover:underline" type="button" onClick={() => void kopieren(buildMeldeLink(auftraggeber.org_kennung!), 'Melde-Link')}>
+                  <MockIcon n="copy" ctx="default" className="h-3 w-3" aria-hidden />
                   Melde-Link kopieren
-                </button>
+                </MockBtn>
               </div>
             ) : null}
           </dl>
@@ -219,7 +222,7 @@ export function LeadOrgKontextBlock({
         <Card
           title={
             <>
-              <User className="inline h-4 w-4 text-bw-primary" aria-hidden /> Melder
+              <MockIcon n="user" ctx="default" className="inline h-4 w-4 text-bw-primary" aria-hidden /> Melder
             </>
           }
         >
@@ -251,55 +254,51 @@ export function LeadOrgKontextBlock({
           </dl>
           {lead.einladung_token && lead.einladung_status === 'offen' ? (
             <div className="mt-3 border-t border-bw-border pt-3">
-              <Button
+              <MockBtn
                 type="button"
-                variant="secondary"
-                size="sm"
+                kind="secondary" sm
                 className="gap-1.5"
                 onClick={() =>
                   void kopieren(buildEinladungErgaenzenLink(lead.einladung_token!), 'Einladungslink')
                 }
               >
-                <Copy className="h-3.5 w-3.5" aria-hidden />
+                <MockIcon n="copy" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                 Einladungslink kopieren
-              </Button>
+              </MockBtn>
             </div>
           ) : null}
           {istMelderLead ? (
             <div className="mt-3 flex flex-wrap gap-2 border-t border-bw-border pt-3">
-              <Button
+              <MockBtn
                 type="button"
-                variant="secondary"
-                size="sm"
+                kind="secondary" sm
                 className="gap-1.5"
                 loading={busy === 'auskunft'}
                 onClick={() => void melderAuskunftExport()}
               >
-                <Download className="h-3.5 w-3.5" aria-hidden />
+                <MockIcon n="download" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                 Melder-Auskunft
-              </Button>
+              </MockBtn>
               {fotos.length > 0 ? (
-                <Button
+                <MockBtn
                   type="button"
-                  variant="secondary"
-                  size="sm"
+                  kind="secondary" sm
                   loading={busy === 'melder_fotos'}
                   onClick={() => void melderDatenLoeschen('melder_fotos')}
                 >
                   Fotos löschen
-                </Button>
+                </MockBtn>
               ) : null}
-              <Button
+              <MockBtn
                 type="button"
-                variant="danger"
-                size="sm"
+                kind="danger" sm
                 className="gap-1.5"
                 loading={busy === melderLoeschKategorie}
                 onClick={() => void melderDatenLoeschen(melderLoeschKategorie)}
               >
-                <Shield className="h-3.5 w-3.5" aria-hidden />
+                <MockIcon n="shield-check" ctx="default" className="h-3.5 w-3.5" aria-hidden />
                 Melderdaten löschen
-              </Button>
+              </MockBtn>
               <Link
                 href="/einstellungen/firma"
                 className="inline-flex items-center text-[length:var(--fs-meta)] text-bw-primary hover:underline"
@@ -374,71 +373,67 @@ export function LeadOrgKontextBlock({
             informiert; Folgearbeiten über der Schwelle laufen über den Angebotsweg.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button
+            <MockBtn
               type="button"
-              variant="primary"
-              size="sm"
+              kind="primary" sm
               onClick={() => setNotfallModal(true)}
             >
               Direkt beauftragen
-            </Button>
-            <Button
+            </MockBtn>
+            <MockBtn
               type="button"
-              variant="secondary"
-              size="sm"
+              kind="secondary" sm
               loading={busy === 'notmassnahme'}
               onClick={() => {
                 setBusy('notmassnahme')
                 void disponiereHavarieNotmassnahme(lead.id).then((r) => {
                   setBusy(null)
-                  if (!r.ok) toast.error(r.message)
+                  if (!r.ok) toast.systemError(r)
                   else {
-                    toast.success('Notmaßnahme disponiert')
-                    router.refresh()
+                    toast.success(TOAST.notmassnahme_disponiert)
+                    afterServerActionRefresh()
                   }
                 })
               }}
             >
               Notmaßnahme disponieren
-            </Button>
-            <Button
+            </MockBtn>
+            <MockBtn
               type="button"
-              variant="secondary"
-              size="sm"
+              kind="secondary" sm
               loading={busy === 'kt-versicherung'}
               onClick={() => {
                 setBusy('kt-versicherung')
                 void schlageKostentraegerVor(lead.id, 'versicherung').then((r) => {
                   setBusy(null)
-                  if (!r.ok) toast.error(r.message)
+                  if (!r.ok) toast.systemError(r)
                   else {
-                    toast.success('Kostenträger Versicherung vorgeschlagen')
-                    router.refresh()
+                    toast.success(TOAST.kostentraeger_versicherung_vorgeschlagen)
+                    afterServerActionRefresh()
                   }
                 })
               }}
             >
               KT: Versicherung vorschlagen
-            </Button>
-            <Button
+            </MockBtn>
+            <MockBtn
               type="button"
-              variant="secondary"
-              size="sm"
+              kind="secondary" sm
               loading={busy === 'kt-se'}
               onClick={() => {
                 setBusy('kt-se')
                 void schlageKostentraegerVor(lead.id, 'sondereigentum').then((r) => {
                   setBusy(null)
-                  if (!r.ok) toast.error(r.message)
+                  if (!r.ok) toast.systemError(r)
                   else {
-                    toast.success('Kostenträger SE vorgeschlagen')
-                    router.refresh()
+                    toast.success(TOAST.kostentraeger_se_vorgeschlagen)
+                    afterServerActionRefresh()
                   }
                 })
               }}
             >
               KT: SE vorschlagen
-            </Button>
+            </MockBtn>
           </div>
         </Card>
       ) : null}

@@ -1,6 +1,7 @@
 'use client'
 
 import { MockCard } from '@/components/mock-ui/MockCard'
+import { formatDatum } from '@/lib/utils'
 import {
   parseZahlungsbedingungenKey,
   type AngebotWizardZahlungsbedingung,
@@ -15,7 +16,7 @@ function zahlungszielKurz(key: AngebotWizardZahlungsbedingung, zahlfristDatum?: 
   })
   if (seg === 'datum') {
     try {
-      return `bis ${new Date(`${datum}T12:00:00`).toLocaleDateString('de-DE')}`
+      return `bis ${formatDatum(`${datum}T12:00:00`)}`
     } catch {
       return `bis ${datum}`
     }

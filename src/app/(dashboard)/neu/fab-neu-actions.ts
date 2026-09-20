@@ -1,9 +1,14 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateAuftragDetail, revalidateVorgaengeListe } from '@/lib/crm-revalidate'
+=======
+>>>>>>> Stashed changes
+import { logDbError } from '@/lib/errors/log-db-error'
 import { randomBytes } from 'crypto'
-import { revalidatePath } from 'next/cache'
 import { createAnfrage } from '@/app/(dashboard)/anfragen/actions'
 import { createClient } from '@/lib/supabase-server'
+import { planLeadStatusWrite } from '@/lib/status/write-lead-status'
 import { kundeDisplayName, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import type { LeadKanal } from '@/lib/types'
 
@@ -25,6 +30,7 @@ export async function listGewerkeFuerFab(): Promise<
     .eq('aktiv', true)
     .order('sort_order')
     .order('name')
+  if (error) logDbError('app/neu/fab-neu-actions:gewerke', error)
   if (error) return { ok: false, message: error.message }
   return {
     ok: true,
@@ -55,6 +61,7 @@ export async function listAuftraegeFuerKunde(
     .not('lead_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(40)
+  if (error) logDbError('app/neu/fab-neu-actions:auftraege', error)
 
   if (error) {
     // Fallback ohne Join, falls FK-Embed fehlt — dann manuell filtern.
@@ -79,7 +86,8 @@ export async function listAuftraegeFuerKunde(
     )
     let existingLeadIds = new Set<string>()
     if (leadIds.length) {
-      const { data: leads } = await supabase.from('leads').select('id').in('id', leadIds)
+      const { data: leads, error } = await supabase.from('leads').select('id').in('id', leadIds)
+      if (error) logDbError('app/neu/fab-neu-actions:leads', error)
       existingLeadIds = new Set((leads ?? []).map((l) => String(l.id)))
     }
 
@@ -147,6 +155,7 @@ export async function createAnfrageFuerKunde(
     )
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/neu/fab-neu-actions:kunden', error)
 
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden.' }
 
@@ -204,23 +213,24 @@ export async function createAnfrageFuerKunde(
   }
 
   // Sofort aus Anfragen-Pipeline nehmen (Status vor Angebot = neu/kontaktiert/termin).
-  const now = new Date().toISOString()
   const { error: statusErr } = await supabase
     .from('leads')
-    .update({ status: 'angebot', updated_at: now })
+    .update(planLeadStatusWrite('angebot'))
     .eq('id', r.id)
     .is('geloescht_am', null)
+  if (statusErr) logDbError('app/neu/fab-neu-actions:leads', statusErr)
 
   if (statusErr) {
     console.warn('[createAnfrageFuerKunde] status→angebot:', statusErr.message)
   } else {
-    await supabase.from('leads_status_history').insert({
+    const { error: __dbErr1 } = await supabase.from('leads_status_history').insert({
       lead_id: r.id,
       status_alt: 'neu',
       status_neu: 'angebot',
       user_id: null,
       notiz: 'Direkt-Angebot — Lead nur als Vorgangsträger (nicht in Anfragen).',
     })
+    if (__dbErr1) logDbError('app/neu/fab-neu-actions:leads_status_history', __dbErr1)
   }
 
   return { ok: true, leadId: r.id }
@@ -242,6 +252,7 @@ export async function discardOrphanDirektAngebotLead(
     .select('id, funnel_daten, geloescht_am')
     .eq('id', id)
     .maybeSingle()
+  if (error) logDbError('app/neu/fab-neu-actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
   if (!lead?.id) return { ok: true, discarded: false }
@@ -263,6 +274,7 @@ export async function discardOrphanDirektAngebotLead(
     .select('id')
     .eq('lead_id', id)
     .limit(1)
+  if (angErr) logDbError('app/neu/fab-neu-actions:angebote', angErr)
 
   if (angErr) return { ok: false, message: angErr.message }
   if ((angs ?? []).length > 0) {
@@ -293,6 +305,7 @@ export async function createDirektAuftrag(input: {
     .select('id, name, vorname, nachname')
     .eq('id', kundeId)
     .maybeSingle()
+  if (kErr) logDbError('app/neu/fab-neu-actions:kunden', kErr)
 
   if (kErr || !kunde) return { ok: false, message: kErr?.message ?? 'Kunde nicht gefunden.' }
 
@@ -300,7 +313,7 @@ export async function createDirektAuftrag(input: {
     input.titel?.trim() ||
     `Auftrag — ${kundeDisplayName(kunde)}`.slice(0, 240)
 
-  const { data, error } = await supabase
+  const { data, error: error2 } = await supabase
     .from('auftraege')
     .insert({
       angebot_id: null,
@@ -316,11 +329,11 @@ export async function createDirektAuftrag(input: {
     })
     .select('id')
     .single()
+  if (error2) logDbError('app/neu/fab-neu-actions:auftraege', error2)
 
-  if (error || !data) return { ok: false, message: error?.message ?? 'Auftrag konnte nicht angelegt werden.' }
+  if (error2 || !data) return { ok: false, message: error2?.message ?? 'Auftrag konnte nicht angelegt werden.' }
 
-  revalidatePath('/auftraege')
-  revalidatePath('/vorgaenge')
-  revalidatePath(`/auftraege/${data.id}`)
+  revalidateVorgaengeListe()
+  revalidateAuftragDetail(data.id)
   return { ok: true, auftragId: data.id as string }
 }

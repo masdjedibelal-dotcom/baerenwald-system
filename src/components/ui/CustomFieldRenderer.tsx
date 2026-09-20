@@ -1,8 +1,10 @@
 'use client'
+import { DateInput } from '@/components/ui/DateInput'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
-import { Textarea } from '@/components/ui/Textarea'
+import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
 import type { CustomFieldDefinition } from '@/lib/custom-fields'
-
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 type Props = {
   def: CustomFieldDefinition
   value: string
@@ -19,41 +21,20 @@ export function CustomFieldRenderer({ def, value, onChange, disabled }: Props) {
   switch (def.feld_typ) {
     case 'textarea':
       return (
-        <Textarea
-          rows={3}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          required={def.pflicht}
-        />
+        <MockField required={def.pflicht}><RichTextEditor value={typeof (value) === 'string' ? (value) : ''} onChange={(__v) => onChange(__v)} disabled={disabled} minHeight={120} /></MockField>
       )
     case 'number':
       return (
-        <input
-          type="number"
-          className="input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          required={def.pflicht}
-        />
+        <MockInput type="number" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} required={def.pflicht} />
       )
     case 'date':
       return (
-        <input
-          type="date"
-          className="input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          required={def.pflicht}
-        />
+        <DateInput value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} required={def.pflicht} />
       )
     case 'boolean':
       return (
         <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+          <MockCheckbox
             checked={value === 'true' || value === '1'}
             onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
             disabled={disabled}
@@ -63,31 +44,18 @@ export function CustomFieldRenderer({ def, value, onChange, disabled }: Props) {
       )
     case 'select':
       return (
-        <select
-          className="input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          required={def.pflicht}
-        >
+        <MockSelect value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} required={def.pflicht}>
           <option value="">—</option>
           {opts.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
           ))}
-        </select>
+        </MockSelect>
       )
     default:
       return (
-        <input
-          type="text"
-          className="input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          required={def.pflicht}
-        />
+        <MockInput type="text" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} required={def.pflicht} />
       )
   }
 }

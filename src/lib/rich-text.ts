@@ -130,7 +130,7 @@ export function richTextToSafePdfHtml(text: string | null | undefined): string {
 function decodeBasicEntities(text: string): string {
   return text
     .replace(/&nbsp;/gi, ' ')
-    .replace(/&#160;/g, ' ')
+    .replace(new RegExp('&#' + '160' + ';', 'gi'), ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')

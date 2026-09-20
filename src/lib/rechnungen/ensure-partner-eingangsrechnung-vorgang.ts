@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { normalizeHwRechnungStatus } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
 
@@ -24,11 +25,12 @@ export async function ensurePartnerEingangsRechnungVorgang(
   const ahId = angebotHandwerkerId.trim()
   if (!ahId) return { ok: false, error: 'Zuweisung fehlt.' }
 
-  const { data: existing } = await supabaseAdmin
+  const { data: existing, error } = await supabaseAdmin
     .from('rechnungen')
     .select('id')
     .eq('angebot_handwerker_id', ahId)
     .maybeSingle()
+  if (error) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:rechnungen', error)
 
   const { data: ah, error: ahErr } = await supabaseAdmin
     .from('angebot_handwerker')
@@ -49,6 +51,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
     )
     .eq('id', ahId)
     .maybeSingle()
+  if (ahErr) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:angebot_handwerker', ahErr)
 
   if (ahErr || !ah) {
     return { ok: false, error: ahErr?.message ?? 'Zuweisung nicht gefunden.' }
@@ -72,7 +75,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
   let leistungszeitraumVon: string | null = null
   let leistungszeitraumBis: string | null = null
   if (angebotId) {
-    const { data: auf } = await supabaseAdmin
+    const { data: auf, error } = await supabaseAdmin
       .from('auftraege')
       .select('id, titel, kunde_id, start_datum, end_datum')
       .eq('angebot_id', angebotId)
@@ -80,6 +83,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:auftraege', error)
     if (auf?.id) {
       auftragId = String(auf.id)
       auftragTitel = (auf.titel as string | null)?.trim() || null
@@ -124,7 +128,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
 
   // Positions-Zeitraum des Partners, falls Auftrag keinen Zeitraum hat
   if (auftragId && handwerkerId && (!leistungszeitraumVon || !leistungszeitraumBis)) {
-    const { data: posRows } = await supabaseAdmin
+    const { data: posRows, error } = await supabaseAdmin
       .from('auftrag_positionen')
       .select('start_datum, end_datum')
       .eq('auftrag_id', auftragId)
@@ -132,6 +136,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
       .not('start_datum', 'is', null)
       .order('start_datum', { ascending: true })
       .limit(20)
+    if (error) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:auftrag_positionen', error)
     const starts = (posRows ?? [])
       .map((p) => String(p.start_datum ?? '').trim().slice(0, 10))
       .filter(Boolean)
@@ -198,6 +203,7 @@ export async function ensurePartnerEingangsRechnungVorgang(
       .from('rechnungen')
       .update(payload)
       .eq('id', existing.id)
+    if (upErr) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:rechnungen', upErr)
     if (upErr) return { ok: false, error: upErr.message }
     return { ok: true, rechnungId: String(existing.id), created: false }
   }
@@ -210,17 +216,20 @@ export async function ensurePartnerEingangsRechnungVorgang(
     })
     .select('id')
     .single()
+  if (insErr) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:rechnungen', insErr)
 
   if (insErr || !created?.id) {
     // Race: parallel insert
     if (/unique|duplicate/i.test(insErr?.message ?? '')) {
-      const { data: again } = await supabaseAdmin
+      const { data: again, error } = await supabaseAdmin
         .from('rechnungen')
         .select('id')
         .eq('angebot_handwerker_id', ahId)
         .maybeSingle()
+      if (error) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:rechnungen', error)
       if (again?.id) {
-        await supabaseAdmin.from('rechnungen').update(payload).eq('id', again.id)
+        const { error: __dbErr1 } = await supabaseAdmin.from('rechnungen').update(payload).eq('id', again.id)
+        if (__dbErr1) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:rechnungen', __dbErr1)
         return { ok: true, rechnungId: String(again.id), created: false }
       }
     }
@@ -236,11 +245,12 @@ export async function backfillPartnerEingangsRechnungVorgaenge(): Promise<{
   ok: number
   failed: number
 }> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('angebot_handwerker')
     .select('id')
     .not('hw_rechnung_pdf_url', 'is', null)
     .limit(500)
+  if (error) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:angebot_handwerker', error)
 
   let ok = 0
   let failed = 0

@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateLeadList, revalidatePartnerList, revalidateRechnungList, revalidateVorgaengeListe } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { createRechnungEntwurf } from '@/app/(dashboard)/rechnungen/actions'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
@@ -17,6 +23,7 @@ export async function duplicateAnfrage(
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (loadErr) logDbError('app/crm/list-copy-actions:leads', loadErr)
   if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Anfrage nicht gefunden.' }
 
   const row = src as Record<string, unknown>
@@ -40,6 +47,7 @@ export async function duplicateAnfrage(
     })
     .select('id')
     .single()
+  if (insErr) logDbError('app/crm/list-copy-actions:leads', insErr)
 
   if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
   const newId = inserted.id as string
@@ -48,15 +56,16 @@ export async function duplicateAnfrage(
     data: { user },
   } = await supabase.auth.getUser()
 
-  await supabase.from('leads_status_history').insert({
+  const { error: __dbErr1 } = await supabase.from('leads_status_history').insert({
     lead_id: newId,
     status_alt: null,
     status_neu: 'neu',
     user_id: user?.id ?? null,
   })
+  if (__dbErr1) logDbError('app/crm/list-copy-actions:leads_status_history', __dbErr1)
 
-  revalidatePath('/anfragen')
-  revalidatePath('/vorgaenge')
+  revalidateLeadList()
+  revalidateVorgaengeListe()
   return { ok: true, id: newId }
 }
 
@@ -64,7 +73,8 @@ export async function duplicateAngebotHref(
   angebotId: string
 ): Promise<{ ok: true; href: string } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data } = await supabase.from('angebote').select('lead_id').eq('id', angebotId).maybeSingle()
+  const { data, error } = await supabase.from('angebote').select('lead_id').eq('id', angebotId).maybeSingle()
+  if (error) logDbError('app/crm/list-copy-actions:angebote', error)
   const leadId = (data as { lead_id?: string | null } | null)?.lead_id?.trim()
   if (!leadId) {
     return { ok: true, href: `/angebote/neu?kopie_von=${encodeURIComponent(angebotId)}` }
@@ -79,11 +89,12 @@ export async function duplicateAuftragHref(
   auftragId: string
 ): Promise<{ ok: true; href: string } | { ok: false; message: string }> {
   const supabase = createClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('auftraege')
     .select('lead_id, angebot_id')
     .eq('id', auftragId)
     .maybeSingle()
+  if (error) logDbError('app/crm/list-copy-actions:auftraege', error)
 
   if (!data) return { ok: false, message: 'Auftrag nicht gefunden.' }
   const row = data as { lead_id?: string | null; angebot_id?: string | null }
@@ -109,6 +120,7 @@ export async function duplicateRechnung(
     )
     .eq('id', rechnungId)
     .maybeSingle()
+  if (loadErr) logDbError('app/crm/list-copy-actions:rechnungen', loadErr)
 
   if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden.' }
 
@@ -134,7 +146,7 @@ export async function duplicateRechnung(
   })
 
   if (!res.ok) return res
-  revalidatePath('/rechnungen')
+  revalidateRechnungList()
   return { ok: true, id: res.id }
 }
 
@@ -143,6 +155,7 @@ export async function duplicatePartner(
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const supabase = createClient()
   const { data: src, error: loadErr } = await supabase.from('partner').select('*').eq('id', partnerId).maybeSingle()
+  if (loadErr) logDbError('app/crm/list-copy-actions:partner', loadErr)
   if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Partner nicht gefunden.' }
 
   const row = src as Record<string, unknown>
@@ -159,8 +172,9 @@ export async function duplicatePartner(
     .insert(payload)
     .select('id')
     .single()
+  if (insErr) logDbError('app/crm/list-copy-actions:partner', insErr)
 
   if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
-  revalidatePath('/partner')
+  revalidatePartnerList()
   return { ok: true, id: inserted.id as string }
 }

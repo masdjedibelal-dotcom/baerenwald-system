@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
+import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-
+import { useEffect, useState } from 'react'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
+import { C } from '@/lib/tokens/colors'
 
 /** HTML/PDF-Vorschau einer gespeicherten Rechnung. */
 export function RechnungWizardPdfPreview({
@@ -28,20 +29,20 @@ export function RechnungWizardPdfPreview({
 
   if (loading || !previewSrc) {
     return (
-      <div
-        className="card"
+      <MockCard
+        flush
         style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)', fontSize: 'var(--fs-text)' }}
       >
         <MockIcon ctx="default" n="hourglass" size={22} />
         <div style={{ marginTop: 10 }}>Rechnungsvorschau wird vorbereitet…</div>
-      </div>
+      </MockCard>
     )
   }
 
   if (failed) {
     return (
-      <div
-        className="card"
+      <MockCard
+        flush
         style={{
           padding: 32,
           textAlign: 'center',
@@ -59,20 +60,20 @@ export function RechnungWizardPdfPreview({
             PDF öffnen
           </MockBtn>
         ) : null}
-      </div>
+      </MockCard>
     )
   }
 
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+    <MockCard flush style={{ padding: 0, overflow: 'hidden' }}>
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: 8,
-          padding: '8px 12px',
-          borderBottom: '0.5px solid var(--border)',
+          padding: '0.5rem 0.75rem',
+          borderBottom: '0.0.3125remrem solid var(--border)',
           background: 'var(--bg-soft)',
           fontSize: 'var(--fs-meta)',
           color: 'var(--text-3)',
@@ -94,12 +95,12 @@ export function RechnungWizardPdfPreview({
         onError={() => setFailed(true)}
         style={{
           width: '100%',
-          height: 'min(56vh, 640px)',
+          height: 'min(56vh, 40rem)',
           border: 0,
-          background: '#fff',
+          background: C.white,
           display: 'block',
         }}
       />
-    </div>
+    </MockCard>
   )
 }

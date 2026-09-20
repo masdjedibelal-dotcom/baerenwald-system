@@ -1,8 +1,9 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { AssistentMarkdown } from '@/components/assistent/AssistentMarkdown'
 import { KiChatComposer, KI_CHAT_POSITIONEN_MAX_CHARS } from '@/components/assistent/KiChatComposer'
@@ -26,6 +27,7 @@ import {
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
+import { TOAST } from '@/lib/copy'
 
 type ChatMsg = {
   role: 'user' | 'assistant'
@@ -45,7 +47,7 @@ const QUICK_DEFAULT = [
   {
     label: 'HW zuordnen',
     prompt:
-      'Schlage für den aktuellen oder genannten Auftrag passende Handwerker je Gewerk vor — dann zuweisen nach meiner Bestätigung.',
+      'Schlage für den aktuellen oder genannten Auftrag passende Partner je Gewerk vor — dann zuweisen nach meiner Bestätigung.',
   },
 ]
 
@@ -92,16 +94,10 @@ function NavChip({
   disabled?: boolean
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      title={link.hint}
-      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#2E7D52]/35 bg-white px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-[#2E7D52] hover:bg-[#EAF3DE] disabled:opacity-50"
-      onClick={() => onNavigate(link.href)}
-    >
+    <MockBtn className="inline-flex max-w-full items-center gap-1 rounded-pill border border-bw-primary/35 bg-white px-2.5 py-1 text-[length:var(--fs-meta)] font-medium text-bw-primary hover:bg-bw-green-bg disabled:opacity-50" type="button" disabled={disabled} title={link.hint} onClick={() => onNavigate(link.href)}>
       <MockIcon ctx="btn" n="external-link" size={12} />
       <span className="truncate">{link.label}</span>
-    </button>
+    </MockBtn>
   )
 }
 
@@ -115,8 +111,8 @@ function PreviewCard({
   disabled?: boolean
 }) {
   return (
-    <div className="rounded-lg border border-[#2E7D52]/30 bg-white p-2.5 shadow-sm">
-      <p className="mb-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-[#2E7D52]">
+    <div className="rounded-card border border-bw-primary/30 bg-white p-2.5 shadow-sm">
+      <p className="mb-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-primary">
         {preview.title}
       </p>
       <dl className="space-y-1 text-[length:var(--fs-meta)]">
@@ -130,14 +126,9 @@ function PreviewCard({
       {preview.warning ? (
         <p className="mt-1.5 text-[length:var(--fs-meta)] text-bw-text-muted">{preview.warning}</p>
       ) : null}
-      <button
-        type="button"
-        className="btn primary sm mt-2 w-full"
-        disabled={disabled}
-        onClick={onConfirm}
-      >
+      <MockBtn kind="primary" sm fullWidth className="mt-2" type="button" disabled={disabled} onClick={onConfirm}>
         Jetzt ausführen
-      </button>
+      </MockBtn>
     </div>
   )
 }
@@ -154,13 +145,13 @@ function PositionDraftCard({
   applyLabel: string
 }) {
   return (
-    <div className="ki-pos-draft-card">
-      <div className="ki-pos-draft-card__head">Positions-Vorschlag</div>
-      <p className="ki-pos-draft-card__name">{draft.name || '—'}</p>
+    <div className="ki-pos-draft">
+      <div className="ki-pos-draft__head">Positions-Vorschlag</div>
+      <p className="ki-pos-draft__name">{draft.name || '—'}</p>
       {draft.beschreibung?.trim() ? (
-        <p className="ki-pos-draft-card__desc">{draft.beschreibung}</p>
+        <p className="ki-pos-draft__desc">{draft.beschreibung}</p>
       ) : null}
-      <p className="ki-pos-draft-card__meta">
+      <p className="ki-pos-draft__meta">
         {[
           draft.menge != null && draft.menge > 0
             ? `${draft.menge} ${draft.einheit?.trim() || 'Stk.'}`
@@ -172,14 +163,9 @@ function PositionDraftCard({
           .filter(Boolean)
           .join(' · ') || 'Menge / Preis offen'}
       </p>
-      <button
-        type="button"
-        className="btn primary sm ki-pos-draft-card__apply"
-        disabled={disabled}
-        onClick={onApply}
-      >
+      <MockBtn kind="primary" sm className="ki-pos-draft__apply" type="button" disabled={disabled} onClick={onApply}>
         {applyLabel}
-      </button>
+      </MockBtn>
     </div>
   )
 }
@@ -196,15 +182,15 @@ function PositionenDraftCard({
   applyLabel: string
 }) {
   return (
-    <div className="ki-pos-draft-card">
-      <div className="ki-pos-draft-card__head">
-        {draft.items.length} Positionen zum Übernehmen
+    <div className="ki-pos-draft">
+      <div className="ki-pos-draft__head">
+        {draft.items.length} Positionen zum Speichern
       </div>
-      <ul className="ki-pos-draft-card__list">
+      <ul className="ki-pos-draft__list">
         {draft.items.map((it, i) => (
           <li key={`${it.name}-${i}`}>
-            <span className="ki-pos-draft-card__name">{it.name}</span>
-            <span className="ki-pos-draft-card__meta">
+            <span className="ki-pos-draft__name">{it.name}</span>
+            <span className="ki-pos-draft__meta">
               {[
                 it.menge != null && it.menge > 0
                   ? `${it.menge} ${it.einheit?.trim() || 'Stk.'}`
@@ -218,14 +204,9 @@ function PositionenDraftCard({
           </li>
         ))}
       </ul>
-      <button
-        type="button"
-        className="btn primary sm ki-pos-draft-card__apply"
-        disabled={disabled}
-        onClick={onApply}
-      >
+      <MockBtn kind="primary" sm className="ki-pos-draft__apply" type="button" disabled={disabled} onClick={onApply}>
         {applyLabel}
-      </button>
+      </MockBtn>
     </div>
   )
 }
@@ -256,22 +237,17 @@ function TextDraftCard({
   const text = draft.text?.trim() || ''
 
   return (
-    <div className="ki-pos-draft-card">
-      <div className="ki-pos-draft-card__head">{head}</div>
-      {titel ? <p className="ki-pos-draft-card__name">{titel}</p> : null}
+    <div className="ki-pos-draft">
+      <div className="ki-pos-draft__head">{head}</div>
+      {titel ? <p className="ki-pos-draft__name">{titel}</p> : null}
       {text ? (
-        <p className="ki-pos-draft-card__desc ki-pos-draft-card__desc--pre">{text}</p>
+        <p className="ki-pos-draft__desc ki-pos-draft__desc--pre">{text}</p>
       ) : (
-        <p className="ki-pos-draft-card__meta">Kein Text im Vorschlag</p>
+        <p className="ki-pos-draft__meta">Kein Text im Vorschlag</p>
       )}
-      <button
-        type="button"
-        className="btn primary sm ki-pos-draft-card__apply"
-        disabled={disabled || !text}
-        onClick={onApply}
-      >
+      <MockBtn kind="primary" sm className="ki-pos-draft__apply" type="button" disabled={disabled || !text} onClick={onApply}>
         {applyLabel}
-      </button>
+      </MockBtn>
     </div>
   )
 }
@@ -326,10 +302,10 @@ export function AssistentPanel() {
     : scopeMeta
       ? scoped?.layer === 'over-sheet'
         ? scoped.scopeId === 'feld'
-          ? 'KI-Assistent: Sag, wie der Feldtext werden soll — danach Übernehmen.'
+          ? 'KI-Assistent: Sag, wie der Feldtext werden soll — danach Speichern.'
           : isPositionenScope
-            ? 'KI-Assistent: Beschreib die Position(en) — danach Übernehmen in die Karte.'
-            : 'KI-Assistent: Beschreib, was du brauchst — danach Übernehmen.'
+            ? 'KI-Assistent: Beschreib die Position(en) — danach Speichern in die Karte.'
+            : 'KI-Assistent: Beschreib, was du brauchst — danach Speichern.'
         : 'Ich bin dein KI-Assistent für diesen Editor.'
       : 'Ich bin dein KI-Assistent fürs CRM.'
 
@@ -454,7 +430,7 @@ export function AssistentPanel() {
   function applyDraftFromMessage(content: string) {
     const draft = parseBwApplyDraft(content)
     if (!draft) {
-      toast.error('Kein übernehmbarer Entwurf in der Antwort.')
+      toast.error(TOAST.kein_uebernehmbarer_entwurf_in_der_antwort)
       return
     }
     setPendingDraft(draft)
@@ -471,7 +447,7 @@ export function AssistentPanel() {
       closePanel()
       return
     }
-    toast.success('In Formular übernommen')
+    toast.success(TOAST.in_formular_uebernommen)
   }
 
   function send(text: string, opts?: { historyOverride?: ChatMsg[] }) {
@@ -558,12 +534,7 @@ export function AssistentPanel() {
 
   return (
     <>
-      <button
-        type="button"
-        className={cn('assistent-scrim', overSheet && 'assistent-scrim--over-sheet')}
-        aria-label="KI-Assistent schließen"
-        onClick={closePanel}
-      />
+      <MockBtn className={cn('assistent-scrim', overSheet && 'assistent-scrim--over-sheet')} type="button" aria-label="KI-Assistent schließen" onClick={closePanel} />
       <aside
         ref={panelRef}
         className={cn('assistent-panel', overSheet && 'assistent-panel--over-sheet')}
@@ -571,26 +542,16 @@ export function AssistentPanel() {
         aria-label="KI-Assistent"
       >
         <header className="assistent-panel__head">
-          <button
-            type="button"
-            className="assistent-panel__close"
-            onClick={closePanel}
-            aria-label="Schließen"
-          >
+          <MockBtn className="assistent-panel__close" type="button" onClick={closePanel} aria-label="Schließen">
             <MockIcon ctx="btn" n="x" size={16} />
-          </button>
+          </MockBtn>
           <div className="assistent-panel__head-title min-w-0 flex-1">
             <p className="assistent-panel__title">{title}</p>
           </div>
           {(scoped || autoSession) && !overSheet ? (
-            <button
-              type="button"
-              className="btn ghost sm"
-              title="Allgemeinen Assistenten öffnen"
-              onClick={resetToGeneral}
-            >
+            <MockBtn kind="ghost" sm type="button" title="Allgemeinen Assistenten öffnen" onClick={resetToGeneral}>
               Allgemein
-            </button>
+            </MockBtn>
           ) : null}
         </header>
 
@@ -637,7 +598,7 @@ export function AssistentPanel() {
                       <PositionDraftCard
                         draft={draft}
                         disabled={pending}
-                        applyLabel={overSheet ? 'Übernehmen' : 'In Formular übernehmen'}
+                        applyLabel={overSheet ? 'Speichern' : 'In Formular speichern'}
                         onApply={() => applyDraftFromMessage(m.content)}
                       />
                     ) : draft?.type === 'positionen' ? (
@@ -646,7 +607,7 @@ export function AssistentPanel() {
                         disabled={pending}
                         applyLabel={
                           overSheet
-                            ? `Alle ${draft.items.length} übernehmen`
+                            ? `Alle ${draft.items.length} speichern`
                             : `Alle ${draft.items.length} in Formular`
                         }
                         onApply={() => applyDraftFromMessage(m.content)}
@@ -657,18 +618,13 @@ export function AssistentPanel() {
                       <TextDraftCard
                         draft={draft}
                         disabled={pending}
-                        applyLabel={overSheet ? 'Übernehmen' : 'In Formular übernehmen'}
+                        applyLabel={overSheet ? 'Speichern' : 'In Formular speichern'}
                         onApply={() => applyDraftFromMessage(m.content)}
                       />
                     ) : draft ? (
-                      <button
-                        type="button"
-                        className="btn primary sm mt-2"
-                        disabled={pending}
-                        onClick={() => applyDraftFromMessage(m.content)}
-                      >
-                        {overSheet ? 'Übernehmen' : 'In Formular übernehmen'}
-                      </button>
+                      <MockBtn kind="primary" sm className="mt-2" type="button" disabled={pending} onClick={() => applyDraftFromMessage(m.content)}>
+                        {overSheet ? 'Speichern' : 'In Formular speichern'}
+                      </MockBtn>
                     ) : null}
                     {m.role === 'assistant' && m.ui ? (
                       <AssistentUiBlocks
@@ -698,14 +654,9 @@ export function AssistentPanel() {
           )}
 
           {stuckUp ? (
-            <button
-              type="button"
-              className="assistent-panel__scroll-down"
-              aria-label="Zum Ende scrollen"
-              onClick={() => scrollToBottom(true)}
-            >
+            <MockBtn className="assistent-panel__scroll-down" type="button" aria-label="Zum Ende scrollen" onClick={() => scrollToBottom(true)}>
               <MockIcon ctx="btn" n="arrow-down" size={16} />
-            </button>
+            </MockBtn>
           ) : null}
         </div>
 
@@ -713,15 +664,9 @@ export function AssistentPanel() {
           {!chatStarted ? (
             <div className="assistent-panel__chips">
               {quick.map((q) => (
-                <button
-                  key={q.label}
-                  type="button"
-                  className="assistent-chip"
-                  disabled={pending}
-                  onClick={() => send(q.prompt)}
-                >
+                <MockBtn className="assistent-chip" key={q.label} type="button" disabled={pending} onClick={() => send(q.prompt)}>
                   {q.label}
-                </button>
+                </MockBtn>
               ))}
             </div>
           ) : null}

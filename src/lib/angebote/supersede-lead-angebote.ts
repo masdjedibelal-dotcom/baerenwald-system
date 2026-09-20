@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -34,11 +35,12 @@ export async function supersedeLeadAngebote(
   const activeId = activeAngebotId.trim()
   if (!trimmedLead || !activeId) return
 
-  const { data: others } = await supabase
+  const { data: others, error } = await supabase
     .from('angebote')
     .select('id, status, status_einfach, gueltig_bis')
     .eq('lead_id', trimmedLead)
     .neq('id', activeId)
+  if (error) logDbError('lib/angebote/supersede-lead-angebote:angebote', error)
 
   const now = new Date().toISOString()
 
@@ -54,9 +56,11 @@ export async function supersedeLeadAngebote(
     }
 
     const { error } = await supabase.from('angebote').update(patch).eq('id', row.id)
+    if (error) logDbError('lib/angebote/supersede-lead-angebote:angebote', error)
     if (error && /ersetzt_durch|korrektur_von|schema cache|column/i.test(error.message)) {
       delete patch.ersetzt_durch
-      await supabase.from('angebote').update(patch).eq('id', row.id)
+      const { error: __dbErr1 } = await supabase.from('angebote').update(patch).eq('id', row.id)
+      if (__dbErr1) logDbError('lib/angebote/supersede-lead-angebote:angebote', __dbErr1)
     }
   }
 }

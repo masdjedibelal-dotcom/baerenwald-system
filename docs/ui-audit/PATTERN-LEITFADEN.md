@@ -10,6 +10,35 @@
 
 ---
 
+## 0b. Tokens P5-19 (Schrift · Rundung · Icons · Farbe)
+
+| | CRM | Portal |
+|--|--|--|
+| **Schrift 5 Stufen** | `text-fs-caption` · `text-fs-meta` · `text-fs-text` · `text-fs-title` · `text-fs-head` → `--fs-*` | `text-fs-caption` · `meta` · `body` · `title` · `head` → `--p2-fs-*` |
+| **Rundung Element** | nur `rounded-card` · `rounded-button` · `rounded-field` · `rounded-pill` · `rounded-sheet` | dasselbe → `--p2-radius-*` |
+| **Icons** | nur `MockIcon` (`n` + `ctx`) | nur `PortalIcon` (`n`/`glyph`/`asset` + `ctx`) |
+| **Farbe** | CRM-Tokens / `bw-*` / Status — kein Roh-Hex, kein TW-std | nur `--p2-*` / `p2-*` |
+
+### Icon-Aktion → gleiches Icon
+
+| Aktion | `n` |
+|--|--|
+| Speichern | `device-floppy` |
+| Senden / Mail | `send` / `mail` |
+| Löschen | `trash` |
+| Bearbeiten | `pencil` |
+| Hinzufügen | `plus` |
+| Schließen | `x` |
+| Zurück / Weiter | `chevron-left` / `chevron-right` |
+| Download / Upload | `download` / `upload` |
+| Suche | `search` |
+| Einstellungen | `settings` |
+| Kalender / Termin | `calendar` |
+| Warnung | `alert-triangle` |
+| Erfolg / Haken | `check` |
+
+---
+
 ## 0. Prinzipien (kurz)
 
 1. **Eine CSS-Quelle** für CRM-Komponenten: `mock-design-system.css` (Tokens nur `globals.css`).
@@ -117,22 +146,27 @@
 
 | | |
 |--|--|
-| **Kanonisch** | `DocumentCanvas` + DocBar (Vorschau · Senden · … · Verwerfen) — Fullscreen |
-| **Referenz** | `AngebotWizard.tsx`, `RechnungWizard.tsx` · `src/components/surfaces/DocumentCanvas.tsx` |
+| **Kanonisch** | `DocumentCanvas` — Fullscreen · Gliederung (`sections`) · Prüfliste vor Primary · Footer: Entwurf sekundär + Primary-Text rechts · „Zuletzt gespeichert vor X Min.“ |
+| **Referenz** | `AngebotWizard.tsx`, `RechnungWizard.tsx` · `DocumentCanvas.tsx` · `document-canvas-chrome.ts` |
+| **Header** | X · Titel · lastSaved · optional nur Icons (Vorschau) — **kein** ✓-Speichern |
+| **Footer** | `draftAction` + `primaryAction` (`getGaps` → Prüfliste mit Sprung) |
 | **Nested Auswahl** | EditorSheet / Center-Modal über Canvas (Kunde, Position) — Spec Surface |
-| **Hinweis** | Früherer Docs-Name „WizardShell“ ist **obsolet** — überall DocumentCanvas. |
+| **Hinweis** | Früherer Docs-Name „WizardShell“ ist **obsolet** — überall DocumentCanvas. Header-✓ = Legacy. |
 | **Legacy** | Mehrstufige Mini-Overlays · Staff-Funnel nur für Staff-Sonderfälle |
 
 ---
 
-## 9. Modal / ActionSheet / Picker
+## 9. Modal / ActionSheet / Picker / Menü
 
 | Muster | Kanonisch | Wann |
 |--------|-----------|------|
-| Dialog / Confirm | `ui/Modal` | Zerstören, kurze Entscheidung |
-| ⋯ Menü | `ActionSheet` | Secondary Actions |
-| Auswahl Liste | `PickerSheet` / EditorSheet-Picker | Kunde, HW, Katalog |
-| Legacy | lose `*Modal.tsx` ohne Surface | Inhalt in Modal/Sheet migrieren |
+| Dialog / Confirm | `ConfirmPopup` (E1) | Zerstören, kurze Entscheidung |
+| Overlay Create/Edit | `EditorSheet` | Entity create/edit, Compose |
+| Zeilen-⋯ | `MockEntityRowMenu` | Listen-/Auswahl-Zeilen |
+| Detail-⋯ / Listbar-Chrome | `ActionsMenu` in `DetailActionsBar` · `ListbarActionsMenu` | **Kanon (O6):** Chrome-Header nur hier; keine neuen Zeilen-Menüs außerhalb `MockEntityRowMenu` |
+| Auswahl Liste | EditorSheet-Picker | Kunde, HW, Katalog |
+
+Siehe auch `docs/SCREEN-CONTRACTS.md`.
 
 ---
 

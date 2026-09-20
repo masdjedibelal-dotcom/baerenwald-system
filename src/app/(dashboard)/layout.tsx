@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -9,7 +10,6 @@ import { ensureStandardTemplatesCached } from '@/lib/standard-templates'
 import { isDevAuthSkipEnabled } from '@/lib/dev-auth'
 import { DashboardProviders } from '@/components/layout/DashboardProviders'
 import { DashboardShell } from '@/components/layout/DashboardShell'
-import { isDemoTestUserEmail } from '@/lib/is-demo-user'
 
 export const metadata: Metadata = {
   title: {
@@ -37,11 +37,12 @@ export default async function DashboardLayout({
       redirect('/login')
     }
 
-    let { data: crmProfile } = await supabase
+    let {data: crmProfile, error} = await supabase
       .from('user_profiles')
       .select('id')
       .eq('id', user.id)
       .maybeSingle()
+    if (error) logDbError('app/layout:user_profiles', error)
 
     if (!crmProfile) {
       const meta = (user.user_metadata ?? {}) as { name?: string; role?: string }
@@ -68,11 +69,9 @@ export default async function DashboardLayout({
 
     await ensureStandardTemplatesCached()
 
-    const showDemoBanner = isDemoTestUserEmail(user.email)
-
     return (
       <DashboardProviders>
-        <DashboardShell user={user} showDemoBanner={showDemoBanner}>
+        <DashboardShell user={user}>
           {children}
         </DashboardShell>
       </DashboardProviders>

@@ -85,7 +85,7 @@ export const KI_ASSIST_SCOPES: Record<KiAssistScopeId, KiAssistScope> = {
     id: 'position',
     label: 'Position',
     intro:
-      'Beschreib mir die **Position** — was gemacht wird, **Menge/Einheit** und idealerweise den **Netto-Preis**. Ich formuliere daraus eine klare Positions-Card zum Übernehmen.',
+      'Beschreib mir die **Position** — was gemacht wird, **Menge/Einheit** und idealerweise den **Netto-Preis**. Ich formuliere daraus eine klare Positions-Card zum Speichern.',
     placeholder: 'z. B. „Wandfliesen Bad 12 m², inkl. Verlegen, 85 €/m²“…',
     systemHint: `Modus: EINE Position für Angebot/Rechnung (Handwerk Bärenwald).
 Frage bei Bedarf kurz nach fehlenden Angaben (Menge, Einheit, Preis).
@@ -235,7 +235,7 @@ ${BW_APPLY_HINT}`,
     quickPrompts: [
       {
         label: 'Kürzer',
-        prompt: 'Formuliere den aktuellen Feldtext kürzer und klarer — als fertigen Feldtext zum Übernehmen.',
+        prompt: 'Formuliere den aktuellen Feldtext kürzer und klarer — als fertigen Feldtext zum Speichern.',
       },
       {
         label: 'Neu schreiben',

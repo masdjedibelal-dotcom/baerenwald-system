@@ -1,9 +1,15 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+<<<<<<< Updated upstream
+=======
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import {
   DokumenteVorgangAccordions,
@@ -140,7 +146,7 @@ export function HandwerkerAkteDokumente({
   function renderItems(items: AkteDocRow[]) {
     if (isMobile) {
       return (
-        <div className="dok-cards">
+        <div className="dok-mobiles">
           {items.map((doc) => {
             const { title, meta } = rowMeta(doc)
             return (
@@ -200,10 +206,10 @@ export function HandwerkerAkteDokumente({
           </h2>
         </div>
         {rows.length > 0 ? (
-          <Button type="button" variant="primary" size="sm" onClick={openAdd}>
+          <MockBtn type="button" kind="primary" sm onClick={openAdd}>
             <MockIcon ctx="btn" n="upload" size={14} />
             Upload
-          </Button>
+          </MockBtn>
         ) : null}
       </div>
 
@@ -212,10 +218,10 @@ export function HandwerkerAkteDokumente({
           <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
             Noch keine Dokumente.
           </p>
-          <Button type="button" variant="primary" onClick={openAdd}>
+          <MockBtn type="button" kind="primary" onClick={openAdd}>
             <MockIcon ctx="btn" n="upload" size={16} />
             Dokument oder Foto hochladen
-          </Button>
+          </MockBtn>
         </div>
       ) : (
         <DokumenteVorgangAccordions groups={groups} renderItems={renderItems} />
@@ -234,7 +240,7 @@ export function HandwerkerAkteDokumente({
         onSaved={() => {
           setSheetOpen(false)
           setEditDoc(null)
-          router.refresh()
+          afterServerActionRefresh()
         }}
       />
     </div>

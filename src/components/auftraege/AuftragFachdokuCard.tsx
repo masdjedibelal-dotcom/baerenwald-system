@@ -1,8 +1,8 @@
 'use client'
 
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockBtn } from '@/components/mock-ui'
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { Eye, Upload } from 'lucide-react'
-
 import {
   ensureAndLoadFachdokuSlots,
   uploadCrmFachdokuSlot,
@@ -12,10 +12,14 @@ import {
   fachdokuOffenCount,
   type FachdokuSlotRow,
 } from '@/lib/auftraege/fachdoku-slots'
-import { Button } from '@/components/ui/Button'
+<<<<<<< Updated upstream
+=======
+import { MockBtn } from '@/components/mock-ui'
+>>>>>>> Stashed changes
 import { Card } from '@/components/ui/Card'
 import { toast } from '@/components/ui/app-toast'
 import { cn } from '@/lib/utils'
+import { TOAST } from '@/lib/copy'
 
 export function AuftragFachdokuCard({
   auftragId,
@@ -63,11 +67,11 @@ export function AuftragFachdokuCard({
       const res = await uploadCrmFachdokuSlot({ auftragId, slotId, file })
       setBusyId(null)
       if (!res.ok) {
-        toast.error(res.message)
+        toast.systemError(res)
         return
       }
       setSlots(res.slots)
-      toast.success('Fachnachweis gespeichert')
+      toast.success(TOAST.fachnachweis_gespeichert)
       onChanged?.()
     })
   }
@@ -85,10 +89,10 @@ export function AuftragFachdokuCard({
         {chip ? (
           <span
             className={cn(
-              'rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+              'rounded-pill border px-2.5 py-0.5 text-fs-caption font-semibold',
               offen > 0
-                ? 'border-amber-200 bg-amber-50 text-amber-950'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                ? 'border-status-contact-bg bg-status-contact-bg text-status-contact-text'
+                : 'border-status-order-bg bg-status-order-bg text-status-order-text'
             )}
           >
             {chip}
@@ -113,8 +117,8 @@ export function AuftragFachdokuCard({
               </div>
               <span
                 className={cn(
-                  'rounded-full px-2 py-0.5 text-[10px] font-bold',
-                  done ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
+                  'rounded-pill px-2 py-0.5 text-fs-caption font-bold',
+                  done ? 'bg-status-order-bg text-status-order-text' : 'bg-status-contact-bg text-status-contact-text'
                 )}
               >
                 {done ? 'Erledigt' : 'Offen'}
@@ -124,10 +128,10 @@ export function AuftragFachdokuCard({
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted hover:bg-canvas"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-pill border border-border text-muted hover:bg-canvas"
                   title="Ansehen"
                 >
-                  <Eye className="h-3.5 w-3.5" />
+                  <MockIcon n="eye" ctx="default" className="h-3.5 w-3.5" />
                 </a>
               ) : null}
               <input
@@ -143,16 +147,15 @@ export function AuftragFachdokuCard({
                   if (f) onFile(s.id, f)
                 }}
               />
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
+              <MockBtn
+                type="button" sm
+                kind="secondary"
                 disabled={pending || busyId === s.id}
                 onClick={() => inputRefs.current[s.id]?.click()}
               >
-                <Upload className="mr-1 h-3.5 w-3.5" />
+                <MockIcon n="upload" ctx="default" className="mr-1 h-3.5 w-3.5" />
                 {busyId === s.id ? '…' : done ? 'Ersetzen' : 'Upload'}
-              </Button>
+              </MockBtn>
             </li>
           )
         })}

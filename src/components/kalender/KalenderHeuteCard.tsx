@@ -1,5 +1,7 @@
 'use client'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 
+import { formatTagMonatLang } from '@/lib/utils'
 import { Card } from '@/components/ui/Card'
 import { KalenderTerminZeile } from '@/components/kalender/KalenderTerminZeile'
 import type { KalenderTermin } from '@/lib/types'
@@ -16,7 +18,7 @@ export function KalenderHeuteCard({
     .filter((t) => !t.erledigt && isHeute(t.datum))
     .sort((a, b) => (a.uhrzeit_von ?? '').localeCompare(b.uhrzeit_von ?? ''))
 
-  const label = new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })
+  const label = formatTagMonatLang(new Date(), { withYear: false })
 
   return (
     <Card
@@ -24,7 +26,7 @@ export function KalenderHeuteCard({
       bodyClassName="p-0"
     >
       {heute.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-bw-text-muted">Keine Termine für heute.</p>
+        <MockEmpty title="Keine Termine für heute." />
       ) : (
         <div className="divide-y divide-bw-border">
           {heute.map((t) => (

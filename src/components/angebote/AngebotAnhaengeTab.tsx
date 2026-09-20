@@ -1,13 +1,14 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { useMemo } from 'react'
 import { AnfrageDokumenteTab } from '@/components/anfragen/AnfrageDokumenteTab'
-import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import type { AngebotDetail, LeadDokumentRow } from '@/lib/types'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { formatDatum } from '@/lib/utils'
 
 const COLS = 'minmax(0, 1fr) auto auto'
 
@@ -17,18 +18,6 @@ type DocRow = {
   href: string
   created_at: string
   beschreibung: string
-}
-
-function formatDatum(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-  } catch {
-    return '—'
-  }
 }
 
 function angebotPdfDateiname(detail: AngebotDetail): string {
@@ -168,7 +157,7 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
   return (
     <MockDokumenteCard count={docs.length} empty={docs.length === 0}>
       {docs.length === 0 ? null : isMobile ? (
-        <div className="dok-cards">
+        <div className="dok-mobiles">
           {docs.map((d) => {
             const meta = [d.beschreibung || null, formatDatum(d.created_at)]
               .filter(Boolean)
@@ -179,7 +168,7 @@ function AngebotDokumenteFallback({ detail }: { detail: AngebotDetail }) {
                 title={d.name}
                 meta={meta}
                 onClick={() => openDokumentDatei(d.href)}
-                badge={<span className="dok-card__tag">intern</span>}
+                badge={<span className="dok-mobile__tag">intern</span>}
               />
             )
           })}

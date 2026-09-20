@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
 import { MockCard } from '@/components/mock-ui/MockCard'
+import Link from 'next/link'
 import type { Handwerker } from '@/lib/types'
 
 function PropRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -36,8 +36,8 @@ export function RechnungEingangStammdatenCard({
   if (!handwerker) {
     return (
       <MockCard title="Partner" icon="user" className="dshell-framed">
-        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '4px 0' }}>
-          Kein Handwerker verknüpft.
+        <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-4)', padding: '0.25rem 0' }}>
+          Kein Partner verknüpft.
         </div>
       </MockCard>
     )

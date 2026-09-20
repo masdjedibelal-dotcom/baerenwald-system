@@ -10,6 +10,7 @@
  * - Über Schwelle → Freigabe/Annahme abwarten.
  * - System nicht aktiv → nur Angebot, auf Annahme warten.
  */
+import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
@@ -160,13 +161,14 @@ async function loadOrgKunde(
   supabase: SupabaseClient,
   orgKundeId: string
 ): Promise<OrgKundePick | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('kunden')
     .select(
       'id, name, email, org_anzeigename, portal_modus, freigabe_modus, freigabe_schwelle_eur, notfall_direkt'
     )
     .eq('id', orgKundeId)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-freigabe-logic:kunden', error)
   return (data as OrgKundePick | null) ?? null
 }
 
@@ -175,11 +177,12 @@ async function loadObjektFreigabe(
   objektId: string | null | undefined
 ): Promise<ObjektFreigabePick | null> {
   if (!objektId?.trim()) return null
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('kunden_objekte')
     .select('freigabe_schwelle_eur, notfall_direkt')
     .eq('id', objektId)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-freigabe-logic:kunden_objekte', error)
   return (data as ObjektFreigabePick | null) ?? null
 }
 
@@ -188,11 +191,12 @@ async function loadObjektTitel(
   objektId: string | null | undefined
 ): Promise<string> {
   if (!objektId?.trim()) return 'Objekt'
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('kunden_objekte')
     .select('titel')
     .eq('id', objektId)
     .maybeSingle()
+  if (error) logDbError('lib/org/org-freigabe-logic:kunden_objekte', error)
   return String((data as { titel?: string } | null)?.titel ?? 'Objekt').trim() || 'Objekt'
 }
 
@@ -204,13 +208,14 @@ function angebotBetragEur(gesamtFix: number | null | undefined, gesamtMax: numbe
 
 /** Zuletzt freigegebene / angeforderte Summe — Basis für Refreeze nach AG-Korrektur. */
 async function loadLetzterFreigegebenerBetrag(leadId: string): Promise<number> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('org_freigabe_log')
     .select('aktion, betrag_eur, created_at')
     .eq('lead_id', leadId)
     .in('aktion', ['freigegeben', 'angefordert'])
     .order('created_at', { ascending: false })
     .limit(30)
+  if (error) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', error)
 
   const rows = data ?? []
   const freig = rows.find(
@@ -269,17 +274,19 @@ export async function syncOrgFreigabeNachAngebot(input: {
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (leadErr) logDbError('lib/org/org-freigabe-logic:leads', leadErr)
 
   if (leadErr || !leadRaw) return { ok: false, message: leadErr?.message ?? 'Lead nicht gefunden.' }
   const lead = leadRaw as LeadPick
 
   let orgKundeId = resolveOrgKundeIdFuerLead(lead)
   if (!orgKundeId && lead.kunde_id) {
-    const { data: k } = await supabaseAdmin
+    const { data: k, error } = await supabaseAdmin
       .from('kunden')
       .select('id, portal_modus')
       .eq('id', lead.kunde_id)
       .maybeSingle()
+    if (error) logDbError('lib/org/org-freigabe-logic:kunden', error)
     if ((k as { portal_modus?: string } | null)?.portal_modus === 'organisation') {
       orgKundeId = lead.kunde_id
     }
@@ -320,9 +327,10 @@ export async function syncOrgFreigabeNachAngebot(input: {
             updated_at: now,
           })
           .eq('id', leadId)
+        if (reopenErr) logDbError('lib/org/org-freigabe-logic:leads', reopenErr)
         if (reopenErr) return { ok: false, message: reopenErr.message }
 
-        await supabaseAdmin.from('org_freigabe_log').insert({
+        const { error: __dbErr1 } = await supabaseAdmin.from('org_freigabe_log').insert({
           lead_id: leadId,
           angebot_id: angebotId,
           auftraggeber_kunde_id: orgKundeId,
@@ -331,6 +339,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
           notiz: 'AG-Korrektur: Betrag über freigegebener Summe — erneute Freigabe',
           erstellt_von: 'crm',
         })
+        if (__dbErr1) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr1)
 
         const objektTitel = await loadObjektTitel(supabaseAdmin, lead.kunde_objekt_id)
         const orgEmail = org?.email?.trim()
@@ -382,7 +391,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
 
   if (!erforderlich) {
     const now = new Date().toISOString()
-    await supabaseAdmin
+    const { error: __dbErr2 } = await supabaseAdmin
       .from('leads')
       .update({
         org_freigabe_status: 'nicht_noetig',
@@ -390,6 +399,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
         updated_at: now,
       })
       .eq('id', leadId)
+    if (__dbErr2) logDbError('lib/org/org-freigabe-logic:leads', __dbErr2)
 
     const regeln = resolveEffektiveFreigabeRegeln(org, objekt)
     // Freigabe/Schwellen-System aktiv? Sonst: nur Angebot, auf Annahme warten (kein Auto-Auftrag).
@@ -402,15 +412,16 @@ export async function syncOrgFreigabeNachAngebot(input: {
     // Aktiv + unter Schwelle (oder Modus „direkt“): keine HV-Freigabe.
     // Keine zweite „Angebot zur Information“-Mail — die normale Angebots-Mail
     // (ctaMode unter_schwelle_direkt) enthält den Schwellen-Hinweis bereits.
-    const { data: existingInfo } = await supabaseAdmin
+    const { data: existingInfo, error } = await supabaseAdmin
       .from('org_freigabe_log')
       .select('id')
       .eq('angebot_id', angebotId)
       .eq('aktion', 'info_gesendet')
       .limit(1)
       .maybeSingle()
+    if (error) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', error)
     if (!existingInfo?.id) {
-      await supabaseAdmin.from('org_freigabe_log').insert({
+      const { error: __dbErr3 } = await supabaseAdmin.from('org_freigabe_log').insert({
         lead_id: leadId,
         angebot_id: angebotId,
         auftraggeber_kunde_id: orgKundeId,
@@ -422,6 +433,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
             : 'Bypass Schwelle — Hinweis in Angebots-Mail, keine Extra-Info-Mail',
         erstellt_von: 'crm',
       })
+      if (__dbErr3) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr3)
     }
 
     return {
@@ -445,10 +457,11 @@ export async function syncOrgFreigabeNachAngebot(input: {
       updated_at: now,
     })
     .eq('id', leadId)
+  if (updErr) logDbError('lib/org/org-freigabe-logic:leads', updErr)
 
   if (updErr) return { ok: false, message: updErr.message }
 
-  await supabaseAdmin.from('org_freigabe_log').insert({
+  const { error: __dbErr4 } = await supabaseAdmin.from('org_freigabe_log').insert({
     lead_id: leadId,
     angebot_id: angebotId,
     auftraggeber_kunde_id: orgKundeId,
@@ -456,6 +469,7 @@ export async function syncOrgFreigabeNachAngebot(input: {
     betrag_eur: betrag > 0 ? betrag : null,
     erstellt_von: 'crm',
   })
+  if (__dbErr4) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr4)
 
   if (orgEmail) {
     const branding = await getMailBranding(supabaseAdmin)
@@ -510,6 +524,7 @@ export async function syncOrgFreigabeNachNachtrag(input: {
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (leadErr) logDbError('lib/org/org-freigabe-logic:leads', leadErr)
 
   if (leadErr || !leadRaw) return { ok: false, message: leadErr?.message ?? 'Lead nicht gefunden.' }
   const lead = leadRaw as LeadPick
@@ -536,13 +551,14 @@ export async function syncOrgFreigabeNachNachtrag(input: {
     .update({ org_freigabe_status: 'ausstehend', updated_at: now })
     .eq('id', leadId)
 
-  await supabaseAdmin.from('org_freigabe_log').insert({
+  const { error: __dbErr5 } = await supabaseAdmin.from('org_freigabe_log').insert({
     lead_id: leadId,
     auftraggeber_kunde_id: orgKundeId,
     aktion: 'nachtrag_angefordert',
     betrag_eur: input.nachtragBetragEur,
     erstellt_von: 'partner',
   })
+  if (__dbErr5) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr5)
 
   return { ok: true, status: 'ausstehend' }
 }
@@ -575,6 +591,7 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
     )
     .eq('id', leadId)
     .maybeSingle()
+  if (leadErr) logDbError('lib/org/org-freigabe-logic:leads', leadErr)
 
   if (leadErr || !leadRaw) return { ok: false, message: leadErr?.message ?? 'Lead nicht gefunden.' }
   const lead = leadRaw as LeadPick
@@ -586,11 +603,12 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
 
   let orgKundeId = resolveOrgKundeIdFuerLead(lead)
   if (!orgKundeId && lead.kunde_id) {
-    const { data: k } = await supabaseAdmin
+    const { data: k, error } = await supabaseAdmin
       .from('kunden')
       .select('id, portal_modus')
       .eq('id', lead.kunde_id)
       .maybeSingle()
+    if (error) logDbError('lib/org/org-freigabe-logic:kunden', error)
     if ((k as { portal_modus?: string } | null)?.portal_modus === 'organisation') {
       orgKundeId = lead.kunde_id
     }
@@ -602,11 +620,12 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
     input.betragEur ??
     angebotBetragEur(input.gesamtFix ?? null, input.gesamtMax ?? null)
   if (!(betrag > 0)) {
-    const { data: ang } = await supabaseAdmin
+    const { data: ang, error } = await supabaseAdmin
       .from('angebote')
       .select('gesamt_fix, gesamt_max')
       .eq('id', angebotId)
       .maybeSingle()
+    if (error) logDbError('lib/org/org-freigabe-logic:angebote', error)
     const a = ang as { gesamt_fix?: number | null; gesamt_max?: number | null } | null
     betrag = angebotBetragEur(a?.gesamt_fix, a?.gesamt_max)
   }
@@ -620,10 +639,11 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
       updated_at: now,
     })
     .eq('id', leadId)
+  if (updErr) logDbError('lib/org/org-freigabe-logic:leads', updErr)
   if (updErr) return { ok: false, message: updErr.message }
 
   const notiz = `erneut angefordert nach Ablehnung: ${anpassung}`
-  await supabaseAdmin.from('org_freigabe_log').insert({
+  const { error: __dbErr6 } = await supabaseAdmin.from('org_freigabe_log').insert({
     lead_id: leadId,
     angebot_id: angebotId,
     auftraggeber_kunde_id: orgKundeId,
@@ -632,6 +652,7 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
     notiz,
     erstellt_von: 'crm',
   })
+  if (__dbErr6) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr6)
 
   const objektTitel = await loadObjektTitel(supabaseAdmin, lead.kunde_objekt_id)
   const orgEmail = org?.email?.trim()

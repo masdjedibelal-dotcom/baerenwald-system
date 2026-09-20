@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 
@@ -34,10 +35,11 @@ export async function recordHwAuftragErledigtGemeldet(input: {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (findErr) logDbError('lib/auftraege/record-hw-auftrag-erledigt:auftrag_handwerker', findErr)
 
   if (findErr) return { ok: false, message: findErr.message }
   if (!row?.id) {
-    return { ok: false, message: 'Keine aktive Handwerker-Zuweisung gefunden' }
+    return { ok: false, message: 'Keine aktive Partner-Zuweisung gefunden' }
   }
 
   // Idempotent: bereits gemeldet → Timestamp behalten
@@ -45,12 +47,13 @@ export async function recordHwAuftragErledigtGemeldet(input: {
     return { ok: true, erledigtAm: String(row.erledigt_gemeldet_am) }
   }
 
-  const { error } = await supabaseAdmin
+  const { error: error2 } = await supabaseAdmin
     .from('auftrag_handwerker')
     .update({ erledigt_gemeldet_am: erledigtAm })
     .eq('id', row.id)
+  if (error2) logDbError('lib/auftraege/record-hw-auftrag-erledigt:auftrag_handwerker', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
 
   if (!input.skipTimeline) {
     await insertAuftragTimelineEvent({

@@ -15,6 +15,8 @@ import {
   type VersammlungsberichtViewModel,
 } from '@/lib/objektakte/build-versammlungsbericht-view-model'
 import type { VersammlungsberichtPayload } from '@/lib/objektakte/load-versammlungsbericht-data'
+import { pdfFussPuppeteerTemplate } from '@/lib/pdf/chrome'
+import { C } from '@/lib/tokens/colors'
 
 const ACCENT = VERSAMMLUNG_ACCENT
 const TINT = VERSAMMLUNG_TINT
@@ -46,7 +48,7 @@ function buildCover(vm: VersammlungsberichtViewModel): string {
     <div class="cover-body">
       <p class="cover-kicker">Objektbericht</p>
       <p class="cover-sub">Instandhaltung &amp; Reparaturen</p>
-      <h1 class="cover-objekt">${esc(vm.objektAdresse || vm.objektTitel)}</h1>
+<h1 class="cover-objekt">${esc(vm.objektAdresse || vm.objektTitel)}</h1>
       <p class="cover-range">Berichtszeitraum: ${esc(vm.zeitraumLabel)}</p>
       <hr class="cover-rule" />
       <p class="cover-meta">Erstellt für die Eigentümerversammlung</p>
@@ -83,10 +85,10 @@ function buildZusammenfassung(vm: VersammlungsberichtViewModel): string {
   return `<section class="content-section page-break-before">
     ${sectionHead(1, 'Zusammenfassung', vm)}
     <div class="kpi-row">
-      <div class="kpi-card"><div class="kpi-val">${k.massnahmenGesamt}</div><div class="kpi-lbl">Maßnahmen gesamt</div></div>
-      <div class="kpi-card"><div class="kpi-val tabular">${esc(k.gesamtKostenLabel)}</div><div class="kpi-lbl">Gesamtkosten</div>${ohneHinweis}</div>
-      <div class="kpi-card"><div class="kpi-val">${k.abgeschlossen}</div><div class="kpi-lbl">Abgeschlossen</div></div>
-      <div class="kpi-card"><div class="kpi-val">${k.offenLaufend}</div><div class="kpi-lbl">Offen / laufend</div></div>
+      <div class="kpi-tile"><div class="kpi-val">${k.massnahmenGesamt}</div><div class="kpi-lbl">Maßnahmen gesamt</div></div>
+      <div class="kpi-tile"><div class="kpi-val tabular">${esc(k.gesamtKostenLabel)}</div><div class="kpi-lbl">Gesamtkosten</div>${ohneHinweis}</div>
+      <div class="kpi-tile"><div class="kpi-val">${k.abgeschlossen}</div><div class="kpi-lbl">Abgeschlossen</div></div>
+      <div class="kpi-tile"><div class="kpi-val">${k.offenLaufend}</div><div class="kpi-lbl">Offen / laufend</div></div>
     </div>
     <table class="data-table data-table--compact">
       <thead><tr><th>Art</th><th class="num">Anzahl</th><th class="num">Kosten</th><th class="num">Anteil</th></tr></thead>
@@ -384,7 +386,7 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
     gap: 8px;
     margin-bottom: 16px;
   }
-  .kpi-card {
+  .kpi-tile {
     border: 1px solid var(--line);
     border-radius: 4px;
     padding: 12px 8px;
@@ -475,11 +477,11 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
   .bar-track {
     height: 7mm;
     border: 0.5pt solid var(--line);
-    background: #fff;
+    background: ${C.white};
     border-radius: 2px;
     overflow: hidden;
   }
-  .bar-fill { height: 100%; background: #c5d0c8; min-width: 2mm; }
+  .bar-fill { height: 100%; background: ${C.borderSoft}; min-width: 2mm; }
   .bar-fill--primary { background: var(--primary); }
   .bar-val { text-align: right; font-size: 9pt; color: var(--muted); }
   .bar-sum {
@@ -499,10 +501,10 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
     border-radius: 50%;
     margin-right: 4px;
     vertical-align: middle;
-    border: 0.5pt solid #888;
+    border: 0.5pt solid ${C.grayNeutral2};
   }
   .dot--done { background: ${ACCENT}; border-color: ${ACCENT}; }
-  .dot--open { background: #fff; }
+  .dot--open { background: ${C.white}; }
   .kosten-offen { font-style: italic; color: var(--muted); }
   .sub-hint { font-size: 8pt; color: var(--muted); margin-top: 2px; }
 
@@ -511,7 +513,7 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
     padding: 10px 12px;
     border: 1px solid var(--line);
     border-radius: 4px;
-    background: #fff;
+    background: ${C.white};
   }
   .anlage-block-title { margin: 0 0 4px; font-weight: 700; color: var(--primary); }
   .anlage-block-summary { margin: 0 0 6px; font-size: 9pt; color: var(--muted); }
@@ -539,27 +541,19 @@ export function buildVersammlungsberichtHtml(payload: VersammlungsberichtPayload
 </html>`
 }
 
-/** Puppeteer footer — Angebots-Stil: links Bärenwald, Mitte Seite, rechts HV + Datum */
+/** Puppeteer footer — HV-WL + „Ein Service von Bärenwald“ (F4). */
 export function buildVersammlungsberichtPdfFooterTemplate(
   vm: VersammlungsberichtViewModel
 ): string {
-  const org = esc(vm.orgName)
-  const erstellt = esc(vm.erstelltAmLabel)
-  return `<div style="width:100%;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-size:7.5pt;color:${TEXT_MUTED};padding:4px 16mm 2px;border-top:0.5pt solid #E5E7EB;background:#fff;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;width:100%;">
-      <div style="flex:1;text-align:left;line-height:1.45;">
-        <span style="font-weight:700;color:${ACCENT};">Bärenwald</span><br/>
-        Objektbericht · ${erstellt}
-      </div>
-      <div style="flex:0 0 auto;text-align:center;line-height:1.45;white-space:nowrap;padding:0 8px;">
-        Seite <span class="pageNumber"></span> von <span class="totalPages"></span>
-      </div>
-      <div style="flex:1;text-align:right;line-height:1.45;">
-        ${org}<br/>
-        ${esc(vm.objektTitel)}
-      </div>
-    </div>
-  </div>`
+  return pdfFussPuppeteerTemplate({
+    variant: 'hv-wl',
+    absender: {
+      name: vm.orgName,
+      adresseZeilen: [vm.objektTitel, `Objektbericht · ${vm.erstelltAmLabel}`],
+    },
+    serviceVonBaerenwald: true,
+    seitenZusatz: 'Objektbericht',
+  })
 }
 
 export function buildVersammlungsberichtPdfHeaderTemplate(

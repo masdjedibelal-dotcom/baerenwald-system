@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { loadWizardContext } from '@/lib/wizard-context'
 import { AngebotNeuFromKundeClient } from '@/components/angebote/AngebotNeuFromKundeClient'
@@ -51,7 +52,6 @@ export default async function AngebotNeuRedirectPage({
         .order('name')
         .limit(200),
     ])
-
     if (error || !kunde) {
       return (
         <AngebotNeuKundeGate

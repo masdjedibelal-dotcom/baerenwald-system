@@ -1,6 +1,7 @@
 'use server'
 
-import { withCrmReadFallback } from '@/lib/kunden/kunden-db'
+import { createClient } from '@/lib/supabase-server'
+import { logDbError } from '@/lib/errors/log-db-error'
 import { handwerkerDisplayName } from '@/lib/handwerker-stammdaten'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import {
@@ -42,13 +43,12 @@ async function kundenKontaktKandidaten(email: string | null, telefon: string | n
   const rows: StammdatenKontaktTreffer[] = []
 
   if (em) {
-    const { data } = await withCrmReadFallback(async (db) =>
-      db
+    const { data, error } = await (() => { const db = createClient(); return db
         .from('kunden')
         .select('id, name, vorname, nachname, typ, email, telefon')
         .ilike('email', em)
-        .limit(12)
-    )
+        .limit(12) })()
+    if (error) logDbError('app/actions/stammdaten-kontakt:kunden', error)
     for (const r of data ?? []) {
       if (!emailKontaktMatch(r.email as string, em)) continue
       rows.push({
@@ -62,13 +62,12 @@ async function kundenKontaktKandidaten(email: string | null, telefon: string | n
   }
 
   if (tel) {
-    const { data } = await withCrmReadFallback(async (db) =>
-      db
+    const { data, error } = await (() => { const db = createClient(); return db
         .from('kunden')
         .select('id, name, vorname, nachname, typ, email, telefon')
         .ilike('telefon', `%${tel.slice(-8)}%`)
-        .limit(12)
-    )
+        .limit(12) })()
+    if (error) logDbError('app/actions/stammdaten-kontakt:kunden', error)
     for (const r of data ?? []) {
       if (!telefonKontaktMatch(r.telefon as string, tel)) continue
       rows.push({
@@ -90,13 +89,12 @@ async function handwerkerKontaktKandidaten(email: string | null, telefon: string
   const rows: StammdatenKontaktTreffer[] = []
 
   if (em) {
-    const { data } = await withCrmReadFallback(async (db) =>
-      db
+    const { data, error } = await (() => { const db = createClient(); return db
         .from('handwerker')
         .select('id, name, firma, vorname, nachname, email, telefon')
         .ilike('email', em)
-        .limit(12)
-    )
+        .limit(12) })()
+    if (error) logDbError('app/actions/stammdaten-kontakt:handwerker', error)
     for (const r of data ?? []) {
       if (!emailKontaktMatch(r.email as string, em)) continue
       rows.push({
@@ -110,13 +108,12 @@ async function handwerkerKontaktKandidaten(email: string | null, telefon: string
   }
 
   if (tel) {
-    const { data } = await withCrmReadFallback(async (db) =>
-      db
+    const { data, error } = await (() => { const db = createClient(); return db
         .from('handwerker')
         .select('id, name, firma, vorname, nachname, email, telefon')
         .ilike('telefon', `%${tel.slice(-8)}%`)
-        .limit(12)
-    )
+        .limit(12) })()
+    if (error) logDbError('app/actions/stammdaten-kontakt:handwerker', error)
     for (const r of data ?? []) {
       if (!telefonKontaktMatch(r.telefon as string, tel)) continue
       rows.push({
@@ -138,9 +135,8 @@ async function partnerKontaktKandidaten(email: string | null, telefon: string | 
   const rows: StammdatenKontaktTreffer[] = []
 
   if (em) {
-    const { data } = await withCrmReadFallback(async (db) =>
-      db.from('partner').select('id, name, email, telefon').ilike('email', em).limit(12)
-    )
+    const { data, error } = await (() => { const db = createClient(); return db.from('partner').select('id, name, email, telefon').ilike('email', em).limit(12) })()
+    if (error) logDbError('app/actions/stammdaten-kontakt:partner', error)
     for (const r of data ?? []) {
       if (!emailKontaktMatch(r.email as string, em)) continue
       rows.push({
@@ -154,9 +150,8 @@ async function partnerKontaktKandidaten(email: string | null, telefon: string | 
   }
 
   if (tel) {
-    const { data } = await withCrmReadFallback(async (db) =>
-      db.from('partner').select('id, name, email, telefon').ilike('telefon', `%${tel.slice(-8)}%`).limit(12)
-    )
+    const { data, error } = await (() => { const db = createClient(); return db.from('partner').select('id, name, email, telefon').ilike('telefon', `%${tel.slice(-8)}%`).limit(12) })()
+    if (error) logDbError('app/actions/stammdaten-kontakt:partner', error)
     for (const r of data ?? []) {
       if (!telefonKontaktMatch(r.telefon as string, tel)) continue
       rows.push({

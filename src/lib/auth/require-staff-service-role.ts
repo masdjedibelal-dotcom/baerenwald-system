@@ -12,9 +12,8 @@ export type StaffServiceRole =
 /**
  * CRM-Staff-Gate + Service-Role-Client für mutierende Server-Actions.
  *
- * Warum: Detail-/Listen-Seiten laden oft über `withCrmReadFallback` (Admin bei RLS).
- * Mutationen über den User-Client finden denselben Datensatz dann nicht
- * („Rechnung nicht gefunden“ trotz sichtbarer Detailseite).
+ * Warum: Detail-/Listen-Seiten lesen über User-Client + RLS; Mutationen über denselben
+ * Client finden Datensätze oft nicht („Rechnung nicht gefunden“ trotz sichtbarer Detailseite).
  *
  * Sicherheit: Nur CRM-Team (`user_profiles` / Staff-E-Mail). Portal-/Partner-/Token-
  * Kontexte dürfen diesen Helper NIEMALS nutzen — dort bleibt User-Client + RLS.

@@ -9,7 +9,7 @@
 .staff-funnel .wizard-inner,
 .staff-funnel .app-flow-body,
 .staff-funnel.document-canvas .document-canvas__body {
-  background: var(--bg-soft, #f4f5f4) !important;
+  background: var(--bg-soft);
 }
 
 .staff-funnel .document-canvas__paper {
@@ -37,9 +37,9 @@
     max-width: min(1120px, 100%);
     margin-inline: auto;
     padding: 12px 8px 36px;
-    background: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
+    background: transparent;
+    box-shadow: none;
+    border: none;
     min-height: 0;
   }
 }
@@ -75,17 +75,17 @@
 }
 
 .staff-funnel .document-canvas__header {
-  background: var(--card, #fff) !important;
+  background: var(--card);
   border-bottom: 0.5px solid var(--border, rgba(30, 28, 26, 0.08));
 }
 
 .staff-funnel {
-  --sf-accent: var(--green, #2e7d52);
-  --sf-accent-dark: var(--green-dark, #1a3d2b);
-  --sf-text: var(--text, #1e1c1a);
-  --sf-text-2: var(--text-2, #524e4a);
-  --sf-text-3: var(--text-3, #7a7570);
-  --sf-text-4: var(--text-4, #9a9590);
+  --sf-accent: var(--green);
+  --sf-accent-dark: var(--green-dark);
+  --sf-text: var(--text);
+  --sf-text-2: var(--text-2);
+  --sf-text-3: var(--text-3);
+  --sf-text-4: var(--text-4);
   --sf-border: var(--border, rgba(30, 28, 26, 0.08));
   --sf-radius: 10px;
 }
@@ -101,8 +101,8 @@
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--red-bg, #fde8e8);
-  color: var(--red-tx, #b42318);
+  background: var(--red-bg);
+  color: var(--red-tx);
   font-size: var(--fs-text);
 }
 
@@ -118,7 +118,7 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-3, #7a7570);
+  color: var(--text-3);
 }
 
 .staff-funnel .sf-radio-list {
@@ -135,7 +135,7 @@
   padding: 6px 10px;
   border-radius: 8px;
   border: 0.5px solid var(--border);
-  background: var(--card, #fff);
+  background: var(--card);
   font-size: var(--fs-text);
   color: var(--sf-text);
   cursor: pointer;
@@ -143,7 +143,7 @@
 
 .staff-funnel .sf-radio:has(input:checked) {
   border-color: var(--border-strong, rgba(30, 28, 26, 0.18));
-  background: var(--bg-soft, #f4f5f4);
+  background: var(--bg-soft);
 }
 
 .staff-funnel .sf-radio input {
@@ -194,7 +194,7 @@
   padding: 0 14px;
   border-radius: 999px;
   border: 0.5px solid var(--border);
-  background: var(--card, #fff);
+  background: var(--card);
   color: var(--sf-text-2);
   font-size: var(--fs-meta, 12px);
   font-weight: 500;
@@ -242,7 +242,7 @@
   padding: 12px 14px;
   border-radius: 10px;
   border: 0.5px solid var(--border);
-  background: var(--card, #fff);
+  background: var(--card);
   color: var(--sf-accent);
   font-size: var(--fs-text);
   font-weight: 600;
@@ -267,7 +267,7 @@
 .staff-funnel .sf-meta {
   border-radius: 12px;
   border: 0.5px solid var(--border);
-  background: var(--card, #fff);
+  background: var(--card);
   overflow: hidden;
 }
 
@@ -292,7 +292,7 @@
 }
 
 .staff-funnel .sf-meta-row:hover {
-  background: var(--bg-soft, #f4f5f4);
+  background: var(--bg-soft);
 }
 
 .staff-funnel .sf-meta-k {
@@ -319,7 +319,7 @@
 .staff-funnel .sf-meta-expand {
   padding: 4px 14px 14px;
   border-bottom: 0.5px solid var(--border);
-  background: var(--bg-soft, #f4f5f4);
+  background: var(--bg-soft);
 }
 
 /* Anliegen-Tiles — flach wie Mock */
@@ -333,7 +333,7 @@
   gap: 4px;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
-  background: var(--card, #fff);
+  background: var(--card);
   box-shadow: none;
   text-align: left;
   width: 100%;
@@ -368,7 +368,7 @@
 }
 
 .staff-funnel .funnel-tile-label {
-  font-size: 13.5px;
+  font-size: var(--fs-text);
   font-weight: 650;
   color: var(--sf-text);
   margin: 0;
@@ -376,7 +376,7 @@
 }
 
 .staff-funnel .funnel-tile-hint {
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 400;
   color: var(--sf-text-3);
   line-height: 1.4;
@@ -387,9 +387,9 @@
   margin-top: 6px;
   display: inline-block;
   border-radius: 6px;
-  background: var(--green-10, #eaf3de);
+  background: var(--green-10);
   color: var(--sf-accent-dark);
-  font-size: 10px;
+  font-size: var(--fs-caption);
   font-weight: 650;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -403,7 +403,7 @@
 
 /* Preis — hellgrün wie Mock */
 .staff-funnel .preis-karte {
-  background: var(--green-10, #e8f3ec);
+  background: var(--green-10);
   border: none;
   border-radius: 12px;
   padding: 16px 18px;
@@ -413,7 +413,7 @@
 
 .staff-funnel .preis-karte-kicker {
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: var(--fs-caption);
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -445,13 +445,13 @@
 
 .staff-funnel .preis-karte-hinweis {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   line-height: 1.45;
   color: var(--sf-accent);
 }
 
 .staff-funnel .preis-karte--beratung {
-  background: var(--green-10, #e8f3ec);
+  background: var(--green-10);
 }
 
 /* Legacy tile grid (falls noch genutzt) */
@@ -490,12 +490,12 @@
   padding: 16px;
   border-radius: 14px;
   border: 1px dashed rgba(30, 28, 26, 0.14);
-  background: var(--bg-soft, #f6f5f3);
+  background: var(--bg-soft);
 }
 
 .staff-funnel .sf-intern-label {
   margin: 0 0 12px;
-  font-size: 11px;
+  font-size: var(--fs-caption);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -505,7 +505,7 @@
 /* DocBar: Anlegen + Verwerfen */
 .staff-funnel .document-canvas__docbar {
   justify-content: space-evenly;
-  background: var(--card, #fff);
+  background: var(--card);
 }
 
 .staff-funnel .doc-action-bar__btn--danger {
@@ -520,7 +520,7 @@
 }
 
 .staff-funnel .doc-action-bar__btn:not(.doc-action-bar__btn--danger) {
-  color: var(--green, #1a7f4e);
+  color: var(--green);
 }
 
 .staff-funnel .doc-action-bar__btn:not(.doc-action-bar__btn--danger) .doc-action-bar__lbl {
@@ -543,7 +543,7 @@
   flex-shrink: 0;
   border-top: 0.5px solid var(--border, rgba(30, 28, 26, 0.08));
   padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
-  background: var(--bw-material-bar, var(--card, #fff));
+  background: var(--bw-material-bar, var(--card));
   backdrop-filter: blur(var(--bw-material-blur, 12px));
   -webkit-backdrop-filter: blur(var(--bw-material-blur, 12px));
 }
@@ -601,10 +601,10 @@
 }
 
 .staff-funnel .preis-karte-zahl--dash {
-  color: var(--text-3, #7a7570);
+  color: var(--text-3);
   font-weight: 600;
 }
 
 .staff-funnel .preis-karte--empty .preis-karte-trenner {
-  color: var(--text-3, #7a7570);
+  color: var(--text-3);
 }

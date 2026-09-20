@@ -1,22 +1,25 @@
-import type { LucideIcon } from 'lucide-react'
+/** Text mit MockIcon davor (keine Emojis, kein Lucide). */
 import type { ReactNode } from 'react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import type { MockIconName } from '@/lib/mock-icons'
 import { cn } from '@/lib/utils'
 
-/** Text mit Lucide-Icon davor (keine Emojis). */
 export function IconText({
-  icon: Icon,
+  icon,
   children,
   className,
   iconClassName,
+  ctx = 'default',
 }: {
-  icon: LucideIcon
+  icon: MockIconName | string
   children: ReactNode
   className?: string
   iconClassName?: string
+  ctx?: 'default' | 'row' | 'btn' | 'emphasis' | 'empty' | 'nav' | 'tab' | 'sidebar'
 }) {
   return (
     <span className={cn('inline-flex items-center gap-1.5', className)}>
-      <Icon className={cn('icon-lucide icon-ctx-default h-3.5 w-3.5 shrink-0', iconClassName)} aria-hidden />
+      <MockIcon n={icon} ctx={ctx} size={14} className={cn('shrink-0', iconClassName)} />
       <span>{children}</span>
     </span>
   )

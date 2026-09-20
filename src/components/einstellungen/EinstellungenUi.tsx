@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { cn } from '@/lib/utils'
 
 const TITLE_CLASS = 'm-0 text-[length:var(--fs-text)] font-semibold text-[var(--text)]'
@@ -48,8 +49,11 @@ export function EinstellungenListBody({
   children?: ReactNode
   empty?: ReactNode
 }) {
-  if (empty) {
-    return <p className="text-sm text-bw-text-muted">{empty}</p>
+  if (empty != null && empty !== false) {
+    if (typeof empty === 'string') {
+      return <MockEmpty title={empty} />
+    }
+    return <>{empty}</>
   }
   return <ul className="einst-list">{children}</ul>
 }

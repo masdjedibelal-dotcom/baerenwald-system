@@ -1,6 +1,12 @@
 'use server'
 
+<<<<<<< Updated upstream
+import { revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { logDbError } from '@/lib/errors/log-db-error'
+=======
+import { logDbError } from '@/lib/errors/log-db-error'
 import { revalidatePath } from 'next/cache'
+>>>>>>> Stashed changes
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
@@ -17,6 +23,7 @@ async function assertLead(leadId: string) {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet' }
   const { data, error } = await supabase.from('leads').select('id').eq('id', leadId).maybeSingle()
+  if (error) logDbError('app/anfragen/dokumente-actions:leads', error)
   if (error || !data) return { ok: false as const, message: 'Anfrage nicht gefunden' }
   return { ok: true as const, userId: user.id }
 }
@@ -47,10 +54,10 @@ export async function insertLeadDokument(input: {
     })
     .select('id')
     .single()
+  if (error) logDbError('app/anfragen/dokumente-actions:lead_dokumente', error)
 
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidatePath(`/anfragen/${input.leadId}`)
-  revalidatePath('/anfragen')
+  revalidateLeadDetail(input.leadId)
   return { ok: true, id: data.id as string }
 }
 
@@ -62,26 +69,32 @@ export async function deleteLeadDokument(
   if (!gate.ok) return gate
 
   const supabase = createClient()
-  const { data: row } = await supabase
+  const { data: row, error } = await supabase
     .from('lead_dokumente')
     .select('datei_url')
     .eq('id', dokumentId)
     .eq('lead_id', leadId)
     .maybeSingle()
+  if (error) logDbError('app/anfragen/dokumente-actions:lead_dokumente', error)
 
   const path = leadDokumentStoragePath((row as { datei_url?: string | null } | null)?.datei_url)
   if (path) {
     await supabaseAdmin.storage.from(BUCKET).remove([path])
   }
 
-  const { error } = await supabase
+  const { error: error2 } = await supabase
     .from('lead_dokumente')
     .delete()
     .eq('id', dokumentId)
     .eq('lead_id', leadId)
+  if (error2) logDbError('app/anfragen/dokumente-actions:lead_dokumente', error2)
 
-  if (error) return { ok: false, message: error.message }
+  if (error2) return { ok: false, message: error2.message }
+<<<<<<< Updated upstream
+  revalidateLeadDetail(leadId)
+=======
   revalidatePath(`/anfragen/${leadId}`)
   revalidatePath('/anfragen')
+>>>>>>> Stashed changes
   return { ok: true }
 }

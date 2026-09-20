@@ -1,9 +1,9 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { MockBtn } from '@/components/mock-ui/MockPrimitives'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { AuftragAuftragdetailsTab } from '@/components/auftraege/AuftragDetailsTab'
 import { VorgangZahlungTab } from '@/components/vorgang/VorgangZahlungTab'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'

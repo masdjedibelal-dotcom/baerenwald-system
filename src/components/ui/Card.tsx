@@ -1,6 +1,5 @@
-import type { HTMLAttributes, ReactNode } from 'react'
 import { MockCard } from '@/components/mock-ui/MockCard'
-
+import type { HTMLAttributes, ReactNode } from 'react'
 interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode
   action?: ReactNode

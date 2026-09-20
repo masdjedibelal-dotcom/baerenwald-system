@@ -1,9 +1,11 @@
 'use client'
 
+
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import { confirmKundeDelete } from '@/components/ui/confirm-kunde-delete'
 import { deleteVorgang } from '@/app/(dashboard)/vorgaenge/actions'
 import { deleteRechnungEntwurf } from '@/app/(dashboard)/rechnungen/wizard-actions'
@@ -15,22 +17,23 @@ import {
 } from '@/app/(dashboard)/crm/list-copy-actions'
 import { duplicateKunde } from '@/app/actions/kunden'
 import { duplicateHandwerker, deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
+import { TOAST } from '@/lib/copy'
 
 export function runDeleteVorgang(
   leadId: string,
   router: AppRouterInstance,
   label = 'Vorgang'
 ): void {
-  confirmDelete(
+  openDeleteConfirm(
     `${label} löschen?`,
     async () => {
       const r = await deleteVorgang(leadId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         throw new Error(r.message)
       }
       toast.success(`${label} gelöscht`)
-      router.refresh()
+      afterServerActionRefresh()
     },
     {
       sub: 'Dauerhaft entfernen — Kunde bleibt erhalten.',
@@ -48,16 +51,16 @@ export function runDeleteStandaloneRechnung(
   router: AppRouterInstance,
   label = 'Rechnung'
 ): void {
-  confirmDelete(
+  openDeleteConfirm(
     `${label} löschen?`,
     async () => {
       const r = await deleteRechnungEntwurf(rechnungId)
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         throw new Error(r.message)
       }
       toast.success(`${label} gelöscht`)
-      router.refresh()
+      afterServerActionRefresh()
     },
     {
       sub: 'Dauerhaft entfernen.',
@@ -69,9 +72,9 @@ export function runDeleteStandaloneRechnung(
 export function runDuplicateAnfrage(leadId: string, router: AppRouterInstance) {
   void actionBusy.run('Anfrage wird kopiert…', async () => {
     const r = await duplicateAnfrage(leadId)
-    if (!r.ok) toast.error(r.message)
+    if (!r.ok) toast.systemError(r)
     else {
-      toast.success('Anfrage kopiert')
+      toast.success(TOAST.anfrage_kopiert)
       router.push(`/anfragen/${r.id}`)
     }
   })
@@ -80,7 +83,7 @@ export function runDuplicateAnfrage(leadId: string, router: AppRouterInstance) {
 export function runDuplicateAngebot(angebotId: string, router: AppRouterInstance) {
   void actionBusy.run('Angebot wird kopiert…', async () => {
     const r = await duplicateAngebotHref(angebotId)
-    if (!r.ok) toast.error(r.message)
+    if (!r.ok) toast.systemError(r)
     else router.push(r.href)
   })
 }
@@ -88,9 +91,9 @@ export function runDuplicateAngebot(angebotId: string, router: AppRouterInstance
 export function runDuplicateAuftrag(auftragId: string, router: AppRouterInstance) {
   void actionBusy.run('Auftrag wird kopiert…', async () => {
     const r = await duplicateAuftragHref(auftragId)
-    if (!r.ok) toast.error(r.message)
+    if (!r.ok) toast.systemError(r)
     else {
-      toast.success('Kopie wird vorbereitet …')
+      toast.success(TOAST.kopie_wird_vorbereitet)
       router.push(r.href)
     }
   })
@@ -99,9 +102,9 @@ export function runDuplicateAuftrag(auftragId: string, router: AppRouterInstance
 export function runDuplicateRechnung(rechnungId: string, router: AppRouterInstance) {
   void actionBusy.run('Rechnung wird kopiert…', async () => {
     const r = await duplicateRechnung(rechnungId)
-    if (!r.ok) toast.error(r.message)
+    if (!r.ok) toast.systemError(r)
     else {
-      toast.success('Rechnungsentwurf kopiert')
+      toast.success(TOAST.rechnungsentwurf_kopiert)
       router.push(`/rechnungen/${r.id}`)
     }
   })
@@ -110,20 +113,20 @@ export function runDuplicateRechnung(rechnungId: string, router: AppRouterInstan
 export function runDuplicateKunde(kundeId: string, router: AppRouterInstance) {
   void actionBusy.run('Kunde wird kopiert…', async () => {
     const r = await duplicateKunde(kundeId)
-    if (!r.ok) toast.error(r.message)
+    if (!r.ok) toast.systemError(r)
     else {
-      toast.success('Kunde kopiert')
+      toast.success(TOAST.kunde_kopiert)
       router.push(`/kunden/${r.id}`)
     }
   })
 }
 
 export function runDuplicateHandwerker(handwerkerId: string, router: AppRouterInstance) {
-  void actionBusy.run('Handwerker wird kopiert…', async () => {
+  void actionBusy.run('Partner wird kopiert…', async () => {
     const r = await duplicateHandwerker(handwerkerId)
-    if (!r.ok) toast.error(r.message)
+    if (!r.ok) toast.systemError(r)
     else {
-      toast.success('Handwerker kopiert')
+      toast.success(TOAST.partner_kopiert)
       router.push(`/handwerker/${r.id}`)
     }
   })
@@ -136,7 +139,7 @@ export function runDeleteKunde(
   onDone?: () => void | Promise<void>
 ): void {
   confirmKundeDelete(kundeId, async () => {
-    router.refresh()
+    afterServerActionRefresh()
     if (onDone) await onDone()
   })
 }
@@ -144,19 +147,19 @@ export function runDeleteKunde(
 export async function runDeleteHandwerker(
   handwerkerId: string,
   router: AppRouterInstance,
-  label = 'Handwerker'
+  label = 'Partner'
 ): Promise<void> {
-  confirmDelete(
+  openDeleteConfirm(
     `„${label}“ löschen?`,
     async () => {
       await actionBusy.run(`${label} wird gelöscht…`, async () => {
         const r = await deleteHandwerker(handwerkerId)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
         toast.success(`${label} gelöscht`)
-        router.refresh()
+        afterServerActionRefresh()
       })
     },
     {

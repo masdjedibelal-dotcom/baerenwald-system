@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 
 import { isCrmAdminOrManager } from '@/lib/auth/is-crm-staff'
@@ -40,11 +41,12 @@ export async function POST(request: Request) {
     if (!leadId) {
       return NextResponse.json({ ok: false, error: 'leadId fehlt.' }, { status: 400 })
     }
-    const { data: lead } = await supabaseAdmin
+    const {data: lead, error} = await supabaseAdmin
       .from('leads')
       .select('melde_tracking_token')
       .eq('id', leadId)
       .maybeSingle()
+    if (error) logDbError('app/api/portal-impersonate/route:leads', error)
     const token = lead?.melde_tracking_token ? String(lead.melde_tracking_token) : ''
     if (!token) {
       return NextResponse.json(
@@ -75,11 +77,12 @@ export async function POST(request: Request) {
   let redirectPath = '/portal'
 
   if (targetType === 'kunde') {
-    const { data: kunde } = await supabaseAdmin
+    const {data: kunde, error} = await supabaseAdmin
       .from('kunden')
       .select('id, name, email, portal_modus, auth_user_id')
       .eq('id', targetId)
       .maybeSingle()
+    if (error) logDbError('app/api/portal-impersonate/route:kunden', error)
     if (!kunde?.email?.trim()) {
       return NextResponse.json(
         { ok: false, error: 'Kunde ohne E-Mail oder nicht gefunden.' },
@@ -116,14 +119,15 @@ export async function POST(request: Request) {
       redirectPath = '/portal?view=hausmeister'
     }
   } else {
-    const { data: hw } = await supabaseAdmin
+    const {data: hw, error} = await supabaseAdmin
       .from('handwerker')
       .select('id, name, email, auth_user_id')
       .eq('id', targetId)
       .maybeSingle()
+    if (error) logDbError('app/api/portal-impersonate/route:handwerker', error)
     if (!hw?.email?.trim() || !hw.auth_user_id) {
       return NextResponse.json(
-        { ok: false, error: 'Handwerker ohne Portal-Konto oder E-Mail.' },
+        { ok: false, error: 'Partner ohne Portal-Konto oder E-Mail.' },
         { status: 422 }
       )
     }

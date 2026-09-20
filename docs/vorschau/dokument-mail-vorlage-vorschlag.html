@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vorlagenvorschlag — PDF + Mail (Phase A)</title>
+  <style>
+    :root {
+      --fl-accent: #2e7d52;
+      --fl-accent-dark: #1a3d2b;
+      --fl-bg: #f5f6f4;
+      --fl-panel: #ffffff;
+      --fl-ink: #142019;
+      --fl-muted: #524e4a;
+      --fl-faint: #6a746f;
+      --fl-line: rgba(20, 32, 25, 0.12);
+      --fs-meta: 11px;
+      --fs-text: 13px;
+      --fs-title: 15px;
+      --fs-head: 20px;
+      --r: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      background: var(--fl-bg);
+      color: var(--fl-ink);
+      padding: 32px 20px 64px;
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; letter-spacing: -0.02em; }
+    .lede { color: var(--fl-muted); font-size: 14px; max-width: 52rem; margin: 0 0 28px; line-height: 1.5; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fl-faint);
+      margin-bottom: 10px;
+    }
+    /* —— PDF mock (A4 proportion) —— */
+    .pdf {
+      background: var(--fl-panel);
+      border: 1px solid var(--fl-line);
+      border-radius: 4px;
+      box-shadow: 0 8px 28px rgba(20, 32, 25, 0.08);
+      padding: 28px 32px 20px;
+      min-height: 520px;
+      display: flex;
+      flex-direction: column;
+    }
+    .pdf-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 2px solid var(--fl-accent);
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+    .pdf-logo {
+      width: 40px; height: 40px;
+      border-radius: 8px;
+      background: var(--fl-accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      display: grid; place-items: center;
+    }
+    .pdf-brand { font-weight: 700; font-size: var(--fs-title); margin-top: 4px; }
+    .pdf-absender {
+      text-align: right;
+      font-size: var(--fs-meta);
+      color: var(--fl-muted);
+      line-height: 1.45;
+    }
+    .pdf-title { font-size: var(--fs-head); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
+    .pdf-meta { font-size: var(--fs-meta); color: var(--fl-faint); margin-bottom: 16px; }
+    table.pdf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--fs-text);
+    }
+    .pdf-table th {
+      text-align: left;
+      font-size: var(--fs-meta);
+      color: var(--fl-faint);
+      font-weight: 600;
+      border-bottom: 1px solid var(--fl-line);
+      padding: 6px 4px;
+    }
+    .pdf-table td {
+      padding: 8px 4px;
+      border-bottom: 1px solid var(--fl-line);
+      vertical-align: top;
+    }
+    .pdf-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pdf-sum {
+      margin-top: 12px;
+      margin-left: auto;
+      width: 200px;
+      font-size: var(--fs-text);
+    }
+    .pdf-sum .row { display: flex; justify-content: space-between; padding: 3px 0; color: var(--fl-muted); }
+    .pdf-sum .row.total { font-weight: 700; color: var(--fl-ink); font-size: var(--fs-title); border-top: 1px solid var(--fl-line); margin-top: 4px; padding-top: 8px; }
+    .pdf-foot {
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid var(--fl-line);
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--fl-faint);
+      gap: 12px;
+    }
+    /* —— Mail mock —— */
+    .mail {
+      background: #e8ebe8;
+      border-radius: var(--r);
+      padding: 16px;
+    }
+    .mail-card {
+      background: var(--fl-panel);
+      border-radius: var(--r);
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(20, 32, 25, 0.08);
+      max-width: 420px;
+      margin: 0 auto;
+    }
+    .mail-header {
+      background: var(--fl-accent-dark);
+      color: #fff;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .mail-header .mark {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--fl-accent);
+      display: grid; place-items: center;
+      font-size: 12px;
+    }
+    .mail-body { padding: 22px 20px 8px; font-size: 14px; line-height: 1.55; color: var(--fl-ink); }
+    .mail-body p { margin: 0 0 12px; }
+    .mail-cta {
+      display: inline-block;
+      margin: 8px 0 18px;
+      padding: 12px 20px;
+      background: var(--fl-accent);
+      color: #fff !important;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      border-radius: 999px;
+    }
+    .mail-footer {
+      padding: 14px 20px 18px;
+      border-top: 1px solid var(--fl-line);
+      font-size: 11px;
+      color: var(--fl-faint);
+      line-height: 1.45;
+    }
+    .mail-footer .service {
+      margin-top: 8px;
+      font-size: 10px;
+      color: #9aa39e;
+    }
+    .notes {
+      max-width: 1100px;
+      margin: 32px auto 0;
+      font-size: 13px;
+      color: var(--fl-muted);
+      line-height: 1.5;
+    }
+    .notes code { font-size: 12px; background: #e8ebe8; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Vorlagenvorschlag PDF + Mail</h1>
+  <p class="lede">
+    Phase A — nur Visual. Keine Generator-Änderungen. Steuerliche Pflichttexte und Rechnungsnummern bleiben inhaltlich unberührt;
+    hier nur Kopf, Typo, Tabelle, CTA und Fuß.
+  </p>
+
+  <div class="grid">
+    <div>
+      <div class="label">PDF-Basis (Beleg-Familie)</div>
+      <article class="pdf" aria-label="PDF-Vorschau Angebot">
+        <div class="pdf-head">
+          <div>
+            <div class="pdf-logo">BW</div>
+            <div class="pdf-brand">Bärenwald München</div>
+          </div>
+          <div class="pdf-absender">
+            Musterfirma GmbH<br />
+            Beispielweg 1 · 80331 München<br />
+            089 123456 · info@beispiel.de<br />
+            USt-IdNr. DE123456789
+          </div>
+        </div>
+        <h2 class="pdf-title">Angebot AN-2026-0042</h2>
+        <p class="pdf-meta">Objekt: Musterstraße 12, 80331 München · 20.09.2026 · gültig bis 20.10.2026</p>
+        <table class="pdf-table">
+          <thead>
+            <tr>
+              <th>Pos.</th>
+              <th>Leistung</th>
+              <th class="num">Menge</th>
+              <th class="num">Betrag</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>Malerarbeiten Wohnzimmer</td>
+              <td class="num">1 Pausch</td>
+              <td class="num">1.280,00 €</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Untergrund vorbereiten</td>
+              <td class="num">12 m²</td>
+              <td class="num">360,00 €</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>Materialzuschlag</td>
+              <td class="num">1 Pausch</td>
+              <td class="num">95,00 €</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pdf-sum">
+          <div class="row"><span>Netto</span><span>1.735,00 €</span></div>
+          <div class="row"><span>MwSt. 19&nbsp;%</span><span>329,65 €</span></div>
+          <div class="row total"><span>Brutto</span><span>2.064,65 €</span></div>
+        </div>
+        <div class="pdf-foot">
+          <span>Bank · IBAN DE00 0000 0000 0000 0000 00 · Pflichtangaben gemäß §14 UStG unverändert aus Generator</span>
+          <span>1 / 1</span>
+        </div>
+      </article>
+    </div>
+
+    <div>
+      <div class="label">Mail-Layout (eine Hülle)</div>
+      <div class="mail">
+        <div class="mail-card" aria-label="Mail-Vorschau">
+          <div class="mail-header">
+            <span class="mark">BW</span>
+            Bärenwald
+          </div>
+          <div class="mail-body">
+            <p>Guten Tag Frau Beispiel,</p>
+            <p>
+              Ihr Angebot zu <strong>Musterstraße 12</strong> ist bereit.
+              Bitte prüfen Sie die Positionen im Portal.
+            </p>
+            <a class="mail-cta" href="#">Im Portal ansehen</a>
+            <p style="font-size:13px;color:var(--fl-muted);">
+              Mit freundlichen Grüßen<br />
+              <strong>Ihr Bärenwald Team</strong>
+            </p>
+          </div>
+          <div class="mail-footer">
+            Bärenwald München · baerenwaldmuenchen.de · Impressum<br />
+            <span class="service">Ein Service von Bärenwald — nur bei HV-White-Label an Nicht-Mieter</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <p><strong>Betreff-Ziel:</strong> <code>Musterstraße 12 – Angebot bereit</code></p>
+    <p><strong>Text-Part:</strong> gleiche Aussage ohne HTML (für Clients ohne HTML-Rendering).</p>
+    <p><strong>White-Label:</strong> keine BW-Mails an Mieter; HV-Kopf optional Org-Logo/Farbe; Fußzeile „Ein Service von Bärenwald“ klein.</p>
+    <p>Inventur: <code>docs/DOKUMENTE-MAIL-INVENTUR.md</code> · Freigabe §4 dort.</p>
+  </div>
+</body>
+</html>

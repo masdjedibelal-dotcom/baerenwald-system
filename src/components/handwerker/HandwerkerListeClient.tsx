@@ -1,29 +1,25 @@
 'use client'
 
+import { ListBulkBar, MockBtn, MockChip, MockEmpty, MockIcon, MockPager, MockSortHead } from '@/components/mock-ui'
+import { MockEntityRowMenu, MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
+
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  MockBtn,
-  MockChip,
-  MockEmpty,
-  MockIcon,
-  MockModal,
-  MockPager,
-  MockSortHead,
-  ListBulkBar,
-} from '@/components/mock-ui'
-import { MockField } from '@/components/mock-ui/MockForm'
+import { buildListReturnUrl } from '@/lib/list-return-url'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { openFabCreate } from '@/components/neu/FabCreateHost'
 import { useExport, type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { runDuplicateHandwerker, runDeleteHandwerker } from '@/lib/list-actions'
+import { COPY_ROLE } from '@/lib/copy'
 import { listSortDirNum } from '@/lib/list-mock-sort'
 import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { cn } from '@/lib/utils'
-import { ListbarActionsMenu } from '@/components/layout/ListbarActionsMenu'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { SwipeRow } from '@/components/ui/SwipeRow'
@@ -251,7 +247,7 @@ export function HandwerkerListeClient({
     if (!ids.length) return
     setBulkDeletePending(true)
     const loadingId = toast.loading(
-      ids.length === 1 ? 'Handwerker wird gelöscht…' : `${ids.length} Handwerker werden gelöscht…`
+      ids.length === 1 ? 'Partner wird gelöscht…' : `${ids.length} Partner werden gelöscht…`
     )
     let okCount = 0
     let lastErr: string | null = null
@@ -264,10 +260,10 @@ export function HandwerkerListeClient({
     setBulkDeleteOpen(false)
     setSelected({})
     if (okCount > 0) {
-      toast.success(okCount === 1 ? 'Handwerker gelöscht' : `${okCount} Handwerker gelöscht`, {
+      toast.success(okCount === 1 ? COPY_ROLE.partnerGeloescht : `${okCount} Partner gelöscht`, {
         id: loadingId,
       })
-      router.refresh()
+      afterServerActionRefresh()
     } else {
       toast.error(lastErr ?? 'Löschen fehlgeschlagen', { id: loadingId })
     }
@@ -295,7 +291,9 @@ export function HandwerkerListeClient({
   } = useListPage(filtered, 12, paginationResetKey)
 
   function openDetail(id: string) {
-    router.push(`/handwerker/${id}`)
+    const qs = searchParams.toString()
+    const listReturn = qs ? `/handwerker?${qs}` : '/handwerker'
+    router.push(buildListReturnUrl(listReturn, `/handwerker/${id}`))
   }
 
   const sortDirNum = listSortDirNum(sortDir === 1 ? 'asc' : 'desc')
@@ -319,39 +317,17 @@ export function HandwerkerListeClient({
     setSelected(n)
   }
 
-  const filterFooter = (
-    <div className="sheet-footer-actions">
-      <MockBtn kind="ghost" onClick={resetFilters}>
-        Zurücksetzen
-      </MockBtn>
-      <MockBtn kind="primary" onClick={() => setFilterOpen(false)}>
-        Anwenden ({filtered.length})
-      </MockBtn>
-    </div>
-  )
-
   const filterFields = (
     <>
       <div className="form-section-h">Suche</div>
       <div className="input" style={{ marginBottom: 16 }}>
         <MockIcon ctx="default" n="search" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Name, Gewerk, Telefon, E-Mail…"
-          autoFocus={!isMobile}
-        />
+        <MockInput type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, Gewerk, Telefon, E-Mail…" autoFocus={!isMobile} />
       </div>
       <div className="form-grid" style={{ marginBottom: 16 }}>
         <MockField label="Name">
           <div className="input">
-            <input
-              type="text"
-              value={fName}
-              onChange={(e) => setFName(e.target.value)}
-              placeholder="Name enthält…"
-            />
+            <MockInput type="text" value={fName} onChange={(e) => setFName(e.target.value)} placeholder="Name enthält…" />
           </div>
         </MockField>
       </div>
@@ -386,7 +362,7 @@ export function HandwerkerListeClient({
               </MockChip>
             ))}
           </div>
-          <ListbarActionsMenu
+          <MockListbarChrome
           title="Listen-Aktionen"
           activeHint={activeFilterCount}
           directOpen={() => setFilterOpen(true)}
@@ -449,34 +425,32 @@ export function HandwerkerListeClient({
           onClose={() => setFilterOpen(false)}
           title="Filter & Suchen"
           headerEnd={
-            <button
-              type="button"
-              className="mobile-filter-sheet__reset"
-              onClick={resetFilters}
-              disabled={!activeFilterCount}
-            >
+            <MockBtn className="mobile-filter-sheet__reset" type="button" onClick={resetFilters} disabled={!activeFilterCount}>
               Zurücksetzen
-            </button>
+            </MockBtn>
           }
           footer={
-            <button type="button" className="btn primary" onClick={() => setFilterOpen(false)}>
+            <MockBtn kind="primary" type="button" onClick={() => setFilterOpen(false)}>
               Anwenden ({filtered.length})
-            </button>
+            </MockBtn>
           }
         >
           {filterFields}
         </MobileListFilterSheet>
       ) : (
-        <MockModal
+        <EditorSheet
           open={filterOpen}
           onClose={() => setFilterOpen(false)}
-          icon="filter"
           title="Filter & Suchen"
-          sub="Partner eingrenzen"
-          footer={filterFooter}
+          subtitle="Partner eingrenzen"
+          secondary={{ label: 'Zurücksetzen', onClick: resetFilters, kind: 'ghost' }}
+          primary={{
+            label: `Anwenden (${filtered.length})`,
+            onClick: () => setFilterOpen(false),
+          }}
         >
           {filterFields}
-        </MockModal>
+        </EditorSheet>
       )}
 
       {selectedCount > 0 ? (
@@ -490,44 +464,32 @@ export function HandwerkerListeClient({
         />
       ) : null}
 
-      <MockModal
+      <ConfirmPopup
         open={bulkDeleteOpen}
         onClose={() => {
           if (!bulkDeletePending) setBulkDeleteOpen(false)
         }}
-        icon="trash"
         title={
-          selectedCount === 1 ? 'Handwerker löschen?' : `${selectedCount} Handwerker löschen?`
+          selectedCount === 1 ? `${COPY_ROLE.partner} löschen?` : `${selectedCount} Partner löschen?`
         }
-        sub="Dauerhaft entfernen."
-        size="sm"
-        footer={
-          <>
-            <MockBtn kind="ghost" disabled={bulkDeletePending} onClick={() => setBulkDeleteOpen(false)}>
-              Abbrechen
-            </MockBtn>
-            <div style={{ flex: 1 }} />
-            <MockBtn
-              kind="danger"
-              icon={bulkDeletePending ? undefined : 'trash'}
-              disabled={bulkDeletePending}
-              onClick={() => void runBulkDelete()}
-            >
-              {bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
-            </MockBtn>
-          </>
-        }
+        danger
+        busy={bulkDeletePending}
+        confirmLabel={bulkDeletePending ? 'Wird gelöscht…' : 'Löschen'}
+        onConfirm={() => void runBulkDelete()}
       >
+        <p className="m-0 mb-2" style={{ color: 'var(--text-3)' }}>
+          Dauerhaft entfernen.
+        </p>
         <div style={{ fontSize: 'var(--fs-text)', color: 'var(--text-2)', lineHeight: 1.5 }}>
           {bulkDeletePending
             ? 'Bitte warten…'
             : selectedCount === 1
-              ? 'Der ausgewählte Handwerker wird unwiderruflich gelöscht.'
-              : `${selectedCount} ausgewählte Handwerker werden unwiderruflich gelöscht.`}
+              ? 'Der ausgewählte Partner wird unwiderruflich gelöscht.'
+              : `${selectedCount} ausgewählte Partner werden unwiderruflich gelöscht.`}
         </div>
-      </MockModal>
+      </ConfirmPopup>
 
-      <PullToRefresh onRefresh={() => router.refresh()}>
+      <PullToRefresh onRefresh={() => afterServerActionRefresh()}>
       <div
         className="listcard listcard--scroll listcard--cols vg-selectmode"
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
@@ -603,11 +565,11 @@ export function HandwerkerListeClient({
           <MockEmpty
             icon="tool"
             title={rows.length === 0 ? 'Keine Partner' : 'Keine Treffer'}
-            hint={rows.length === 0 ? 'Partner anlegen' : 'Filter zurücksetzen'}
+            hint={rows.length === 0 ? COPY_ROLE.partnerAnlegen : 'Filter zurücksetzen'}
             action={
               rows.length === 0 ? (
                 <MockBtn kind="primary" icon="plus" onClick={() => openFabCreate('handwerker')}>
-                  Handwerker anlegen
+                  {COPY_ROLE.partnerAnlegen}
                 </MockBtn>
               ) : (
                 <MockBtn kind="ghost" onClick={resetFilters}>

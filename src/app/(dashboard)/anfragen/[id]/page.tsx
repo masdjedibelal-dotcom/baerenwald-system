@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import dynamic from 'next/dynamic'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
@@ -91,7 +92,6 @@ export default async function AnfrageDetailPage({
       .order('created_at', { ascending: false })
       .limit(8),
   ])
-
   const latestAngebot = filterKundenAngebote(
     (Array.isArray(latestAngebotRes.data)
       ? latestAngebotRes.data
@@ -144,7 +144,6 @@ export default async function AnfrageDetailPage({
       kundeId,
     }),
   ])
-
   const dbAuftragId = (auftragRow as { id: string } | null)?.id ?? null
   let kundenObjekte: KundenObjekt[] = []
   if (
@@ -186,13 +185,14 @@ export default async function AnfrageDetailPage({
     )
   }
 
-  const { data: angebotRows } = await supabase
+  const {data: angebotRows, error} = await supabase
     .from('angebote')
     .select(
       'id, status, status_einfach, gesamt_fix, gesamt_min, gesamt_max, created_at, angebotsnr, pdf_url, ist_partner_einholung'
     )
     .eq('lead_id', params.id)
     .order('created_at', { ascending: false })
+  if (error) logDbError('app/anfragen/[id]/page:angebote', error)
 
   const angebotKopieVon =
     typeof searchParams?.angebot_kopie_von === 'string' && searchParams.angebot_kopie_von.trim()

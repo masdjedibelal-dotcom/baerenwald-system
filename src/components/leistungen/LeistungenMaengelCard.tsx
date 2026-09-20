@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle } from 'lucide-react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatDatum } from '@/lib/utils'
 import type { LeistungMangelAnzeige } from '@/components/leistungen/types'
@@ -22,7 +22,7 @@ export function LeistungenMaengelCard({ maengel }: { maengel: LeistungMangelAnze
     <div className="lt-maengel" role="region" aria-label="Offene Mängel">
       <div className="lt-maengel__head">
         <span className="lt-maengel__title">
-          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+          <MockIcon n="alert-triangle" ctx="default" className="h-3.5 w-3.5" aria-hidden />
           Offene Mängel
         </span>
         {metaParts.length ? (

@@ -1,5 +1,6 @@
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
+import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
   mailKundenContactLine,
@@ -8,17 +9,15 @@ import {
   mailSummaryBlock,
 } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { formatEuro } from '@/lib/format/geld-datum'
+import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+.replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-function formatEur(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export type RechnungMailInput = {
@@ -46,30 +45,31 @@ export type RechnungMailInput = {
 }
 
 export function rechnungMailBetreff(
-  anrede: AngebotMailAnrede,
-  rechnungsnummer: string,
-  firmenname: string
+  projektTitel: string | null | undefined,
+  rechnungsnummer: string
 ): string {
-  const nr = sanitizeRechnungNrFuerBetreff(rechnungsnummer)
-  return anrede === 'du'
-    ? `Deine Rechnung ${nr} · ${firmenname}`
-    : `Ihre Rechnung ${nr} · ${firmenname}`
+  return buildSubject({
+    objekt: projektTitel,
+    ereignis: 'Rechnung',
+    nummer: sanitizeRechnungNrFuerBetreff(rechnungsnummer),
+  })
 }
 
 /** Betreff bei Korrektur (Storno-Gutschrift + neue RE). */
 export function rechnungKorrekturMailBetreff(
+  projektTitel: string | null | undefined,
   rechnungsnummer: string,
-  firmenname: string,
   opts?: { originalNr?: string | null }
 ): string {
   const neu = sanitizeRechnungNrFuerBetreff(rechnungsnummer)
   const orig = opts?.originalNr?.trim()
     ? sanitizeRechnungNrFuerBetreff(opts.originalNr)
     : null
-  if (orig && orig !== neu) {
-    return `Korrektur ${orig} → ${neu} · ${firmenname}`
-  }
-  return `Korrektur ${neu} · ${firmenname}`
+  return buildSubject({
+    objekt: projektTitel,
+    ereignis: 'Korrektur',
+    nummer: orig && orig !== neu ? `${orig} → ${neu}` : neu,
+  })
 }
 
 /** Kein „Entwurf“ im Kunden-Betreff (auch bei Platzhalter ohne echte Nummer). */
@@ -217,7 +217,7 @@ export function buildRechnungMail(
     label: summaryLabel,
     title: titel,
     priceHtml: mailBetragPriceHtml(data.brutto, { reverseCharge: data.reverseCharge }),
-    metaHtml: `<p style="font-size:15px;color:#374151;margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
+    metaHtml: `<p style="font-size:15px;color:${C.gray700};margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
   })
 
   const contact = mailKundenContactLine(anrede, b.telefon)
@@ -228,15 +228,15 @@ export function buildRechnungMail(
       ? 'Du erhältst diese Mail, weil wir dir eine Rechnung zugesendet haben.'
       : 'Sie erhalten diese Mail, weil wir Ihnen eine Rechnung zugesendet haben.'
 
-  const preheader = `${data.rechnungsnummer} · ${formatEur(data.brutto)} € · fällig ${data.faelligAm}`
+  const preheader = `${data.rechnungsnummer} · ${formatEuro(data.brutto)} · fällig ${data.faelligAm}`
 
   const html = mailHtmlBase(
-    `<p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${begr}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${intro}</p>
+    `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
-      <p style="font-size:15px;color:#374151;margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
-      <p style="font-size:15px;color:#374151;margin:0 0 16px;line-height:1.6;">${contact}</p>
-      <p style="font-size:15px;color:#374151;margin:0;line-height:1.6;">${gruss}</p>`,
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
+      <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,
     disclaimer,
@@ -246,10 +246,10 @@ export function buildRechnungMail(
   const betreff = sanitizeRechnungMailBetreff(
     data.mailBetreff?.trim() ||
       (istKorrektur
-        ? rechnungKorrekturMailBetreff(data.rechnungsnummer, b.firmenname, {
+        ? rechnungKorrekturMailBetreff(data.projektTitel, data.rechnungsnummer, {
             originalNr: data.stornoBezugRechnungsnummer,
           })
-        : rechnungMailBetreff(anrede, data.rechnungsnummer, b.firmenname))
+        : rechnungMailBetreff(data.projektTitel, data.rechnungsnummer))
   )
 
   return { betreff, html }

@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 
 export type CustomFieldDefinition = {
@@ -30,6 +31,7 @@ export async function getCustomFields(objektTyp: string): Promise<CustomFieldDef
     .eq('objekt_typ', objektTyp)
     .eq('aktiv', true)
     .order('sort_order', { ascending: true })
+  if (error) logDbError('lib/custom-fields:custom_field_definitions', error)
 
   if (error) {
     console.warn('getCustomFields', error.message)
@@ -44,6 +46,7 @@ export async function getCustomValues(objektId: string): Promise<CustomFieldValu
     .from('custom_field_values')
     .select('*, custom_field_definitions(*)')
     .eq('objekt_id', objektId)
+  if (error) logDbError('lib/custom-fields:custom_field_values', error)
 
   if (error) {
     console.warn('getCustomValues', error.message)
@@ -67,6 +70,7 @@ export async function saveCustomValue(
     },
     { onConflict: 'definition_id,objekt_id' }
   )
+  if (error) logDbError('lib/custom-fields:custom_field_values', error)
 
   if (error) return { ok: false, message: error.message }
   return { ok: true }

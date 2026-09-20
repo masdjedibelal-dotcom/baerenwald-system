@@ -1,9 +1,10 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BOTTOM_NAV_ITEMS, navItemIsActive } from '@/lib/nav-config'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
 /**
@@ -37,17 +38,11 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
         </Link>
       ))}
 
-      <button
-        type="button"
-        className="bottomnav-cta"
-        aria-label="Neu erstellen"
-        title="Neu erstellen"
-        onClick={() => onNeuOpen?.()}
-      >
+      <MockBtn className="bottomnav-cta" type="button" aria-label="Neu erstellen" title="Neu erstellen" onClick={() => onNeuOpen?.()}>
         <span className="bottomnav-cta-fab">
           <MockIcon ctx="sidebar" n="plus" size={22} />
         </span>
-      </button>
+      </MockBtn>
 
       {right.map((item) => (
         <Link

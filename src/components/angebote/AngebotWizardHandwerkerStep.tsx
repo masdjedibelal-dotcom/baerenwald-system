@@ -1,9 +1,10 @@
 'use client'
 
+import { MockField } from '@/components/mock-ui/MockForm'
 import { useMemo } from 'react'
+import { Combobox } from '@/components/ui/Combobox'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { Card } from '@/components/ui/Card'
-import { Select } from '@/components/ui/Select'
-import { Textarea } from '@/components/ui/Textarea'
 import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { gewerkById } from '@/lib/gewerke-ausfuehrung'
 import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
@@ -92,7 +93,7 @@ function GewerkHandwerkerBlock({
     handwerker.find((h) => h.id === block.handwerker_id) ??
     null
   const selectOptions = [
-    { value: '', label: 'Handwerker wählen…' },
+    { value: '', label: 'Partner wählen…' },
     ...(selected && !opts.some((h) => h.id === selected.id)
       ? [{ value: selected.id, label: selected.name }]
       : []),
@@ -102,28 +103,14 @@ function GewerkHandwerkerBlock({
 
   const form = (
     <div className="space-y-3">
-      <Select
-        label="Handwerker"
-        name={`hw-${block.gewerk_id}`}
-        value={block.handwerker_id}
-        disabled={disabled}
-        onChange={(e) => onPatch({ handwerker_id: e.target.value })}
-        options={selectOptions}
-      />
-      <Textarea
-        label="Notiz für Handwerker"
-        rows={3}
-        value={block.aufgabe_notiz}
-        disabled={disabled}
-        placeholder="z. B. Zugang über Hausmeister, Terminwunsch, Besonderheiten…"
-        onChange={(e) => onPatch({ aufgabe_notiz: e.target.value })}
-      />
+      <Combobox label="Partner" id={`hw-${block.gewerk_id}`} name={`hw-${block.gewerk_id}`} disabled={disabled} options={selectOptions} value={block.handwerker_id == null ? '' : String(block.handwerker_id)} placeholder="Auswählen…" onChange={(next) => { onPatch({ handwerker_id: next }); }} />
+      <MockField label="Notiz für Partner"><RichTextEditor value={typeof (block.aufgabe_notiz) === 'string' ? (block.aufgabe_notiz) : ''} onChange={(__v) => onPatch({ aufgabe_notiz: __v })} disabled={disabled} placeholder="z. B. Zugang über Hausmeister, Terminwunsch, Besonderheiten…" minHeight={120} aria-label="Notiz für Partner" /></MockField>
     </div>
   )
 
   const overview = (
     <dl className="space-y-2.5">
-      <MobileOverviewField label="Handwerker" value={handwerkerLabel} />
+      <MobileOverviewField label="Partner" value={handwerkerLabel} />
       <MobileOverviewField
         label="Notiz"
         value={
@@ -136,7 +123,7 @@ function GewerkHandwerkerBlock({
   )
 
   return (
-    <div className="rounded-lg border border-bw-border bg-bw-bg-soft/40 p-4">
+    <div className="rounded-card border border-bw-border bg-bw-bg-soft/40 p-4">
       <p className="mb-3 text-[length:var(--fs-text)] font-semibold text-bw-text">{block.gewerk_name}</p>
       <MobileEditableBlock
         sheetTitle={block.gewerk_name}
@@ -169,7 +156,7 @@ export function AngebotWizardHandwerkerStep({
 
   if (!blocks.length) {
     return (
-      <Card title="Handwerker">
+      <Card title="Partner">
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
           Bitte zuerst Positionen mit Gewerk erfassen.
         </p>
@@ -182,7 +169,7 @@ export function AngebotWizardHandwerkerStep({
   }
 
   return (
-    <Card title="Handwerker — Angebot / Rechnung einholen">
+    <Card title="Partner — Angebot / Rechnung einholen">
       <div className="space-y-4">
         {blocks.map((b) => (
           <GewerkHandwerkerBlock

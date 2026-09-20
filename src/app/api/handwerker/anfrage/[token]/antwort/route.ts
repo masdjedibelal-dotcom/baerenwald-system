@@ -1,3 +1,4 @@
+import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
 import { acceptHandwerkerZuweisung } from '@/lib/angebote/handwerker-annahme'
 import { isHandwerkerAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
@@ -34,6 +35,7 @@ export async function PATCH(req: Request, { params }: { params: { token: string 
     .select('id')
     .eq('token', token)
     .maybeSingle()
+  if (error) logDbError('app/api/handwerker/anfrage/[token]/antwort/route:angebot_handwerker', error)
 
   if (error || !row?.id) {
     return NextResponse.json({ error: 'Link ungültig' }, { status: 404 })

@@ -1,4 +1,11 @@
 'use client'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+
+import { MockBtn, MockChip, MockDragHandle } from '@/components/mock-ui'
+import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useMemo, useState } from 'react'
@@ -12,15 +19,14 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+<<<<<<< Updated upstream
+=======
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { MockBtn } from '@/components/mock-ui'
 import { FilterChips } from '@/components/ui/FilterChips'
+>>>>>>> Stashed changes
 import { EinstellungenListMeta } from '@/components/einstellungen/EinstellungenUi'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/app-toast'
-import { confirmDelete } from '@/components/ui/confirm-delete'
 import type { CustomFieldDefinition } from '@/lib/custom-fields'
 import {
   loadAllCustomFieldDefinitions,
@@ -28,7 +34,7 @@ import {
   saveCustomFieldDefinition,
   softDeleteCustomField,
 } from '@/app/(dashboard)/einstellungen/felder/actions'
-import { useRouter } from 'next/navigation'
+import { TOAST } from '@/lib/copy'
 
 const TABS: { key: string; label: string }[] = [
   { key: 'lead', label: 'Anfragen' },
@@ -66,17 +72,14 @@ function SortRow({
     <li
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 rounded-lg border border-bw-border bg-bw-card px-3 py-2"
+      className="flex items-center gap-2 rounded-card border border-bw-border bg-surface px-3 py-2"
     >
-      <button
-        type="button"
+      <MockDragHandle
         className="touch-none text-bw-text-muted hover:text-bw-text"
         aria-label="Verschieben"
         {...attributes}
         {...listeners}
-      >
-        <GripVertical className="h-5 w-5" />
-      </button>
+      />
       <div className="min-w-0 flex-1">
         <p className="font-medium text-bw-text">
           {f.label}
@@ -84,18 +87,24 @@ function SortRow({
         </p>
         <EinstellungenListMeta>{labelFeldtyp(f.feld_typ)}</EinstellungenListMeta>
       </div>
-      <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
+      <MockBtn type="button" kind="ghost" sm onClick={onEdit}>
+<<<<<<< Updated upstream
+        <MockIcon n="pencil" ctx="default" className="h-4 w-4" aria-hidden />
+      </MockBtn>
+      <MockBtn type="button" kind="ghost" sm onClick={onDelete}>
+        <MockIcon n="trash" ctx="default" className="h-4 w-4 text-status-cancel-text" aria-hidden />
+=======
         <Pencil className="h-4 w-4" aria-hidden />
-      </Button>
-      <Button type="button" variant="ghost" size="sm" onClick={onDelete}>
+      </MockBtn>
+      <MockBtn type="button" kind="ghost" sm onClick={onDelete}>
         <Trash2 className="h-4 w-4 text-status-cancel-text" aria-hidden />
-      </Button>
+>>>>>>> Stashed changes
+      </MockBtn>
     </li>
   )
 }
 
 export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFieldDefinition[] }) {
-  const router = useRouter()
   const [tab, setTab] = useState(TABS[0].key)
   const [rows, setRows] = useState(initial)
   const [modal, setModal] = useState<CustomFieldDefinition | 'new' | null>(null)
@@ -134,7 +143,7 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
 
   function saveModal() {
     if (!label.trim()) {
-      toast.error('Label erforderlich')
+      toast.error(TOAST.label_erforderlich)
       return
     }
     let optionen: unknown = null
@@ -154,29 +163,28 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
         pflicht,
       })
       if (!r.ok) {
-        toast.error(r.message)
+        toast.systemError(r)
         return
       }
-      toast.success('Gespeichert')
+      toast.success(TOAST.gespeichert)
       setModal(null)
       const fresh = await loadAllCustomFieldDefinitions()
       setRows(fresh)
-      router.refresh()
+      // revalidatePath in felder/actions — lokaler State schon aktualisiert
     })
   }
 
   function remove(f: CustomFieldDefinition) {
-    confirmDelete(
+    openDeleteConfirm(
       `Feld „${f.label}“ deaktivieren?`,
       async () => {
         const r = await softDeleteCustomField(f.id)
         if (!r.ok) {
-          toast.error(r.message)
+          toast.systemError(r)
           throw new Error(r.message)
         }
-        toast.success('Feld deaktiviert')
+        toast.success(TOAST.feld_deaktiviert)
         setRows((prev) => prev.map((x) => (x.id === f.id ? { ...x, aktiv: false } : x)))
-        router.refresh()
       }
     )
   }
@@ -194,21 +202,22 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
       next.map((x) => x.id)
     )
     if (!r.ok) {
-      toast.error(r.message)
+      toast.systemError(r)
       return
     }
     const fresh = await loadAllCustomFieldDefinitions()
     setRows(fresh)
-    router.refresh()
   }
 
   return (
     <div className="space-y-4">
-      <FilterChips
-        options={TABS.map((t) => ({ label: t.label, value: t.key }))}
-        selected={[tab]}
-        onChange={(v) => setTab(v[0] ?? TABS[0].key)}
-      />
+      <div className="chiprow">
+        {TABS.map((t) => (
+          <MockChip key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
+            {t.label}
+          </MockChip>
+        ))}
+      </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={filtered.map((f) => f.id)} strategy={verticalListSortingStrategy}>
@@ -220,62 +229,60 @@ export function CustomFieldsEinstellungenClient({ initial }: { initial: CustomFi
         </SortableContext>
       </DndContext>
 
-      <Button type="button" variant="secondary" onClick={openNew}>
+      <MockBtn type="button" kind="secondary" onClick={openNew}>
         + Feld hinzufügen
-      </Button>
+      </MockBtn>
 
-      <Modal
+      <EditorSheet
         open={modal !== null}
         onClose={() => setModal(null)}
         title={modal !== 'new' && modal ? 'Feld bearbeiten' : 'Neues Feld'}
+<<<<<<< Updated upstream
+        secondary={{ label: 'Abbrechen', onClick: () => setModal(null), kind: 'ghost' }}
+        primary={{
+          label: 'Speichern',
+          onClick: () => saveModal(),
+          busy: pending,
+        }}
+=======
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setModal(null)}>
+            <MockBtn type="button" kind="ghost" onClick={() => setModal(null)}>
               Abbrechen
-            </Button>
-            <Button type="button" variant="primary" loading={pending} onClick={() => saveModal()}>
+            </MockBtn>
+            <MockBtn type="button" kind="primary" loading={pending} onClick={() => saveModal()}>
               Speichern
-            </Button>
+            </MockBtn>
           </div>
         }
+>>>>>>> Stashed changes
       >
         <div className="space-y-4">
-          <Input label="Label" required value={label} onChange={(e) => setLabel(e.target.value)} />
+          <MockField label="Label" required><MockInput required value={label} onChange={(e) => setLabel(e.target.value)} /></MockField>
           <div>
             <label className="input-label" htmlFor="ftyp">
               Typ
             </label>
-            <select
-              id="ftyp"
-              className="input w-full max-w-md"
-              value={feldTyp}
-              onChange={(e) => setFeldTyp(e.target.value)}
-            >
+            <MockSelect id="ftyp" className="w-full max-w-md" value={feldTyp} onChange={(e) => setFeldTyp(e.target.value)}>
               {TYPEN.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
                 </option>
               ))}
-            </select>
+            </MockSelect>
           </div>
           {feldTyp === 'select' ? (
             <div>
               <label className="input-label">Optionen (eine pro Zeile)</label>
-              <Textarea
-                plain
-                className="font-mono text-sm"
-                rows={4}
-                value={optionenText}
-                onChange={(e) => setOptionenText(e.target.value)}
-              />
+              <MockTextarea rows={4} value={optionenText} onChange={(e) => setOptionenText(e.target.value)} className="resize-y py-2 min-h-[120px] font-mono text-sm" />
             </div>
           ) : null}
           <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input type="checkbox" checked={pflicht} onChange={(e) => setPflicht(e.target.checked)} />
+            <MockCheckbox checked={pflicht} onChange={(e) => setPflicht(e.target.checked)} />
             Pflichtfeld
           </label>
         </div>
-      </Modal>
+      </EditorSheet>
     </div>
   )
 }
