@@ -148,8 +148,11 @@ export function rechnungStatusDisplay(
       korrektur_von: opts.korrektur_von,
       korrektur_art: opts.korrektur_art,
     })
-    if (ui.dualBadges) {
-      return { label: ui.dualBadges.secondary, variant: 'neutral' }
+    if (ui.filterKey === 'korrektur_entwurf') {
+      return { label: 'Korrektur Entwurf', variant: 'neutral' }
+    }
+    if (ui.filterKey === 'korrektur_versendet') {
+      return { label: 'Korrektur versendet', variant: 'active' }
     }
   }
   const key = String(status ?? '')

@@ -4,6 +4,49 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
+## Korrektur-UI: Verlauf + eine Vorgangs-Card — 2026-09-21
+
+**Commit-Text:** `fix(ui): Korrektur-Verlauf wie Phasenliste; Vorgänge ohne Storno-Card`
+
+**Befund:** Korrektur-Kette überlappte auf Mobile; Hilfstext störte; Vorgangsliste zeigte Extra-Cards (Storno-Gutschrift) und Nested-Chips.
+
+**Design:**
+- Detail: Zeilen wie Phasenverlauf — Rolle+Nr | Betrag | Status; mehrstufige Korrekturen möglich
+- Liste: eine Card, Status „Korrektur Entwurf“ / „Korrektur versendet“; keine Storno-Card
+
+**Dateien:**
+- `src/components/rechnungen/RechnungKorrekturKetteCard.tsx` — Verlauf-Layout, Hilfstext weg
+- `src/lib/rechnungen/rechnung-korrektur.ts` — mehrstufige Kette; ein Status-Badge
+- `src/lib/status/status-display.ts` / `RechnungDetailClient.tsx` — Status „Korrektur Entwurf/versendet“
+- `src/lib/vorgang/korrektur-kette-groups.ts` — Gruppierung ohne Gutschrift-Card
+- `src/lib/vorgang/load-vorgaenge-liste.ts` — Gutschriften nicht listen
+- `src/components/vorgaenge/VorgaengeListeClient.tsx` — keine Expand-Kinder/Chips
+- `src/styles/mock-design-system.css` — `.re-kette-*`
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
+## Rechnungswizard: Freitext + Nachlass übernehmen / TotBand — 2026-09-21
+
+**Commit-Text:** `fix(rechnung): Freitext/Nachlass vom Angebot in Wizard + grüne TotBand`
+
+**Befund:** Auftragsleistungen ohne Angebots-Sonderzeilen → Freitext/Nachlass fehlten im Wizard; TotBand zeigte keinen Nachlass. Bei editierbarem Plan wurden Positionen auf die erste Abschlagsrate gefiltert (Sonderzeilen weg).
+
+**Fix:**
+- `mergeAngebotSonderzeilen` hängt Freitext/Gesamtnachlass vom Angebot an
+- Schluss/Voll behalten Sonderzeilen; Abschlagsraten weiter ohne
+- Editierbarer Plan lädt volle Positionen; TotBand zeigt Nachlass nur bei Schluss/Voll
+- `buildSchlussrechnungPositionen` / `positionenFuerZahlungsplanZeile` behalten Sonderzeilen
+
+**Dateien:**
+- `src/lib/dokument-zeilen.ts` — `mergeAngebotSonderzeilen`
+- `src/app/(dashboard)/rechnungen/wizard-actions.ts` — Merge beim Auftrag-Load + Entwürfen; Plan-Filter nur bei fester Rate
+- `src/lib/rechnungen/zahlungsplan.ts` — Schluss inkl. Freitext/Nachlass
+- `src/components/rechnungen/RechnungWizard.tsx` — Nachlass in grüner TotBand (Schluss/Voll)
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+---
+
 ## Zahlungserinnerung Doppelversand / Versand-Anker — 2026-09-21
 
 **Commit-Text:** `fix(mahnung): Claim vor Mail; Anker max(Fälligkeit,Versand); nie Folgetag-Doppel`

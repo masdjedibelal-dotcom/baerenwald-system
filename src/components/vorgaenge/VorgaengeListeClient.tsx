@@ -18,7 +18,7 @@ import { runMockListExport } from '@/lib/mock-list-export'
 import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
 import {
   groupVorgaengeByKorrekturKette,
-  korrekturKetteRoleLabel,
+  korrekturKetteListenStatus,
 } from '@/lib/vorgang/korrektur-kette-groups'
 import {
   runDeleteStandaloneRechnung,
@@ -108,20 +108,7 @@ function vorgaengeEmptyHint(opts: {
   return 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
 }
 
-/** Original mit laufender Korrektur (noch nicht storniert). */
-function isKorrekturPendingOriginal(row: VorgangListeRow): boolean {
-  return (
-    Boolean(row.ersetzt_durch) &&
-    row.unterstatus.toLowerCase() !== 'storniert' &&
-    row.unterstatus.toLowerCase() !== 'ersetzt'
-  )
-}
 
-function isErsetzt(row: VorgangListeRow): boolean {
-  if (isKorrekturPendingOriginal(row)) return false
-  const st = row.unterstatus.toLowerCase()
-  return st === 'ersetzt' || (Boolean(row.ersetzt_durch) && st === 'storniert')
-}
 
 const VORGAENGE_CHECK_COL: ResizableColDef = {
   id: 'check',
@@ -201,7 +188,8 @@ function statusLabel(row: VorgangListeRow): string {
     korrektur_von: row.korrektur_von,
     korrektur_art: row.korrektur_art,
   })
-  if (ui.dualBadges) return ui.dualBadges.secondary
+  if (ui.filterKey === 'korrektur_entwurf') return 'Korrektur Entwurf'
+  if (ui.filterKey === 'korrektur_versendet') return 'Korrektur versendet'
   return row.unterstatusLabel
 }
 
@@ -229,10 +217,6 @@ function dateKey(row: VorgangListeRow): string {
 
 /** Abgeschlossen / verloren / storniert → Erledigt-Bucket; sonst Offen. */
 function isVorgangErledigt(row: VorgangListeRow): boolean {
-  // Storno-Gutschrift-Entwurf gehört zur offenen Korrektur
-  if (row.belegTyp === 'gutschrift') {
-    return String(row.unterstatus).toLowerCase() !== 'entwurf'
-  }
   const kind = statusKind(row)
   return kind === 'storniert' || kind === 'fertig'
 }
@@ -306,8 +290,7 @@ export function VorgaengeListeClient({
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
-  /** Aufgeklappte Korrektur-Ketten (rootId). */
-  const [ketteOpen, setKetteOpen] = useState<Record<string, boolean>>({})
+  /** Aufgeklappte Korrektur-Ketten entfallen — eine Card pro Vorgang. */
   const visibleCols: Record<DataColId, boolean> = {
     kunde: true,
     titel: true,
@@ -1404,21 +1387,11 @@ export function VorgaengeListeClient({
         ) : (
           displayGroups.map((group) => {
             const hasKette = group.members.length > 1
-            const open = Boolean(ketteOpen[group.rootId]) || (hasKette && group.pending)
             const v = group.head
             const key = rowKey(v)
-            const kind = statusKind(v)
-            const label = statusLabel(v)
-            const korrekturUi =
-              v.phase === 'rechnung'
-                ? resolveRechnungKorrekturUi({
-                    status: v.unterstatus,
-                    korrektur_von: v.korrektur_von,
-                    korrektur_art: v.korrektur_art,
-                  })
-                : null
-            const ersetzt = isErsetzt(v)
-            const pendingOrig = isKorrekturPendingOriginal(v)
+            const ketteStatus = hasKette ? korrekturKetteListenStatus(group) : null
+            const kind = ketteStatus?.kind ?? statusKind(v)
+            const label = ketteStatus?.label ?? statusLabel(v)
             const del = () => {
               if (v.standalone) runDeleteStandaloneRechnung(v.entityId, router, v.titel)
               else runDeleteVorgang(v.leadId, router)
@@ -1441,12 +1414,7 @@ export function VorgaengeListeClient({
             ]
             const row = (
               <div
-                className={cn(
-                  'vg-row',
-                  selected[key] && 'sel',
-                  ersetzt && 'vg-row--ersetzt',
-                  flashKeys[key] && 'vg-row--flash'
-                )}
+                className={cn('vg-row', selected[key] && 'sel', flashKeys[key] && 'vg-row--flash')}
                 onClick={() => openDetail(v)}
                 role="button"
                 tabIndex={0}
@@ -1462,108 +1430,78 @@ export function VorgaengeListeClient({
                   onToggle={() => toggleSel(key)}
                 />
                 {visibleCols.kunde ? (
-                <div className="vg-kunde">
-                  <span className="vg-kunde__name" title={v.kundeName ?? undefined}>
-                    {v.kundeName ?? '—'}
-                  </span>
-                </div>
+                  <div className="vg-kunde">
+                    <span className="vg-kunde__name" title={v.kundeName ?? undefined}>
+                      {v.kundeName ?? '—'}
+                    </span>
+                  </div>
                 ) : null}
                 {visibleCols.titel ? (
-                <div className="vg-vorgang">
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
-                  >
-                    {hasKette ? (
-                      <MockBtn className="vg-kette-toggle" type="button" aria-expanded={open} aria-label={open ? 'Kette zuklappen' : 'Kette aufklappen'} onClick={(e) => {
-                          e.stopPropagation()
-                          setKetteOpen((prev) => ({
-                            ...prev,
-                            [group.rootId]: !open,
-                          }))
-                        }}>
-                        <MockIcon
-                          ctx="default"
-                          n={open ? 'chevron-down' : 'chevron-right'}
-                          size={14}
-                        />
-                      </MockBtn>
-                    ) : null}
-                    <div className={cn('t', ersetzt && 'vg-title--ersetzt')} title={v.titel}>
-                      {hasKette && group.pending ? group.label : v.titel}
+                  <div className="vg-vorgang">
+                    <div className="t" title={v.titel}>
+                      {v.titel}
                     </div>
                   </div>
-                  {pendingOrig ? (
-                    <span className="vg-chip-ersetzt">Korrektur läuft</span>
-                  ) : ersetzt ? (
-                    <span className="vg-chip-ersetzt">ersetzt</span>
-                  ) : hasKette && !group.pending ? (
-                    <span className="vg-chip-ersetzt">Korrektur-Kette</span>
-                  ) : null}
-                </div>
                 ) : null}
                 {visibleCols.phase ? (
-                <div className="vg-phase">
-                  <span className="ph-neutral">
-                    <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
-                    {PHASE_META[v.phase].label}
-                  </span>
-                </div>
+                  <div className="vg-phase">
+                    <span className="ph-neutral">
+                      <MockIcon ctx="default" n={PHASE_META[v.phase].icon} size={13} />
+                      {PHASE_META[v.phase].label}
+                    </span>
+                  </div>
                 ) : null}
                 {visibleCols.wert ? (
-                <div
-                  className="vg-wert"
-                  style={{
-                    textAlign: 'right',
-                    fontWeight: 500,
-                    fontVariantNumeric: 'tabular-nums',
-                    fontSize: 'var(--fs-text)',
-                  }}
-                >
-                  {v.wertLabel ?? '—'}
-                </div>
+                  <div
+                    className="vg-wert"
+                    style={{
+                      textAlign: 'right',
+                      fontWeight: 500,
+                      fontVariantNumeric: 'tabular-nums',
+                      fontSize: 'var(--fs-text)',
+                    }}
+                  >
+                    {v.wertLabel ?? '—'}
+                  </div>
                 ) : null}
                 {visibleCols.datum ? (
-                <div className="vg-datum" style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                  {formatDatum(v.updatedAt)}
-                </div>
+                  <div className="vg-datum" style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
+                    {formatDatum(v.updatedAt)}
+                  </div>
                 ) : null}
                 {visibleCols.status ? (
-                <div className="vg-status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-                  {v.badges?.notfall ? (
-                    <span
-                      className="inline-flex items-center gap-1"
-                      title="Notfall"
-                      aria-label="Notfall"
-                    >
+                  <div
+                    className="vg-status"
+                    style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}
+                  >
+                    {v.badges?.notfall ? (
                       <span
-                        aria-hidden
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 999,
-                          background: `var(--danger, ${C.redTx3})`,
-                          display: 'inline-block',
-                          flexShrink: 0,
-                        }}
-                      />
-                    </span>
-                  ) : null}
-                  {hasKette && group.pending ? (
-                    <MockBadge kind="neu">Korrektur Entwurf</MockBadge>
-                  ) : korrekturUi?.dualBadges ? (
-                    <>
-                      <MockBadge kind="warten">{korrekturUi.dualBadges.primary}</MockBadge>
-                      <MockBadge kind="neu">{korrekturUi.dualBadges.secondary}</MockBadge>
-                    </>
-                  ) : v.badges?.wartet_freigabe ? (
-                    <>
-                      <MockBadge kind="warten">Warte auf HV</MockBadge>
+                        className="inline-flex items-center gap-1"
+                        title="Notfall"
+                        aria-label="Notfall"
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 999,
+                            background: `var(--danger, ${C.redTx3})`,
+                            display: 'inline-block',
+                            flexShrink: 0,
+                          }}
+                        />
+                      </span>
+                    ) : null}
+                    {v.badges?.wartet_freigabe && !ketteStatus ? (
+                      <>
+                        <MockBadge kind="warten">Warte auf HV</MockBadge>
+                        <MockBadge kind={kind}>{label}</MockBadge>
+                      </>
+                    ) : (
                       <MockBadge kind={kind}>{label}</MockBadge>
-                    </>
-                  ) : (
-                    <MockBadge kind={kind}>{label}</MockBadge>
-                  )}
-                </div>
+                    )}
+                  </div>
                 ) : null}
                 <div
                   className="vg-row-menu"
@@ -1574,85 +1512,8 @@ export function VorgaengeListeClient({
                 </div>
               </div>
             )
-            const childRows =
-              hasKette && open
-                ? group.members
-                    .filter((m) => m.row.entityId !== v.entityId)
-                    .map((m) => {
-                      const child = m.row
-                      const cKey = rowKey(child)
-                      const cKind = statusKind(child)
-                      const cLabel = statusLabel(child)
-                      return (
-                        <div
-                          key={cKey}
-                          className={cn('vg-row', 'vg-row--kette-child', selected[cKey] && 'sel')}
-                          onClick={() => openDetail(child)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              openDetail(child)
-                            }
-                          }}
-                        >
-                          <ListRowCheck
-                            checked={Boolean(selected[cKey])}
-                            onToggle={() => toggleSel(cKey)}
-                          />
-                          {visibleCols.kunde ? <div className="vg-kunde" /> : null}
-                          {visibleCols.titel ? (
-                            <div className="vg-vorgang">
-                              <div className="t" title={child.titel}>
-                                <span className="vg-kette-role">
-                                  {korrekturKetteRoleLabel(m.role)}
-                                </span>{' '}
-                                {child.titel}
-                              </div>
-                            </div>
-                          ) : null}
-                          {visibleCols.phase ? (
-                            <div className="vg-phase">
-                              <span className="ph-neutral">
-                                <MockIcon ctx="default" n="receipt" size={13} />
-                                Rechnung
-                              </span>
-                            </div>
-                          ) : null}
-                          {visibleCols.wert ? (
-                            <div
-                              className="vg-wert"
-                              style={{
-                                textAlign: 'right',
-                                fontWeight: 500,
-                                fontVariantNumeric: 'tabular-nums',
-                                fontSize: 'var(--fs-text)',
-                              }}
-                            >
-                              {child.wertLabel ?? '—'}
-                            </div>
-                          ) : null}
-                          {visibleCols.datum ? (
-                            <div
-                              className="vg-datum"
-                              style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}
-                            >
-                              {formatDatum(child.updatedAt)}
-                            </div>
-                          ) : null}
-                          {visibleCols.status ? (
-                            <div className="vg-status">
-                              <MockBadge kind={cKind}>{cLabel}</MockBadge>
-                            </div>
-                          ) : null}
-                          <div className="vg-row-menu" />
-                        </div>
-                      )
-                    })
-                : null
             return (
-              <div key={`kette:${group.rootId}`} className={hasKette ? 'vg-kette' : undefined}>
+              <div key={`kette:${group.rootId}`}>
                 <SwipeRow
                   disabled={!isMobile}
                   leftActions={
@@ -1671,7 +1532,6 @@ export function VorgaengeListeClient({
                 >
                   {row}
                 </SwipeRow>
-                {childRows}
               </div>
             )
           })

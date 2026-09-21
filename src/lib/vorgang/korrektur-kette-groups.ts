@@ -2,15 +2,44 @@ import type { VorgangListeRow } from '@/lib/vorgang/types'
 
 export type KorrekturKetteRole = 'original' | 'gutschrift' | 'neu'
 
-/** Root-ID der Korrektur-Familie (Original-RE), sonst null. */
-export function korrekturKetteRootId(row: VorgangListeRow): string | null {
+/** Wurzel-ID der Korrektur-Familie innerhalb der gegebenen Zeilen. */
+export function korrekturKetteRootId(
+  row: VorgangListeRow,
+  byId?: Map<string, VorgangListeRow>
+): string | null {
   if (row.phase !== 'rechnung') return null
-  if (row.belegTyp === 'gutschrift') {
-    const bezug = String(row.bezug_rechnung_id ?? '').trim()
-    return bezug || null
+
+  let cur: VorgangListeRow | null = row
+  const seen = new Set<string>()
+  for (let i = 0; i < 24; i++) {
+    if (!cur || seen.has(cur.entityId)) break
+    seen.add(cur.entityId)
+
+    if (cur.belegTyp === 'gutschrift') {
+      const bezug = String(cur.bezug_rechnung_id ?? '').trim()
+      if (!bezug) return null
+      if (byId?.has(bezug)) {
+        cur = byId.get(bezug)!
+        continue
+      }
+      return bezug
+    }
+
+    const von = String(cur.korrektur_von ?? '').trim()
+    if (von) {
+      if (byId?.has(von)) {
+        cur = byId.get(von)!
+        continue
+      }
+      return von
+    }
+
+    if (String(cur.ersetzt_durch ?? '').trim()) return cur.entityId
+    break
   }
-  const von = String(row.korrektur_von ?? '').trim()
-  if (von) return von
+
+  if (row.belegTyp === 'gutschrift') return String(row.bezug_rechnung_id ?? '').trim() || null
+  if (String(row.korrektur_von ?? '').trim()) return String(row.korrektur_von).trim()
   if (String(row.ersetzt_durch ?? '').trim()) return row.entityId
   return null
 }
@@ -25,7 +54,7 @@ export function korrekturKetteRole(row: VorgangListeRow): KorrekturKetteRole | n
 
 export function korrekturKetteRoleLabel(role: KorrekturKetteRole): string {
   if (role === 'original') return 'Original'
-  if (role === 'gutschrift') return 'Storno-Gutschrift'
+  if (role === 'gutschrift') return 'Storno'
   return 'Korrektur'
 }
 
@@ -37,7 +66,7 @@ const ROLE_ORDER: Record<KorrekturKetteRole, number> = {
 
 export type KorrekturKetteGroup = {
   rootId: string
-  /** Zeile die in der Hauptliste steht (neue RE oder Original). */
+  /** Zeile die in der Hauptliste steht (aktuelle Korrektur-RE). */
   head: VorgangListeRow
   members: Array<{ row: VorgangListeRow; role: KorrekturKetteRole }>
   pending: boolean
@@ -46,7 +75,7 @@ export type KorrekturKetteGroup = {
 
 /**
  * Baut Korrektur-Familien aus flachen Listen-Zeilen.
- * Einzelzeilen ohne Kette → groups mit nur head, members.length === 1.
+ * Storno-Gutschriften werden nie als eigene Listenkarte geführt.
  */
 export function groupVorgaengeByKorrekturKette(rows: VorgangListeRow[]): {
   groups: KorrekturKetteGroup[]
@@ -57,14 +86,22 @@ export function groupVorgaengeByKorrekturKette(rows: VorgangListeRow[]): {
   const buckets = new Map<string, VorgangListeRow[]>()
 
   for (const row of rows) {
-    const root = korrekturKetteRootId(row)
+    // Gutschriften nie eigene Gruppe — nur anhängen, wenn Root schon da
+    if (row.belegTyp === 'gutschrift') {
+      const root = korrekturKetteRootId(row, byId)
+      if (!root) continue
+      const list = buckets.get(root) ?? []
+      list.push(row)
+      buckets.set(root, list)
+      continue
+    }
+    const root = korrekturKetteRootId(row, byId)
     if (!root) continue
     const list = buckets.get(root) ?? []
     list.push(row)
     buckets.set(root, list)
   }
 
-  // Original ggf. nachziehen, falls Root-ID nicht in rows (selten)
   for (const [rootId, list] of buckets) {
     if (!list.some((r) => r.entityId === rootId) && byId.has(rootId)) {
       list.push(byId.get(rootId)!)
@@ -83,30 +120,33 @@ export function groupVorgaengeByKorrekturKette(rows: VorgangListeRow[]): {
         const role = korrekturKetteRole(row) ?? (row.entityId === rootId ? 'original' : 'neu')
         return { row, role: role as KorrekturKetteRole }
       })
-      .sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role])
+      .sort((a, b) => {
+        const ra = ROLE_ORDER[a.role]
+        const rb = ROLE_ORDER[b.role]
+        if (ra !== rb) return ra - rb
+        return String(a.row.updatedAt).localeCompare(String(b.row.updatedAt))
+      })
 
-    if (members.length < 2) continue
+    // Mindestens Original+Korrektur oder Korrektur allein mit Gutschrift
+    const hasNeu = members.some((m) => m.role === 'neu')
+    const hasGs = members.some((m) => m.role === 'gutschrift')
+    if (!hasNeu && !hasGs && members.length < 2) continue
+    if (members.length < 2 && !hasNeu) continue
 
-    const neu = members.find((m) => m.role === 'neu')
+    const neuMembers = members.filter((m) => m.role === 'neu')
+    const tipNeu =
+      [...neuMembers].reverse().find((m) => !String(m.row.ersetzt_durch ?? '').trim()) ??
+      neuMembers[neuMembers.length - 1]
     const original = members.find((m) => m.role === 'original')
-    const head = neu?.row ?? original?.row ?? members[members.length - 1]!.row
+    const head = tipNeu?.row ?? original?.row ?? members[members.length - 1]!.row
+
     const pending = members.some(
       (m) =>
-        String(m.row.unterstatus).toLowerCase() === 'entwurf' ||
-        (m.role === 'original' &&
-          String(m.row.unterstatus).toLowerCase() !== 'storniert' &&
-          Boolean(m.row.ersetzt_durch))
+        String(m.row.unterstatus).toLowerCase() === 'entwurf' &&
+        (m.role === 'neu' || m.role === 'gutschrift')
     )
 
-    const origNr =
-      original?.row.titel?.replace(/^Rechnung\s+/i, '') ||
-      members.find((m) => m.role === 'original')?.row.entityId.slice(0, 8)
-    const neuNr =
-      neu?.row.titel?.replace(/^Rechnung\s+/i, '') ||
-      (neu ? 'Entwurf' : null)
-    const label = pending
-      ? `Korrektur${origNr ? ` ${origNr}` : ''}${neuNr ? ` → ${neuNr}` : ''} (Entwurf)`
-      : `Korrektur${origNr && neuNr ? ` ${origNr} → ${neuNr}` : ''}`
+    const label = head.titel
 
     for (const m of members) {
       if (m.row.entityId !== head.entityId) childIds.add(m.row.entityId)
@@ -116,9 +156,14 @@ export function groupVorgaengeByKorrekturKette(rows: VorgangListeRow[]): {
     groups.push({ rootId, head, members, pending, label })
   }
 
-  // Restliche Zeilen als Single-Groups (Reihenfolge der Eingabe)
   for (const row of rows) {
     if (consumed.has(row.entityId)) continue
+    // Storno-Gutschrift ohne erkennbare Kette: nicht als eigene Card
+    if (row.belegTyp === 'gutschrift') {
+      consumed.add(row.entityId)
+      childIds.add(row.entityId)
+      continue
+    }
     groups.push({
       rootId: row.entityId,
       head: row,
@@ -129,11 +174,29 @@ export function groupVorgaengeByKorrekturKette(rows: VorgangListeRow[]): {
     consumed.add(row.entityId)
   }
 
-  // Reihenfolge: nach head.updatedAt der ursprünglichen displayItems-Order
   const order = new Map(rows.map((r, i) => [r.entityId, i]))
   groups.sort(
     (a, b) => (order.get(a.head.entityId) ?? 0) - (order.get(b.head.entityId) ?? 0)
   )
 
   return { groups, childIds }
+}
+
+/** Listen-Status für Korrektur-Kopfzeile. */
+export function korrekturKetteListenStatus(group: KorrekturKetteGroup): {
+  label: string
+  kind: 'neu' | 'warten' | 'aktiv' | 'fertig' | 'storniert' | 'plain'
+} | null {
+  if (group.members.length < 2 && !group.pending) return null
+  if (group.pending) return { label: 'Korrektur Entwurf', kind: 'neu' }
+  const tip = group.members.filter((m) => m.role === 'neu').at(-1)?.row ?? group.head
+  const st = String(tip.unterstatus).toLowerCase()
+  if (st === 'bezahlt') return { label: 'Bezahlt', kind: 'fertig' }
+  if (st === 'gesendet' || st === 'versendet') {
+    return { label: 'Korrektur versendet', kind: 'warten' }
+  }
+  if (String(tip.korrektur_von ?? '').trim()) {
+    return { label: 'Korrektur versendet', kind: 'warten' }
+  }
+  return null
 }

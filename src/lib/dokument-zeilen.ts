@@ -254,6 +254,32 @@ export function summeArtikelBruttoAusAngebotPositionen(
   )
 }
 
+/**
+ * Freitext + Gesamtnachlass vom Angebot an Auftragsleistungen anhängen
+ * (liegen oft nur am Angebot, nicht in auftrag_positionen).
+ */
+export function mergeAngebotSonderzeilen(
+  leistungen: AngebotPosition[],
+  angebotPositionen: AngebotPosition[]
+): AngebotPosition[] {
+  const sonder = angebotPositionen.filter((p) => {
+    const slug = p.gewerk_slug ?? ''
+    return slug === ZEILE_SLUG_FREITEXT || slug === ZEILE_SLUG_GESAMTRABATT
+  })
+  if (!sonder.length) return leistungen
+
+  const existingIds = new Set(leistungen.map((p) => p.id))
+  const hatNachlass = leistungen.some((p) => (p.gewerk_slug ?? '') === ZEILE_SLUG_GESAMTRABATT)
+  const toAdd: AngebotPosition[] = []
+  for (const p of sonder) {
+    if (existingIds.has(p.id)) continue
+    if ((p.gewerk_slug ?? '') === ZEILE_SLUG_GESAMTRABATT && hatNachlass) continue
+    toAdd.push(p)
+    existingIds.add(p.id)
+  }
+  return toAdd.length ? [...leistungen, ...toAdd] : leistungen
+}
+
 /** Nachlass-Abzug (positiv) aus Angebots-Positionen — auch wenn Beträge beim Laden auf 0 gesetzt wurden. */
 export function gesamtrabattAbzugAusAngebotPositionen(
   positionen: AngebotPosition[],

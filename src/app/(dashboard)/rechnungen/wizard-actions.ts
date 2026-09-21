@@ -18,6 +18,7 @@ import {
 } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { normalizeAngebotPositionen, repairAngebotPositionen } from '@/lib/angebot-positionen'
+import { mergeAngebotSonderzeilen } from '@/lib/dokument-zeilen'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadGewerkeAusfuehrung, sanitizeAngebotPositionenForExport } from '@/lib/gewerke-ausfuehrung'
 import { KUNDE_EMBED_SELECT, KUNDE_EMBED_SELECT_LEGACY, loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
@@ -256,6 +257,13 @@ async function positionenAusAuftrag(
     throw new Error('Auftrag nicht gefunden oder ohne Kunde verknüpft.')
   }
 
+  const angRaw = auf.angebote as { positionen?: unknown } | unknown[] | null | undefined
+  const ang = Array.isArray(angRaw) ? angRaw[0] : angRaw
+  const angebotPositionen = sanitizeAngebotPositionenForExport(
+    normalizeAngebotPositionen((ang as { positionen?: unknown } | null)?.positionen ?? []),
+    gewerke
+  )
+
   const auftragPos = (auf.auftrag_positionen ?? []) as AuftragPosition[]
   let positionen: AngebotPosition[] = []
   if (auftragPos.length > 0) {
@@ -298,11 +306,10 @@ async function positionenAusAuftrag(
       }),
       gewerke
     )
+    // Freitext/Nachlass liegen nur am Angebot — in den Rechnungs-Wizard übernehmen.
+    positionen = mergeAngebotSonderzeilen(positionen, angebotPositionen)
   } else {
-    const angRaw = auf.angebote as { positionen?: unknown } | unknown[] | null | undefined
-    const ang = Array.isArray(angRaw) ? angRaw[0] : angRaw
-    const rawPos = (ang as { positionen?: unknown } | null)?.positionen ?? []
-    positionen = sanitizeAngebotPositionenForExport(normalizeAngebotPositionen(rawPos), gewerke)
+    positionen = angebotPositionen
   }
 
   const auftragsReferenz = formatAuftragsNr({
@@ -702,9 +709,11 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
         bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
       }
 
+      // Plan editierbar → volle Positionen inkl. Freitext/Nachlass (Rate nur für Beträge).
+      // Rate fest → Positionen der Rate (Schluss inkl. Sonderzeilen).
       let positionen = basis.positionen
       const abschlagMeta = abschlag
-      if (abschlagMeta && zahlungsplan) {
+      if (abschlagMeta && zahlungsplan && !zahlungsplanBearbeiten) {
         const kontextPos = berechneZahlungsplanMitIst(
           zahlungsplan,
           basis.gesamtNetto,
@@ -833,17 +842,20 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
             String(r.status ?? '') === 'entwurf'
         )
         draftRechnungId = draft?.id ?? null
-        positionen = positionenFuerAbschlagRechnung({
-          zeile: zeilePos,
-          allePositionen: basis.positionen,
-          plan: zahlungsplan,
-          gesamtNetto: basis.gesamtNetto,
-          auftragsReferenz: basis.auftragsReferenz,
-          projektTitel: basis.projektTitel ?? '',
-          bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
-          vorherigeAbschlaege: rechnungen,
-          ausserRechnungId: draftRechnungId,
-        })
+        // Plan editierbar → volle Positionen inkl. Freitext/Nachlass behalten.
+        if (!zahlungsplanBearbeiten) {
+          positionen = positionenFuerAbschlagRechnung({
+            zeile: zeilePos,
+            allePositionen: basis.positionen,
+            plan: zahlungsplan,
+            gesamtNetto: basis.gesamtNetto,
+            auftragsReferenz: basis.auftragsReferenz,
+            projektTitel: basis.projektTitel ?? '',
+            bereitsGestelltBrutto: berechneBereitsGestellt(rechnungen).brutto,
+            vorherigeAbschlaege: rechnungen,
+            ausserRechnungId: draftRechnungId,
+          })
+        }
       }
     }
 
@@ -964,6 +976,11 @@ export async function loadRechnungWizardBootstrap(
       { keepAbschlagPauschal }
     )
   )
+  // Freitext/Nachlass vom Auftrag nachziehen (Entwürfe ohne Sonderzeilen).
+  const positionenFinal =
+    rechnungArt === 'abschlag'
+      ? positionen
+      : mergeAngebotSonderzeilen(positionen, basis.positionen)
 
   const firm = await fetchFirmenEinstellungen(supabase)
   const zt = Math.max(
@@ -1020,7 +1037,7 @@ export async function loadRechnungWizardBootstrap(
         basis.objekt_anlage_id ||
         null,
       kunde: kunde ?? null,
-      positionen,
+      positionen: positionenFinal,
       meta,
       auftragsReferenz: basis.auftragsReferenz,
       projektTitel: basis.projektTitel,

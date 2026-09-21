@@ -1154,6 +1154,9 @@ export function RechnungWizard({
   const displayMwst = schlussAbrechnung
     ? schlussAbrechnung.rest_mwst
     : Math.max(0, displayBrutto - displayNetto)
+  const showNachlassInTotBand =
+    nachlassSummen.nachlassNetto > 0 &&
+    (!hasPlan || Boolean(selBerechnet?.istSchluss) || rechnungsart === 'schluss')
   const anteil35a = berechneHinweis35aAnteil(
     positionenBerechnet,
     schlussAbrechnung ? schlussAbrechnung.rest_netto : berechnung.netto,
@@ -1328,21 +1331,9 @@ export function RechnungWizard({
             ? `MwSt ${schlussAbrechnung.mwst_prozent}%`
             : ustLabel
         }
-        nachlassNetto={
-          !schlussAbrechnung &&
-          !(hasPlan && selBerechnet) &&
-          nachlassSummen.nachlassNetto > 0
-            ? nachlassSummen.nachlassNetto
-            : null
-        }
+        nachlassNetto={showNachlassInTotBand ? nachlassSummen.nachlassNetto : null}
         nachlassLabel={nachlassSummen.nachlassLabel}
-        nettoVorNachlass={
-          !schlussAbrechnung &&
-          !(hasPlan && selBerechnet) &&
-          nachlassSummen.nachlassNetto > 0
-            ? nachlassSummen.nettoVorNachlass
-            : null
-        }
+        nettoVorNachlass={showNachlassInTotBand ? nachlassSummen.nettoVorNachlass : null}
         bereitsGezahlt={
           schlussAbrechnung?.bereits_gezahlt_brutto
             ? schlussAbrechnung.bereits_gezahlt.map((z) => ({

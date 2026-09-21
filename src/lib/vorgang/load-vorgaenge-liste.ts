@@ -841,14 +841,16 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     if (showSatelliten) {
       for (const r of leadRechnungen) {
         const istGutschrift = String(r.beleg_typ ?? '').toLowerCase() === 'gutschrift'
+        // Storno-Gutschrift gehört zur Korrektur — nicht als eigene Vorgangs-Card
+        if (istGutschrift) continue
         const istKorrekturEntwurf =
           r.status === 'entwurf' && Boolean(String(r.korrektur_von ?? '').trim())
-        // Normale Entwürfe ausblenden; Korrektur-Entwürfe + Storno-Gutschriften behalten
-        if (r.status === 'entwurf' && !istGutschrift && !istKorrekturEntwurf) continue
+        // Normale Entwürfe ausblenden; Korrektur-Entwürfe behalten
+        if (r.status === 'entwurf' && !istKorrekturEntwurf) continue
         if (resolved.entityId === r.id) continue
         const art = (r.rechnung_art ?? 'voll').trim().toLowerCase()
         const istStorniert = r.status === 'storniert'
-        if (!istGutschrift && !istKorrekturEntwurf) {
+        if (!istKorrekturEntwurf) {
           if (hatAbschlagsplan) {
             if (art !== 'abschlag' && art !== 'schluss') continue
             if (!istStorniert && !istRechnungGestelltOderBezahlt(r.status)) continue
@@ -882,7 +884,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
           korrektur_von: r.korrektur_von ?? null,
           korrektur_art: r.korrektur_art ?? null,
           bezug_rechnung_id: r.bezug_rechnung_id ?? null,
-          belegTyp: istGutschrift ? 'gutschrift' : 'rechnung',
+          belegTyp: 'rechnung',
           rechnungRichtung: 'ausgehend',
         })
       }
@@ -891,14 +893,12 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
 
   for (const r of standaloneRechnungen) {
     const istGutschrift = r.beleg_typ === 'gutschrift'
+    // Storno-Gutschrift nur in der Korrektur-Detailansicht, nicht als Vorgangs-Card
+    if (istGutschrift) continue
     const nr = r.rechnungsnummer?.trim()
-    const titel = istGutschrift
-      ? nr
-        ? `Storno-Gutschrift ${nr}`
-        : 'Storno-Gutschrift'
-      : nr
-        ? `Rechnung ${nr}`
-        : r.kunde_name?.trim() || 'Direktrechnung'
+    const titel = nr
+      ? `Rechnung ${nr}`
+      : r.kunde_name?.trim() || 'Direktrechnung'
     const resolved = resolveStandaloneDirektrechnung({
       rechnung: {
         id: r.id,
@@ -926,19 +926,15 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     rows.push({
       ...resolved,
       titel,
-      unterstatusLabel: istGutschrift
-        ? r.status === 'entwurf'
-          ? 'Storno-Gutschrift'
-          : unterstatusLabel('rechnung', resolved.unterstatus)
-        : unterstatusLabel('rechnung', resolved.unterstatus),
+      unterstatusLabel: unterstatusLabel('rechnung', resolved.unterstatus),
       kanalMeta: 'Direktkunde',
       leadId: '',
       kundeId: r.kunde_id,
       kundeName: r.kunde_name,
       wertLabel,
       listenSummeEuro,
-      // Stornierte / Gutschriften nicht in der offenen Summe
-      listeSummeZaehlen: r.status !== 'storniert' && !istGutschrift,
+      // Stornierte nicht in der offenen Summe
+      listeSummeZaehlen: r.status !== 'storniert',
       detailHref: detailHrefForPhase('rechnung', r.id, ''),
       handwerkerIds: [],
       ist_wiederkehrend: Boolean(r.ist_wiederkehrend),
@@ -949,7 +945,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       korrektur_art: r.korrektur_art ?? null,
       bezug_rechnung_id: r.bezug_rechnung_id ?? null,
       rechnungRichtung: 'ausgehend',
-      belegTyp: istGutschrift ? 'gutschrift' : 'rechnung',
+      belegTyp: 'rechnung',
     })
   }
 

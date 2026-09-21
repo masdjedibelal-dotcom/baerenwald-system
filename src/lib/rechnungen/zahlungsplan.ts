@@ -781,7 +781,7 @@ export function berechneSchlussAbrechnung(
   }
 }
 
-/** Schlussrechnung = nur Leistungsübersicht (keine Abzugszeilen). */
+/** Schlussrechnung = Leistungsübersicht inkl. Freitext/Nachlass (keine Abzugszeilen). */
 export function buildSchlussrechnungPositionen(input: {
   allePositionen: AngebotPosition[]
   vorherigeAbschlaege?: RechnungAbschlagLink[]
@@ -793,9 +793,6 @@ export function buildSchlussrechnungPositionen(input: {
     if (istAbschlagPauschalPosition(p)) return false
     if ((p.gewerk_slug ?? '').toLowerCase() === 'abschlag_abzug') return false
     if ((p.leistung ?? '').toLowerCase().startsWith('abzüglich')) return false
-    if (p.gewerk_slug === '__freitext__' && p.lohn_netto === 0 && p.material_netto === 0) {
-      return false
-    }
     return true
   })
 }
@@ -820,23 +817,31 @@ export function positionIdsBelegt(plan: Zahlungsplan, ausserZeileId?: string | n
   return belegt
 }
 
-/** Leistungen pro Planzeile — Schlussrechnung erhält alle nicht zugeordneten Positionen. */
+/** Leistungen pro Planzeile — Schlussrechnung erhält alle nicht zugeordneten Positionen (inkl. Freitext/Nachlass). */
 export function positionenFuerZahlungsplanZeile(
   zeile: ZahlungsplanZeile,
   allePositionen: AngebotPosition[],
   plan: Zahlungsplan
 ): AngebotPosition[] {
-  const norm = normalizeAngebotPositionen(allePositionen).filter(
-    (p) => p.gewerk_slug !== '__freitext__' || p.lohn_netto !== 0 || p.material_netto !== 0
-  )
+  const norm = normalizeAngebotPositionen(allePositionen)
   if (zeile.typ === 'rest') {
     const belegt = positionIdsBelegt(plan)
-    return norm.filter((p) => !belegt.has(p.id))
+    return norm.filter((p) => {
+      const slug = p.gewerk_slug ?? ''
+      // Freitext/Nachlass immer auf die Schlussrechnung — nie in Abschlag-IDs.
+      if (slug === '__freitext__' || slug === '__gesamtrabatt__') return true
+      return !belegt.has(p.id)
+    })
   }
   const ids = zeile.position_ids ?? []
   if (!ids.length) return []
   const idSet = new Set(ids)
-  return norm.filter((p) => idSet.has(p.id))
+  return norm.filter((p) => {
+    const slug = p.gewerk_slug ?? ''
+    // Freitext/Nachlass gehören nicht auf Abschlagsraten.
+    if (slug === '__freitext__' || slug === '__gesamtrabatt__') return false
+    return idSet.has(p.id)
+  })
 }
 
 export function rechnungDokumentBezeichnung(

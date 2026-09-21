@@ -50,10 +50,7 @@ export function resolveRechnungKorrekturUi(r: RechnungKorrekturUiInput): Rechnun
   // DB: korrektur_art nur 'gutschrift' | 'ersetzt' — Entwurf vs. gespeichert über Status
   return {
     filterKey: 'korrektur_entwurf',
-    dualBadges: {
-      primary: 'Gesendet',
-      secondary: RECHNUNG_KORREKTUR_FILTER_LABELS.korrektur_entwurf,
-    },
+    dualBadges: null,
   }
 }
 
@@ -417,6 +414,8 @@ export type RechnungKorrekturKetteMemberRole = 'original' | 'gutschrift' | 'neu'
 export type RechnungKorrekturKetteMember = {
   id: string
   role: RechnungKorrekturKetteMemberRole
+  /** 0 = erste Korrektur-Welle (Original), 1 = Korrektur der Korrektur, … */
+  wave: number
   rechnungsnummer: string | null
   status: string
   brutto: number | null
@@ -441,8 +440,58 @@ export type RechnungKorrekturKetteSiblingRow = {
   created_at?: string | null
 }
 
+function isGutschriftRow(row: { beleg_typ?: string | null } | undefined): boolean {
+  return String(row?.beleg_typ ?? 'rechnung').toLowerCase() === 'gutschrift'
+}
+
+/** Wurzel der Korrektur-Familie (erste Original-RE). */
+export function resolveKorrekturKetteRootId(
+  startId: string,
+  byId: Map<string, RechnungKorrekturKetteSiblingRow>
+): string {
+  let cur = startId
+  const seen = new Set<string>()
+  for (let i = 0; i < 24; i++) {
+    if (seen.has(cur)) break
+    seen.add(cur)
+    const row = byId.get(cur)
+    if (!row) break
+    if (isGutschriftRow(row)) {
+      const bezug = String(row.bezug_rechnung_id ?? '').trim()
+      if (bezug) {
+        cur = bezug
+        continue
+      }
+      break
+    }
+    const von = String(row.korrektur_von ?? '').trim()
+    if (von) {
+      cur = von
+      continue
+    }
+    break
+  }
+  return cur
+}
+
+function findNachfolgerId(
+  rechnungId: string,
+  byId: Map<string, RechnungKorrekturKetteSiblingRow>,
+  siblings: RechnungKorrekturKetteSiblingRow[]
+): string | null {
+  const row = byId.get(rechnungId)
+  const ersetzt = String(row?.ersetzt_durch ?? '').trim()
+  if (ersetzt) return ersetzt
+  const via = siblings.find(
+    (s) =>
+      String(s.korrektur_von ?? '').trim() === rechnungId && !isGutschriftRow(s)
+  )
+  return via?.id ?? null
+}
+
 /**
  * Baut die sichtbare Korrektur-Kette für Detail-UI aus aktueller RE + Sibling-Zeilen.
+ * Mehrstufig: Original → Storno → Korrektur → (nochmals) Storno → Korrektur …
  */
 export function buildRechnungKorrekturKetteUi(
   current: {
@@ -461,71 +510,50 @@ export function buildRechnungKorrekturKetteUi(
   for (const s of siblings) byId.set(s.id, s)
   byId.set(current.id, { ...current, id: current.id })
 
-  const beleg = String(current.beleg_typ ?? 'rechnung').toLowerCase()
-  let originalId: string | null = null
-  let neuId: string | null = null
-
-  if (beleg === 'gutschrift') {
-    originalId = String(current.bezug_rechnung_id ?? '').trim() || null
-  } else if (String(current.korrektur_von ?? '').trim()) {
-    originalId = String(current.korrektur_von).trim()
-    neuId = current.id
-  } else if (String(current.ersetzt_durch ?? '').trim()) {
-    originalId = current.id
-    neuId = String(current.ersetzt_durch).trim()
-  } else {
-    const neuVia = siblings.find(
+  const hasLink =
+    Boolean(String(current.korrektur_von ?? '').trim()) ||
+    Boolean(String(current.ersetzt_durch ?? '').trim()) ||
+    isGutschriftRow(current) ||
+    siblings.some(
       (s) =>
-        String(s.korrektur_von ?? '').trim() === current.id &&
-        String(s.beleg_typ ?? 'rechnung').toLowerCase() !== 'gutschrift'
+        String(s.korrektur_von ?? '').trim() === current.id ||
+        String(s.ersetzt_durch ?? '').trim() === current.id ||
+        (isGutschriftRow(s) && String(s.bezug_rechnung_id ?? '').trim() === current.id)
     )
-    if (neuVia) {
-      originalId = current.id
-      neuId = neuVia.id
+  if (!hasLink) return null
+
+  const rootId = resolveKorrekturKetteRootId(current.id, byId)
+  const memberIds: Array<{ id: string; role: RechnungKorrekturKetteMemberRole; wave: number }> =
+    []
+  let curId: string | null = rootId
+  let wave = 0
+  const seen = new Set<string>()
+
+  while (curId && !seen.has(curId)) {
+    seen.add(curId)
+    memberIds.push({
+      id: curId,
+      role: wave === 0 ? 'original' : 'neu',
+      wave,
+    })
+    const gsId = findeStornoGutschriftId(curId, siblings)
+    if (gsId && !seen.has(gsId)) {
+      memberIds.push({ id: gsId, role: 'gutschrift', wave })
     }
+    const next = findNachfolgerId(curId, byId, siblings)
+    if (!next || next === curId) break
+    curId = next
+    wave += 1
   }
-
-  if (!originalId && !neuId) return null
-
-  if (!neuId && originalId) {
-    const viaErsetzt = byId.get(originalId)
-    const ersetzt = String(viaErsetzt?.ersetzt_durch ?? '').trim()
-    if (ersetzt) neuId = ersetzt
-    else {
-      const neuVia = siblings.find(
-        (s) =>
-          String(s.korrektur_von ?? '').trim() === originalId &&
-          String(s.beleg_typ ?? 'rechnung').toLowerCase() !== 'gutschrift'
-      )
-      neuId = neuVia?.id ?? null
-    }
-  }
-
-  if (!originalId && neuId) {
-    const neu = byId.get(neuId)
-    originalId = String(neu?.korrektur_von ?? '').trim() || null
-    if (!originalId) {
-      const orig = siblings.find((s) => String(s.ersetzt_durch ?? '').trim() === neuId)
-      originalId = orig?.id ?? null
-    }
-  }
-
-  if (!originalId) return null
-
-  const gsId = findeStornoGutschriftId(originalId, siblings)
-  const memberIds: Array<{ id: string; role: RechnungKorrekturKetteMemberRole }> = [
-    { id: originalId, role: 'original' },
-  ]
-  if (gsId) memberIds.push({ id: gsId, role: 'gutschrift' })
-  if (neuId && neuId !== originalId) memberIds.push({ id: neuId, role: 'neu' })
 
   if (memberIds.length < 2) return null
 
-  const members: RechnungKorrekturKetteMember[] = memberIds.map(({ id, role }) => {
+  const members: RechnungKorrekturKetteMember[] = memberIds.map(({ id, role, wave: w }) => {
     const row = byId.get(id)
     return {
       id,
       role,
+      wave: w,
       rechnungsnummer: row?.rechnungsnummer?.trim() || null,
       status: String(row?.status ?? 'entwurf'),
       brutto: row?.brutto ?? null,
@@ -534,20 +562,20 @@ export function buildRechnungKorrekturKetteUi(
     }
   })
 
-  const orig = members.find((m) => m.role === 'original')
-  const pending =
-    members.some((m) => m.status.toLowerCase() === 'entwurf') ||
-    Boolean(
-      orig &&
-        orig.status.toLowerCase() !== 'storniert' &&
-        String(byId.get(orig.id)?.ersetzt_durch ?? '').trim()
-    )
+  const pending = members.some((m) => m.status.toLowerCase() === 'entwurf')
 
   return { pending, members }
 }
 
-export function korrekturKetteMemberRoleLabel(role: RechnungKorrekturKetteMemberRole): string {
+export function korrekturKetteMemberRoleLabel(
+  role: RechnungKorrekturKetteMemberRole,
+  wave = 0
+): string {
   if (role === 'original') return 'Original'
-  if (role === 'gutschrift') return 'Storno-Gutschrift'
-  return 'Korrektur'
+  if (role === 'gutschrift') {
+    return wave > 0 ? `Storno ${wave + 1}` : 'Storno'
+  }
+  if (wave <= 1) return 'Korrektur'
+  return `Korrektur ${wave}`
 }
+

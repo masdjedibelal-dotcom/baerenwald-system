@@ -877,15 +877,22 @@ export function RechnungDetailClient({
       head={{
         title: projektTitelAnzeige,
         sub: headSub,
-        badges: korrekturUi.dualBadges ? (
-          <span className="inline-flex flex-wrap items-center gap-1.5">
-            <StatusBadge status="gesendet" label={korrekturUi.dualBadges.primary} />
-            <StatusBadge status="entwurf" label={korrekturUi.dualBadges.secondary} />
-          </span>
-        ) : (
+        badges: (
           <StatusBadge
-            status={ueberfaellig ? 'ueberfaellig' : detail.status}
-            label={rechnungStatus.label}
+            status={
+              korrekturUi.filterKey === 'korrektur_entwurf'
+                ? 'entwurf'
+                : ueberfaellig
+                  ? 'ueberfaellig'
+                  : detail.status
+            }
+            label={
+              korrekturUi.filterKey === 'korrektur_entwurf'
+                ? 'Korrektur Entwurf'
+                : korrekturUi.filterKey === 'korrektur_versendet'
+                  ? 'Korrektur versendet'
+                  : rechnungStatus.label
+            }
           />
         ),
         meta: headMeta,

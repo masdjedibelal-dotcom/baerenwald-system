@@ -2548,6 +2548,101 @@ font-size: var(--fs-caption);
   color: var(--green);
 }
 
+/* Korrektur-Verlauf (Rechnung-Detail): Text | Betrag | Status */
+.re-kette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.re-kette-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 0.55rem 0;
+  border-bottom: 0.03125rem solid var(--border);
+  min-width: 0;
+}
+
+.re-kette-row:last-child {
+  border-bottom: none;
+}
+
+.re-kette-row--current {
+  background: color-mix(in srgb, var(--green) 6%, transparent);
+  margin: 0 -0.5rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  border-radius: 8px;
+}
+
+.re-kette-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.re-kette-role {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-3);
+  line-height: 1.2;
+}
+
+.re-kette-nr {
+  font-size: var(--fs-text);
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.re-kette-nr--link {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.re-kette-here {
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.re-kette-betrag {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-text);
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.re-kette-status {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .re-kette-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "text status"
+      "betrag status";
+  }
+  .re-kette-text { grid-area: text; }
+  .re-kette-betrag {
+    grid-area: betrag;
+    justify-self: start;
+    font-size: var(--fs-meta);
+  }
+  .re-kette-status { grid-area: status; align-self: center; }
+}
+
 @media (max-width: 640px) {
 .vgp-table-row {
     grid-template-columns: minmax(76px, 0.75fr) minmax(0, 1fr) minmax(56px, auto) 22px;
