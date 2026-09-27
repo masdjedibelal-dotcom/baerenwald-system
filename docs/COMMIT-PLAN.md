@@ -4,6 +4,16 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
+## Deploy-Fix: Netlify Build-Guards — 2026-09-27
+
+**Commit-Text:** `fix(crm): MockSelect in Partner-Aufgabe, Void-Allowlist, db-spalten aus Build`
+
+1. `PartnerAufgabeBearbeitenSheet`: rohes `<select>` → `MockSelect` (check-raw-elements).
+2. `void-call-allowlist.txt`: `loadRegiePositionFuerBearbeitung` (check-void-calls).
+3. `check-db-spalten` aus `npm run build` genommen (bleibt `npm run check:db-spalten`) — 62 Altlasten, Inventur-rot, blockierte sonst Netlify nach den beiden Fixes.
+
+---
+
 ## FIX 7 Commit 3: Anzeige + Guard Texttrennung — 2026-09-26
 
 **Commit-Text:** `feat(crm): Partner-Aufgabe im Detail sichtbar, Guard gegen Textvermischung`

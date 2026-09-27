@@ -86,6 +86,7 @@ loadDraft
 loadHandwerkerBewertungenFuerAuftrag
 loadObjektAnlageVorgaenge
 loadPreview
+loadRegiePositionFuerBearbeitung
 loadSessions
 loader
 loeschen

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useLocalTransition } from '@/components/ui/action-busy'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -193,7 +193,7 @@ export function PartnerAufgabeBearbeitenSheet({
       {aufgaben.length > 1 ? (
         <label className="hw-anfrage-field mb-3 block">
           <span className="hw-anfrage-label">Ausgewählte Positionen zuordnen zu</span>
-          <select
+          <MockSelect
             className="sel w-full"
             value={zielAufgabeId}
             onChange={(e) => setZielAufgabeId(e.target.value)}
@@ -204,7 +204,7 @@ export function PartnerAufgabeBearbeitenSheet({
                 {a.titel?.trim() || `Aufgabe ohne Titel (${a.id.slice(0, 8)}…)`}
               </option>
             ))}
-          </select>
+          </MockSelect>
         </label>
       ) : null}
 
