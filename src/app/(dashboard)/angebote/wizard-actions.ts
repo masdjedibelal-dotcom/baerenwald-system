@@ -28,6 +28,11 @@ import {
   angebotStatusErlaubtImWizard,
   angebotWizardBearbeitenSperrgrund,
 } from '@/lib/angebote/angebot-wizard-types'
+import {
+  loadAuftragKorrekturKontext,
+  auftragKorrekturSperrgrund,
+  type AuftragKorrekturKontext,
+} from '@/lib/angebote/auftrag-korrektur'
 import { parseZahlungsplan, zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import {
@@ -453,7 +458,13 @@ function normalizeVariantenFromDb(raw: unknown): AngebotVariantenPersistJson | n
 export async function loadAngebotWizardBootstrap(
   angebotId: string,
   leadId: string,
-  opts?: { asSystem?: boolean; /** Angenommenes Angebot für Auftrags-Korrektur/Nachtrag laden */ forAuftragKorrektur?: boolean }
+  opts?: {
+    asSystem?: boolean
+    /** Auftrags-Korrektur/Nachtrag: Gate am Auftrag, nicht am Angebotsstatus */
+    forAuftragKorrektur?: boolean
+    /** Nachtrag: gestellte Rechnung sperrt den Load nicht */
+    ignoreGestellteRechnung?: boolean
+  }
 ): Promise<{ ok: true; bootstrap: AngebotWizardBootstrap } | { ok: false; message: string }> {
   const supabase = opts?.asSystem ? supabaseAdmin : createClient()
 
@@ -535,11 +546,25 @@ export async function loadAngebotWizardBootstrap(
   if (ang.lead_id !== leadId) {
     return { ok: false, message: 'Angebot gehört nicht zu dieser Anfrage.' }
   }
-  if (!angebotStatusErlaubtImWizard(ang.status, opts)) {
+  let auftragKorrektur: AuftragKorrekturKontext | undefined
+  if (opts?.forAuftragKorrektur) {
+    const loadedCtx = await loadAuftragKorrekturKontext(supabase, {
+      angebotId,
+    })
+    auftragKorrektur = opts.ignoreGestellteRechnung
+      ? { auftragId: loadedCtx.auftragId, hatGestellteRechnung: false }
+      : loadedCtx
+  }
+  if (!angebotStatusErlaubtImWizard(ang.status, { ...opts, auftragKorrektur })) {
     return {
       ok: false,
       message: opts?.forAuftragKorrektur
-        ? 'Korrektur nur nach Annahme — Angebot muss angenommen sein.'
+        ? auftragKorrekturSperrgrund(
+            auftragKorrektur ?? {
+              auftragId: null,
+              hatGestellteRechnung: false,
+            }
+          )
         : angebotWizardBearbeitenSperrgrund(ang.status) ??
           'Dieses Angebot kann im Wizard nicht mehr bearbeitet werden.',
     }

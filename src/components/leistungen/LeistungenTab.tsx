@@ -11,6 +11,7 @@ import { COPY_ROLE } from '@/lib/copy'
 import { LeistungDrawer } from '@/components/leistungen/LeistungDrawer'
 import { LeistungHandwerkerUpdatesAccordion } from '@/components/leistungen/LeistungHandwerkerUpdatesAccordion'
 import { LeistungenMaengelCard } from '@/components/leistungen/LeistungenMaengelCard'
+import { RegiePositionBearbeitenSheet } from '@/components/auftraege/RegiePositionBearbeitenSheet'
 import type {
   LeistungDrawerAction,
   LeistungMangelAnzeige,
@@ -66,6 +67,7 @@ export function LeistungenTab({
   drawerActionsForRow,
   onNachtragEntscheiden,
   nachtragDecidePending = false,
+  onRegieKorrigiert,
   belowTable,
   emptyTitle = 'Noch keine Leistungen',
   emptyHint,
@@ -96,6 +98,8 @@ export function LeistungenTab({
     status: 'anerkannt' | 'abgelehnt'
   ) => void
   nachtragDecidePending?: boolean
+  /** Nach Regie-Korrektur vor Entscheidung (Detail neu laden) */
+  onRegieKorrigiert?: () => void
   /** z. B. Button „Tagebucheintrag“ unter der Tabelle */
   belowTable?: ReactNode
   emptyTitle?: string
@@ -104,6 +108,7 @@ export function LeistungenTab({
   const allowBulk = phase === 'auftrag' && (bulkActions?.length ?? 0) > 0
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [bearbeitenId, setBearbeitenId] = useState<string | null>(null)
 
   const activeRow = useMemo(
     () => (activeId ? rows.find((r) => r.id === activeId) ?? null : null),
@@ -572,6 +577,15 @@ export function LeistungenTab({
               }
             : undefined
         }
+        onRegieBearbeiten={
+          activeRow?.brauchtFreigabe
+            ? () => {
+                const id = activeRow.id
+                setActiveId(null)
+                setBearbeitenId(id)
+              }
+            : undefined
+        }
         actions={
           activeRow
             ? activeRow.brauchtFreigabe
@@ -579,6 +593,16 @@ export function LeistungenTab({
               : drawerActionsForRow?.(activeRow) ?? []
             : []
         }
+      />
+
+      <RegiePositionBearbeitenSheet
+        open={Boolean(bearbeitenId)}
+        positionId={bearbeitenId}
+        onClose={() => setBearbeitenId(null)}
+        onSaved={() => {
+          setBearbeitenId(null)
+          onRegieKorrigiert?.()
+        }}
       />
     </div>
   )

@@ -4,6 +4,279 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
+## FIX 7 Commit 3: Anzeige + Guard Texttrennung — 2026-09-26
+
+**Commit-Text:** `feat(crm): Partner-Aufgabe im Detail sichtbar, Guard gegen Textvermischung`
+
+**Anzeige:** `partnerSiehtLabel` in Leistungen-Tabelle (Subline) und LeistungDrawer („Partner sieht“); leerer Titel → LV via `partnerAufgabeAnzeigeTitel`. Aufgaben parallel in `loadAuftragDetail`.
+
+**Guard:** `scripts/check-partner-text-trennung.mjs` in `npm run build` (vor void-calls). Self-Test: `--self-test`.
+
+**Abnahme:** Zeiterfassung/Regie/Abrechnung/Fortschritt lesen `partner_aufgabe_id` nicht; `npx tsc --noEmit` grün.
+
+---
+
+## FIX 7 Commit 2: Partner-Titel bei Zuweisung — 2026-09-26
+
+**Commit-Text:** `feat(crm): Partner-Titel und -Beschreibung bei der Zuweisung`
+
+**Bug (Punkt 9):** `AuftragLeistungZuweisungModal` schrieb bei Einzelzuweisung `leistung_name`/`beschreibung` via `updateAuftragPositionSteuerung` — Kunden-LV wurde mit Partnerformulierung überschrieben. Behoben: Partnertext nur in `auftrag_partner_aufgaben`; `leistung_name` unberührt.
+
+**Zuweisung:** `zuweiseHandwerkerAnPositionenV3` + Legacy `assignAuftragHandwerker*` legen Partner-Aufgabe an und setzen `partner_aufgabe_id`. Dialog: optionale Felder „Titel/Beschreibung für den Partner“ (leer = LV), auch Mehrfach.
+
+**Nachträglich:** `PartnerAufgabeBearbeitenSheet` + `partner-aufgabe-actions.ts` (Titel/Beschreibung, zuordnen/herauslösen).
+
+**Fehler:** Schreibfehler → `COPY_ERROR.saveFailed` / `notFound` / `validation` — kein Erfolgs-Toast bei Fail.
+
+---
+
+## FIX 7 Commit 1: Partner-Aufgabe Datenmodell — 2026-09-26
+
+**Commit-Text:** `feat(crm): Partner-Aufgabe als Gruppierung über Auftragspositionen`
+
+**Migration:** `supabase/migrations/20260926230000_auftrag_partner_aufgaben.sql`
+- Tabelle `auftrag_partner_aufgaben` (titel/beschreibung nullable = LV-Fallback)
+- Spalte `auftrag_positionen.partner_aufgabe_id` (ON DELETE SET NULL)
+- Index `(auftrag_id, handwerker_id)`; Kommentare: Gruppierung, keine Arbeitseinheit
+
+**Typen:** `src/types/supabase.ts` handergänzt (`// HAND ERGÄNZT 2026-09-26`).
+
+**Punkt 5 — Verhältnis zu bestehenden Feldern (kein Halt):**
+| Feld | Künftig | Warum keine Doppelung |
+|---|---|---|
+| `auftrag_handwerker.absprachen` | Freitext-Absprachen CRM↔Partner an der Zuweisung (1 Zeile je Partner/Auftrag) | Kein Titel/Beschreibung-Paket, kein Multi-Position-Grouping |
+| `auftrag_positionen.absprachen` | Freitext-Absprachen an einer einzelnen Position | Bleibt positionsbezogen; Aufgabe ist Überschrift darüber |
+| `auftrag_positionen.notizen_intern` | Nur CRM-intern (nicht Partner-sichtbar) | Partner sieht `titel`/`beschreibung` der Aufgabe bzw. LV |
+| neu: `auftrag_partner_aufgaben.titel` / `.beschreibung` | Partner-Überschrift für N Positionen; leer = LV | Eigene Ebene; mehrere Pakete je Partner möglich |
+
+**Nicht in Scope:** Portal-Anzeige, Angebots-Spiegelung.
+
+---
+
+## FIX 4 Teil 1: Schreiblisten für Partner- und Nebenstatus — 2026-09-26
+
+**Commit-Text:** `fix(crm): Schreiblisten für Partner- und Nebenstatus`
+
+**Listen (Herkunft = tatsächliche Schreibaufrufe):**
+| Helfer | Werte |
+|---|---|
+| auftrag_handwerker | ausstehend, angefragt, warten, akzeptiert, abgelehnt, zugewiesen, ersetzt |
+| angebot_handwerker | ausstehend, angefragt, akzeptiert, abgelehnt, ersetzt |
+| nachtrag | akzeptiert, gesendet, genehmigt |
+| einbehalt | einbehalten, buergschaft, freigegeben |
+| fachdoku_slot | offen, erledigt |
+| handwerker_vertrag | entwurf, pdf_erzeugt, unterschrieben |
+| hw_formular | ausgefuellt, abgeschlossen |
+| partner_dokument | freigegeben, abgelehnt |
+| partner_positions_anfrage | intern, nachtrag, abgelehnt |
+
+**Guard:** `check-status-writes.mjs` bricht ab ohne `*_WRITE_STATUSES` / `assertKnownStatus`.
+
+**beauftragt:** aus Terminal-Liste PDF-Promote und HW-Annahme-Filter entfernt (nicht schreibbar, A4).
+
+---
+
+## FIX 2 Teil 1: Informationsmail an Kunden bei angenommener Regie — 2026-09-26
+
+**Commit-Text:** `feat(crm): Informationsmail an Kunden bei angenommener Regie`
+
+**Datei:** `src/lib/mail/regie-information-kunden-mail.ts` (neu)
+
+**Betreff:** `{Projekt} – Zusätzliche Leistung übernommen` (`regieInformationKundenMailBetreff`)
+
+**Inhalt:** Titel/Beschreibung nach Korrektur, Stunden, Kundensatz, Positionsbetrag, neue Vorgangs-Gesamtsumme, Datum, Portal-Link (`mailKundenPortalTop` + `mailKundenStandardOptions`), Zeile „Fragen zu dieser Position?“
+
+**Nicht enthalten:** Partnersatz/Partnerbetrag/Korrekturbegründung; bei Ablehnung keine Kundenmail (Auslösung Teil 2).
+
+**Nachweis:** `npx tsc --noEmit` grün; Kundenmail ohne `preis_partner` / `stundensatz` / `Begründung`.
+
+---
+
+## FIX 2 Teil 2: Regie-Mails auslösen, Doppelversand ausgeschlossen — 2026-09-26
+
+**Commit-Text:** `feat(crm): Regie-Mails auslösen, Doppelversand ausgeschlossen`
+
+**Auslösung:** `decideWeitereArbeitMitNotify` + `decidePartnerPositionsAnfrageIntern` → `sendRegieEntscheidungMailsAfterWrite` (nach allen Writes).
+
+**Spalten:** `regie_mail_partner_at`, `regie_mail_kunde_at` (Migration `20260926220000_…`, Types handergänzt).
+
+**Claim:** `.is(col, null)` + `select` Zeilenzahl vor `sendMail` (wie `claimMahnungStufe`).
+
+**Punkt 10:** bei Mail-Fehler nach Claim → `console.error('[regie-mail] …')` + Warnung in `DecideResult.message` (Toast).
+
+**Typen:** `regie_entscheidung_partner`, `regie_information` (+ BCC für Kundenmail).
+
+---
+
+## Paket D-CRM Teil 1: Regie-/Positionsbeträge in shared-domain — 2026-09-26
+
+**Commit-Text:** `refactor(crm): Regie- und Positionsbeträge in shared-domain`
+
+**Quelle:** `src/lib/shared-domain/regie-betrag.ts` — rein, Sync-Eintrag in `scripts/shared-domain-files.json`.
+
+**Funktionen:** `regieMengeStunden`, `regieBetragPartner`, `regieBetragKunde`, `positionBetrag`, `summeBetraege`, `roundBetrag2`.
+
+**Umgestellt (rechnen):**
+| Datei | Seite |
+|---|---|
+| `auftrag-positionen-rechnung.ts` | Kunde |
+| `adapters.ts` (erfasstNetto) | Kunde |
+| `lebenszyklus-abrechnung-actions.ts` (Rechnung + Schwelle) | Kunde |
+| `regiebericht-lebenszyklus-actions.ts` | Partner |
+| `api/.../regiebericht/[eintrag_id]/route.ts` | Partner (Formular) |
+| `regie-display.ts` (`regieKundenStundensatz`) | Rate über shared |
+
+**Tests:** `npm run test:regie-betrag` — erfasst vs. Schätzung, leerer Kundensatz, Menge/Satz 0, 95 Min.
+
+**Danach (nicht Teil dieses Commits):** `npm run sync:shared-domain` fürs Portal.
+
+---
+
+## Paket C-CRM Teil 1: Partner-Mail bei Regie-Entscheidung — 2026-09-26
+
+**Commit-Text:** `feat(crm): Mail an Partner bei Regie-Entscheidung`
+
+**Datei:** `src/lib/mail/regie-entscheidung-partner-mail.ts` — `mailHtmlBase` / `buildSubject` / `mailSummaryBlock` / Anrede-Helfer. Kein eigenes HTML-Gerüst.
+
+**Betreffzeilen:**
+| Fall | Betreff |
+|---|---|
+| angenommen | `{Auftrag} – Weitere Arbeit angenommen` |
+| angenommen · korrigiert | `{Auftrag} – Weitere Arbeit angenommen · korrigiert` |
+| abgelehnt | `{Auftrag} – Weitere Arbeit abgelehnt` |
+
+**Audit:** `loadLatestRegieKorrekturPartnerSicht` liest `audit_events` (`regie_korrigiert`); nur Titel/Beschreibung/Stunden/Stundensatz — kein Kundenpreis im Text.
+
+**Auslösung:** Teil 3.
+
+---
+
+## Paket B-CRM Teil 3: Kundenrechnung mit Kundensatz — 2026-09-26
+
+**Commit-Text:** `fix(crm): Kundenrechnung rechnet Regie mit dem Kundensatz`
+
+**Kern:** `regieKundenStundensatz()` in `regie-display.ts` — `stundensatz_kunde` wenn > 0, sonst `stundensatz` (Altdaten).
+
+**Umgestellt (Kundenseite):** `auftrag-positionen-rechnung.ts`, `createRechnungEntwurfFromPositionLebenszyklus`, `pruefeSchwelleWeitereArbeitUndNachtrag`, `decideWeitereArbeitMitNotify` (preis_fix/lohn_fix), CRM-Zeilenbetrag in `adapters.ts`.
+
+**Unangetastet (Partnerseite):** `load-bericht-datenquelle.ts`, Regiebericht-PDF/Template/API/Lebenszyklus, `createPartnerGutschriftEntwurfFromLebenszyklus`.
+
+**Typen:** `AuftragPosition.stundensatz_kunde` in `src/lib/types.ts`.
+
+---
+
+## Paket B-CRM Teil 2: Regie vor Entscheidung bearbeiten — 2026-09-26
+
+**Commit-Text:** `feat(crm): Regie-Position vor der Entscheidung bearbeiten`
+
+**Aufschlag (Punkt 4):** `grep` in `src/lib/` nach `aufschlag|marge|faktor|vk_faktor` — **kein** Regie-/Stunden-Aufschlagsfaktor. Nur Materialaufschlag-Toast bzw. Angebots-/Positions-Margen-Berechnung (Anzeige). Kundensatz wird mit Partnersatz vorbelegt + Feldhinweis „kein Aufschlag hinterlegt“. Entscheidung Belal.
+
+**Audit-Payload `regie_korrigiert`** (`entityType: 'auftrag_position'`):
+```ts
+{
+  begruendung: string | null,
+  // je geändertem Feld (nur wenn geändert):
+  titel?: { alt: string, neu: string },
+  beschreibung?: { alt: string | null, neu: string | null },
+  stunden?: { alt: number | null, neu: number },
+  stundensatz?: { alt: number | null, neu: number },
+  stundensatz_kunde?: { alt: number | null, neu: number },
+}
+```
+Reihenfolge: Position-Update zuerst, dann Audit. Speichern fasst `anerkennung_status` **nicht** an.
+
+**Aufrufstellen:** `AuftragPartnerPositionsPruefungPanel` (Banner, Regie-Zeilen) · `LeistungDrawer` via `LeistungenTab` / `AuftragDetailsTab` (Footer Bearbeiten neben Annehmen/Ablehnen).
+
+**Dateien:** partner-positions-anfrage-actions.ts, write-audit-event.ts, RegiePositionBearbeitenSheet.tsx (neu), AuftragPartnerPositionsPruefungPanel.tsx, LeistungDrawer.tsx, LeistungenTab.tsx, AuftragDetailsTab.tsx, docs/COMMIT-PLAN.md
+
+---
+
+## Paket B-CRM Teil 1: stundensatz_kunde — 2026-09-26
+
+**Commit-Text:** `feat(crm): auftrag_positionen.stundensatz_kunde`
+
+**Migration:** `supabase/migrations/20260926210000_auftrag_positionen_stundensatz_kunde.sql` — Spalte `stundensatz_kunde numeric null`, Kommentar Kundensatz vs. Partnersatz `stundensatz`. Kein Default, kein Backfill.
+
+**Typen:** `src/types/supabase.ts` bei `auftrag_positionen` Row/Insert/Update **von Hand ergänzt** (Zugangstoken fehlt für `gen types`). Kommentar `HAND ERGÄNZT 2026-09-26` — beim nächsten Neuerzeugen entfällt die Zeile. Kein Vorbild für weitere Handänderungen.
+
+**Nicht:** Spalten-Guard / Grundlinie (bleibt rot, anderer Auftrag).
+
+---
+
+## Auftrag A Teil 4: Auftrag-Korrektur prüft Auftrag — 2026-09-26
+
+**Commit-Text:** `fix(crm): Auftrag-Korrektur prüft den Auftrag statt des Angebots`
+
+**Konstante:** `RECHNUNG_GESTELLT_STATUSES` in `src/lib/status/write-rechnung-status.ts` (neben WRITE).
+
+**Gate:** `auftragDarfKorrektur` / `loadAuftragKorrekturKontext` — Auftrag vorhanden + keine gestellte Kundenrechnung. `angebotDarfFuerAuftragKorrektur` entfernt; kein `beauftragt` mehr in Erlaubnisliste.
+
+| Fall | Ergebnis |
+|---|---|
+| Normalweg, Kunde angenommen, Auftrag da, keine RE | bearbeitbar |
+| Angebot beim Kunden, kein Auftrag | gesperrt (`auftragKorrekturKeinAuftrag`) |
+| Direktauftrag (handwerker_akzeptiert), Auftrag da | bearbeitbar |
+| Rechnung gestellt | gesperrt (`auftragKorrekturRechnungGestellt`); CTA ausgeblendet |
+
+**Aufrufstellen:** wizard-actions load/save, angebote/actions updateAngebot, angebot-korrektur-actions, AuftragDetailClient (CTA ausgeblendet statt deaktiviert). Nachtrag: `ignoreGestellteRechnung`.
+
+**Dateien:** write-rechnung-status.ts, auftrag-korrektur-gate.ts, auftrag-korrektur.ts, angebot-wizard-types.ts, copy/errors.ts, wizard-actions.ts, actions.ts, angebot-korrektur-actions.ts, AuftragDetailClient.tsx, docs/*
+
+---
+
+## Auftrag A Teil 3: Regie-Annahme bricht bei DB-Fehler ab — 2026-09-26
+
+**Commit-Text:** `fix(crm): Regie-Annahme bricht bei DB-Fehler ab statt still weiterzulaufen`
+
+**Tragend (log + Abbruch mit COPY_ERROR.saveFailed):** Positions-Insert; Angebot lesen/schreiben; Anfrage-Status intern/nachtrag/abgelehnt; Regie Preis-Update; Position laden vor Annahme; resolveAngebot bei Fehler.
+
+**Begleitend (log + Kommentar, weiter):** Listen-Reads; Fotos; Auftrag-Titel; Gewerk/sort_order-Defaults; Auftrag↔Angebot-Link; Notify/Audit/Timeline nach Erfolg; Pos-Load nach Ablehnung.
+
+**Unteilbarkeit:** Reihenfolge (keine DB-Transaktion) — Position/Preis + Angebot zuerst, Status `intern`/`anerkannt` zuletzt.
+
+**UI:** `AuftragPartnerPositionsPruefungPanel` / `AuftragDetailsTab` zeigen bei `!r.ok` Fehler-Toast, kein Erfolg „Angenommen“.
+
+**Nebenbei:** `gesamt_preis` → `gesamt_fix` im Angebot-Update (Ursache stiller Write-Fails).
+
+**Dateien:** partner-positions-anfrage-actions.ts, lib/copy/errors.ts, docs/*
+
+---
+
+## Auftrag A Teil 2: Guard DB-Spalten — 2026-09-26
+
+**Commit-Text:** `feat(crm+portal): Guard gegen unbekannte DB-Spalten in Abfragen`
+
+**Neu:** `scripts/check-db-spalten.mjs` + `scripts/db-spalten-allowlist.txt` (0 Einträge, max 0).
+Wahrheitsquelle: `src/types/supabase.ts` (Tables+Views Row). Eingeklinkt als `check:db-spalten` und in `npm run build` vor CSS-Werte-Guard.
+
+**CRM-Lauf:** geprüft 3816 · übersprungen 731 · Verstöße 65 (34 eindeutige Tabelle.Spalte).
+Übersprungen u.a.: from_dynamic 273, write_non_literal 165, select_star 152, from_table_not_in_schema 45, write_partial_spread 33, select_const_unresolved 22, filter_embedded_path 3.
+
+**Portal-Lauf:** lokale Typen fehlen → CRM-Sibling. geprüft 2169 · übersprungen 338 · Verstöße 26 (20 eindeutig). Darunter erneut `preis_kunde`.
+
+**Verstöße nicht repariert** — Belal entscheidet. Guard bricht mit Exit 1 ab → Build ist rot bis Entscheidung.
+
+**Dateien:** scripts/check-db-spalten.mjs, scripts/db-spalten-allowlist.txt, package.json, docs/*
+
+---
+
+## Auftrag A Teil 1: preis_kunde → preis_fix — 2026-09-26
+
+**Commit-Text:** `fix(crm): preis_kunde existiert nicht — auf preis_fix`
+
+**Befund:** `preis_kunde` stand in Select/Insert/Feldzugriffen, existiert aber in keiner Migration und nicht in `src/types/supabase.ts`. Kundenpreis der Auftragsposition ist `preis_fix`.
+
+**Fix:** Ersetzt in allen sechs Treffer-Dateien; `grep` auf `preis_kunde` in `src/` = 0.
+
+**read-document.ts:** Fallback-Reihenfolge `row.preis ?? row.preis_fix ?? row.lohn_fix` — `preis` für Angebots-/Rechnungs-JSON, `preis_fix` für Auftragspositionen (Kundenpreis), `lohn_fix` als letzter Lohn-Fallback. Fachlich Kundenpreis, nicht Partnerpreis.
+
+**Dateien:**
+- `src/app/(dashboard)/auftraege/partner-positions-anfrage-actions.ts` — Insert/Select/Update
+- `src/lib/copilot/crm-registry.ts`, `entity-snapshot.ts`, `crm-actions.ts`, `read-document.ts`
+- `docs/COMMIT-PLAN.md`, `docs/TODO-ENTWICKLUNG.md`
+
+---
+
 ## Korrektur-UI: Verlauf + eine Vorgangs-Card — 2026-09-21
 
 **Commit-Text:** `fix(ui): Korrektur-Verlauf wie Phasenliste; Vorgänge ohne Storno-Card`

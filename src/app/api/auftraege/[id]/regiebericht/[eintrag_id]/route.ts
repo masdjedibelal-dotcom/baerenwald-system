@@ -7,6 +7,7 @@ import { renderRegieberichtPdfBuffer } from '@/lib/pdf/regiebericht-pdf'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import type { FormularEintrag, FormularTemplate, Kunde } from '@/lib/types'
+import { regieBetragPartner, roundBetrag2 } from '@/lib/shared-domain/regie-betrag'
 
 export async function GET(
   _request: Request,
@@ -76,7 +77,7 @@ export async function GET(
   const matDb = eintrag.material_kosten != null ? Number(eintrag.material_kosten) : null
   const matDaten = num(daten.material_kosten)
   const materialNetto = matDb != null && !Number.isNaN(matDb) ? matDb : matDaten
-  const lohnNetto = stunden * stundensatz
+  const lohnNetto = roundBetrag2(regieBetragPartner(stunden, stundensatz))
   const netto = lohnNetto + materialNetto
   const mwst = netto * 0.19
   const brutto = netto + mwst

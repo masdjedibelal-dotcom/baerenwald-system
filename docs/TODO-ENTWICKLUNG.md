@@ -159,3 +159,31 @@ Offene Entscheidungen: `docs/OFFENE-FRAGEN.md`.
 - MockBtn-Karten (doctype/Neu/Pos-Add/KPI): `height:auto` + `white-space:normal` gegen `.btn` 32px/nowrap.
 - PosTable-Checkbox: nur Rahmenwert korrigiert (kein MockCheckbox — visuelle Select-Box in DnD-Zeile).
 
+## Auftrag A — Regie-Fundament (2026-09-26)
+
+### Teil 1 — erledigt (Commit vorbereiten)
+- `preis_kunde` → `preis_fix` in 6 Dateien (Select/Insert/Zugriff).
+- Nachweis: `preis_kunde` in `src/` = 0 Treffer; `npx tsc --noEmit` grün; `npm run build` grün.
+- `read-document.ts`: `preis ?? preis_fix ?? lohn_fix` (Kundenpreis-Fallbacks, kein Partnerpreis).
+- Teil 2–4 noch offen; nach jedem Teil eigener Commit + Halt.
+
+### Teil 2 — Guard fertig, Verstöße offen (Commit vorbereiten)
+- `scripts/check-db-spalten.mjs` + Allowlist max 0; `check:db-spalten` + Build-Kette.
+- CRM: geprüft 3816 / übersprungen 731 / Verstöße 65 (34 unique). Portal: 2169 / 338 / 26 (20 unique); Typen via CRM-Sibling.
+- Smoke: `.select('…, gibtesnicht')` und `.eq('gibtesnicht_eq', …)` erkannt, zurückgenommen.
+- Verstöße nur gelistet, nicht repariert — Build rot bis Belal entscheidet.
+
+### Teil 3 — erledigt (Commit vorbereiten)
+- 20 logDbError bewertet: tragend mit Abbruch + COPY_ERROR.saveFailed; begleitend mit Begründung.
+- Unteilbarkeit per Reihenfolge (Status zuletzt). UI meldet bei Fehler nicht „Angenommen“.
+
+### Teil 4 — erledigt (Commit vorbereiten)
+- Korrektur-Gate am Auftrag + `RECHNUNG_GESTELLT_STATUSES`; Angebotsstatus-Prüfung entfernt.
+- Vier Fälle: Normalweg/Direktauftrag bearbeitbar; kein Auftrag / RE gestellt gesperrt.
+- CTA „Auftrag bearbeiten“ bei gestellter Rechnung ausgeblendet.
+- Auftrag A (CRM) damit abgeschlossen; Portal-Nachzug `preis_kunde` separat (Teil 5).
+
+## Paket B-CRM (2026-09-26)
+
+### Teil 1 — erledigt
+Migration + Hand-Ergänzung `stundensatz_kunde` in supabase.ts (Notbehelf bis gen types).

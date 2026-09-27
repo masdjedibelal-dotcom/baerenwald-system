@@ -40,6 +40,7 @@ export function LeistungDrawer({
   actions = [],
   pruefungPending = false,
   onNachtragEntscheiden,
+  onRegieBearbeiten,
 }: {
   open: boolean
   onClose: () => void
@@ -47,6 +48,8 @@ export function LeistungDrawer({
   actions?: LeistungDrawerAction[]
   pruefungPending?: boolean
   onNachtragEntscheiden?: (status: 'anerkannt' | 'abgelehnt') => void
+  /** Regie in Prüfung: dritte Aktion neben Annehmen/Ablehnen */
+  onRegieBearbeiten?: () => void
   /** @deprecated */
   secondaryHint?: string | null
 }) {
@@ -98,6 +101,23 @@ export function LeistungDrawer({
       }
     : null
   const footerSecondary = brauchtFreigabe
+    ? onRegieBearbeiten
+      ? {
+          label: 'Bearbeiten',
+          onClick: () => {
+            onClose()
+            onRegieBearbeiten()
+          },
+          disabled: pruefungPending,
+          kind: 'secondary' as const,
+        }
+      : {
+          label: 'Ablehnen',
+          onClick: () => onNachtragEntscheiden?.('abgelehnt'),
+          disabled: pruefungPending,
+        }
+    : null
+  const footerDanger = brauchtFreigabe && onRegieBearbeiten
     ? {
         label: 'Ablehnen',
         onClick: () => onNachtragEntscheiden?.('abgelehnt'),
@@ -115,6 +135,7 @@ export function LeistungDrawer({
       headerEnd={headerEnd}
       primary={footerPrimary}
       secondary={footerSecondary}
+      danger={footerDanger}
     >
       {brauchtFreigabe ? (
         <Section title="Nachtrag zur Freigabe" icon="clipboard-list">
@@ -179,6 +200,14 @@ export function LeistungDrawer({
           ) : null}
           {row.zeitraumLabel ? (
             <DetailProp label="Zeitraum">{row.zeitraumLabel}</DetailProp>
+          ) : null}
+          {row.partnerSiehtLabel ? (
+            <DetailProp label="Partner sieht">
+              {row.partnerSiehtLabel}
+              {!row.partnerAufgabeTitel ? (
+                <span className="text-bw-text-muted"> (LV)</span>
+              ) : null}
+            </DetailProp>
           ) : null}
         </div>
       </Section>

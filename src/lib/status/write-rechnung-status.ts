@@ -25,6 +25,25 @@ export const RECHNUNG_WRITE_STATUSES = [
 
 export type RechnungWriteStatus = (typeof RECHNUNG_WRITE_STATUSES)[number]
 
+/**
+ * Kundenrechnung ist „gestellt“ (nicht mehr nur Entwurf).
+ * Entwürfe / Korrektur-Entwürfe / ausstehend / storniert zählen nicht.
+ */
+export const RECHNUNG_GESTELLT_STATUSES = [
+  'gesendet',
+  'bezahlt',
+  'ueberfaellig',
+  'ueberwiesen',
+  'korrektur_versendet',
+] as const
+
+export type RechnungGestelltStatus = (typeof RECHNUNG_GESTELLT_STATUSES)[number]
+
+export function istRechnungGestellt(status: string): boolean {
+  const key = String(status ?? '').trim().toLowerCase()
+  return (RECHNUNG_GESTELLT_STATUSES as readonly string[]).includes(key)
+}
+
 export function planRechnungStatusWrite(
   status: string,
   extra: Record<string, unknown> = {},

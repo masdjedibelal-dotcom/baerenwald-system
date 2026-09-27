@@ -787,13 +787,24 @@ export type AuftragPosition = {
   /** festpreis | aufwand */
   verguetung?: string | null
   geschaetzt_std?: number | null
+  /** Partnersatz €/h netto (Handwerker) */
   stundensatz?: number | null
+  /**
+   * Kundensatz €/h netto. Leer → Abrechnung fällt auf `stundensatz` zurück.
+   * HAND-Feld parallel zu supabase.ts bis gen types.
+   */
+  stundensatz_kunde?: number | null
   gestartet_am?: string | null
   erledigt_am?: string | null
   /** Weitere Arbeit / Regie: nicht_noetig | in_pruefung | anerkannt | abgelehnt */
   anerkennung_status?: string | null
   absprachen?: string | null
   notizen_intern?: string | null
+  /**
+   * Optionale Partner-Aufgabe (Gruppierung). Leer/null = keine Überschrift-Gruppe.
+   * HAND-Feld parallel zu supabase.ts bis gen types.
+   */
+  partner_aufgabe_id?: string | null
   sort_order: number | null
   created_at?: string | null
   handwerker?: { id?: string; name: string; email?: string | null; telefon?: string | null } | null
@@ -985,11 +996,23 @@ export type Eingangsrechnung = {
   created_at?: string
 }
 
+export type AuftragPartnerAufgabe = {
+  id: string
+  auftrag_id: string
+  handwerker_id: string
+  titel: string | null
+  beschreibung: string | null
+  sort_order?: number | null
+  created_at?: string
+}
+
 export type AuftragDetail = Auftrag & {
   kunden?: Kunde | null
   angebote?: (Angebot & { positionen?: unknown }) | null
   auftrag_handwerker?: AuftragHandwerkerRow[] | null
   auftrag_positionen?: AuftragPosition[] | null
+  /** Partner-Aufgaben (Gruppierung) — parallel geladen */
+  auftrag_partner_aufgaben?: AuftragPartnerAufgabe[] | null
   formular_eintraege?: FormularEintrag[] | null
   kalender_termine?: KalenderTermin[] | null
   auftrag_timeline?: AuftragTimelineEvent[] | null

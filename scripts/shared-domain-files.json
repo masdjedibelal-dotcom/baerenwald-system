@@ -66,8 +66,18 @@
       "portal": "src/lib/shared-domain/html-to-plain-text.ts"
     },
     {
+      "crm": "src/lib/shared-domain/regie-betrag.ts",
+      "portal": "src/lib/shared-domain/regie-betrag.ts"
+    },
+    {
       "crm": "src/lib/media/optimize-image-for-upload.ts",
       "portal": "src/lib/media/optimize-image-for-upload.ts"
+    },
+    {
+      "crm": "src/types/supabase.ts",
+      "portal": "src/types/supabase.ts",
+      "rewrite": false,
+      "note": "Generierte DB-Typen — keine Import-Rewrite; Portal-Guard check-db-spalten."
     }
   ],
   "planned": [

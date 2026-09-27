@@ -53,7 +53,7 @@ function positionenKurz(positionen: unknown): Array<Record<string, unknown>> {
       beschreibung: row.beschreibung ?? row.notiz_extern ?? null,
       menge: row.menge ?? null,
       einheit: row.einheit ?? null,
-      preis: row.preis ?? row.preis_kunde ?? row.lohn_fix ?? null,
+      preis: row.preis ?? row.preis_fix ?? row.lohn_fix ?? null,
       gewerk: row.gewerk_name ?? row.gewerk_slug ?? null,
     }
   })

@@ -5,10 +5,18 @@ Regel: Agent entscheidet nicht. Unklarheiten hier eintragen und mit dem nächste
 | Datum | Thema | Frage | Block |
 |-------|--------|-------|-------|
 | 2026-09-20 | N7 Partner planer/gpt | Sections `planer` und `gpt` sind im Partner-Portal per Deep-Link erreichbar, aber nicht in `PORTAL_NAV_ITEMS`. Option A: Menüpunkte „Planer“ / „GPT“ ergänzen. Option B: Routes/Sections entfernen (nur Deep-Link tot). Welche Variante? | N |
+| 2026-09-26 | Partner-Schicht Titel/Text bei Zuweisung | Beim Zuweisen (einzeln/mehrere) optional Partner-Titel + Partner-Beschreibung; leer = LV-Text der Positionen. CRM behält Einzelpositionen; Partner sieht eine Aufgabe. **Speicherort:** A) an `auftrag_handwerker` / `angebot_handwerker` (`partner_titel`, `partner_beschreibung`) — eine Formulierung für die Gruppe; B) Override-Felder pro `auftrag_positionen` — fein, aber kein „eine Sicht“. **Scope:** nur Auftrag, oder auch Angebots-Zuweisung? Heute überschreibt das Einzel-Sheet oft Kunden-`leistung_name` — das soll weg. Entscheidung A/B + Scope, dann eigener Auftrag. | — |
 
 *(Prod-Migrationen 19.09. + Deploy-Reihenfolge: `docs/ABSCHLUSS.md` — Manuell für Belal.)*
 
 *(Weitere Zeilen bei Bedarf anhängen.)*
+
+### Partner-Schicht Zuweisung (Kurz, 2026-09-26)
+
+- **Ziel:** LV/Detail bleibt für Kunde (Angebot/Rechnung); Partner bekommt optional andere Formulierung; bei Mehrfach-Zuweisung eine Partner-Aufgabe über `positionIds[]`.
+- **Nicht:** Kundenfelder überschreiben; keine echte Zusammenlegung der Abrechnungspositionen.
+- **Empfehlung Agent (nicht entschieden):** Variante **A** (Felder an der Zuweisung) + Scope **Auftrag zuerst**, Angebot später spiegeln.
+- **Offen für Belal:** A oder B? Nur Auftrag oder auch Angebot?
 
 ### Erledigt 2026-09-20 (Freigaben O1–O6)
 

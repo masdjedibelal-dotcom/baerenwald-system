@@ -47,6 +47,7 @@ const KUNDE_MAIL_BCC_TYPEN = new Set([
   'freitext_auftrag',
   'freitext_rechnung',
   'freitext_kunde',
+  'regie_information',
 ])
 
 export interface SendMailOptions {

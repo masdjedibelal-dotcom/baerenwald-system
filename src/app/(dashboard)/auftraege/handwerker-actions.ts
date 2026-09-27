@@ -23,6 +23,8 @@ import {
   writeAuftragHandwerkerStatus,
 } from '@/lib/status/write-auftrag-handwerker-status'
 import { planAngebotHandwerkerStatusWrite } from '@/lib/status/write-angebot-handwerker-status'
+import { createPartnerAufgabeAndLinkPositions } from '@/lib/auftraege/partner-aufgabe-write'
+import { COPY_ERROR } from '@/lib/copy/errors'
 export { listHandwerkerFuerGewerk }
 
 type HandwerkerRow = {
@@ -247,6 +249,7 @@ export async function assignAuftragHandwerkerGewerk(input: {
   }
 
   const { data: posRows } = await posQuery
+  const linkedPosIds: string[] = []
   if (posRows?.length) {
     for (const p of posRows) {
       const patch: Record<string, unknown> = {
@@ -257,8 +260,18 @@ export async function assignAuftragHandwerkerGewerk(input: {
       // preis_partner nur aus EK/Kondition — nie lohn_fix+material_fix (Kunden-VK)
       const { error: posErr } = await supabase.from('auftrag_positionen').update(patch).eq('id', p.id as string)
       if (posErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', posErr)
-      if (posErr) return { ok: false, message: posErr.message }
+      if (posErr) return { ok: false, message: COPY_ERROR.saveFailed }
+      linkedPosIds.push(String(p.id))
     }
+  }
+
+  if (linkedPosIds.length) {
+    const aufgabe = await createPartnerAufgabeAndLinkPositions(supabase, {
+      auftragId: input.auftragId,
+      handwerkerId: input.handwerkerId,
+      positionIds: linkedPosIds,
+    })
+    if (!aufgabe.ok) return aufgabe
   }
 
   await logHwTimeline(
@@ -375,7 +388,14 @@ export async function assignAuftragHandwerkerPosition(input: {
     .update(posPatch)
     .eq('id', input.positionId)
   if (error3) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', error3)
-  if (error3) return { ok: false, message: error3.message }
+  if (error3) return { ok: false, message: COPY_ERROR.saveFailed }
+
+  const aufgabe = await createPartnerAufgabeAndLinkPositions(supabase, {
+    auftragId: input.auftragId,
+    handwerkerId: input.handwerkerId,
+    positionIds: [input.positionId],
+  })
+  if (!aufgabe.ok) return aufgabe
 
   if (pos.gewerk_slug) {
     const { data: gw, error } = await supabase

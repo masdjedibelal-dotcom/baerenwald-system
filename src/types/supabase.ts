@@ -1345,6 +1345,53 @@ export type Database = {
           },
         ]
       }
+      // HAND ERGÄNZT 2026-09-26 (Migration auftrag_partner_aufgaben) — beim nächsten
+      // `supabase gen types` entfällt dieser Block. Nicht als Vorbild nehmen.
+      auftrag_partner_aufgaben: {
+        Row: {
+          id: string
+          auftrag_id: string
+          handwerker_id: string
+          titel: string | null
+          beschreibung: string | null
+          sort_order: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          auftrag_id: string
+          handwerker_id: string
+          titel?: string | null
+          beschreibung?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          auftrag_id?: string
+          handwerker_id?: string
+          titel?: string | null
+          beschreibung?: string | null
+          sort_order?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auftrag_partner_aufgaben_auftrag_id_fkey"
+            columns: ["auftrag_id"]
+            isOneToOne: false
+            referencedRelation: "auftraege"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auftrag_partner_aufgaben_handwerker_id_fkey"
+            columns: ["handwerker_id"]
+            isOneToOne: false
+            referencedRelation: "handwerker"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auftrag_positionen: {
         Row: {
           absprachen: string | null
@@ -1374,6 +1421,8 @@ export type Database = {
           menge: number | null
           notizen_intern: string | null
           oberkategorie: string | null
+          // HAND ERGÄNZT 2026-09-26 (Migration auftrag_partner_aufgaben)
+          partner_aufgabe_id: string | null
           preis_alt: number | null
           preis_fix: number | null
           preis_partner: number | null
@@ -1381,6 +1430,13 @@ export type Database = {
           sort_order: number | null
           start_datum: string | null
           stundensatz: number | null
+          // HAND ERGÄNZT 2026-09-26 (Migration stundensatz_kunde) — beim nächsten
+          // `supabase gen types` entfällt diese Zeile. Nicht als Vorbild nehmen.
+          stundensatz_kunde: number | null
+          // HAND ERGÄNZT 2026-09-26 (Migration regie_mail_*_at)
+          regie_mail_partner_at: string | null
+          // HAND ERGÄNZT 2026-09-26 (Migration regie_mail_*_at)
+          regie_mail_kunde_at: string | null
           typ: string | null
           unterkategorie: string | null
           verguetung: string | null
@@ -1413,6 +1469,8 @@ export type Database = {
           menge?: number | null
           notizen_intern?: string | null
           oberkategorie?: string | null
+          // HAND ERGÄNZT 2026-09-26 (Migration auftrag_partner_aufgaben)
+          partner_aufgabe_id?: string | null
           preis_alt?: number | null
           preis_fix?: number | null
           preis_partner?: number | null
@@ -1420,6 +1478,13 @@ export type Database = {
           sort_order?: number | null
           start_datum?: string | null
           stundensatz?: number | null
+          // HAND ERGÄNZT 2026-09-26 (Migration stundensatz_kunde) — beim nächsten
+          // `supabase gen types` entfällt diese Zeile. Nicht als Vorbild nehmen.
+          stundensatz_kunde?: number | null
+          // HAND ERGÄNZT 2026-09-26 (Migration regie_mail_*_at)
+          regie_mail_partner_at?: string | null
+          // HAND ERGÄNZT 2026-09-26 (Migration regie_mail_*_at)
+          regie_mail_kunde_at?: string | null
           typ?: string | null
           unterkategorie?: string | null
           verguetung?: string | null
@@ -1452,6 +1517,8 @@ export type Database = {
           menge?: number | null
           notizen_intern?: string | null
           oberkategorie?: string | null
+          // HAND ERGÄNZT 2026-09-26 (Migration auftrag_partner_aufgaben)
+          partner_aufgabe_id?: string | null
           preis_alt?: number | null
           preis_fix?: number | null
           preis_partner?: number | null
@@ -1459,6 +1526,13 @@ export type Database = {
           sort_order?: number | null
           start_datum?: string | null
           stundensatz?: number | null
+          // HAND ERGÄNZT 2026-09-26 (Migration stundensatz_kunde) — beim nächsten
+          // `supabase gen types` entfällt diese Zeile. Nicht als Vorbild nehmen.
+          stundensatz_kunde?: number | null
+          // HAND ERGÄNZT 2026-09-26 (Migration regie_mail_*_at)
+          regie_mail_partner_at?: string | null
+          // HAND ERGÄNZT 2026-09-26 (Migration regie_mail_*_at)
+          regie_mail_kunde_at?: string | null
           typ?: string | null
           unterkategorie?: string | null
           verguetung?: string | null
@@ -1483,6 +1557,14 @@ export type Database = {
             columns: ["handwerker_id"]
             isOneToOne: false
             referencedRelation: "handwerker_compliance_status"
+            referencedColumns: ["id"]
+          },
+          // HAND ERGÄNZT 2026-09-26 (Migration auftrag_partner_aufgaben)
+          {
+            foreignKeyName: "auftrag_positionen_partner_aufgabe_id_fkey"
+            columns: ["partner_aufgabe_id"]
+            isOneToOne: false
+            referencedRelation: "auftrag_partner_aufgaben"
             referencedColumns: ["id"]
           },
         ]

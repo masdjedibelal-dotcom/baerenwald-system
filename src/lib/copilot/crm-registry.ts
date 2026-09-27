@@ -539,7 +539,7 @@ export const CRM_ACTION_REGISTRY: Record<
         const { data: posRows, error } = await supabaseAdmin
           .from('auftrag_positionen')
           .select(
-            'id, leistung_name, beschreibung, menge, einheit, preis_kunde, gewerk_name, gewerk_slug, sort_order'
+            'id, leistung_name, beschreibung, menge, einheit, preis_fix, gewerk_name, gewerk_slug, sort_order'
           )
           .eq('auftrag_id', auftragId)
           .order('sort_order', { ascending: true })
@@ -550,7 +550,7 @@ export const CRM_ACTION_REGISTRY: Record<
           beschreibung: row.beschreibung,
           menge: row.menge ?? 1,
           einheit: row.einheit ?? 'Stk.',
-          preis: Number(row.preis_kunde) || 0,
+          preis: Number(row.preis_fix) || 0,
           gewerk_name: row.gewerk_name,
           gewerk_slug: row.gewerk_slug,
         }))

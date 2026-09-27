@@ -1,5 +1,9 @@
 import { splitNettoStueck, type KostenartZeile } from '@/lib/angebot-kosten-split'
 import { defaultAngebotRechtshinweise } from '@/lib/angebote/angebot-rechtshinweise'
+import {
+  auftragDarfKorrektur,
+  type AuftragKorrekturKontext,
+} from '@/lib/angebote/auftrag-korrektur-gate'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
   defaultAngebotEinleitungText,
@@ -438,7 +442,7 @@ export const STANDARD_WICHTIGE_HINWEISE_PROJEKT =
  * Inkl. `gesendet_kunde`: Korrektur solange HV/Kunde noch nicht reagiert hat.
  * Portal behält die letzte versendete Fassung (`positionen_portal` / PDF) bis
  * erneut „Versenden“ (Mail + Snapshot-Update).
- * Nicht `kunde_akzeptiert` / `angenommen`: nur über AG-Korrektur (`forAuftragKorrektur`).
+ * Angenommenes Angebot: nur über AG-Korrektur (`forAuftragKorrektur` + Auftrag-Gate).
  */
 const ANGEBOT_WIZARD_BEARBEITBAR: readonly AngebotStatus[] = [
   'entwurf',
@@ -465,21 +469,16 @@ export function angebotWartetAufKundenentscheidung(status: string): boolean {
   )
 }
 
-/**
- * Auftrags-Korrektur („Auftrag bearbeiten“): nur angenommenes Angebot.
- * Abgelehnt / ersetzt / storniert / noch offen beim Kunden → gesperrt.
- */
-export function angebotDarfFuerAuftragKorrektur(status: string): boolean {
-  const st = String(status ?? '').toLowerCase()
-  return st === 'kunde_akzeptiert' || st === 'angenommen' || st === 'beauftragt'
-}
-
-/** Wizard-Load/Save: Entwurf… oder angenommen nur mit AG-Korrektur-Flag. */
+/** Wizard-Load/Save: Entwurf… oder AG-Korrektur nur mit Auftrag-Kontext (nicht Angebotsstatus). */
 export function angebotStatusErlaubtImWizard(
   status: string,
-  opts?: { forAuftragKorrektur?: boolean }
+  opts?: { forAuftragKorrektur?: boolean; auftragKorrektur?: AuftragKorrekturKontext }
 ): boolean {
-  if (opts?.forAuftragKorrektur) return angebotDarfFuerAuftragKorrektur(status)
+  if (opts?.forAuftragKorrektur) {
+    return auftragDarfKorrektur(
+      opts.auftragKorrektur ?? { auftragId: null, hatGestellteRechnung: false }
+    )
+  }
   return angebotDarfImWizardBearbeitetWerden(status)
 }
 

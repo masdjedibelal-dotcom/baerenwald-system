@@ -220,7 +220,7 @@ export async function acceptHandwerkerZuweisung(
       .from('angebote')
       .update(patchHwAkzeptiert)
       .eq('id', angebotId)
-      .not('status', 'in', '("kunde_akzeptiert","beauftragt","storniert","abgelehnt")')
+      .not('status', 'in', '("kunde_akzeptiert","storniert","abgelehnt")')
     if (__dbErr1) logDbError('lib/angebote/handwerker-annahme:angebote', __dbErr1)
   }
 

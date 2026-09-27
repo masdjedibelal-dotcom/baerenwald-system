@@ -9,7 +9,6 @@ import { C } from '@/lib/tokens/colors'
 import { useEffect, useMemo, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
-import { updateAuftragPositionSteuerung } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import {
   sendAuftragLeistungenAnHandwerkerV3,
   zuweiseHandwerkerAnPositionenV3,
@@ -102,6 +101,9 @@ auftragId?: string | null
 
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
+  /** Auftrag: optionaler Partner-Text — leer = LV-Fallback. Nie leistung_name. */
+  const [partnerTitel, setPartnerTitel] = useState('')
+  const [partnerBeschreibung, setPartnerBeschreibung] = useState('')
   const [partnerNetto, setPartnerNetto] = useState('')
   /** Mehrfachzuweisung: EK pro Positions-ID */
   const [ekByPos, setEkByPos] = useState<Record<string, string>>({})
@@ -126,11 +128,22 @@ auftragId?: string | null
       setPickerOpen(false)
       setDirty(false)
       setEkByPos({})
+      setPartnerTitel('')
+      setPartnerBeschreibung('')
       return
     }
     if (!sample) return
-    setTitel(sample.leistung_name?.trim() || '')
-    setBeschreibung(richTextToPlain(sample.beschreibung ?? '') || '')
+    // Angebot (Legacy): LV-Vorbelegung für Titel/Beschreibung bleibt bis Angebots-Spiegelung.
+    // Auftrag: Partnerfelder bewusst leer — sonst unklar, ob Text gesetzt wurde.
+    if (isAngebotOnly) {
+      setTitel(sample.leistung_name?.trim() || '')
+      setBeschreibung(richTextToPlain(sample.beschreibung ?? '') || '')
+    } else {
+      setTitel('')
+      setBeschreibung('')
+      setPartnerTitel('')
+      setPartnerBeschreibung('')
+    }
     setPartnerNetto(numInput(sample.preis_partner))
     setEkByPos(
       Object.fromEntries(
@@ -169,7 +182,7 @@ auftragId?: string | null
     setDirty(false)
     // selectedPositions nur über IDs — sonst Endlosschleife bei neuer Array-Referenz
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync beim Öffnen / Sample-Wechsel
-  }, [open, sample?.id, positionIds.join('|')])
+  }, [open, sample?.id, positionIds.join('|'), isAngebotOnly])
 
   function removeHw(id: string) {
     setDirty(true)
@@ -192,7 +205,7 @@ auftragId?: string | null
       applyFieldErrors({ _form: TOAST.bitte_mindestens_einen_partner_auswaehlen })
       return
     }
-    const primaryHw = ids[0]
+    const primaryHw = ids[0]!
 
     let ekNum: number | null = null
     let ekByPositionId: Record<string, number> | undefined
@@ -247,73 +260,97 @@ auftragId?: string | null
     dismissKiOverSheet()
     setPickerOpen(false)
 
+    if (isAngebotOnly && angebotId) {
+      confirmAngebotZuweisung({
+        angebotId,
+        primaryHw,
+        ekNum,
+        ekByPositionId,
+      })
+      return
+    }
+
+    if (!auftragId) {
+      toast.error(TOAST.auftrag_fehlt)
+      return
+    }
+
+    confirmAuftragZuweisung({
+      auftragId,
+      primaryHw,
+      ekNum,
+      ekByPositionId,
+      vonYmd,
+      bisYmd,
+    })
+  }
+
+  /** Angebot-Pfad (Legacy): darf leistung_name setzen — getrennt vom Auftrag-Partnertext. */
+  function confirmAngebotZuweisung(args: {
+    angebotId: string
+    primaryHw: string
+    ekNum: number | null
+    ekByPositionId?: Record<string, number>
+  }) {
     startTransition(async () => {
-      if (isAngebotOnly && angebotId) {
-        const assign = await zuweiseHandwerkerAnAngebotPositionen({
-          angebotId,
-          positionIds,
-          handwerkerId: primaryHw,
-          ekNetto: isSingle ? ekNum : null,
-          ekNettoByPositionId: ekByPositionId,
-          leistung_name: isSingle ? titel.trim() || sample?.leistung_name : undefined,
-          beschreibung: isSingle ? beschreibung.trim() || null : undefined,
-          aufgabe_notiz: isSingle
-            ? beschreibung.trim() || null
-            : selectedPositions
-                .map((p) => p.leistung_name?.trim() || 'Leistung')
-                .join(', '),
-        })
-        if (!assign.ok) {
-          toast.systemError(assign)
-          return
-        }
-
-        const sent = await sendAngebotLeistungenAnHandwerkerV3({
-          angebotId,
-          zuweisungIds: assign.zuweisungIds,
-        })
-        if (!sent.ok) {
-          toast.systemError(sent)
-          return
-        }
-
-        toast.success(
-          sent.gesendet === 1
-            ? 'Anfrage an Partner gesendet'
-            : `${sent.gesendet} Anfragen an Partner gesendet`
-        )
-        onDone()
-        onClose()
-        return
-      }
-
-      if (!auftragId) {
-        toast.error(TOAST.auftrag_fehlt)
-        return
-      }
-
-      if (isSingle && sample && ekNum != null) {
-        const patch = await updateAuftragPositionSteuerung(sample.id, auftragId, {
-          leistung_name: titel.trim() || sample.leistung_name,
-          beschreibung: beschreibung.trim() || null,
-          preis_partner: ekNum,
-          start_datum: vonYmd,
-          end_datum: bisYmd,
-        })
-        if (!patch.ok) {
-          toast.systemError(patch)
-          return
-        }
-      }
-
-      const assign = await zuweiseHandwerkerAnPositionenV3({
-        auftragId,
+      const assign = await zuweiseHandwerkerAnAngebotPositionen({
+        angebotId: args.angebotId,
         positionIds,
-        handwerkerId: primaryHw,
-        ekNetto: isSingle ? ekNum : null,
-        ekNettoByPositionId: ekByPositionId,
-        startDatum: vonYmd,
-        endDatum: bisYmd,
+        handwerkerId: args.primaryHw,
+        ekNetto: isSingle ? args.ekNum : null,
+        ekNettoByPositionId: args.ekByPositionId,
+        leistung_name: isSingle ? titel.trim() || sample?.leistung_name : undefined,
+        beschreibung: isSingle ? beschreibung.trim() || null : undefined,
+        aufgabe_notiz: isSingle
+          ? beschreibung.trim() || null
+          : selectedPositions
+              .map((p) => p.leistung_name?.trim() || 'Leistung')
+              .join(', '),
+      })
+      if (!assign.ok) {
+        toast.systemError(assign)
+        return
+      }
+
+      const sent = await sendAngebotLeistungenAnHandwerkerV3({
+        angebotId: args.angebotId,
+        zuweisungIds: assign.zuweisungIds,
+      })
+      if (!sent.ok) {
+        toast.systemError(sent)
+        return
+      }
+
+      toast.success(
+        sent.gesendet === 1
+          ? 'Anfrage an Partner gesendet'
+          : `${sent.gesendet} Anfragen an Partner gesendet`
+      )
+      onDone()
+      onClose()
+    })
+  }
+
+  /** Auftrag-Pfad: Partnertext nur in Partner-Aufgabe — nie leistung_name. */
+  function confirmAuftragZuweisung(args: {
+    auftragId: string
+    primaryHw: string
+    ekNum: number | null
+    ekByPositionId?: Record<string, number>
+    vonYmd: string | null
+    bisYmd: string | null
+  }) {
+    startTransition(async () => {
+      const assign = await zuweiseHandwerkerAnPositionenV3({
+        auftragId: args.auftragId,
+        positionIds,
+        handwerkerId: args.primaryHw,
+        ekNetto: isSingle ? args.ekNum : null,
+        ekNettoByPositionId: args.ekByPositionId,
+        startDatum: args.vonYmd,
+        endDatum: args.bisYmd,
+        partnerTitel: partnerTitel.trim() || null,
+        partnerBeschreibung: partnerBeschreibung.trim() || null,
       })
       if (!assign.ok) {
         toast.systemError(assign)
@@ -321,7 +358,7 @@ auftragId?: string | null
       }
 
       const sent = await sendAuftragLeistungenAnHandwerkerV3({
-        auftragId,
+        auftragId: args.auftragId,
         angebotId,
         projektName,
         gewerke,
@@ -439,7 +476,7 @@ auftragId?: string | null
           )}
         </div>
 
-        {isSingle ? (
+        {isAngebotOnly && isSingle ? (
           <>
             <label className="hw-anfrage-field">
               <span className="hw-anfrage-label">Titel</span>
@@ -485,7 +522,116 @@ auftragId?: string | null
               ) : null}
             </label>
           </>
-        ) : (
+        ) : null}
+
+        {!isAngebotOnly ? (
+          <>
+            <label className="hw-anfrage-field">
+              <span className="hw-anfrage-label">Titel für den Partner</span>
+              <MockInput
+                value={partnerTitel}
+                placeholder="Leer = LV-Text der Positionen"
+                onChange={(e) => {
+                  setDirty(true)
+                  setPartnerTitel(e.target.value)
+                }}
+                disabled={pending}
+              />
+              <span className="hw-anfrage-hint" style={{ fontSize: 'var(--fs-meta)' }}>
+                Optional — leer lassen ist der Normalfall
+              </span>
+            </label>
+
+            <div className="hw-anfrage-field">
+              <KiAssistFieldLabel
+                label="Beschreibung für den Partner"
+                value={partnerBeschreibung}
+                onApply={(text) => {
+                  setDirty(true)
+                  setPartnerBeschreibung(text)
+                }}
+                extraHint="Optional. Leer = Partner sieht die LV-Texte der Positionen."
+                disabled={pending || pickerOpen}
+              >
+                <MockTextarea
+                  className="ta ta--long"
+                  rows={8}
+                  value={partnerBeschreibung}
+                  placeholder="Leer = LV-Text der Positionen"
+                  onChange={(e) => {
+                    setDirty(true)
+                    setPartnerBeschreibung(e.target.value)
+                  }}
+                  disabled={pending}
+                />
+              </KiAssistFieldLabel>
+            </div>
+
+            {isSingle ? (
+              <label className="hw-anfrage-field">
+                <span className="hw-anfrage-label">Partner-EK netto *</span>
+                <div className="txt-prefix">
+                  <span className="prefix" aria-hidden>
+                    €
+                  </span>
+                  <MockInput type="number" step="0.01" min="0" required value={partnerNetto} onChange={(e) => {
+                      setDirty(true)
+                      setPartnerNetto(e.target.value)
+                    }} disabled={pending} aria-invalid={!ekOk && partnerNetto.trim() !== ''} />
+                </div>
+                {!ekOk ? (
+                  <span className="hw-anfrage-hint" style={{ color: `var(--red, ${C.redTx2})`, fontSize: 'var(--fs-meta)' }}>
+                    Pflicht — 0 € oder mehr
+                  </span>
+                ) : null}
+              </label>
+            ) : (
+              <div className="hw-anfrage-section">
+                <div className="hw-anfrage-section-head">
+                  <span>Partner-EK je Leistung</span>
+                  <span>Partner gilt für alle</span>
+                </div>
+                <div className="hw-zuw-ek-table" role="table" aria-label="Leistungen mit Partner-EK">
+                  <div className="hw-zuw-ek-head" role="row">
+                    <span role="columnheader">Leistung</span>
+                    <span role="columnheader">VK</span>
+                    <span role="columnheader">EK netto *</span>
+                  </div>
+                  {selectedPositions.map((p) => {
+                    const raw = ekByPos[p.id] ?? ''
+                    const n = parseNum(raw)
+                    const rowOk = n != null && n >= 0
+                    return (
+                      <div key={p.id} className="hw-zuw-ek-row" role="row">
+                        <span className="hw-zuw-ek-name" role="cell" title={p.leistung_name}>
+                          {p.leistung_name?.trim() || 'Leistung'}
+                        </span>
+                        <span className="hw-zuw-ek-vk" role="cell">
+                          {formatVk(p)}
+                        </span>
+                        <label className="hw-zuw-ek-input" role="cell">
+                          <span className="txt-prefix">
+                            <span className="prefix" aria-hidden>
+                              €
+                            </span>
+                            <MockInput type="number" step="0.01" min="0" required value={raw} onChange={(e) => setEkForPos(p.id, e.target.value)} disabled={pending} aria-label={`Partner-EK für ${p.leistung_name?.trim() || 'Leistung'}`} aria-invalid={!rowOk && raw.trim() !== ''} />
+                          </span>
+                        </label>
+                      </div>
+                    )
+                  })}
+                </div>
+                {!ekOk ? (
+                  <span className="hw-anfrage-hint" style={{ color: `var(--red, ${C.redTx2})`, fontSize: 'var(--fs-meta)' }}>
+                    Für jede Leistung Partner-EK eintragen (0 € oder mehr)
+                  </span>
+                ) : null}
+              </div>
+            )}
+          </>
+        ) : null}
+
+        {isAngebotOnly && !isSingle ? (
           <div className="hw-anfrage-section">
             <div className="hw-anfrage-section-head">
               <span>Partner-EK je Leistung</span>
@@ -527,7 +673,7 @@ auftragId?: string | null
               </span>
             ) : null}
           </div>
-        )}
+        ) : null}
 
         {!isAngebotOnly ? (
             <div className="hw-anfrage-section">

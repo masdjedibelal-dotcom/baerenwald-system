@@ -1,5 +1,7 @@
 /** Spec §10 / Phase 9 — Regie-Anzeige (CRM-intern „Regie“, Badge „nach Aufwand“). */
 
+import { regieBetragKunde } from '@/lib/shared-domain/regie-betrag'
+
 export function istRegiePosition(p: {
   typ?: string | null
   verguetung?: string | null
@@ -35,6 +37,18 @@ export function formatRegieSchaetzung(opts: {
   const stdLabel = Number.isInteger(std) ? String(std) : std.toFixed(1).replace('.', ',')
   const satzLabel = Number.isInteger(satz) ? String(satz) : satz.toFixed(2).replace('.', ',')
   return `geschätzt ${stdLabel} h × ${satzLabel} €/h`
+}
+
+/**
+ * Kundensatz für Regie-Abrechnung an den Kunden.
+ * Leer → Partnersatz (`stundensatz`), damit Altdaten unverändert bleiben.
+ * Rate = Betrag bei Menge 1 aus shared-domain (ohne Rundung).
+ */
+export function regieKundenStundensatz(p: {
+  stundensatz_kunde?: number | null
+  stundensatz?: number | null
+}): number {
+  return regieBetragKunde(1, p.stundensatz_kunde, p.stundensatz)
 }
 
 /** Minuten → „3:05“ */

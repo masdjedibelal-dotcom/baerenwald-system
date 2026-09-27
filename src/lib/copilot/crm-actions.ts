@@ -429,7 +429,7 @@ export async function getEntity(typ: string, id: string): Promise<unknown> {
           kunde_id, lead_id, angebot_id, abnahme_protokoll_url,
           kunden(name, email, telefon),
           auftrag_positionen(
-            id, leistung_name, beschreibung, menge, einheit, preis_kunde,
+            id, leistung_name, beschreibung, menge, einheit, preis_fix,
             gewerk_name, gewerk_slug, handwerker_id, leistung_status, sort_order
           ),
           auftrag_handwerker(

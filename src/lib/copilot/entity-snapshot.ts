@@ -53,7 +53,7 @@ export async function buildEntityPageSnapshot(pathname: string): Promise<string 
           id, titel, status, fortschritt, created_at, start_datum, end_datum,
           kunde_id, lead_id, angebot_id, abnahme_protokoll_url,
           kunden(name, email, telefon),
-          auftrag_positionen(id, leistung_name, beschreibung, menge, einheit, preis_kunde, gewerk_name, gewerk_slug, handwerker_id, leistung_status, sort_order),
+          auftrag_positionen(id, leistung_name, beschreibung, menge, einheit, preis_fix, gewerk_name, gewerk_slug, handwerker_id, leistung_status, sort_order),
           auftrag_handwerker(id, status, gewerk_id, handwerker_id, handwerker(name, firma), gewerke(name))
         `
         )

@@ -4,7 +4,12 @@ import {
   formatRegieSollIst,
   istRegiePosition,
   REGIE_BADGE_LABEL,
+  regieKundenStundensatz,
 } from '@/lib/auftraege/regie-display'
+import {
+  positionBetrag,
+  regieMengeStunden,
+} from '@/lib/shared-domain/regie-betrag'
 import type { AngebotPosition, AuftragPosition } from '@/lib/types'
 
 export type RegieZeitByPosition = Record<string, number>
@@ -13,6 +18,7 @@ export type RegieBeschreibungByPosition = Record<string, string>
 /**
  * Auftragspositionen → Angebot-Positionsformat für Rechnungseditor.
  * Regie: Menge/Preis aus Bautagebuch-Zeiten wenn vorhanden; sonst Stundensatz-Schätzung.
+ * Beträge über shared-domain/regie-betrag (Kundenrechnung: Kundensatz, Fallback Partnersatz).
  * Partner-Texte aus BT optional in `beschreibung` (prüfbar vor Versand).
  * notiz_extern trägt Soll/Ist + Regieschein-Hinweis (CRM-intern „Regie“).
  */
@@ -31,7 +37,7 @@ export function auftragPositionenToAngebotPositionen(
     .map((p) => {
       const isRegie = istRegiePosition(p)
       const erfasstMin = zeitMap[p.id] ?? 0
-      const stundensatz = Number(p.stundensatz) || 0
+      const stundensatz = isRegie ? regieKundenStundensatz(p) : Number(p.stundensatz) || 0
       const geschStd = Number(p.geschaetzt_std) || 0
       const partnerText = textMap[p.id]?.trim() || ''
 
@@ -43,14 +49,25 @@ export function auftragPositionenToAngebotPositionen(
 
       if (isRegie) {
         einheit = 'Std'
-        if (erfasstMin > 0 && stundensatz > 0) {
-          menge = Math.round((erfasstMin / 60) * 100) / 100
-          lineNetto = Math.round(menge * stundensatz * 100) / 100
-          lohn = lineNetto
-          material = 0
-        } else if (stundensatz > 0) {
-          menge = geschStd > 0 ? geschStd : 1
-          lineNetto = Math.round(menge * stundensatz * 100) / 100
+        if (stundensatz > 0) {
+          menge = regieMengeStunden(
+            erfasstMin > 0 ? erfasstMin : null,
+            geschStd > 0 ? geschStd : null
+          )
+          lineNetto = positionBetrag(
+            {
+              typ: p.typ,
+              verguetung: p.verguetung,
+              menge: p.menge,
+              geschaetzt_std: geschStd > 0 ? geschStd : null,
+              stundensatz: p.stundensatz,
+              stundensatz_kunde: p.stundensatz_kunde,
+              preis_partner: p.preis_partner,
+              preis_fix: p.preis_fix,
+              erfasst_minuten: erfasstMin > 0 ? erfasstMin : null,
+            },
+            'kunde'
+          )
           lohn = lineNetto
           material = 0
         }

@@ -25,6 +25,7 @@ import { AuftragStammdatenCard } from '@/components/auftraege/AuftragStammdatenC
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
+import { auftragHatGestellteKundenrechnung } from '@/lib/angebote/auftrag-korrektur-gate'
 import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import {
   gewichteterFortschrittProzent,
@@ -876,6 +877,14 @@ export function AuftragDetailClient({
     [rechnungenListe]
   )
 
+  /** CTA „Auftrag bearbeiten“: ausgeblendet bei gestellter Kundenrechnung */
+  const kannAuftragKorrektur = useMemo(
+    () =>
+      Boolean(detail.angebot_id) &&
+      !auftragHatGestellteKundenrechnung(rechnungenListe),
+    [detail.angebot_id, rechnungenListe]
+  )
+
   const hatAbschlagsplan = hatAktivenAbschlagsplan(zahlungsplanParsed)
 
   const abrechnungKontext = useMemo(() => {
@@ -1307,7 +1316,7 @@ export function AuftragDetailClient({
                   title: 'Rechnung öffnen — dort korrigieren',
                 }
               }
-              if (detail.angebot_id) {
+              if (kannAuftragKorrektur) {
                 return {
                   label: 'Auftrag bearbeiten',
                   icon: 'pencil',
@@ -1320,7 +1329,7 @@ export function AuftragDetailClient({
             menuItems={
               !istStorniert
                 ? [
-                    ...(detail.angebot_id &&
+                    ...(kannAuftragKorrektur &&
                     (detail.status === 'offen' ||
                       detail.status === 'in_arbeit' ||
                       detail.status === 'abnahme')

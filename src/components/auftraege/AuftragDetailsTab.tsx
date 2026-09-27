@@ -11,6 +11,7 @@ import {
   leistungenFromAuftragPositionen,
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
+import { PartnerAufgabeBearbeitenSheet } from '@/components/auftraege/PartnerAufgabeBearbeitenSheet'
 import { CrmPositionEintragModal, type CrmTagebuchEditSeed } from '@/components/auftraege/CrmPositionEintragModal'
 import {
   AuftragBautagebuchSection,
@@ -163,6 +164,10 @@ export function AuftragLeistungenTab({
 }) {
   const [pendingNachtrag, setPendingNachtrag] = useState(false)
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
+  const [partnerAufgabeEdit, setPartnerAufgabeEdit] = useState<{
+    aufgabeId: string
+    handwerkerId: string
+  } | null>(null)
   const clearBulkSelAfterZuweisung = useRef<(() => void) | null>(null)
   const [tagebuchOpen, setTagebuchOpen] = useState(false)
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
@@ -211,7 +216,15 @@ export function AuftragLeistungenTab({
   }, [detail.auftrag_positionen, mwstSatz, bautagebuchEintraege])
 
   const rows = useMemo(() => {
+    const partnerAufgabenById: Record<
+      string,
+      { titel?: string | null; beschreibung?: string | null }
+    > = {}
+    for (const a of detail.auftrag_partner_aufgaben ?? []) {
+      partnerAufgabenById[a.id] = { titel: a.titel, beschreibung: a.beschreibung }
+    }
     return leistungenFromAuftragPositionen(detail.auftrag_positionen ?? [], {
+      partnerAufgabenById,
       eintraege: bautagebuchEintraege.map((e) => {
         const fotoUrls = (e.eintrag_fotos ?? [])
           .map((f) => f.display_url)
@@ -235,7 +248,7 @@ export function AuftragLeistungenTab({
         }
       }),
     })
-  }, [detail.auftrag_positionen, bautagebuchEintraege])
+  }, [detail.auftrag_positionen, detail.auftrag_partner_aufgaben, bautagebuchEintraege])
 
   useEffect(() => {
     let cancelled = false
@@ -469,6 +482,20 @@ export function AuftragLeistungenTab({
                                 },
                               ]
                             : []),
+                          ...(row.partnerAufgabeId && row.handwerkerId
+                            ? [
+                                {
+                                  id: 'partner-aufgabe',
+                                  label: 'Partner-Aufgabe',
+                                  icon: 'file-text',
+                                  onClick: () =>
+                                    setPartnerAufgabeEdit({
+                                      aufgabeId: row.partnerAufgabeId!,
+                                      handwerkerId: row.handwerkerId!,
+                                    }),
+                                },
+                              ]
+                            : []),
                           {
                             id: 'zuweisen',
                             label: 'Zuweisen',
@@ -479,6 +506,7 @@ export function AuftragLeistungenTab({
             }
             onNachtragEntscheiden={disabled ? undefined : decideNachtrag}
             nachtragDecidePending={pendingNachtrag}
+            onRegieKorrigiert={disabled ? undefined : onSaved}
           />
         </>
       ) : (
@@ -509,6 +537,21 @@ export function AuftragLeistungenTab({
             clearBulkSelAfterZuweisung.current?.()
             clearBulkSelAfterZuweisung.current = null
             setZuweisungIds(null)
+            onSaved?.()
+          }}
+        />
+      ) : null}
+
+      {partnerAufgabeEdit ? (
+        <PartnerAufgabeBearbeitenSheet
+          open
+          onClose={() => setPartnerAufgabeEdit(null)}
+          auftragId={detail.id}
+          aufgabeId={partnerAufgabeEdit.aufgabeId}
+          handwerkerId={partnerAufgabeEdit.handwerkerId}
+          positionen={detail.auftrag_positionen ?? []}
+          onSaved={() => {
+            setPartnerAufgabeEdit(null)
             onSaved?.()
           }}
         />

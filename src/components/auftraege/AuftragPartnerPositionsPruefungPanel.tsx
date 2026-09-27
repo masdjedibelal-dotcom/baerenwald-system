@@ -14,6 +14,7 @@ import {
   type PartnerPositionsAnfrageRow,
   type WeitereArbeitInPruefungRow,
 } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
+import { RegiePositionBearbeitenSheet } from '@/components/auftraege/RegiePositionBearbeitenSheet'
 import { formatEuro, formatDatumZeit } from '@/lib/format/geld-datum'
 
 type PruefItem =
@@ -79,6 +80,7 @@ export function AuftragPartnerPositionsPruefungPanel({
   const [initialLoading, setInitialLoading] = useState(true)
   const [pending, setPending] = useState(false)
   const [action, setAction] = useState<PendingAction | null>(null)
+  const [bearbeitenId, setBearbeitenId] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const reload = useCallback(() => {
@@ -247,6 +249,13 @@ export function AuftragPartnerPositionsPruefungPanel({
                     <MockBtn
                       kind="secondary" sm
                       disabled={pending}
+                      onClick={() => setBearbeitenId(row.id)}
+                    >
+                      Bearbeiten
+                    </MockBtn>
+                    <MockBtn
+                      kind="secondary" sm
+                      disabled={pending}
                       onClick={() => setAction({ item, decision: 'ablehnen' })}
                     >
                       Ablehnen
@@ -285,6 +294,16 @@ export function AuftragPartnerPositionsPruefungPanel({
           </p>
         ) : null}
       </EditorSheet>
+
+      <RegiePositionBearbeitenSheet
+        open={Boolean(bearbeitenId)}
+        positionId={bearbeitenId}
+        onClose={() => setBearbeitenId(null)}
+        onSaved={() => {
+          reload()
+          onChanged?.()
+        }}
+      />
 
       {lightboxUrl ? (
         <div

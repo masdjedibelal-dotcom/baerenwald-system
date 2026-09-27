@@ -12,6 +12,12 @@ export const COPY_ERROR = {
   notFound: 'Eintrag nicht gefunden.',
   validation: 'Bitte Eingaben prüfen.',
   network: 'Keine Verbindung – Erneut versuchen',
+  /** Regie-/Nacharbeit: tragender Schreibfehler — kein „Angenommen“. */
+  saveFailed: 'Speichern fehlgeschlagen — bitte erneut versuchen.',
+  /** Auftrag bearbeiten: noch kein Auftrag zum Vorgang. */
+  auftragKorrekturKeinAuftrag: 'Noch kein Auftrag — erst Angebot annehmen.',
+  /** Auftrag bearbeiten: gestellte Rechnung — Korrektur über Rechnung. */
+  auftragKorrekturRechnungGestellt: 'Rechnung gestellt — Korrektur über die Rechnung.',
 } as const
 
 export type CopyErrorKey = keyof typeof COPY_ERROR

@@ -26,6 +26,15 @@ export type LeistungRow = {
   gewerkName?: string | null
   handwerkerName?: string | null
   handwerkerId?: string | null
+  /** Partner-Aufgabe (Gruppierung) — nur Darstellung */
+  partnerAufgabeId?: string | null
+  /**
+   * Was der Partner als Überschrift sieht.
+   * Bei leerem Aufgabentitel = LV (`bezeichnung`), nie leer.
+   */
+  partnerSiehtLabel?: string | null
+  /** Roh-Titel der Aufgabe (leer/null = LV-Fallback aktiv) */
+  partnerAufgabeTitel?: string | null
   /** Anfrage-Status beim Partner (z. B. Angefragt) */
   anfrageStatusLabel?: string | null
   /** Ampel für Mobile-Card: offen | warten | zugewiesen */

@@ -10,6 +10,8 @@ import { createRechnungEntwurf } from '@/app/(dashboard)/rechnungen/actions'
 import { createNachtragManuell } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { orgFreigabeErforderlich } from '@/lib/org/org-freigabe-logic'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
+import { regieKundenStundensatz } from '@/lib/auftraege/regie-display'
+import { positionBetrag, regieMengeStunden } from '@/lib/shared-domain/regie-betrag'
 import type { AngebotPosition, Kunde, Lead } from '@/lib/types'
 
 function round2(n: number) {
@@ -69,7 +71,7 @@ export async function createRechnungEntwurfFromPositionLebenszyklus(
   const { data: positionen, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
-      'id, leistung_name, beschreibung, menge, einheit, preis_vk, preis_partner, lohn_vk, typ, verguetung, stundensatz, leistung_status'
+      'id, leistung_name, beschreibung, menge, einheit, preis_fix, preis_partner, lohn_fix, typ, verguetung, stundensatz, stundensatz_kunde, leistung_status'
     )
     .eq('auftrag_id', auftragId)
     .order('sort_order', { ascending: true })
@@ -96,11 +98,13 @@ export async function createRechnungEntwurfFromPositionLebenszyklus(
     if (String(p.typ) === 'regie' && minuten <= 0 && String(p.leistung_status) !== 'erledigt') {
       continue
     }
-    const std = minuten > 0 ? round2(minuten / 60) : Number(p.menge) || 1
-    const satz =
-      isAufwand && p.stundensatz != null
-        ? Number(p.stundensatz)
-        : Number(p.preis_vk ?? p.lohn_vk ?? p.preis_partner) || 0
+    const std =
+      minuten > 0
+        ? regieMengeStunden(minuten, null)
+        : Number(p.menge) || 1
+    const satz = isAufwand
+      ? regieKundenStundensatz(p)
+      : Number(p.preis_fix ?? p.lohn_fix ?? p.preis_partner) || 0
     if (satz <= 0) continue
     const menge = isAufwand ? Math.max(std, 0.25) : Number(p.menge) || 1
     const partnerText = textByPos[String(p.id)]?.trim() || ''
@@ -277,7 +281,7 @@ export async function pruefeSchwelleWeitereArbeitUndNachtrag(
   const { data: regiePos, error: error2 } = await supabaseAdmin
     .from('auftrag_positionen')
     .select(
-      'id, leistung_name, beschreibung, preis_partner, stundensatz, verguetung, anerkennung_status, menge, einheit'
+      'id, leistung_name, beschreibung, preis_partner, stundensatz, stundensatz_kunde, verguetung, anerkennung_status, menge, einheit'
     )
     .eq('auftrag_id', auftragId)
     .eq('typ', 'regie')
@@ -291,17 +295,26 @@ export async function pruefeSchwelleWeitereArbeitUndNachtrag(
     const min = eintraege
       .filter((e) => e.position_id === String(p.id))
       .reduce((s, e) => s + (Number(e.zeit_minuten) || 0), 0)
-    const satz = Number(p.stundensatz ?? p.preis_partner) || 0
-    let zeile = 0
+    const satz = regieKundenStundensatz(p)
     let menge = Number(p.menge) || 1
     let einheit = String(p.einheit ?? 'Psch')
     if (String(p.verguetung) === 'aufwand' && min > 0) {
-      menge = round2(min / 60)
+      menge = regieMengeStunden(min, null)
       einheit = 'Std'
-      zeile = round2(menge * satz)
-    } else {
-      zeile = round2(satz * menge)
     }
+    const zeile = positionBetrag(
+      {
+        typ: 'regie',
+        verguetung: p.verguetung,
+        menge,
+        stundensatz: p.stundensatz,
+        stundensatz_kunde: p.stundensatz_kunde,
+        preis_partner: p.preis_partner,
+        erfasst_minuten: min > 0 ? min : null,
+        geschaetzt_std: min > 0 ? null : menge,
+      },
+      'kunde'
+    )
     betrag += zeile
     nachtragPos.push(
       posFromLebenszyklus({

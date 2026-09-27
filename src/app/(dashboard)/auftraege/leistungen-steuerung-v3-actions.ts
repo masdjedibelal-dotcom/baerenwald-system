@@ -20,6 +20,8 @@ import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-proj
 import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
 import { planAuftragHandwerkerStatusWrite } from '@/lib/status/write-auftrag-handwerker-status'
 import { planAngebotHandwerkerStatusWrite } from '@/lib/status/write-angebot-handwerker-status'
+import { createPartnerAufgabeAndLinkPositions } from '@/lib/auftraege/partner-aufgabe-write'
+import { COPY_ERROR } from '@/lib/copy/errors'
 import type { AuftragPosition } from '@/lib/types'
 
 async function assertAuftrag(auftragId: string) {
@@ -114,14 +116,20 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   /** Ausführungszeitraum (Pflicht für PDF/Leistungszeitraum später). */
   startDatum?: string | null
   endDatum?: string | null
-}): Promise<{ ok: true; updated: number } | { ok: false; message: string }> {
+  /**
+   * Partner-Aufgabe Titel/Beschreibung (optional).
+   * Leer = LV-Fallback. Schreibt niemals leistung_name.
+   */
+  partnerTitel?: string | null
+  partnerBeschreibung?: string | null
+}): Promise<{ ok: true; updated: number; partnerAufgabeId: string } | { ok: false; message: string }> {
   const gate = await assertAuftrag(input.auftragId)
   if (!gate.ok) return gate
 
   const ids = Array.from(new Set(input.positionIds.map((id) => id.trim()).filter(Boolean)))
   const hwId = input.handwerkerId.trim()
   if (!ids.length || !hwId) {
-    return { ok: false, message: 'Positionen und Partner erforderlich.' }
+    return { ok: false, message: COPY_ERROR.validation }
   }
 
   const { data: hw, error } = await gate.supabase!
@@ -130,7 +138,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     .eq('id', hwId)
     .maybeSingle()
   if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:handwerker', error)
-  if (!hw) return { ok: false, message: 'Partner nicht gefunden.' }
+  if (!hw) return { ok: false, message: COPY_ERROR.notFound }
 
   const ekGlobal =
     input.ekNetto != null && Number.isFinite(input.ekNetto) && input.ekNetto >= 0
@@ -145,8 +153,8 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
     .in('id', ids)
   if (loadErr) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', loadErr)
 
-  if (loadErr) return { ok: false, message: loadErr.message }
-  if (!rows?.length) return { ok: false, message: 'Positionen nicht gefunden.' }
+  if (loadErr) return { ok: false, message: COPY_ERROR.saveFailed }
+  if (!rows?.length) return { ok: false, message: COPY_ERROR.notFound }
 
   let updated = 0
   const gewerkIdsTouched = new Set<string>()
@@ -179,6 +187,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
       patch.start_datum = startYmd
       patch.end_datum = endYmd
     }
+    // leistung_name / beschreibung bewusst nicht hier — Partnertext → Partner-Aufgabe
 
     const { error } = await gate.supabase!
       .from('auftrag_positionen')
@@ -186,7 +195,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
       .eq('id', posId)
       .eq('auftrag_id', input.auftragId)
     if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
-    if (error) return { ok: false, message: error.message }
+    if (error) return { ok: false, message: COPY_ERROR.saveFailed }
     updated++
 
     await ensureAngebotHandwerkerGewerkId(gate.supabase!, {
@@ -206,6 +215,15 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
       if (gw?.id) gewerkIdsTouched.add(String(gw.id))
     }
   }
+
+  const aufgabe = await createPartnerAufgabeAndLinkPositions(gate.supabase!, {
+    auftragId: input.auftragId,
+    handwerkerId: hwId,
+    positionIds: ids,
+    titel: input.partnerTitel,
+    beschreibung: input.partnerBeschreibung,
+  })
+  if (!aufgabe.ok) return aufgabe
 
   // Auftrag-Zuweisungstabelle mitziehen (Tagebuch anfordern / Partner-UI liest daraus).
   for (const gewerkId of gewerkIdsTouched) {
@@ -236,7 +254,7 @@ export async function zuweiseHandwerkerAnPositionenV3(input: {
   provisionProjektvertragFireAndForget(input.auftragId, hwId)
 
   revalidateAuftragDetail(input.auftragId)
-  return { ok: true, updated }
+  return { ok: true, updated, partnerAufgabeId: aufgabe.aufgabeId }
 }
 
 type PositionPartnerSnapshotRow = {

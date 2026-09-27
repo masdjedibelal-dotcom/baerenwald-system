@@ -10,6 +10,7 @@ import {
 } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { auftragHwStatusLabel } from '@/lib/auftraege/auftrag-handwerker-status'
 import { handwerkerAntwortAnzeige } from '@/lib/auftraege/partner-vorgang-display'
+import { partnerAufgabeAnzeigeTitel } from '@/lib/auftraege/partner-aufgabe-display'
 import { formatZeitraumKurz } from '@/components/auftraege/leistungen-v3/utils'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import {
@@ -17,7 +18,9 @@ import {
   formatStundenColon,
   istRegiePosition,
   REGIE_BADGE_LABEL,
+  regieKundenStundensatz,
 } from '@/lib/auftraege/regie-display'
+import { positionBetrag } from '@/lib/shared-domain/regie-betrag'
 import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import { richTextToPlain } from '@/lib/rich-text'
 import { formatDatum } from '@/lib/utils'
@@ -194,7 +197,14 @@ export function leistungenFromAngebotPositionen(
 /** Auftrag: AuftragPosition[]. */
 export function leistungenFromAuftragPositionen(
   positionen: AuftragPosition[],
-  opts?: { eintraege?: LeistungEintragLite[] }
+  opts?: {
+    eintraege?: LeistungEintragLite[]
+    /** id → Partner-Aufgabe (Titel/Beschreibung) */
+    partnerAufgabenById?: Record<
+      string,
+      { titel?: string | null; beschreibung?: string | null }
+    >
+  }
 ): LeistungRow[] {
   const eintraegeByPos = new Map<string, LeistungEintragLite[]>()
   for (const e of opts?.eintraege ?? []) {
@@ -213,6 +223,7 @@ export function leistungenFromAuftragPositionen(
       eintraegeByPos.set(pid, list)
     }
   }
+  const aufgabenById = opts?.partnerAufgabenById ?? {}
 
   return [...positionen]
     .filter((p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt')
@@ -308,10 +319,24 @@ export function leistungenFromAuftragPositionen(
           }
         })
 
-      const stundensatz = Number(p.stundensatz) || 0
+      const partnersatz = Number(p.stundensatz) || 0
+      const kundensatz = regieKundenStundensatz(p)
       const erfasstNetto =
-        isRegie && erfasstMin > 0 && stundensatz > 0
-          ? Math.round((erfasstMin / 60) * stundensatz * 100) / 100
+        isRegie && erfasstMin > 0 && kundensatz > 0
+          ? positionBetrag(
+              {
+                typ: p.typ,
+                verguetung: p.verguetung,
+                menge: p.menge,
+                geschaetzt_std: p.geschaetzt_std,
+                stundensatz: p.stundensatz,
+                stundensatz_kunde: p.stundensatz_kunde,
+                preis_partner: p.preis_partner,
+                preis_fix: p.preis_fix,
+                erfasst_minuten: erfasstMin,
+              },
+              'kunde'
+            )
           : null
       const sollIst = isRegie
         ? formatRegieSollIst({
@@ -320,7 +345,15 @@ export function leistungenFromAuftragPositionen(
           })
         : null
 
-      // Subline: Regie + Ist wenn vorhanden
+      const lvName = p.leistung_name?.trim() || 'Leistung'
+      const aufgabeId = p.partner_aufgabe_id?.trim() || null
+      const aufgabe = aufgabeId ? aufgabenById[aufgabeId] : null
+      const partnerAufgabeTitel = aufgabe?.titel?.trim() || null
+      const partnerSiehtLabel = aufgabeId
+        ? partnerAufgabeAnzeigeTitel(aufgabe?.titel, lvName)
+        : null
+
+      // Subline: Regie + Ist wenn vorhanden + Partner-Aufgabe (Anzeige)
       const subParts: string[] = []
       if (brauchtFreigabe) subParts.push('Nachtrag · zur Freigabe')
       else if (isRegie) subParts.push(REGIE_BADGE_LABEL)
@@ -329,6 +362,13 @@ export function leistungenFromAuftragPositionen(
         subParts.push(`in Arbeit seit ${formatDatum(p.gestartet_am.slice(0, 10))}`)
       } else if (!brauchtFreigabe && st === 'erledigt') {
         subParts.push('dokumentiert · erledigt von HW')
+      }
+      if (partnerSiehtLabel) {
+        subParts.push(
+          partnerAufgabeTitel
+            ? `Partner sieht: ${partnerSiehtLabel}`
+            : `Partner sieht: ${partnerSiehtLabel} (LV)`
+        )
       }
 
       const preisLabel =
@@ -342,7 +382,7 @@ export function leistungenFromAuftragPositionen(
 
       return {
         id: p.id,
-        bezeichnung: p.leistung_name?.trim() || 'Leistung',
+        bezeichnung: lvName,
         subline: subParts.length ? subParts.join(' · ') : p.gewerk_name?.trim() || null,
         mengeLabel: isRegie
           ? erfasstMin > 0
@@ -359,13 +399,15 @@ export function leistungenFromAuftragPositionen(
                 ? p.preis_partner
                 : 0,
         einzelpreisLabel: isRegie
-          ? stundensatz > 0
-            ? `${formatEurBetrag(stundensatz)}/h`
-            : ek
-              ? ek
-              : einzel > 0
-                ? `${formatEurBetrag(einzel)}/h`
-                : null
+          ? kundensatz > 0
+            ? `${formatEurBetrag(kundensatz)}/h`
+            : partnersatz > 0
+              ? `${formatEurBetrag(partnersatz)}/h`
+              : ek
+                ? ek
+                : einzel > 0
+                  ? `${formatEurBetrag(einzel)}/h`
+                  : null
           : einzel > 0
             ? formatEurBetrag(einzel)
             : null,
@@ -375,6 +417,9 @@ export function leistungenFromAuftragPositionen(
         gewerkName: p.gewerk_name?.trim() || null,
         handwerkerName: hwName,
         handwerkerId: p.handwerker_id,
+        partnerAufgabeId: aufgabeId,
+        partnerAufgabeTitel,
+        partnerSiehtLabel,
         anfrageStatusLabel,
         handwerkerStatusTone: hwTone,
         anerkennungStatus: anerkennung,

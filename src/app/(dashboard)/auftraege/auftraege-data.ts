@@ -18,6 +18,7 @@ import { normalizeUrlList } from '@/lib/utils'
 import type {
   AngebotPosition,
   AuftragDetail,
+  AuftragPartnerAufgabe,
   AuftragPosition,
   AuftragTimelineEvent,
   FormularTemplate,
@@ -218,6 +219,7 @@ export async function loadAuftragDetail(
     if (mode === 'shell') {
       parsed.auftrag_bautagebuch = []
       parsed.auftrag_bautagesberichte = []
+      parsed.auftrag_partner_aufgaben = []
       parsed.auftrag_baustelle_team = {
         bauleiter_name: (parsed as { bauleiter_name?: string | null }).bauleiter_name ?? null,
         bauleiter_telefon: (parsed as { bauleiter_telefon?: string | null }).bauleiter_telefon ?? null,
@@ -235,9 +237,10 @@ export async function loadAuftragDetail(
     }
 
     // Extras parallel statt nacheinander
-    const [bautagebuch, bautagesberichte, baustelleBundle] = await Promise.all([
+    const [bautagebuch, bautagesberichte, partnerAufgaben, baustelleBundle] = await Promise.all([
       listAuftragBautagebuch(id),
       listAuftragBautagesberichte(id),
+      loadAuftragPartnerAufgaben(id),
       parsed.ist_bauprojekt
         ? Promise.all([
             loadAuftragBaustelleTeam(id),
@@ -250,6 +253,7 @@ export async function loadAuftragDetail(
 
     parsed.auftrag_bautagebuch = bautagebuch
     parsed.auftrag_bautagesberichte = bautagesberichte
+    parsed.auftrag_partner_aufgaben = partnerAufgaben
     if (baustelleBundle) {
       parsed.auftrag_baustelle_team = baustelleBundle.team
       parsed.auftrag_regiearbeiten = baustelleBundle.regie
@@ -272,6 +276,20 @@ export async function loadAuftragDetail(
     console.error('[loadAuftragDetail] unexpected', e)
     return null
   }
+}
+
+async function loadAuftragPartnerAufgaben(auftragId: string): Promise<AuftragPartnerAufgabe[]> {
+  const { data, error } = await supabaseAdmin
+    .from('auftrag_partner_aufgaben')
+    .select('id, auftrag_id, handwerker_id, titel, beschreibung, sort_order, created_at')
+    .eq('auftrag_id', auftragId)
+    .order('created_at', { ascending: true })
+  if (error) {
+    // Tabelle ggf. noch nicht migriert — Detailseite nicht killen
+    logDbError('app/auftraege/auftraege-data:auftrag_partner_aufgaben', error)
+    return []
+  }
+  return (data ?? []) as AuftragPartnerAufgabe[]
 }
 
 export type EmailLogRow = {

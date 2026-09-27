@@ -1,0 +1,4 @@
+# Ausnahmen für check-db-spalten.mjs
+# Format: relativer/pfad.ts:zeile:tabelle:spalte  # Begründung
+# Höchstzahl Einträge: siehe ALLOWLIST_MAX_LINES im Skript (aktuell 0).
+# Nur für Fälle, die geprüft werden könnten, aber begründet abweichen — nicht für Parser-Lücken.

@@ -33,6 +33,11 @@ import {
   defaultAngebotZahlungsbedingungen,
   resolveAngebotKundeTyp,
 } from '@/lib/angebote/angebot-wizard-types'
+import {
+  loadAuftragKorrekturKontext,
+  auftragKorrekturSperrgrund,
+  type AuftragKorrekturKontext,
+} from '@/lib/angebote/auftrag-korrektur'
 import { formatDatum, getPublicAppUrl } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
@@ -657,11 +662,22 @@ export async function updateAngebot(
   if (loadErr) logDbError('app/angebote/actions:angebote', loadErr)
 
   if (loadErr || !current) return { ok: false, message: 'Angebot nicht gefunden' }
-  if (!angebotStatusErlaubtImWizard(current.status, opts)) {
+  let auftragKorrektur: AuftragKorrekturKontext | undefined
+  if (opts?.forAuftragKorrektur) {
+    auftragKorrektur = await loadAuftragKorrekturKontext(supabase, {
+      angebotId,
+    })
+  }
+  if (!angebotStatusErlaubtImWizard(current.status, { ...opts, auftragKorrektur })) {
     return {
       ok: false,
       message: opts?.forAuftragKorrektur
-        ? 'Korrektur nur nach Annahme — Angebot muss angenommen sein.'
+        ? auftragKorrekturSperrgrund(
+            auftragKorrektur ?? {
+              auftragId: null,
+              hatGestellteRechnung: false,
+            }
+          )
         : angebotWizardBearbeitenSperrgrund(String(current.status)) ??
           'Dieses Angebot kann nicht mehr bearbeitet werden',
     }
@@ -993,7 +1009,6 @@ export async function persistPdfForAngebot(
     'abgelehnt',
     'ersetzt',
     'abgelaufen',
-    'beauftragt',
   ].includes(st)
   const hadTimestamps = Boolean(
     String(detail.gesendet_am ?? detail.gesendet_kunde_at ?? '').trim()

@@ -11,8 +11,17 @@ import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { plusDaysYmd, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { LeadDetail } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import {
+  loadAuftragKorrekturKontext,
+  auftragDarfKorrektur,
+  auftragKorrekturSperrgrund,
+  auftragHatGestellteKundenrechnung,
+} from '@/lib/angebote/auftrag-korrektur'
 
-export async function loadAngebotKorrekturWizardBootstrap(auftragId: string): Promise<
+export async function loadAngebotKorrekturWizardBootstrap(
+  auftragId: string,
+  opts?: { /** Nachtrag: gestellte Rechnung sperrt nicht */ ignoreGestellteRechnung?: boolean }
+): Promise<
   | {
       ok: true
       bootstrap: AngebotWizardBootstrap
@@ -44,8 +53,17 @@ export async function loadAngebotKorrekturWizardBootstrap(auftragId: string): Pr
   if (!angebotId) return { ok: false, message: 'Kein verknüpftes Angebot.' }
   if (!leadId) return { ok: false, message: 'Keine verknüpfte Anfrage — Wizard nicht verfügbar.' }
 
+  const korrekturKontext = await loadAuftragKorrekturKontext(supabase, {
+    auftragId: id,
+    angebotId,
+  })
+  if (!opts?.ignoreGestellteRechnung && !auftragDarfKorrektur(korrekturKontext)) {
+    return { ok: false, message: auftragKorrekturSperrgrund(korrekturKontext) }
+  }
+
   const loaded = await loadAngebotWizardBootstrap(angebotId, leadId, {
     forAuftragKorrektur: true,
+    ignoreGestellteRechnung: Boolean(opts?.ignoreGestellteRechnung),
   })
   if (!loaded.ok) return loaded
 
@@ -65,8 +83,7 @@ export async function loadAngebotKorrekturWizardBootstrap(auftragId: string): Pr
     if (String(r.richtung ?? '') === 'eingehend') return false
     if (String(r.beleg_typ ?? 'rechnung') === 'gutschrift') return false
     if (String(r.rechnung_art ?? '') !== 'abschlag') return false
-    const st = String(r.status ?? '').toLowerCase()
-    return st === 'gesendet' || st === 'versendet' || st === 'bezahlt'
+    return auftragHatGestellteKundenrechnung([r])
   }).length
 
   return {
@@ -173,7 +190,9 @@ export async function loadNachtragAngebotBootstrap(auftragId: string): Promise<
     }
   | { ok: false; message: string }
 > {
-  const loaded = await loadAngebotKorrekturWizardBootstrap(auftragId)
+  const loaded = await loadAngebotKorrekturWizardBootstrap(auftragId, {
+    ignoreGestellteRechnung: true,
+  })
   if (!loaded.ok) return loaded
 
   const { auftragKorrektur: _k, bereitsGesendet: _b, ...rest } = loaded.bootstrap

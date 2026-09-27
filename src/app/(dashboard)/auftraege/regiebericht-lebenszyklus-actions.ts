@@ -18,6 +18,7 @@ import {
   resolveRegieSollIst,
 } from '@/lib/templates/regiebericht-lebenszyklus-template'
 import { kundeZeigt35a } from '@/lib/rechnung-berechnung'
+import { regieBetragPartner, regieMengeStunden, roundBetrag2 } from '@/lib/shared-domain/regie-betrag'
 
 
 function firmKontaktZeile(f: FirmenEinstellungen): string {
@@ -62,8 +63,8 @@ export async function renderRegieberichtFromLebenszyklus(
 
   const pos = data.positionen[0]
   const stundensatz = Number(pos?.stundensatz) || 0
-  const stunden = data.summeMinuten / 60
-  const lohnNetto = Math.round(stunden * stundensatz * 100) / 100
+  const stunden = regieMengeStunden(data.summeMinuten, null)
+  const lohnNetto = roundBetrag2(regieBetragPartner(stunden, stundensatz))
   const materialNetto = data.summeMaterialNetto
   const netto = lohnNetto + materialNetto
   const mwst = Math.round(netto * 0.19 * 100) / 100

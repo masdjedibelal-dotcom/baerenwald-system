@@ -89,6 +89,8 @@ export function freitextMailTypLabel(typ: string, kontextTyp?: string | null): s
     abnahmeprotokoll: 'Abnahme',
     abschlussdokumentation: 'Abschluss',
     besichtigung_termin: 'Besichtigungstermin',
+    regie_information: 'Regie-Information (Kunde)',
+    regie_entscheidung_partner: 'Regie-Entscheidung (Partner)',
   }
   return map[typ] ?? typ
 }

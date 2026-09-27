@@ -12,7 +12,9 @@ export type AuditEventInput = {
 }
 
 /** Append-only Audit-Eintrag (service_role) — Spiegel Portal. */
-export async function writeAuditEvent(input: AuditEventInput): Promise<void> {
+export async function writeAuditEvent(
+  input: AuditEventInput
+): Promise<{ ok: boolean }> {
   const { error } = await supabaseAdmin.from('audit_events').insert({
     entity_type: input.entityType,
     entity_id: input.entityId,
@@ -22,6 +24,10 @@ export async function writeAuditEvent(input: AuditEventInput): Promise<void> {
     kunde_id: input.kundeId ?? null,
     payload: input.payload ?? {},
   })
-  if (error) logDbError('lib/audit/write-audit-event:audit_events', error)
-  if (error) console.error('[audit]', input.aktion, error.message)
+  if (error) {
+    logDbError('lib/audit/write-audit-event:audit_events', error)
+    console.error('[audit]', input.aktion, error.message)
+    return { ok: false }
+  }
+  return { ok: true }
 }
