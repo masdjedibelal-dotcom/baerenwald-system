@@ -18,6 +18,8 @@ export const COPY_ERROR = {
   auftragKorrekturKeinAuftrag: 'Noch kein Auftrag — erst Angebot annehmen.',
   /** Auftrag bearbeiten: gestellte Rechnung — Korrektur über Rechnung. */
   auftragKorrekturRechnungGestellt: 'Rechnung gestellt — Korrektur über die Rechnung.',
+  /** Direktauftrag ohne Angebot: PosBoard-Edit nur wenn kein Angebot verknüpft. */
+  leistungenOhneAngebotNurDirekt: 'Mit Angebot — Leistungen über Auftrag bearbeiten.',
 } as const
 
 export type CopyErrorKey = keyof typeof COPY_ERROR

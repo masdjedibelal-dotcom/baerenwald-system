@@ -105,13 +105,24 @@ import {
   loadNachtragAngebotBootstrap,
 } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
-import { TOAST } from '@/lib/copy'
+import { COPY_BUTTON, TOAST } from '@/lib/copy'
 
 const AngebotWizard = dynamic(
   () => import('@/components/angebote/AngebotWizard').then((mod) => ({ default: mod.AngebotWizard })),
   {
     ssr: false,
     loading: () => <CrmInlineLoading label="Angebot-Assistent wird geladen …" minHeight={120} />,
+  }
+)
+
+const AuftragLeistungenBearbeitenWizard = dynamic(
+  () =>
+    import('@/components/auftraege/AuftragLeistungenBearbeitenWizard').then((mod) => ({
+      default: mod.AuftragLeistungenBearbeitenWizard,
+    })),
+  {
+    ssr: false,
+    loading: () => <CrmInlineLoading label="Leistungen werden geladen …" minHeight={120} />,
   }
 )
 
@@ -426,6 +437,8 @@ export function AuftragDetailClient({
     useState<AngebotWizardBootstrap | null>(null)
   const [angebotKorrekturLead, setAngebotKorrekturLead] = useState<LeadDetail | null>(null)
   const [angebotKorrekturKey, setAngebotKorrekturKey] = useState(0)
+  const [leistungenOhneAngebotOpen, setLeistungenOhneAngebotOpen] = useState(false)
+  const [leistungenOhneAngebotKey, setLeistungenOhneAngebotKey] = useState(0)
 
   const openAngebotKorrektur = useCallback(() => {
     if (!detail.angebot_id) {
@@ -448,6 +461,12 @@ export function AuftragDetailClient({
       setAngebotKorrekturOpen(true)
     })
   }, [detail.angebot_id, detail.id, detail.lead_id])
+
+  const openLeistungenOhneAngebot = useCallback(() => {
+    if (detail.angebot_id) return
+    setLeistungenOhneAngebotKey((k) => k + 1)
+    setLeistungenOhneAngebotOpen(true)
+  }, [detail.angebot_id])
 
   const openNachtragAngebot = useCallback(() => {
     if (!detail.angebot_id || !detail.lead_id) {
@@ -809,6 +828,38 @@ export function AuftragDetailClient({
     </>
   )
 
+  /** CTA „Auftrag bearbeiten“: mit Angebot, ohne gestellte Kundenrechnung */
+  const kannAuftragKorrektur = useMemo(
+    () =>
+      Boolean(detail.angebot_id) &&
+      !auftragHatGestellteKundenrechnung(rechnungenListe),
+    [detail.angebot_id, rechnungenListe]
+  )
+
+  /** Direktauftrag ohne Angebot: PosBoard direkt auf auftrag_positionen */
+  const kannLeistungenOhneAngebot = useMemo(
+    () =>
+      !detail.angebot_id &&
+      detail.status !== 'storniert' &&
+      !auftragHatGestellteKundenrechnung(rechnungenListe),
+    [detail.angebot_id, detail.status, rechnungenListe]
+  )
+
+  const openLeistungenDokument = useCallback(() => {
+    if (kannLeistungenOhneAngebot) {
+      openLeistungenOhneAngebot()
+      return
+    }
+    if (kannAuftragKorrektur) {
+      openAngebotKorrektur()
+    }
+  }, [
+    kannLeistungenOhneAngebot,
+    kannAuftragKorrektur,
+    openLeistungenOhneAngebot,
+    openAngebotKorrektur,
+  ])
+
   const leistungInhalt = (
     <AuftragLeistungenTab
       detail={detail}
@@ -818,7 +869,16 @@ export function AuftragDetailClient({
       editable={detail.status !== 'storniert'}
       mwstSatz={leistungenMwstSatz}
       onSaved={() => refresh()}
-      onOpenDokument={openAngebotKorrektur}
+      onOpenDokument={
+        kannLeistungenOhneAngebot || kannAuftragKorrektur
+          ? openLeistungenDokument
+          : undefined
+      }
+      dokumentActionLabel={
+        kannLeistungenOhneAngebot
+          ? COPY_BUTTON.leistungenBearbeiten
+          : COPY_BUTTON.auftragBearbeiten
+      }
       vertragNachtragVerfuegbar={hauptvertraegeFuerNachtrag.length > 0}
       onVertragNachtragErstellen={openNachtragErstellen}
       initialLeistungenView={
@@ -875,14 +935,6 @@ export function AuftragDetailClient({
         beleg_typ: r.beleg_typ ?? null,
       })),
     [rechnungenListe]
-  )
-
-  /** CTA „Auftrag bearbeiten“: ausgeblendet bei gestellter Kundenrechnung */
-  const kannAuftragKorrektur = useMemo(
-    () =>
-      Boolean(detail.angebot_id) &&
-      !auftragHatGestellteKundenrechnung(rechnungenListe),
-    [detail.angebot_id, rechnungenListe]
   )
 
   const hatAbschlagsplan = hatAktivenAbschlagsplan(zahlungsplanParsed)
@@ -1316,9 +1368,17 @@ export function AuftragDetailClient({
                   title: 'Rechnung öffnen — dort korrigieren',
                 }
               }
+              if (kannLeistungenOhneAngebot) {
+                return {
+                  label: COPY_BUTTON.leistungenBearbeiten,
+                  icon: 'pencil',
+                  onClick: openLeistungenOhneAngebot,
+                  disabled: pending,
+                }
+              }
               if (kannAuftragKorrektur) {
                 return {
-                  label: 'Auftrag bearbeiten',
+                  label: COPY_BUTTON.auftragBearbeiten,
                   icon: 'pencil',
                   onClick: openAngebotKorrektur,
                   disabled: pending,
@@ -1329,13 +1389,24 @@ export function AuftragDetailClient({
             menuItems={
               !istStorniert
                 ? [
+                    ...(kannLeistungenOhneAngebot &&
+                    (detail.status === 'offen' ||
+                      detail.status === 'in_arbeit' ||
+                      detail.status === 'abnahme')
+                      ? [
+                          {
+                            label: COPY_BUTTON.leistungenBearbeiten,
+                            onClick: openLeistungenOhneAngebot,
+                          },
+                        ]
+                      : []),
                     ...(kannAuftragKorrektur &&
                     (detail.status === 'offen' ||
                       detail.status === 'in_arbeit' ||
                       detail.status === 'abnahme')
                       ? [
                           {
-                            label: 'Auftrag bearbeiten',
+                            label: COPY_BUTTON.auftragBearbeiten,
                             onClick: openAngebotKorrektur,
                           },
                         ]
@@ -1474,6 +1545,23 @@ export function AuftragDetailClient({
             refresh()
           }}
           onSaved={() => refresh()}
+        />
+      ) : null}
+
+      {leistungenOhneAngebotOpen ? (
+        <AuftragLeistungenBearbeitenWizard
+          key={leistungenOhneAngebotKey}
+          auftragId={detail.id}
+          titel={projektName}
+          positionen={detail.auftrag_positionen ?? []}
+          gewerke={gewerke as Gewerk[]}
+          preislisten={preislisten}
+          firm={firm}
+          onClose={() => setLeistungenOhneAngebotOpen(false)}
+          onDone={() => {
+            setLeistungenOhneAngebotOpen(false)
+            refresh()
+          }}
         />
       ) : null}
     </EntityDetailLayout>

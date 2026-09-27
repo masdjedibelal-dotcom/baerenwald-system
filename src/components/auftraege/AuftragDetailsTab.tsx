@@ -143,7 +143,8 @@ export function AuftragLeistungenTab({
   editable = true,
   mwstSatz = 19,
   onSaved,
-  onOpenDokument: _onOpenDokument,
+  onOpenDokument,
+  dokumentActionLabel,
   vertragNachtragVerfuegbar: _vertragNachtragVerfuegbar = false,
   onVertragNachtragErstellen: _onVertragNachtragErstellen,
   initialLeistungenView = 'leistungen',
@@ -157,6 +158,7 @@ export function AuftragLeistungenTab({
   mwstSatz?: number
   onSaved?: () => void
   onOpenDokument?: () => void
+  dokumentActionLabel?: string
   vertragNachtragVerfuegbar?: boolean
   onVertragNachtragErstellen?: () => void
   /** Deep-Link z. B. ?tab=bautagebuch */
@@ -439,8 +441,14 @@ export function AuftragLeistungenTab({
             rows={rows}
             groupByGewerk
             footerNettoMwst={footerNettoMwst}
+            onOpenDokument={disabled ? undefined : onOpenDokument}
+            dokumentActionLabel={dokumentActionLabel}
             dokumentHint={null}
-            emptyHint="Noch keine Leistungen am Auftrag. Sie entstehen mit dem angenommenen Angebot."
+            emptyHint={
+              detail.angebot_id
+                ? 'Noch keine Leistungen am Auftrag. Sie entstehen mit dem angenommenen Angebot.'
+                : 'Noch keine Leistungen — über „Leistungen bearbeiten“ anlegen.'
+            }
             bulkActions={
               disabled
                 ? undefined

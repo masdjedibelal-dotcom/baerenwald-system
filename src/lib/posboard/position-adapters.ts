@@ -1,4 +1,5 @@
 import type { AuftragPosition, AngebotPosition } from '@/lib/types'
+import { istRegiePosition } from '@/lib/auftraege/regie-display'
 import {
   dokumentZeilenToPosBoardLines,
   posBoardLineFromAngebotPosition,
@@ -29,25 +30,37 @@ export function auftragPositionenToPosBoardLines(
   items: AuftragPosition[] | null | undefined
 ): PosBoardLine[] {
   const list = Array.isArray(items) ? items : []
-  return list.map((p) => {
-    const menge = Number(p.menge) || 1
-    const lohn = Number(p.lohn_fix ?? 0)
-    const mat = Number(p.material_fix ?? 0)
-    let unit = lohn + mat
-    if (!unit && p.preis_fix != null) {
-      unit = Number(p.preis_fix) / Math.max(menge, 0.0001)
-    }
-    return {
-      id: p.id,
-      gewerk: p.gewerk_name?.trim() || p.gewerk_slug || 'Allgemein',
-      name: p.leistung_name?.trim() || 'Position',
-      beschreibung: p.beschreibung?.trim() || undefined,
-      menge,
-      einheit: p.einheit ?? 'Stück',
-      preis: Math.round(unit * 100) / 100,
-      ust: 19,
-    }
-  })
+  return list
+    .filter((p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt')
+    .map((p) => {
+      const isRegie = istRegiePosition(p)
+      const menge = isRegie
+        ? Number(p.geschaetzt_std) > 0
+          ? Number(p.geschaetzt_std)
+          : Number(p.menge) || 1
+        : Number(p.menge) || 1
+      const lohn = Number(p.lohn_fix ?? 0)
+      const mat = Number(p.material_fix ?? 0)
+      let unit = lohn + mat
+      const kundenSatz = Number(p.stundensatz_kunde ?? 0)
+      const partnerSatz = Number(p.stundensatz ?? 0)
+      if (isRegie && (kundenSatz > 0 || partnerSatz > 0)) {
+        unit = kundenSatz > 0 ? kundenSatz : partnerSatz
+      } else if (!unit && p.preis_fix != null) {
+        unit = Number(p.preis_fix) / Math.max(menge, 0.0001)
+      }
+      return {
+        id: p.id,
+        gewerk: p.gewerk_name?.trim() || p.gewerk_slug || 'Allgemein',
+        name: p.leistung_name?.trim() || 'Position',
+        beschreibung: p.beschreibung?.trim() || undefined,
+        menge,
+        einheit: isRegie ? p.einheit?.trim() || 'h' : p.einheit ?? 'Stück',
+        preis: Math.round(unit * 100) / 100,
+        ust: 19,
+        regieSchein: isRegie || undefined,
+      }
+    })
 }
 
 /** @deprecated Nutze auftragPositionenToPosBoardLines — bleibt für Alt-Importe. */

@@ -12,6 +12,8 @@ export const COPY_BUTTON = {
   rechnungErstellen: 'Rechnung erstellen',
   verwerfen: 'Verwerfen',
   bearbeiten: 'Bearbeiten',
+  leistungenBearbeiten: 'Leistungen bearbeiten',
+  auftragBearbeiten: 'Auftrag bearbeiten',
   hinzufuegen: 'Hinzufügen',
   uebernehmen: 'Übernehmen',
   schliessen: 'Schließen',

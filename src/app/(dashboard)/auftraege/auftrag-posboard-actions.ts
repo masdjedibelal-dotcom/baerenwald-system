@@ -1,10 +1,16 @@
 'use server'
 
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { COPY_ERROR } from '@/lib/copy/errors'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { syncAuftragIstBauprojekt } from '@/lib/auftraege/sync-auftrag-ist-bauprojekt'
 import { syncAuftragFortschrittFromPositionen } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
+import {
+  auftragDarfKorrektur,
+  loadAuftragKorrekturKontext,
+  auftragKorrekturSperrgrund,
+} from '@/lib/angebote/auftrag-korrektur'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { POS_BOARD_DEFAULT_GEWERK } from '@/lib/posboard/pos-board-line'
 import type { AuftragPosition } from '@/lib/types'
@@ -70,7 +76,9 @@ function lineToRow(
     typ: isRegie ? 'regie' : base?.typ ?? 'lv',
     verguetung: isRegie ? 'aufwand' : 'festpreis',
     geschaetzt_std: isRegie ? menge : null,
-    stundensatz: isRegie ? unit : null,
+    // PosBoard am Direktauftrag = Kundenpreis; Partner-Satz behalten wenn vorhanden
+    stundensatz: isRegie ? (base?.stundensatz ?? unit) : null,
+    stundensatz_kunde: isRegie ? unit : null,
   }
 }
 
@@ -146,4 +154,49 @@ export async function replaceAuftragPositionenFromPosBoard(
 
   revalidateAuftragDetail(auftragId)
   return { ok: true }
+}
+
+/**
+ * Direktauftrag ohne Angebot: PosBoard → `auftrag_positionen`.
+ * Mit verknüpftem Angebot → Angebot-Korrektur nutzen (nicht diesen Pfad).
+ */
+export async function saveAuftragLeistungenOhneAngebot(input: {
+  auftragId: string
+  positionen: PosBoardLine[]
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: COPY_ERROR.sessionExpired }
+
+  const auftragId = input.auftragId.trim()
+  if (!auftragId) return { ok: false, message: COPY_ERROR.validation }
+
+  const { data: auftrag, error } = await supabase
+    .from('auftraege')
+    .select('id, angebot_id, status')
+    .eq('id', auftragId)
+    .maybeSingle()
+  if (error) logDbError('app/auftraege/auftrag-posboard-actions:auftraege', error)
+  if (error || !auftrag) return { ok: false, message: COPY_ERROR.notFound }
+
+  if (String(auftrag.angebot_id ?? '').trim()) {
+    return { ok: false, message: COPY_ERROR.leistungenOhneAngebotNurDirekt }
+  }
+  if ((auftrag.status ?? '') === 'storniert') {
+    return { ok: false, message: COPY_ERROR.forbidden }
+  }
+
+  const korrektur = await loadAuftragKorrekturKontext(supabase, { auftragId })
+  if (!auftragDarfKorrektur(korrektur)) {
+    return { ok: false, message: auftragKorrekturSperrgrund(korrektur) }
+  }
+
+  const lines = (input.positionen ?? []).filter((l) => l.name?.trim())
+  if (!lines.length) {
+    return { ok: false, message: COPY_ERROR.validation }
+  }
+
+  return replaceAuftragPositionenFromPosBoard(auftragId, lines)
 }

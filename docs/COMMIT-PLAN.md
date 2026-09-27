@@ -4,6 +4,26 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
+## Direktauftrag: Leistungen bearbeiten (PosBoard → auftrag_positionen) — 2026-09-27
+
+**Commit-Text:** `feat(crm): Direktauftrag Leistungen bearbeiten ohne Angebot-Korrektur`
+
+**Befund:** „Auftrag bearbeiten“ öffnete den Angebot-Wizard und las `angebote.positionen`. Direktauftrag hat `angebot_id = null` → leere/falsche Positionen.
+
+**Lösung:** Ohne `angebot_id` schreibt PosBoard nur `auftrag_positionen`. Mit Angebot bleibt die bestehende Korrektur.
+
+**Dateien:**
+- `src/app/(dashboard)/auftraege/auftrag-posboard-actions.ts` — `saveAuftragLeistungenOhneAngebot` + Regie `stundensatz_kunde`
+- `src/components/auftraege/AuftragLeistungenBearbeitenWizard.tsx` — neu
+- `src/components/auftraege/AuftragDetailClient.tsx` — CTA/Label/Wiring
+- `src/lib/posboard/position-adapters.ts` — `lohn_fix`/`preis_fix`/`stundensatz_kunde`; `entfernt` raus
+- `src/lib/copy/buttons.ts`, `errors.ts` — Labels/Fehler
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+**Abnahme:** Direktauftrag ohne Angebot → „Leistungen bearbeiten“ zeigt bestehende Positionen, Speichern schreibt `auftrag_positionen`. Mit Angebot → weiter „Auftrag bearbeiten“ (Korrektur). `npx tsc --noEmit` grün.
+
+---
+
 ## Deploy-Fix: Netlify Build-Guards — 2026-09-27
 
 **Commit-Text:** `fix(crm): MockSelect in Partner-Aufgabe, Void-Allowlist, db-spalten aus Build`
