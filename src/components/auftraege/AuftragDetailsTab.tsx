@@ -368,9 +368,12 @@ export function AuftragLeistungenTab({
           {
             id: 'bautagebuch',
             label: (() => {
-              const n = bautagebuchEintraege.filter(
-                (e) => String(e.typ).toLowerCase() !== 'weitere_arbeit'
-              ).length
+              const n = bautagebuchEintraege.filter((e) => {
+                if (String(e.typ).toLowerCase() === 'weitere_arbeit') return false
+                const von = String(e.erfasst_von ?? '')
+                if (von.includes('partner') || von.includes('eigenbetrieb')) return false
+                return true
+              }).length
               return (
                 <>
                   Bautagebuch

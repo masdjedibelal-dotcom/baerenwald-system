@@ -230,7 +230,10 @@ export function LeistungDrawer({
           {(row.handwerkerUpdates ?? []).length === 0 ? (
             <MockEmpty title="Keine Einträge." />
           ) : (
-            <LeistungHandwerkerUpdatesAccordion updates={row.handwerkerUpdates ?? []} />
+            <LeistungHandwerkerUpdatesAccordion
+              updates={row.handwerkerUpdates ?? []}
+              variant="list"
+            />
           )}
         </Section>
       ) : null}

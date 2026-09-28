@@ -3,8 +3,7 @@
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
 import { useState } from 'react'
-import { MediaThumb, MediaThumbStrip } from '@/components/shared/MediaThumb'
-import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
+import { MediaThumb } from '@/components/shared/MediaThumb'
 import { cn } from '@/lib/utils'
 import type { LeistungRow } from '@/components/leistungen/types'
 import { formatDatumZeit } from '@/lib/format/geld-datum'
@@ -25,97 +24,111 @@ function fmtDatumZeit(v?: string | null): string {
   return formatDatumZeit(v)
 }
 
+function realText(u: Update): string {
+  const t = u.text?.trim() ?? ''
+  if (!t || /^update$/i.test(t)) return ''
+  return t
+}
+
 /**
- * Accordion unter einer Leistung: Partner-Updates mit Foto-Vorschau.
- * Collapsed: Count + Thumbs. Default offen bei ≥1 Update.
+ * Partner-Updates an einer Leistung.
+ * - `hint`: nur Zähler-Hinweis in der Leistungen-Liste
+ * - `list`: flache Zeilen im Positions-Sheet (Datum/Uhrzeit + Thumbs → Lightbox)
  */
 export function LeistungHandwerkerUpdatesAccordion({
   updates,
   className,
-  defaultOpen,
-  compact,
+  variant = 'list',
 }: {
   updates: Update[]
   className?: string
+  /** hint = Listen-Chip; list = Sheet-Detail */
+  variant?: 'hint' | 'list'
+  /** @deprecated — Accordion defaultet nicht mehr offen */
   defaultOpen?: boolean
-  /** Kompakt in Listenzeile — weniger Padding. */
   compact?: boolean
 }) {
-  const [listOpen, setListOpen] = useState(() => defaultOpen ?? updates.length > 0)
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   if (updates.length === 0) return null
 
-  const headerThumbs = updates.flatMap((u) => u.fotoUrls ?? []).filter(Boolean)
+  if (variant === 'hint') {
+    const n = updates.length
+    return (
+      <div className={cn('hw-upd-hint', className)} aria-label={`${n} Partner-Updates`}>
+        <MockIcon n="camera" ctx="default" size={14} aria-hidden />
+        <span>{n === 1 ? '1 Update' : `${n} Updates`}</span>
+      </div>
+    )
+  }
 
   return (
-    <div className={cn('hw-upd', compact && 'hw-upd--compact', className)}>
-      <MockBtn className="hw-upd__toggle" type="button" aria-expanded={listOpen} onClick={(e) => {
-          e.stopPropagation()
-          setListOpen((o) => !o)
-        }}>
-        <span className="hw-upd__toggle-label">
-          {updates.length === 1 ? '1 Update' : `${updates.length} Updates`}
-        </span>
-        {!listOpen ? <MediaThumbStrip urls={headerThumbs} max={3} size="sm" /> : null}
-        <MockIcon n="chevron-down" ctx="default" className={cn('hw-upd__chev', listOpen && 'hw-upd__chev--open')} aria-hidden />
-      </MockBtn>
-
-      {listOpen ? (
-        <ul className="hw-upd__list">
-          {updates.map((u, i) => {
-            const key = u.id ?? `${u.at ?? i}-${i}`
-            const rowOpen = openId === key
-            const label = eintragTypLabel(u.typ) || 'Update'
-            const fotos = u.fotoUrls ?? []
-            const preview =
-              u.text?.trim() ||
-              (fotos.length > 0 ? `${fotos.length} Foto(s)` : 'Ohne Text')
-            return (
-              <li key={key} className="hw-upd__item">
-                <MockBtn className="hw-upd__row" type="button" aria-expanded={rowOpen} onClick={(e) => {
-                    e.stopPropagation()
-                    setOpenId(rowOpen ? null : key)
-                  }}>
-                  <div className="hw-upd__row-main">
-                    <div className="hw-upd__row-head">
-                      <span className="hw-upd__typ">{label}</span>
-                      <span className="hw-upd__datum">{fmtDatumZeit(u.at)}</span>
-                      {u.zeitLabel ? (
-                        <span className="hw-upd__zeit">{u.zeitLabel} Std.</span>
-                      ) : null}
-                    </div>
-                    {!rowOpen ? <p className="hw-upd__preview">{preview}</p> : null}
-                  </div>
-                  {!rowOpen ? <MediaThumbStrip urls={fotos} max={2} size="sm" /> : null}
-                  <MockIcon n="chevron-down" ctx="row" className={cn('hw-upd__chev', rowOpen && 'hw-upd__chev--open')} aria-hidden />
-                </MockBtn>
-                {rowOpen ? (
-                  <div className="hw-upd__detail">
-                    {u.text?.trim() ? (
-                      <p className="hw-upd__text">{u.text.trim()}</p>
-                    ) : (
-                      <p className="hw-upd__text hw-upd__text--empty">Kein Text</p>
-                    )}
-                    {fotos.length > 0 ? (
-                      <div className="hw-upd__fotos">
-                        {fotos.map((url, fi) => (
-                          <MediaThumb
-                            key={`${key}-f-${fi}`}
-                            src={url}
-                            alt={`Foto ${fi + 1}`}
-                            size="md"
-                            className="hw-upd__foto-img"
-                          />
-                        ))}
-                      </div>
-                    ) : null}
+    <div className={cn('hw-upd', className)}>
+      <ul className="hw-upd__list">
+        {updates.map((u, i) => {
+          const key = u.id ?? `${u.at ?? i}-${i}`
+          const fotos = (u.fotoUrls ?? []).filter(Boolean)
+          const note = realText(u)
+          return (
+            <li key={key} className="hw-upd__item">
+              <div className="hw-upd__flat">
+                <div className="hw-upd__flat-main">
+                  <span className="hw-upd__datum">{fmtDatumZeit(u.at)}</span>
+                  {u.zeitLabel ? (
+                    <span className="hw-upd__zeit">{u.zeitLabel} Std.</span>
+                  ) : null}
+                  {note ? <p className="hw-upd__note">{note}</p> : null}
+                </div>
+                {fotos.length > 0 ? (
+                  <div className="hw-upd__thumbs">
+                    {fotos.map((url, fi) => (
+                      <MediaThumb
+                        key={`${key}-f-${fi}`}
+                        src={url}
+                        alt={`Foto ${fi + 1}`}
+                        size="sm"
+                        href={null}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setLightboxUrl(url)
+                        }}
+                      />
+                    ))}
                   </div>
                 ) : null}
-              </li>
-            )
-          })}
-        </ul>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+
+      {lightboxUrl ? (
+        <div
+          className="bt-foto-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Foto"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(ev) => {
+            if (ev.key === 'Escape') setLightboxUrl(null)
+          }}
+        >
+          <MockBtn
+            className="bt-foto-lightbox__close"
+            type="button"
+            aria-label="Schließen"
+            onClick={() => setLightboxUrl(null)}
+          >
+            <MockIcon n="x" ctx="default" size={20} />
+          </MockBtn>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="bt-foto-lightbox__img"
+            onClick={(ev) => ev.stopPropagation()}
+          />
+        </div>
       ) : null}
     </div>
   )

@@ -4,6 +4,31 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
+## Fix: Partner-Updates UX (Hinweis · Sheet · kein BT) — 2026-09-28
+
+**Commit-Text:** `fix(crm): Partner-Updates nur Hinweis in Liste, Detail im Sheet, nicht im Bautagebuch`
+
+**Soll:**
+1. Leistungen-Liste: nur Chip „n Updates“
+2. Positions-Sheet: flache Zeilen Datum/Uhrzeit + Thumb → CRM-Lightbox
+3. Kein „Update“-Label-Spam
+4. Bautagebuch: nur CRM-Kunden-Einträge, keine Partner-Positions-Updates
+
+**Dateien:**
+- `src/components/leistungen/LeistungHandwerkerUpdatesAccordion.tsx` — `hint` | `list` + Lightbox
+- `src/components/leistungen/LeistungenTab.tsx` — nur `variant="hint"`
+- `src/components/leistungen/LeistungDrawer.tsx` — `variant="list"`
+- `src/components/leistungen/adapters.ts` — Text ohne Typ-Fallback „Update“
+- `src/components/auftraege/AuftragBautagebuchSection.tsx` — Partner rausfiltern
+- `src/components/auftraege/AuftragDetailsTab.tsx` — BT-Zähler ohne Partner
+- `src/styles/mock-design-system.css` — `.hw-upd-hint` / `.hw-upd__flat` + Medien-Resets
+- `src/components/shared/MediaThumb.tsx` — Größe auf Shell, `media-thumb-btn`
+- `docs/COMMIT-PLAN.md` — dieser Abschnitt
+
+**Abnahme:** Liste zeigt Chip; Sheet zeigt Datum+Thumb; Thumb öffnet Lightbox mit X; Bautagebuch ohne Partner-Updates. `npx tsc --noEmit` grün.
+
+---
+
 ## Direktauftrag: Leistungen bearbeiten (PosBoard → auftrag_positionen) — 2026-09-27
 
 **Commit-Text:** `feat(crm): Direktauftrag Leistungen bearbeiten ohne Angebot-Korrektur`

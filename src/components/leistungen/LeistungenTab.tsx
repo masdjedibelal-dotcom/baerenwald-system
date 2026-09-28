@@ -266,14 +266,10 @@ export function LeistungenTab({
             </span>
           </div>
           {(row.handwerkerUpdates?.length ?? 0) > 0 ? (
-            <div
-              className="lt-upd"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
+            <div className="lt-upd">
               <LeistungHandwerkerUpdatesAccordion
                 updates={row.handwerkerUpdates ?? []}
-                compact
+                variant="hint"
               />
             </div>
           ) : null}
@@ -382,14 +378,10 @@ export function LeistungenTab({
         })}
       </div>
       {hasUpdates ? (
-        <div
-          className="lt-upd"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
+        <div className="lt-upd">
           <LeistungHandwerkerUpdatesAccordion
             updates={row.handwerkerUpdates ?? []}
-            compact
+            variant="hint"
           />
         </div>
       ) : null}

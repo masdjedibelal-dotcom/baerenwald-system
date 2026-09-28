@@ -21,7 +21,6 @@ import {
   regieKundenStundensatz,
 } from '@/lib/auftraege/regie-display'
 import { positionBetrag } from '@/lib/shared-domain/regie-betrag'
-import { eintragTypLabel } from '@/lib/auftraege/position-lebenszyklus'
 import { richTextToPlain } from '@/lib/rich-text'
 import { formatDatum } from '@/lib/utils'
 import type { AbnahmeMangel } from '@/lib/auftraege/abnahme-protokoll-types'
@@ -305,14 +304,13 @@ export function leistungenFromAuftragPositionen(
         })
         .map((e) => {
           const zeit = Number(e.zeit_minuten) || 0
-          const typ = eintragTypLabel(e.typ)
-          const text = e.beschreibung?.trim() || typ || 'Update'
           const fotoUrls = (e.fotoUrls ?? []).filter(Boolean)
           return {
             id: e.id,
             typ: e.typ ?? null,
             at: e.created_at ?? null,
-            text,
+            /** Nur echter Text — kein Typ-Fallback „Update“ (vermeidet Label-Spam). */
+            text: e.beschreibung?.trim() || '',
             zeitLabel: zeit > 0 ? formatStundenColon(zeit) : null,
             fotoCount: fotoUrls.length || e.fotoCount || 0,
             fotoUrls,

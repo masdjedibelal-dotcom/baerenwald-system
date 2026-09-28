@@ -104,7 +104,12 @@ export function AuftragBautagebuchSection({
   const [deletePending, setDeletePending] = useState(false)
 
   const sorted = [...eintraege]
-    .filter((e) => String(e.typ).toLowerCase() !== 'weitere_arbeit')
+    .filter((e) => {
+      // Nur CRM-Tagebuch für Kunden — keine Partner-Positions-Updates
+      if (String(e.typ).toLowerCase() === 'weitere_arbeit') return false
+      if (isPartnerEintrag(e)) return false
+      return true
+    })
     .sort((a, b) => {
       const ta = a.ereignis_zeit || a.created_at || ''
       const tb = b.ereignis_zeit || b.created_at || ''

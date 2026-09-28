@@ -66,17 +66,22 @@ export function MediaThumb({
 
   if (!url && !storagePath) return null
 
+  const shellClass = cn(
+    'relative block shrink-0 overflow-hidden',
+    SIZE_CLASS[size],
+    failed && 'opacity-40',
+    refreshing && 'opacity-60',
+    className
+  )
+
   const img = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url || undefined}
       alt={alt}
       className={cn(
-        `object-cover bg-[var(--bg-soft,${C.gray100c})]`,
-        SIZE_CLASS[size],
-        failed && 'opacity-40',
-        refreshing && 'opacity-60',
-        className
+        'block h-full w-full object-cover',
+        `bg-[var(--bg-soft,${C.gray100c})]`
       )}
       onError={() => {
         if (!failed && !refreshing) void tryRefresh()
@@ -87,7 +92,11 @@ export function MediaThumb({
 
   if (onClick) {
     return (
-      <MockBtn className="shrink-0 overflow-hidden p-0" type="button" onClick={onClick}>
+      <MockBtn
+        className={cn(shellClass, 'media-thumb-btn p-0')}
+        type="button"
+        onClick={onClick}
+      >
         {img}
       </MockBtn>
     )
@@ -100,7 +109,7 @@ export function MediaThumb({
         href={link}
         target="_blank"
         rel="noopener noreferrer"
-        className="relative shrink-0 overflow-hidden"
+        className={shellClass}
         onClick={(e) => e.stopPropagation()}
       >
         {img}
@@ -108,7 +117,7 @@ export function MediaThumb({
     )
   }
 
-  return <span className="shrink-0 overflow-hidden">{img}</span>
+  return <span className={shellClass}>{img}</span>
 }
 
 export function MediaThumbStrip({
