@@ -4,6 +4,17 @@ Belal committed selbst über GitHub Desktop auf **staging**. Agent führt keine 
 
 ---
 
+## Fix: Partner-Updates Accordion + Lightbox-Portal — 2026-09-28
+
+**Commit-Text:** `fix(crm): Partner-Updates-Accordion im Sheet, Lightbox per Portal über Sheet`
+
+1. Sheet behält Accordion („n Updates“ + Zeilen), Liste weiter nur Hinweis-Chip.
+2. Foto-Lightbox via `createPortal(document.body)` + `z-index: 700` (über EditorSheet 320–450) — nicht mehr im Sheet gefangen.
+
+**Dateien:** `LeistungHandwerkerUpdatesAccordion.tsx`, `mock-design-system.css`, `docs/COMMIT-PLAN.md`
+
+---
+
 ## Fix: Partner-Updates UX (Hinweis · Sheet · kein BT) — 2026-09-28
 
 **Commit-Text:** `fix(crm): Partner-Updates nur Hinweis in Liste, Detail im Sheet, nicht im Bautagebuch`

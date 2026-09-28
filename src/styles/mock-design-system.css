@@ -6776,7 +6776,8 @@ width: 100%;
 .bt-foto-lightbox {
 position: fixed;
   inset: 0;
-  z-index: 80;
+  /* Über EditorSheet (320–450) — sonst im Sheet gefangen / nicht schließbar */
+  z-index: 700;
   display: flex;
   align-items: center;
   justify-content: center;
