@@ -1,4 +1,7 @@
 import { logDbError } from '@/lib/errors/log-db-error'
+import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
+import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
+import type { AuftragPosition } from '@/lib/types'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { filterKundenAngebote } from '@/lib/angebote/partner-einholung'
 import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
@@ -358,7 +361,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     auftragIds.length
       ? await (() => { const db = createClient(); return db
             .from('auftrag_positionen')
-            .select('auftrag_id, handwerker_id, handwerker_status, preis_fix, menge, aenderung_typ, gewerk_slug, beschreibung')
+            .select('id, auftrag_id, sort_order, handwerker_id, handwerker_status, aenderung_typ, typ, verguetung, gewerk_slug, gewerk_name, gewerk_block_key, leistung_name, beschreibung, einheit, menge, geschaetzt_std, preis_fix, preis_partner, lohn_fix, material_fix, stundensatz, stundensatz_kunde')
             .in('auftrag_id', auftragIds)
             .order('created_at', { ascending: false })
             .limit(scoped ? 800 : 2000) })()
@@ -740,31 +743,12 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       if (phase === 'auftrag') {
         const auf = (auftraegeByLead.get(lead.id) ?? []).find((a) => a.id === entityId)
         const pos = positionenByAuftrag.get(entityId) ?? []
-        const posNetto = pos.reduce((s, p) => {
-          if (String(p.aenderung_typ ?? '').toLowerCase() === 'entfernt') return s
-          const slug = String(p.gewerk_slug ?? '')
-          if (slug.startsWith('_')) return s
-          const menge = Number(p.menge) > 0 ? Number(p.menge) : 1
-          const unit = Number(p.preis_fix) || 0
-          return s + unit * menge
-        }, 0)
+        // Gleicher Rechenkern wie im Auftragsdetail (Positionen, Regie, Nachlass-Zeile).
+        const aktive = pos.filter((p) => String(p.aenderung_typ ?? '').toLowerCase() !== 'entfernt')
+        const { netto: posNetto, brutto } = auftragSummenAusPositionen(
+          auftragPositionenToAngebotPositionen(aktive as unknown as AuftragPosition[])
+        )
         if (posNetto > 0) {
-          // Nachlass-Zeile (`__gesamtrabatt__`, Regel in `beschreibung`) wie im Auftragsdetail abziehen.
-          const rabatt = pos.find(
-            (p) =>
-              p.gewerk_slug === ZEILE_SLUG_GESAMTRABATT &&
-              String(p.aenderung_typ ?? '').toLowerCase() !== 'entfernt'
-          )
-          let nachlass = 0
-          if (rabatt) {
-            const { modus, wert } = parseGesamtrabattMetaFromPosition({
-              gewerk_slug: rabatt.gewerk_slug,
-              beschreibung: rabatt.beschreibung ?? '',
-              gesamt_min: Number(rabatt.preis_fix) || 0,
-            } as AngebotPosition)
-            nachlass = gesamtrabattAbzugFromModus(modus, wert, posNetto, nettoZuBrutto(posNetto, 19))
-          }
-          const brutto = nettoZuBrutto(Math.max(0, posNetto - nachlass), 19)
           return `${formatEuro(brutto)}`
         }
         const leadAngs = angeboteByLead.get(lead.id) ?? []
