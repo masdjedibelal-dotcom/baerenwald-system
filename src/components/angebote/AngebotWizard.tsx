@@ -628,13 +628,18 @@ export function AngebotWizard({
   )
   draftSnapshotRef.current = draftSnapshot
 
+  // P19: Automatische Normalisierungen direkt nach dem Öffnen (Zahlfrist, Empfänger, Zeilen)
+  // sind keine Änderung des Nutzers → keine falsche Frage „Änderungen speichern?“.
+  const geoeffnetAmRef = useRef(Date.now())
   useEffect(() => {
-    if (savedSnapshotRef.current === null) {
+    const einschwingen = Date.now() - geoeffnetAmRef.current < 1200
+    if (savedSnapshotRef.current === null || (einschwingen && bootstrap?.angebotId)) {
       savedSnapshotRef.current = draftSnapshot
+      if (bootstrap?.angebotId) setDraftDirty(false)
       return
     }
     setDraftDirty(draftSnapshot !== savedSnapshotRef.current)
-  }, [draftSnapshot])
+  }, [draftSnapshot, bootstrap?.angebotId])
 
   const positionenFuerSummen = useMemo(
     () => dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke),

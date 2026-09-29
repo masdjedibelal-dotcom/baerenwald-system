@@ -753,7 +753,7 @@ export function AngebotDetailPageClient({
       phase="angebot"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=angebot&lifecycle=offen"
-      crumbBackLabel="Zurück zu den Suchergebnissen"
+      crumbBackLabel="Zurück"
       crumbSectionLabel="Angebote"
       breadcrumbTitle={projektTitel}
       className="space-y-4 pb-0"

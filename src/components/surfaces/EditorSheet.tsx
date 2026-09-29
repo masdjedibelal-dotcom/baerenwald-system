@@ -242,7 +242,13 @@ export function EditorSheet({
           busy: confirmBusy,
         }
       : null)
-  const resolvedSecondary = secondaryProp ?? null
+  // P19/P20: Jedes Sheet mit Hauptaktion hat „Abbrechen“ daneben — gleiche Plätze überall
+  // (Desktop: Abbrechen links, Hauptaktion rechts; mobil nebeneinander, volle Breite).
+  const resolvedSecondary: EditorSheetAction | null =
+    secondaryProp ??
+    (resolvedPrimary && !dangerProp
+      ? { label: 'Abbrechen', kind: 'ghost', disabled: Boolean(resolvedPrimary.busy) }
+      : null)
   const resolvedDanger = dangerProp ?? null
 
   const finishClose = useCallback(() => {

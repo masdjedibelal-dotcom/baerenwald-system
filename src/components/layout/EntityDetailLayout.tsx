@@ -315,7 +315,7 @@ export function EntityDetailLayout({
   head,
   quickBar,
   crumbBackHref,
-  crumbBackLabel = 'Zurück zu den Suchergebnissen',
+  crumbBackLabel = 'Zurück',
   banner,
   children,
   className,

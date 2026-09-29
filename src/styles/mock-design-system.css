@@ -2933,19 +2933,8 @@ padding-bottom: 96px;
     border: none;
     border-radius: 0;
     box-shadow: none;
-    background-color: #e8ebe7;
-    background-image:
-      linear-gradient(
-        105deg,
-        rgba(241, 242, 241, 0.94) 0%,
-        rgba(241, 242, 241, 0.78) 42%,
-        rgba(241, 242, 241, 0.35) 72%,
-        rgba(241, 242, 241, 0.12) 100%
-      ),
-      url('/brand/detail-hero-woman.jpg');
-    background-size: cover;
-    background-position: 72% 28%;
-    background-repeat: no-repeat;
+    /* Kein Stockfoto hinter dem Titel (P25) — ruhige Fläche */
+    background: transparent;
   }
 .detail-entity-hero .detail-head {
     margin-bottom: 10px;
@@ -2959,7 +2948,7 @@ padding-bottom: 96px;
     font-weight: 700;
     letter-spacing: -0.03em;
     color: var(--text);
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+    overflow-wrap: anywhere;
   }
 .detail-entity-hero .detail-head .dh-titlerow {
     gap: 8px;
@@ -8045,6 +8034,9 @@ margin: 0;
     box-shadow: 0 1px 0 rgba(22, 32, 27, 0.04);
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    /* Rechts ausblenden: zeigt, dass weitere Tabs folgen (P25) */
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
   }
 .dshell-tabs-mobile::-webkit-scrollbar { display: none; }
 .dshell-tab-mobile {

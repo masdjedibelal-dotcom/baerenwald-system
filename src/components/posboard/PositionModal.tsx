@@ -204,7 +204,8 @@ export function PositionModal({
               {p.regieSchein ? 'Stundensatz (netto)' : 'Einzelpreis (netto)'}
             </div>
             <div className="pos-add-preis-ust__row">
-              <div className="input-prefix">
+              {/* P19: gleiche Klassen wie „Position hinzufügen“ — vorher undefinierte Klasse, Feld zerbrach */}
+              <div className="txt-prefix pos-add-preis-ust__preis">
                 <span className="prefix">{p.regieSchein ? '€/h' : '€'}</span>
                 <ClearableNumberInput
                   className="txt"
@@ -213,7 +214,7 @@ export function PositionModal({
                 />
               </div>
               {showUst ? (
-                <MockSelect className="sel" value={String(p.ust ?? 19)} onChange={(e) => onChange({ ust: Number(e.target.value) })} aria-label="USt %">
+                <MockSelect className="sel pos-add-preis-ust__ust" value={String(p.ust ?? 19)} onChange={(e) => onChange({ ust: Number(e.target.value) })} aria-label="USt %">
                   <option value="19">19 %</option>
                   <option value="7">7 %</option>
                   <option value="0">0 %</option>

@@ -1211,7 +1211,7 @@ export function AuftragDetailClient({
       phase="auftrag"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=auftrag&lifecycle=offen"
-      crumbBackLabel="Zurück zu den Suchergebnissen"
+      crumbBackLabel="Zurück"
       crumbSectionLabel="Aufträge"
       breadcrumbTitle={projektName}
       className="space-y-4 pb-0"
