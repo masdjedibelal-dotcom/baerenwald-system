@@ -1,4 +1,5 @@
 'use client'
+import { safeAction } from '@/lib/actions/safe-action'
 import { MockBtn } from '@/components/mock-ui'
 import { useTransition } from '@/components/ui/action-busy'
 
@@ -121,9 +122,9 @@ export function HandwerkerAuswahlModal({
     setEmpfohlen([])
     setAlle([])
     void (async () => {
-      const r = await listHandwerkerAuswahlFuerGewerk({
+      const r = await safeAction(listHandwerkerAuswahlFuerGewerk({
         gewerkId: target.gewerkId || null,
-        gewerkSlug: target.gewerkSlug ?? null })
+        gewerkSlug: target.gewerkSlug ?? null }))
       if (!r.ok) {
         setListErr(r.message)
       } else {

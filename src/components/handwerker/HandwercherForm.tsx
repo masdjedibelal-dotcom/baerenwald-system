@@ -1,4 +1,5 @@
 'use client'
+import { safeAction } from '@/lib/actions/safe-action'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
@@ -77,7 +78,7 @@ export function HandwerkerForm({
     }
     setSaving(true)
     if (isNew) {
-      const r = await createHandwerker(payload)
+      const r = await safeAction(createHandwerker(payload))
       setSaving(false)
       if (!r.ok) {
         setErr(r.message)

@@ -100,6 +100,15 @@ import {
   X,
   XCircle,
   Kanban,
+  AlignLeft,
+  Book,
+  Camera,
+  ClipboardCheck,
+  Euro,
+  Key,
+  Paperclip,
+  QrCode,
+  Undo2,
 } from 'lucide-react'
 
 /**
@@ -235,6 +244,17 @@ export const ICON_MAP = {
   users: Users,
   world: Globe,
   x: X,
+  'align-left': AlignLeft,
+  'arrow-back-up': Undo2,
+  'book': Book,
+  'camera': Camera,
+  'clipboard-check': ClipboardCheck,
+  'euro': Euro,
+  'key': Key,
+  'paperclip': Paperclip,
+  'percent': Percent,
+  'qrcode': QrCode,
+  'user-x': UserX,
 } as const satisfies Record<string, LucideIcon>
 
 export type MockIconName = keyof typeof ICON_MAP

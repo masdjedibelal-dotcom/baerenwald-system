@@ -1,4 +1,5 @@
 'use client'
+import { safeAction } from '@/lib/actions/safe-action'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
@@ -554,11 +555,11 @@ export function AnfrageNeuForm({
     let errMsg: string | null = null
     let outId = ''
     if (isBearbeiten && bearbeitenLead) {
-      const u = await updateAnfrageAusNeuForm(bearbeitenLead.id, payloadBase)
+      const u = await safeAction(updateAnfrageAusNeuForm(bearbeitenLead.id, payloadBase))
       if (!u.ok) errMsg = u.message
       else outId = bearbeitenLead.id
     } else {
-      const c = await createAnfrage(payloadBase)
+      const c = await safeAction(createAnfrage(payloadBase))
       if (!c.ok) errMsg = c.message
       else outId = c.id
     }

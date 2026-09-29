@@ -1,4 +1,5 @@
 'use client'
+import { safeAction } from '@/lib/actions/safe-action'
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
@@ -291,19 +292,19 @@ export function AngebotNeuForm({
       }
       setSaving(true)
       const res = modusVorlage.id
-        ? await updateAngebotVorlage(
+        ? await safeAction(updateAngebotVorlage(
             modusVorlage.id,
             vorlageName.trim(),
             vorlageBeschreibung.trim() || null,
             positionen,
             vorlageMitPreisen
-          )
-        : await saveAngebotVorlage(
+          ))
+        : await safeAction(saveAngebotVorlage(
             vorlageName.trim(),
             vorlageBeschreibung.trim() || null,
             positionen,
             vorlageMitPreisen
-          )
+          ))
       setSaving(false)
       if (!res.ok) {
         setError(res.message)
@@ -322,14 +323,14 @@ export function AngebotNeuForm({
         return
       }
       setSaving(true)
-      const created = await createKundeQuick({
+      const created = await safeAction(createKundeQuick({
         vorname: neuVorname.trim() || null,
         nachname: neuNachname.trim() || null,
         email: neuEmail.trim() || null,
         telefon: neuTelefon.trim() || null,
         /* Bestehende Firma gewählt → Kontakt als Ansprechpartner, kein neuer Account */
         parentKundeId: kundeId || null,
-      })
+      }))
       setSaving(false)
       if (!created.ok) {
         setError(created.message)
@@ -369,7 +370,7 @@ export function AngebotNeuForm({
     }
 
     if (isEdit && editAngebot && !istKopie) {
-      const res = await updateAngebot(editAngebot.id, payload)
+      const res = await safeAction(updateAngebot(editAngebot.id, payload))
       setSaving(false)
       if (!res.ok) {
         setError(res.message)

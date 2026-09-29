@@ -1,4 +1,5 @@
 'use client'
+import { safeAction } from '@/lib/actions/safe-action'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
@@ -144,7 +145,7 @@ function LoginPageContent() {
     setLoading(true)
     setError(null)
     setInfo(null)
-    const res = await requestCrmPasswordReset(email)
+    const res = await safeAction(requestCrmPasswordReset(email))
     setLoading(false)
     if (!res.ok) {
       setError(res.message)

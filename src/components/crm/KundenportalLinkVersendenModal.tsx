@@ -1,4 +1,5 @@
 'use client'
+import { safeAction } from '@/lib/actions/safe-action'
 
 import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -55,7 +56,7 @@ export function KundenportalLinkVersendenModal({
       return
     }
     setLoading(true)
-    const draft = await getKundenPortalMailDraft(kundeId)
+    const draft = await safeAction(getKundenPortalMailDraft(kundeId))
     setLoading(false)
     if (!draft.ok) {
       toast.systemError(draft)
@@ -104,14 +105,14 @@ export function KundenportalLinkVersendenModal({
       return
     }
     setSending(true)
-    const res = await sendKundenPortalLinkMail({
+    const res = await safeAction(sendKundenPortalLinkMail({
       kundeId,
       to: mailTo[0]!,
       cc: [...mailCc, ...mailTo.slice(1)],
       betreff: betreff.trim() || defaultPortalInviteBetreff('du'),
       text,
       anrede,
-    })
+    }))
     setSending(false)
     if (!res.ok) {
       toast.systemError(res)

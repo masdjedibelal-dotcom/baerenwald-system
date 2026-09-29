@@ -1,4 +1,5 @@
 'use client'
+import { safeAction } from '@/lib/actions/safe-action'
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
@@ -87,7 +88,7 @@ export function ZahlungserinnerungMailModal({
     setLoading(true)
     setMail(null)
     void (async () => {
-      const res = await previewZahlungserinnerungMail(rechnungId, stufe)
+      const res = await safeAction(previewZahlungserinnerungMail(rechnungId, stufe))
       if (cancelled) return
       setLoading(false)
       if (!res.ok) {
