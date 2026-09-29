@@ -1327,22 +1327,27 @@ export function AuftragDetailClient({
             })()}
             secondary={(() => {
               if (istStorniert) return null
-              // Primary = Abschließen → Secondary = Abnahme-Canvas (direkt, kein Sheet-Hop)
-              if (
+              // Aktionsmodell: zweiter Knopf = Bearbeiten, solange der Auftrag läuft.
+              const laeuft =
                 detail.status === 'offen' ||
                 detail.status === 'in_arbeit' ||
                 detail.status === 'abnahme'
-              ) {
-                // Bei Status Abnahme ist Primary schon „Abnahme starten“ — kein Doppel-CTA
-                if (detail.status === 'abnahme') return null
+              if (laeuft && kannAuftragKorrektur) {
                 return {
-                  label: 'Abnahme starten',
-                  icon: 'clipboard-list',
-                  onClick: () =>
-                    router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
-                  href: `/auftraege/${detail.id}/abnahme/erstellen`,
+                  label: COPY_BUTTON.auftragBearbeiten,
+                  shortLabel: 'Bearbeiten',
+                  icon: 'pencil',
+                  onClick: openAngebotKorrektur,
                   disabled: pending,
-                  title: 'Abnahmeprotokoll erstellen (optional)',
+                }
+              }
+              if (laeuft && kannLeistungenOhneAngebot) {
+                return {
+                  label: COPY_BUTTON.leistungenBearbeiten,
+                  shortLabel: 'Bearbeiten',
+                  icon: 'pencil',
+                  onClick: openLeistungenOhneAngebot,
+                  disabled: pending,
                 }
               }
               // Nie zweiten „Versenden“-Button — mobil links leicht mit „Korrigieren“ verwechselt.
@@ -1393,31 +1398,17 @@ export function AuftragDetailClient({
               return null
             })()}
             menuItems={
-              !istStorniert
+              // Aktionsmodell: „…“ = Abnahme (optional, solange er läuft)
+              !istStorniert &&
+              (detail.status === 'offen' ||
+                detail.status === 'in_arbeit' ||
+                detail.status === 'abnahme') &&
+              detail.status !== 'abnahme'
                 ? [
-                    ...(kannLeistungenOhneAngebot &&
-                    (detail.status === 'offen' ||
-                      detail.status === 'in_arbeit' ||
-                      detail.status === 'abnahme')
-                      ? [
-                          {
-                            label: COPY_BUTTON.leistungenBearbeiten,
-                            onClick: openLeistungenOhneAngebot,
-                          },
-                        ]
-                      : []),
-                    ...(kannAuftragKorrektur &&
-                    (detail.status === 'offen' ||
-                      detail.status === 'in_arbeit' ||
-                      detail.status === 'abnahme')
-                      ? [
-                          {
-                            label: COPY_BUTTON.auftragBearbeiten,
-                            onClick: openAngebotKorrektur,
-                          },
-                        ]
-                      : []),
-                    // „Nachtrag erstellen“ entfällt (30.09.2026) — Änderungen über „Auftrag bearbeiten“ oder Regie im Einsatz.
+                    {
+                      label: 'Abnahme mit Protokoll',
+                      onClick: () => router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
+                    },
                   ]
                 : []
             }

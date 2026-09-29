@@ -6,7 +6,7 @@ import type { LeadKanal, LeadStatus } from '@/lib/types'
 
 /** Lead-Status über einheitliches StatusBadge (Phase 1 / Spec §11). */
 export function LeadStatusBadge({ status }: { status: LeadStatus | string }) {
-  return <StatusBadge status={status} />
+  return <StatusBadge phase="anfrage" status={status} />
 }
 
 const kanalIcon: Record<LeadKanal, MockIconName> = {

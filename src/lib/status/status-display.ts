@@ -1,5 +1,4 @@
 import {
-  ANGEBOT_EINFACH_LABELS,
   resolveStatusEinfach,
   type AngebotStatusEinfach,
   type AngebotStatusEinfachRow,
@@ -90,13 +89,6 @@ export function angebotStatusDisplay(row: AngebotStatusEinfachRow): StatusDispla
   const einfachCol = String(row.status_einfach ?? '')
     .trim()
     .toLowerCase()
-  /* Fein-Status vor Einfach-Collapse: sonst bleibt Badge bei „Gesendet“/blau */
-  if (db === 'handwerker_akzeptiert') {
-    return { label: statusLabel('angebot', 'handwerker_akzeptiert'), variant: 'success' }
-  }
-  if (db === 'gesendet_handwerker') {
-    return { label: statusLabel('angebot', 'gesendet_handwerker'), variant: 'active' }
-  }
   /* Alt-Status (z. B. versendet): nicht zu „Entwurf“ kollabieren — Rohwert, neutral */
   const einfachKnown =
     einfachCol === 'entwurf' ||
@@ -113,7 +105,7 @@ export function angebotStatusDisplay(row: AngebotStatusEinfachRow): StatusDispla
   }
   const einfach = resolveStatusEinfach(row)
   return {
-    label: ANGEBOT_EINFACH_LABELS[einfach],
+    label: statusLabel('angebot', einfach),
     variant: ANGEBOT_VARIANT[einfach],
   }
 }

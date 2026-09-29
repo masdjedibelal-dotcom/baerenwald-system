@@ -119,15 +119,17 @@ export function formatNumber(n: number | null | undefined, opts?: FormatNumberOp
 export function formatDatum(datum: string): string {
   const raw = (datum ?? '').trim()
   if (!raw) return '—'
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw)
-  const d = ymd
-    ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0)
-    : new Date(raw)
+  // Reines Datum: direkt übernehmen. Zeitstempel: Tag in deutscher Zeit (Server läuft in UTC).
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  if (ymd) return `${ymd[3]}.${ymd[2]}.${ymd[1]}`
+  const d = new Date(raw)
   if (Number.isNaN(d.getTime())) return '—'
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  return `${dd}.${mm}.${yyyy}`
+  return d.toLocaleDateString('de-DE', {
+    timeZone: 'Europe/Berlin',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
 }
 
 /**

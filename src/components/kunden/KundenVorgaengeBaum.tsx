@@ -67,7 +67,7 @@ function AstKnoten({
                       {a.label}
                     </Link>
                     <span className="flex items-center gap-2">
-                      <StatusBadge status={a.statusEinfach} />
+                      <StatusBadge phase="angebot" status={a.statusEinfach} />
                       <span className="tabular-nums text-bw-text-muted">{a.betrag}</span>
                     </span>
                   </li>
@@ -86,7 +86,7 @@ function AstKnoten({
                 className="flex flex-wrap items-center justify-between gap-2 text-sm hover:underline"
               >
                 <span>{ast.auftrag.titel}</span>
-                <StatusBadge status={ast.auftrag.status} />
+                <StatusBadge phase="auftrag" status={ast.auftrag.status} />
               </Link>
             </div>
           ) : null}

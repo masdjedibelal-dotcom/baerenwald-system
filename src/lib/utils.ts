@@ -9,6 +9,7 @@ import {
   formatDatumZeitraum,
 } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
+import { statusLabel } from '@/lib/status/status-map'
 
 export {
   formatPreis,
@@ -60,14 +61,15 @@ export function normalizeUrlList(raw: unknown): string[] {
   return []
 }
 
+/** Aus status-map abgeleitet (eine Quelle). */
 export const STATUS_LABELS: Record<LeadStatus, string> = {
-  neu: 'Neu',
-  kontaktiert: 'Kontaktiert',
-  termin: 'Termin',
-  angebot: 'Angebot',
-  auftrag: 'Auftrag',
-  abgeschlossen: 'Abgeschlossen',
-  abgebrochen: 'Verloren', // LEAD_ABGEBROCHEN_LABEL in crm-labels.ts
+  neu: statusLabel('anfrage', 'neu'),
+  kontaktiert: statusLabel('anfrage', 'kontaktiert'),
+  termin: statusLabel('anfrage', 'termin'),
+  angebot: statusLabel('anfrage', 'angebot'),
+  auftrag: statusLabel('anfrage', 'auftrag'),
+  abgeschlossen: statusLabel('anfrage', 'abgeschlossen'),
+  abgebrochen: statusLabel('anfrage', 'abgebrochen'),
 }
 
 export const VERLOREN_GRUND_LABELS: Record<string, string> = {
@@ -131,12 +133,13 @@ export const SITUATION_LABELS: Record<string, string> = {
   neubauen: 'Neu bauen / Ausbau',
 }
 
+/** Aus status-map abgeleitet (eine Quelle). */
 export const AUFTRAG_STATUS_LABELS: Record<AuftragStatus, string> = {
-  offen: 'Offen',
-  in_arbeit: 'In Arbeit',
-  abnahme: 'Abnahme',
-  abgeschlossen: 'Abgeschlossen',
-  storniert: 'Storniert',
+  offen: statusLabel('auftrag', 'offen'),
+  in_arbeit: statusLabel('auftrag', 'in_arbeit'),
+  abnahme: statusLabel('auftrag', 'abnahme'),
+  abgeschlossen: statusLabel('auftrag', 'abgeschlossen'),
+  storniert: statusLabel('auftrag', 'storniert'),
 }
 
 export const FORMULAR_PHASE_LABELS: Record<string, string> = {
@@ -145,13 +148,14 @@ export const FORMULAR_PHASE_LABELS: Record<string, string> = {
   abnahme: 'Abnahme',
 }
 
+/** Aus status-map abgeleitet (eine Quelle). */
 export const ANGEBOT_STATUS_LABELS: Record<AngebotStatus, string> = {
-  entwurf: 'Entwurf',
-  gesendet_handwerker: 'An Partner gesendet',
-  handwerker_akzeptiert: 'Angenommen',
-  gesendet_kunde: 'Gesendet',
-  kunde_akzeptiert: 'Angenommen',
-  abgelehnt: 'Abgelehnt',
+  entwurf: statusLabel('angebot', 'entwurf'),
+  gesendet_handwerker: statusLabel('angebot', 'gesendet_handwerker'),
+  handwerker_akzeptiert: statusLabel('angebot', 'handwerker_akzeptiert'),
+  gesendet_kunde: statusLabel('angebot', 'gesendet_kunde'),
+  kunde_akzeptiert: statusLabel('angebot', 'kunde_akzeptiert'),
+  abgelehnt: statusLabel('angebot', 'abgelehnt'),
 }
 
 export const KALENDER_TYP_BG: Record<string, string> = {
@@ -457,7 +461,9 @@ function parseDisplayDate(raw: string | Date): Date | null {
   }
   const s = (raw ?? '').trim()
   if (!s) return null
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
+  // Nur reines Datum (YYYY-MM-DD) auf 12:00 setzen — Zeitstempel behalten ihre Uhrzeit
+  // (sonst „vor 12h“ für gerade Gespeichertes und falscher Tag nach Mitternacht).
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
   const d = ymd
     ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0)
     : new Date(s)

@@ -2,8 +2,8 @@
  * Kanonische Status-Map (eine Quelle für Labels).
  * Leitfaden §3 / PATTERN-LEITFADEN: Label + optional Kurzlabel.
  *
- * Verboten als UI-Wortlaut: „Fertig“, „Versendet“, „Gesendet HW“,
- * „In Arbeit“ für Auftrag `offen`, „Gesendet Handwerker“.
+ * Aktionsmodell 30.09.2026 (Belal): je Sache 3–4 sichtbare Wörter, mehrere DB-Werte
+ * teilen sich ein Wort. Neue Stellen nutzen statusLabel/…StatusDisplay — keine eigenen Maps.
  *
  * ── CRM → Mieter-Timeline (Melde-Status) ──────────────────────────────
  * Mieter-Stufen bleiben eigene Sprache; sie reagieren auf CRM-Wechsel:
@@ -31,55 +31,61 @@ export type VorgangPhaseKey = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
 
 /** Anfrage / Lead */
 export const ANFRAGE_STATUS_MAP = {
+  // Aktionsmodell 30.09.2026: Neu · In Arbeit · Abgesagt (+ Erledigt, wenn beauftragt)
   neu: { label: 'Neu' },
-  kontaktiert: { label: 'Kontaktiert' },
-  termin: { label: 'Termin' },
-  angebot: { label: 'Angebot' },
-  auftrag: { label: 'Auftrag' },
-  abgeschlossen: { label: 'Abgeschlossen' },
+  kontaktiert: { label: 'In Arbeit' },
+  termin: { label: 'In Arbeit' },
+  in_bearbeitung: { label: 'In Arbeit' },
+  angebot: { label: 'In Arbeit' },
+  auftrag: { label: 'Beauftragt' },
+  abgeschlossen: { label: 'Beauftragt' },
   hm_erledigt: { label: 'Vom Hausmeister erledigt' },
-  abgebrochen: { label: 'Verloren' },
-  storniert: { label: 'Storniert' },
+  abgebrochen: { label: 'Abgesagt' },
+  storniert: { label: 'Abgesagt' },
 } as const satisfies Record<string, StatusMapEntry>
 
 /** Angebot — Fein- + Einfach-Status */
 export const ANGEBOT_STATUS_MAP = {
+  // Aktionsmodell: Entwurf · Beim Kunden · Angenommen · Abgelehnt (+ Abgelaufen, Ersetzt)
   entwurf: { label: 'Entwurf' },
-  gesendet_handwerker: { label: 'An Partner gesendet', shortLabel: 'An Partner' },
-  handwerker_akzeptiert: { label: 'Angenommen', shortLabel: 'Angenommen' },
-  gesendet_kunde: { label: 'Gesendet', shortLabel: 'Gesendet' },
-  gesendet: { label: 'Gesendet' },
+  gesendet_handwerker: { label: 'Entwurf' },
+  handwerker_akzeptiert: { label: 'Entwurf' },
+  gesendet_kunde: { label: 'Beim Kunden' },
+  gesendet: { label: 'Beim Kunden' },
+  versendet: { label: 'Beim Kunden' },
   angenommen: { label: 'Angenommen' },
   kunde_akzeptiert: { label: 'Angenommen' },
   abgelehnt: { label: 'Abgelehnt' },
   abgelaufen: { label: 'Abgelaufen' },
   ersetzt: { label: 'Ersetzt' },
-  storniert: { label: 'Storniert' },
+  storniert: { label: 'Abgelehnt' },
 } as const satisfies Record<string, StatusMapEntry>
 
 /** Auftrag */
 export const AUFTRAG_STATUS_MAP = {
-  offen: { label: 'Offen' },
-  // P14: Zielbild-Vokabular (offen · läuft · abgenommen); gespeicherte Werte unverändert
+  // Aktionsmodell: Läuft · Fertig · Storniert (Abnahme ist ein Schritt, kein Status)
+  offen: { label: 'Läuft' },
   in_arbeit: { label: 'Läuft' },
-  abnahme: { label: 'Abnahme' },
-  abgeschlossen: { label: 'Abgenommen' },
+  wartend: { label: 'Läuft' },
+  abnahme: { label: 'Läuft' },
+  abgeschlossen: { label: 'Fertig' },
   storniert: { label: 'Storniert' },
 } as const satisfies Record<string, StatusMapEntry>
 
 /** Rechnung */
 export const RECHNUNG_STATUS_MAP = {
+  // Aktionsmodell: Entwurf · Offen · Bezahlt · Storniert (Überfällig = rot markiertes Offen)
   ausstehend: { label: 'Rechnung fehlt' },
   entwurf: { label: 'Entwurf' },
-  // P14: Zielbild Entwurf · offen · bezahlt · storniert; „Überfällig“ bleibt Anzeige
   gesendet: { label: 'Offen' },
+  teilbezahlt: { label: 'Offen' },
   bezahlt: { label: 'Bezahlt' },
   storniert: { label: 'Storniert' },
-  korrektur_entwurf: { label: 'Korrektur Entwurf' },
-  korrektur_gespeichert: { label: 'Korrektur Gespeichert' },
-  korrektur_versendet: { label: 'Korrektur Gesendet' },
+  korrektur_entwurf: { label: 'Entwurf' },
+  korrektur_gespeichert: { label: 'Entwurf' },
+  korrektur_versendet: { label: 'Offen' },
   ueberfaellig: { label: 'Überfällig' },
-  ueberwiesen: { label: 'Überwiesen' },
+  ueberwiesen: { label: 'Bezahlt' },
 } as const satisfies Record<string, StatusMapEntry>
 
 const PHASE_MAPS: Record<VorgangPhaseKey, Record<string, StatusMapEntry>> = {
@@ -96,8 +102,9 @@ const PHASE_MAPS: Record<VorgangPhaseKey, Record<string, StatusMapEntry>> = {
 export function unknownStatusEntry(
   unterstatus: string | null | undefined
 ): StatusMapEntry {
-  const raw = String(unterstatus ?? '').trim()
-  return { label: raw || 'Unbekannt' }
+  const raw = String(unterstatus ?? '').trim().replace(/_/g, ' ')
+  // Rohwert nie kleingeschrieben anzeigen („wartend“ → „Wartend“)
+  return { label: raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Unbekannt' }
 }
 
 export function statusMapEntry(

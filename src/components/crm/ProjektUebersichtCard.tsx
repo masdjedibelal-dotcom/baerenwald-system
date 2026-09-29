@@ -57,7 +57,7 @@ export function ProjektUebersichtCard({ kontext }: Props) {
                     {a.angebotsnr?.trim() || a.id.slice(0, 8).toUpperCase()}
                   </Link>
                   <span className="flex items-center gap-2">
-                    <StatusBadge
+                    <StatusBadge phase="angebot"
                       status={resolveStatusEinfach({
                         status: a.status as AngebotStatus,
                         status_einfach: a.status_einfach,

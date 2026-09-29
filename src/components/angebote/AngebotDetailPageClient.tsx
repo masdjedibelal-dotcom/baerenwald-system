@@ -44,7 +44,10 @@ import {
   previewAuftragsbestaetigungMail,
   recordKundeAbgelehntMitDetails,
   schliesseLeadNachAngebotVerlust,
+  deleteAngebot,
 } from '@/app/(dashboard)/angebote/actions'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
+import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { rechnungIstAlsAkteUnterlage } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
@@ -451,6 +454,45 @@ export function AngebotDetailPageClient({
     }
   }, [statusEinfach, auftragId, clearFieldErrors])
 
+  // Aktionsmodell: „…“ = Als neues Angebot · Ablehnen · PDF · Löschen (nur Entwurf)
+  const angebotMenuItems: ActionsMenuItem[] = []
+  if (detail.lead_id) {
+    angebotMenuItems.push({
+      label: 'Als neues Angebot',
+      icon: <MockIcon ctx="btn" n="copy" size={16} />,
+      onClick: openNeuesAngebotAlsKopie,
+    })
+  }
+  if (dangerAction) {
+    angebotMenuItems.push({
+      label: 'Ablehnen',
+      icon: <MockIcon ctx="btn" n="x" size={16} />,
+      onClick: () => dangerAction.onClick?.(),
+    })
+  }
+  if (detail.pdf_url) {
+    angebotMenuItems.push({
+      label: 'PDF öffnen',
+      icon: <MockIcon ctx="btn" n="file" size={16} />,
+      onClick: () => window.open(detail.pdf_url!, '_blank', 'noopener,noreferrer'),
+    })
+  }
+  if (statusEinfach === 'entwurf' && !auftragId) {
+    angebotMenuItems.push({
+      label: 'Entwurf löschen',
+      icon: <MockIcon ctx="btn" n="trash" size={16} />,
+      onClick: () =>
+        openDeleteConfirm('Entwurf löschen?', async () => {
+          const r = await deleteAngebot(detail.id)
+          if ('error' in r) {
+            toast.error(r.error)
+            throw new Error(r.error)
+          }
+          router.push(detail.lead_id ? `/anfragen/${detail.lead_id}` : '/vorgaenge')
+        }),
+    })
+  }
+
   const kundeEmail =
     lead?.auftraggeber?.email?.trim() ||
     kunde?.email?.trim() ||
@@ -579,26 +621,9 @@ export function AngebotDetailPageClient({
         disabled: pending,
       }
     }
-    if (statusEinfach === 'abgelehnt') {
-      return {
-        label: 'Neues Angebot',
-        icon: 'pencil',
-        onClick: openNeuesAngebotAlsKopie,
-        disabled: pending,
-        title: 'Inhalt als neuen Entwurf übernehmen',
-      }
-    }
-    if (bearbeitenSperrgrund) {
-      return {
-        label: 'Angebot bearbeiten',
-        icon: 'pencil',
-        onClick: () => toast.info(bearbeitenSperrgrund),
-        disabled: true,
-        title: bearbeitenSperrgrund,
-      }
-    }
+    // Kein ausgegrauter Knopf: gesperrt → „Als neues Angebot“ im „…“
     return null
-  }, [kannBearbeiten, bearbeitenSperrgrund, pending, statusEinfach])
+  }, [kannBearbeiten, pending])
 
   const stammdatenInhalt = (
     <>
@@ -781,7 +806,7 @@ export function AngebotDetailPageClient({
             sheetTitle="Angebot"
             primary={primaryAction}
             secondary={secondaryAction}
-            danger={dangerAction}
+            menuItems={angebotMenuItems}
           />
         ),
       }}

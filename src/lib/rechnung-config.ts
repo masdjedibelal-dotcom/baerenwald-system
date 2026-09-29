@@ -1,13 +1,15 @@
 /** Konstanten & Textbausteine für Rechnungs-PDF und UI */
+import { statusLabel } from '@/lib/status/status-map'
 
 export const RECHNUNG_STATUS = ['entwurf', 'gesendet', 'bezahlt', 'storniert'] as const
 export type RechnungStatus = (typeof RECHNUNG_STATUS)[number]
 
+/** Aus status-map abgeleitet (eine Quelle). */
 export const RECHNUNG_STATUS_LABELS: Record<RechnungStatus, string> = {
-  entwurf: 'Entwurf',
-  gesendet: 'Gesendet',
-  bezahlt: 'Bezahlt',
-  storniert: 'Storniert',
+  entwurf: statusLabel('rechnung', 'entwurf'),
+  gesendet: statusLabel('rechnung', 'gesendet'),
+  bezahlt: statusLabel('rechnung', 'bezahlt'),
+  storniert: statusLabel('rechnung', 'storniert'),
 }
 
 export const RECHNUNG_BELEG_TYPEN = ['rechnung', 'gutschrift'] as const

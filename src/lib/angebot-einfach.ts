@@ -12,9 +12,10 @@ export type AngebotStatusEinfach =
   | 'abgelaufen'
   | 'ersetzt'
 
+/** @deprecated Wörter kommen aus status-map (statusLabel('angebot', …)). Nur noch Alias. */
 export const ANGEBOT_EINFACH_LABELS: Record<AngebotStatusEinfach, string> = {
   entwurf: 'Entwurf',
-  gesendet: 'Gesendet',
+  gesendet: 'Beim Kunden',
   angenommen: 'Angenommen',
   abgelehnt: 'Abgelehnt',
   abgelaufen: 'Abgelaufen',

@@ -447,10 +447,13 @@ export function RechnungDetailClient({
 
   function handleStornoOhneErsatz() {
     const nr = detail.rechnungsnummer?.trim() || 'Rechnung'
+    const istEntwurf = String(detail.status ?? '').toLowerCase() === 'entwurf'
     openActionConfirm({
-      title: 'Rechnung stornieren?',
-      body: `${nr} wird storniert. Dazu entsteht eine Storno-Gutschrift als Entwurf, die Sie danach an den Kunden senden. Eine neue Rechnung entsteht nicht.`,
-      confirmLabel: 'Stornieren',
+      title: istEntwurf ? 'Entwurf verwerfen?' : 'Rechnung stornieren?',
+      body: istEntwurf
+        ? 'Der Entwurf wird verworfen. Er ging noch nicht an den Kunden.'
+        : `${nr} wird storniert. Dazu entsteht eine Storno-Gutschrift als Entwurf, die Sie danach an den Kunden senden. Eine neue Rechnung entsteht nicht.`,
+      confirmLabel: istEntwurf ? 'Verwerfen' : 'Stornieren',
       cancelLabel: 'Abbrechen',
       danger: true,
       onConfirm: () => {
@@ -470,14 +473,7 @@ export function RechnungDetailClient({
   }
 
   const primaryAction = useMemo((): DetailActionDef | null => {
-    if (darfStornoZuruecknehmen) {
-      return {
-        label: 'Storno zurücknehmen',
-        icon: 'check',
-        onClick: handleStornoZuruecknehmen,
-        disabled: pending,
-      }
-    }
+    // Aktionsmodell: grün = der eine fällige Statuswechsel (Senden → Bezahlt)
     const cta = primaryCta('rechnung', detail.status, {
       ueberfaellig,
       eingehend: isEingehend,
@@ -495,43 +491,8 @@ export function RechnungDetailClient({
         disabled: pending,
       }
     }
-    if (cta?.id === 'bewertung_einholen') {
-      if (isEingehend) return null
-      return {
-        label: cta.label,
-        icon: cta.icon,
-        onClick: () => {
-          const auftragId = detail.auftrag_id?.trim()
-          if (!auftragId) {
-            toast.error(TOAST.keine_auftragsverknuepfung_fuer_bewertung)
-            return
-          }
-          startTransition(async () => {
-            const r = await loadHandwerkerBewertungZiele(auftragId)
-            if (!r.ok) {
-              toast.systemError(r)
-              return
-            }
-            setBewertungZiele(r.ziele)
-            setBewertungOpen(true)
-          })
-        },
-      }
-    }
     return null
-  }, [
-    detail.status,
-    detail.id,
-    detail.auftrag_id,
-    detail.korrektur_von,
-    ueberfaellig,
-    pending,
-    handleSenden,
-    belegTyp,
-    kundeEmail,
-    isEingehend,
-    darfStornoZuruecknehmen,
-  ])
+  }, [detail.status, detail.korrektur_von, ueberfaellig, pending, handleSenden, belegTyp, isEingehend])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
     if (isEingehend) return null
@@ -558,46 +519,7 @@ export function RechnungDetailClient({
   }, [detail.status, pending, isEingehend])
 
   const overflowMenuItems = useMemo((): ActionsMenuItem[] => {
-    if (isEingehend) {
-      return [
-        {
-          label: 'PDF öffnen',
-          icon: <MockIcon ctx="btn" n="file" size={16} />,
-          onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
-        },
-      ]
-    }
-
-    const st = String(detail.status ?? '').toLowerCase()
-    const statusLabel =
-      st === 'gesendet'
-        ? 'Gesendet'
-        : st === 'bezahlt'
-          ? 'Bezahlt'
-          : st === 'storniert'
-            ? 'Storniert'
-            : st === 'entwurf'
-              ? 'Entwurf'
-              : st || 'Rechnung'
-
-    const korrekturModus = rechnungKorrekturModus(detail.status)
-    const korrekturDisabled = korrekturModus === 'gesperrt'
-    const korrekturHint = korrekturDisabled
-      ? `${statusLabel} — Korrektur nicht möglich`
-      : undefined
-
-    const erinnerungOk =
-      belegTyp === 'rechnung' && (st === 'gesendet' || ueberfaellig) && st !== 'bezahlt' && st !== 'storniert'
-    const erinnerungHint = !erinnerungOk
-      ? st === 'entwurf'
-        ? 'Entwurf — erst versenden'
-        : st === 'bezahlt'
-          ? 'Bezahlt — keine Erinnerung'
-          : st === 'storniert'
-            ? 'Storniert — keine Erinnerung'
-            : `${statusLabel} — Erinnerung nicht verfügbar`
-      : undefined
-
+    // Aktionsmodell: im „…“ nur, was gerade passt — PDF · Erinnerung · Stornieren/Verwerfen
     const items: ActionsMenuItem[] = [
       {
         label: 'PDF öffnen',
@@ -605,64 +527,32 @@ export function RechnungDetailClient({
         onClick: () => window.open(pdfHref, '_blank', 'noopener,noreferrer'),
       },
     ]
+    if (isEingehend || belegTyp !== 'rechnung') return items
 
-    // Gesendet/Bezahlt: Korrektur nur über Sekundär-CTA „Rechnung korrigieren“
-    // (Storno-Gutschrift + neue RE). Kein zweites Menü „Korrektur“.
-    if (korrekturModus !== 'storno_neu' && !secondaryAction) {
+    const st = String(detail.status ?? '').toLowerCase()
+    if (st === 'gesendet' || ueberfaellig) {
       items.push({
-        label: 'Korrektur',
-        icon: <MockIcon ctx="btn" n="pencil" size={16} />,
-        disabled: korrekturDisabled,
-        hint: korrekturHint,
-        onClick: () => handleKorrigieren(),
+        label: 'Zahlungserinnerung',
+        icon: <MockIcon ctx="btn" n="mail" size={16} />,
+        onClick: () => setErinnerungModalOpen(true),
       })
     }
-
-    const darfSoftStorno =
-      !isEingehend &&
-      belegTyp === 'rechnung' &&
-      rechnungDarfOhneErsatzStorniertWerden(detail.status)
-    if (darfSoftStorno) {
+    if (rechnungDarfOhneErsatzStorniertWerden(detail.status)) {
       items.push({
         label: 'Stornieren',
         icon: <MockIcon ctx="btn" n="x" size={16} />,
         onClick: handleStornoOhneErsatz,
         hint: 'Mit Storno-Gutschrift, ohne neue Rechnung',
       })
+    } else if (st === 'entwurf') {
+      items.push({
+        label: 'Entwurf verwerfen',
+        icon: <MockIcon ctx="btn" n="trash" size={16} />,
+        onClick: handleStornoOhneErsatz,
+      })
     }
-
-    items.push(
-      {
-        label: 'Zahlungserinnerung',
-        icon: <MockIcon ctx="btn" n="mail" size={16} />,
-        disabled: !erinnerungOk,
-        hint: erinnerungHint,
-        onClick: () => setErinnerungModalOpen(true),
-      },
-      ...(detail.status === 'bezahlt' && !isEingehend && belegTyp === 'rechnung'
-        ? ([
-            {
-              label: 'Als unbezahlt markieren',
-              icon: <MockIcon ctx="btn" n="arrow-left" size={16} />,
-              onClick: () => setRechnungConfirm('unbezahlt'),
-            },
-          ] as ActionsMenuItem[])
-        : [])
-    )
-    // Hart löschen nur Entwurf — gesendete/stornierte Rechnungen nicht anbieten.
     return items
-  }, [
-    isEingehend,
-    pdfHref,
-    detail.status,
-    detail.id,
-    detail.rechnungsnummer,
-    belegTyp,
-    ueberfaellig,
-    router,
-    refresh,
-    secondaryAction,
-  ])
+  }, [isEingehend, pdfHref, detail.status, belegTyp, ueberfaellig])
 
   const projektTitelAnzeige = isEingehend
     ? detail.rechnungsnummer?.trim() ||

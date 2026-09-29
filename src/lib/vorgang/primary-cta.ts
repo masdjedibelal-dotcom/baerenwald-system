@@ -151,10 +151,8 @@ export function primaryCta(
           icon: 'file-invoice',
         }
       }
-      // null = alle Raten/RE bezahlt; undefined = Legacy nur über rechnungBezahlt
-      if (ctx.rechnungBezahlt || ctx.naechsteRechnungAktion === null) {
-        return { id: 'bewertung_einholen', label: 'Bewertung einholen', icon: 'star' }
-      }
+      // null = alle Raten/RE bezahlt → nichts mehr zu tun (Bewertungen entfallen, Block C)
+      if (ctx.rechnungBezahlt || ctx.naechsteRechnungAktion === null) return null
       if (ctx.naechsterAbschlagSenden) {
         return {
           id: 'rechnung_erstellen',
@@ -193,10 +191,7 @@ export function primaryCta(
     }
     return { id: 'als_bezahlt', label: 'Als bezahlt markieren', icon: 'check' }
   }
-  if (ui === 'bezahlt') {
-    if (ctx.eingehend) return null
-    return { id: 'bewertung_einholen', label: 'Bewertung einholen', icon: 'star' }
-  }
+  if (ui === 'bezahlt') return null
   return null
 }
 

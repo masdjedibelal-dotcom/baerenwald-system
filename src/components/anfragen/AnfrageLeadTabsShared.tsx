@@ -394,7 +394,7 @@ export function AngeboteListeTab({
                 <span className="text-right text-[length:var(--fs-text)] font-medium tabular-nums text-bw-text">
                   {formatAngebotEurKurzBrutto(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
                 </span>
-                <StatusBadge status={a.status} />
+                <StatusBadge phase="angebot" status={a.status} />
                 <MockIcon n="external-link" ctx="default" className="mx-auto h-4 w-4 text-bw-text-muted" aria-hidden />
               </MockBtn>
             ))
@@ -451,7 +451,7 @@ export function AngeboteListeTab({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <StatusBadge status={a.status} />
+                <StatusBadge phase="angebot" status={a.status} />
                 <MockIcon n="chevron-right" ctx="default" className="h-4 w-4 text-bw-text-muted" aria-hidden />
               </div>
             </MockBtn>

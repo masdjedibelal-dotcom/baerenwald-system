@@ -40,7 +40,7 @@ import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
 import type { EntityMenuItem } from '@/lib/entity-menu'
-import { PHASE_LABELS, PHASE_UNTERSTATUS_VALUES, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
+import { PHASE_LABELS, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
 import type { VorgaengeListePagination } from '@/lib/vorgang/load-vorgaenge-liste'
 import {
@@ -50,7 +50,6 @@ import {
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
 import { isVorgangErledigt, vorgangStatusKind } from '@/lib/vorgang/vorgang-offen'
 import {
-  matchesRechnungStatusFilterKey,
   resolveRechnungKorrekturUi,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
@@ -151,10 +150,6 @@ type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
 const statusKind = vorgangStatusKind
 
-function statusFilterKey(row: VorgangListeRow): string {
-  return row.unterstatus
-}
-
 function statusLabel(row: VorgangListeRow): string {
   // Rechnung: Text aus derselben Quelle wie Farbe und Detail (z. B. „Überfällig“ statt „Gesendet“).
   if (row.phase === 'rechnung' && row.belegTyp !== 'gutschrift' && String(row.unterstatus).toLowerCase() !== 'ausstehend') {
@@ -175,22 +170,10 @@ function statusLabel(row: VorgangListeRow): string {
   return row.unterstatusLabel
 }
 
+/** Status-Filter = sichtbares Wort (eine Quelle: statusLabel) — gleiche Wörter werden ein Filter. */
 function rowMatchesStatusFilter(row: VorgangListeRow, selected: string[]): boolean {
   if (!selected.length) return true
-  if (row.phase === 'rechnung') {
-    return selected.some((f) =>
-      matchesRechnungStatusFilterKey(
-        {
-          status: row.unterstatus,
-          unterstatus: row.unterstatus,
-          korrektur_von: row.korrektur_von,
-          korrektur_art: row.korrektur_art,
-        },
-        f
-      )
-    )
-  }
-  return selected.includes(statusFilterKey(row))
+  return selected.includes(statusLabel(row))
 }
 
 function dateKey(row: VorgangListeRow): string {
@@ -580,31 +563,17 @@ export function VorgaengeListeClient({
   }, [baseRows, lifecycle, filter, rechnungRichtung])
 
   const statusOptions = useMemo(() => {
-    if (showHwEingang) {
-      return [
-        { value: 'gesendet', label: 'Offen' },
-        { value: 'bezahlt', label: 'Überwiesen' },
-        { value: 'storniert', label: 'Abgelehnt' },
-      ]
-    }
-    // Nr. 9b: Status-Chips aus Resolver-Unterstatus (inkl. Angebot-Fine-Stages)
-    if (filter !== 'alle' && filter !== 'bestand' && filter in PHASE_UNTERSTATUS_VALUES) {
-      const phase = filter as VorgangPhase
-      return PHASE_UNTERSTATUS_VALUES[phase].map((u) => ({
-        value: u,
-        label: unterstatusLabel(phase, u),
-      }))
-    }
-    const byKey = new Map<string, string>()
+    // Optionen aus den tatsächlich sichtbaren Status-Wörtern der aktuellen Ansicht
+    const labels = new Set<string>()
     for (const v of lifecycleRows) {
       if (filter === 'bestand' && !v.ist_wiederkehrend) continue
-      const key = statusFilterKey(v)
-      if (!byKey.has(key)) byKey.set(key, statusLabel(v))
+      if (filter !== 'alle' && filter !== 'bestand' && v.phase !== filter) continue
+      labels.add(statusLabel(v))
     }
-    return Array.from(byKey.entries())
-      .sort((a, b) => a[1].localeCompare(b[1], 'de'))
-      .map(([value, label]) => ({ value, label }))
-  }, [lifecycleRows, filter, showHwEingang])
+    return Array.from(labels)
+      .sort((a, b) => a.localeCompare(b, 'de'))
+      .map((label) => ({ value: label, label }))
+  }, [lifecycleRows, filter])
 
   const counts = useMemo(() => {
     // Phasen-Chips immer über alle Phasen zählen — nicht über den aktiven Phasen-Filter

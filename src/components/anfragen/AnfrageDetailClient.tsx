@@ -40,7 +40,7 @@ import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
 import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
-import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
+import { deleteAnfrage, restoreAnfrage, updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
@@ -671,25 +671,14 @@ export function AnfrageDetailClient({
     <MockBadge kind="warten">Warte auf HV / Hausmeister</MockBadge>
   ) : null
 
-  const detailSecondary = useMemo(() => {
-    if (hmSelbstErledigt) return null
-    if (hatAuftrag || istAkut || wartetAufHvFreigabe) return null
-    if (matrixCta?.id !== 'angebot_erstellen') return null
-    return {
-      label: 'Direkt beauftragen',
-      icon: 'alert-triangle',
-      onClick: openDirektBeauftragen,
-      disabled: pending,
-    }
-  }, [
-    hmSelbstErledigt,
-    hatAuftrag,
-    istAkut,
-    wartetAufHvFreigabe,
-    matrixCta,
-    openDirektBeauftragen,
-    pending,
-  ])
+  // Aktionsmodell: „Ohne Angebot beauftragen“ steht im „…“, nicht als zweiter Knopf.
+  const kannOhneAngebotBeauftragen =
+    !hmSelbstErledigt &&
+    !hatAuftrag &&
+    !istAkut &&
+    !wartetAufHvFreigabe &&
+    matrixCta?.id === 'angebot_erstellen'
+  const detailSecondary = null
 
   const closeAngebotWizard = useCallback(() => {
     setAngebotWizardOpen(false)
@@ -798,21 +787,60 @@ export function AnfrageDetailClient({
     )
   }, [lead.status, lead.org_freigabe_status, lead.hv_meldung_status])
 
+  // Aktionsmodell: „…“ = Absagen · Löschen (nur solange nichts daraus entstanden ist).
+  // Zwischenstufen (kontaktiert, Termin, nicht erreichbar) entfallen — alles ist „In Arbeit“.
   const statusMenuItems = useMemo((): ActionsMenuItem[] => {
-    const items = statusActions.filter((a) => {
-      if (a.id !== 'verloren') return true
-      // Kein eigener Danger-Button mehr — nur ⋯; bei Auftrag/Akut ausblenden
-      if (hatAuftrag || istAkut) return false
-      return true
-    })
-    if (!items.length) return []
-    return items.map((a) => ({
-      label: a.label,
-      danger: a.danger,
-      icon: a.icon ? <MockIcon ctx="btn" n={a.icon} size={16} /> : undefined,
-      onClick: a.onClick,
-    }))
-  }, [statusActions, hatAuftrag, istAkut])
+    const items: ActionsMenuItem[] = []
+    if (kannOhneAngebotBeauftragen) {
+      items.push({
+        label: 'Ohne Angebot beauftragen',
+        icon: <MockIcon ctx="btn" n="briefcase" size={16} />,
+        onClick: openDirektBeauftragen,
+      })
+    }
+    const verloren = statusActions.find((a) => a.id === 'verloren')
+    if (verloren && !hatAuftrag && !istAkut) {
+      items.push({
+        label: 'Absagen',
+        danger: true,
+        icon: <MockIcon ctx="btn" n="circle-x" size={16} />,
+        onClick: verloren.onClick,
+      })
+    }
+    if (!hatAuftrag && angeboteListe.length === 0) {
+      items.push({
+        label: 'Anfrage löschen',
+        danger: true,
+        icon: <MockIcon ctx="btn" n="trash" size={16} />,
+        onClick: () => {
+          void (async () => {
+            const res = await deleteAnfrage(lead.id)
+            if (!res.ok) {
+              toast.systemError(res)
+              return
+            }
+            toast.deleted({
+              message: 'Anfrage gelöscht',
+              onUndo: () => {
+                restoreAnfrage(lead.id).then(() => router.push(`/anfragen/${lead.id}`))
+              },
+            })
+            router.push('/vorgaenge?tab=anfrage')
+          })()
+        },
+      })
+    }
+    return items
+  }, [
+    statusActions,
+    hatAuftrag,
+    istAkut,
+    angeboteListe.length,
+    lead.id,
+    router,
+    kannOhneAngebotBeauftragen,
+    openDirektBeauftragen,
+  ])
 
   const noShowTerminHinweis = useMemo(
     () =>

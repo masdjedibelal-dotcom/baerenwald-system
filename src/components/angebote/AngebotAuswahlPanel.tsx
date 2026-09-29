@@ -198,7 +198,7 @@ export function AngebotAuswahlPanel({
                     <span className="font-mono text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
                       {nr}
                     </span>
-                    <StatusBadge status={a.status} />
+                    <StatusBadge phase="angebot" status={a.status} />
                   </span>
                   <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
                     {a.created_at ? formatRelativeDate(a.created_at) : '—'}
