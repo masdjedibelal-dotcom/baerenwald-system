@@ -2003,6 +2003,11 @@ display: inline-flex;
   cursor: pointer;
 }
 
+@media (max-width: 767px) {
+  /* P25: Tipp-Fläche mindestens 44 px */
+  .vgid-chip { min-height: 44px; }
+}
+
 .vgid-chip:hover {
 border-color: var(--green);
   color: var(--green-dark, #1a3d2b);
@@ -9243,6 +9248,7 @@ padding-top: 6px;
 .fab-wrap {
 position: fixed; right: 26px; bottom: 26px; z-index: 80;
 }
+.fab-wrap[hidden] { display: none; }
 
 .list-pagination {
 display: flex;

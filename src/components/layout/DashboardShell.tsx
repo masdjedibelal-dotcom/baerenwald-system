@@ -3,6 +3,7 @@
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { BottomNav } from '@/components/layout/BottomNav'
@@ -25,6 +26,11 @@ function ShellChrome({
 }) {
   const [neuOpen, setNeuOpen] = useState(false)
   const [sbCollapsed, setSbCollapsed] = useState(false)
+  const pathname = usePathname()
+  // P25: Auf Detailseiten verdeckt der schwebende Plus-Knopf Inhalte — dort stehen die Aktionen oben.
+  const istDetailSeite = /^\/(anfragen|angebote|auftraege|rechnungen|kunden|partner|handwerker)\/(?!neu\b)[^/]+/.test(
+    pathname ?? ''
+  )
   useKeyboardOpen()
 
   useEffect(() => {
@@ -47,7 +53,7 @@ function ShellChrome({
 
       <BottomNav onNeuOpen={() => setNeuOpen(true)} />
 
-      <div className="fab-wrap fab-desktop fab-create">
+      <div className="fab-wrap fab-desktop fab-create" hidden={istDetailSeite}>
         <MockBtn className="fab-btn fab-create" type="button" title="Neu erstellen" aria-label="Neu erstellen" onClick={() => setNeuOpen(true)}>
           <MockIcon ctx="btn" n="plus" size={26} />
         </MockBtn>

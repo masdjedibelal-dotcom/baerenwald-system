@@ -27,6 +27,23 @@ export function ctaVerbLabel(label: string): string {
   return verb.charAt(0).toUpperCase() + verb.slice(1)
 }
 
+const MOBIL_KURZ: Record<string, string> = {
+  'Als bezahlt markieren': 'Bezahlt',
+  'Als überwiesen markieren': 'Überwiesen',
+  'Abnahme starten': 'Abnahme',
+  'Direkt Auftrag': 'Auftrag',
+  'Nächsten Abschlag erstellen': 'Abschlag',
+  'Nächsten Abschlag senden': 'Abschlag',
+  'Schlussrechnung versenden': 'Senden',
+  'Bewertung einholen': 'Bewertung',
+}
+
+/** P25: Kurzform für die Handy-Leiste, wenn mehrere Knöpfe nebeneinander stehen. */
+export function mobilKurzLabel(label: string): string {
+  const l = label.trim()
+  return MOBIL_KURZ[l] ?? ctaVerbLabel(l)
+}
+
 type Props = {
   /** Haupt-CTA — mobil floating unten */
   primary?: DetailActionDef | null
@@ -70,13 +87,14 @@ function InlineActionButton({
 }) {
   const { action, slot } = item
   const displayLabel = compact
-    ? (action.shortLabel?.trim() || ctaVerbLabel(action.label))
+    ? (action.shortLabel?.trim() || mobilKurzLabel(action.label))
     : action.label
   const iconSize = compact ? 15 : size === 'md' ? 16 : 14
 
   const inner = (
     <>
-      {action.icon ? <ActionIcon n={action.icon} size={iconSize} /> : null}
+      {/* P25: In der Handy-Leiste mit mehreren Knöpfen nur Text — sonst wird er abgeschnitten */}
+      {action.icon && !compact ? <ActionIcon n={action.icon} size={iconSize} /> : null}
       <span className="detail-mobile-action-bar__label min-w-0 truncate">{displayLabel}</span>
     </>
   )
@@ -227,7 +245,7 @@ export function DetailActionsBar({
                   key={`${item.slot}-${item.action.label}`}
                   item={item}
                   size="md"
-                  compact={Boolean(item.action.shortLabel?.trim())}
+                  compact={resolved.layout !== 'solo' || Boolean(item.action.shortLabel?.trim())}
                   className={cn(
                     item.slot === 'secondary' && 'detail-mobile-action-bar__secondary',
                     item.slot === 'danger' && 'detail-mobile-action-bar__danger'
@@ -238,7 +256,7 @@ export function DetailActionsBar({
                 <InlineActionButton
                   item={primaryItem}
                   size="md"
-                  compact={false}
+                  compact={resolved.layout !== 'solo'}
                   className={cn(
                     'detail-mobile-action-bar__primary',
                     resolved.layout === 'solo' && 'detail-mobile-action-bar__primary--solo',
