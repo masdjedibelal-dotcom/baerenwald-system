@@ -43,7 +43,14 @@ Branches bauen aufeinander auf: `umbau/p05-liste-auftrag` enthält P01–P05. Lo
 | P16/P17 (Einstiege) | fertig | `umbau/p16-einstiege-raus` (CRM) | Code/Tabellen noch da |
 | P19/P25 (Teil) Details | fertig | `umbau/p19-sheets` (CRM) | Sheet-Fuß, Preisfeld, Speichern-Frage, Handy-Kopf, Tab-Hinweis |
 
-Staging: CRM = `umbau/staging-d` (enthält alles bis P19/P25), Portal = `umbau/staging-c` (per „ours“-Merge, kein Force).
+| P21 Nächster Schritt | fertig | `umbau/p21-naechster-schritt` | Karte + Betrag im Kopf |
+| P24 Texte | fertig | `umbau/p24-texte` (CRM + Portal) | Sie überall (Website bleibt du), Toasts nur Unsichtbares |
+| P25 Handy | fertig | `umbau/p25-handy` | Kurzlabels, 44 px, kein FAB auf Detailseiten |
+| P23 Assistent (Angebot) | fertig | `umbau/p23-assistent` | Schritte + Prüfen-Sheet mit PDF; Rechnung offen |
+| Eine Wahrheit „offen“ + Klick-Fixes | fertig | `umbau/wahrheiten-offen` | `src/lib/vorgang/vorgang-offen.ts`; verlorene CSS aus `b3ef4c563` zurück |
+| Entlastung | fertig | `umbau/entlastung` | Auswahl Belal 30.09. (Memory `entlastung-streichungen`) |
+
+Staging: CRM = `umbau/staging-g` (enthält alles), Portal = `umbau/staging-e` (per „ours“-Merge, kein Force).
 
 ## Nächste Sitzungen
 
@@ -51,7 +58,8 @@ Staging: CRM = `umbau/staging-d` (enthält alles bis P19/P25), Portal = `umbau/s
 2. P14 Daten (35 → 17 Status) mit Probelauf auf Kopie, dann Prod mit Backup.
 3. P15 Ereignis-Protokoll + ein Mail-Weg.
 4. Löschen (Code + Tabellen) nach Backup, P18 alte Partner-Positionsansicht.
-5. Block D Rest: P21 Aufgaben-Karte, P22 Vorgang-Arbeitsfläche, P23 Assistenten in 3 Schritten, P24 Texte, P25 Plus-Knopf und gekürzte Aktion.
+5. P22 Vorgang als eine Seite; Rechnungs-Assistent in 3 Schritten.
+6. Wahrheiten weiter zusammenführen: Dashboard-Funnel/Umsatz, rohe Status-Texte (z. B. „wartend“), Zeitangaben („vor 12h“), Portal auf verlorene CSS-Regeln prüfen.
 
 ## (alt) Nächstes Paket: P11 Einsatz im CRM (Block B2)
 
