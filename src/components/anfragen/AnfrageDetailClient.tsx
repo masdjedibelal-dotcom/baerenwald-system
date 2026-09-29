@@ -10,7 +10,7 @@ import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { primaryCta } from '@/lib/vorgang/primary-cta'
+import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -1013,6 +1013,13 @@ export function AnfrageDetailClient({
           </>
         ),
         meta: headMeta,
+        nextStep: wartetAufHvFreigabe
+          ? 'Die Hausverwaltung muss den Start noch freigeben.'
+          : !detailPrimary
+            ? null
+            : istAkut
+              ? 'Notfall: Beauftragen Sie direkt einen Partner.'
+              : naechsterSchrittText('anfrage', lead.status, matrixCta),
         actions: wartetAufHvFreigabe ? (
           hvWarteStatusPill
         ) : (

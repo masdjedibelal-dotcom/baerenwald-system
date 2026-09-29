@@ -199,3 +199,52 @@ export function primaryCta(
   }
   return null
 }
+
+/**
+ * P21: ein Satz „Was als Nächstes zu tun ist“ zur Primary-CTA.
+ * Leer, wenn es keinen nächsten Schritt gibt.
+ */
+export function naechsterSchrittText(
+  phase: VorgangCtaPhase,
+  status: string,
+  cta: PrimaryCtaResult | null,
+  ctx: PrimaryCtaContext = {}
+): string | null {
+  if (!cta) return null
+  const ui = mapStatusToSpecUi(phase, status)
+  switch (cta.id) {
+    case 'angebot_erstellen':
+      return 'Erstellen Sie das Angebot für diese Anfrage.'
+    case 'angebot_versenden':
+      return 'Senden Sie das Angebot an den Kunden.'
+    case 'angebot_annehmen':
+      return ui === 'entwurf'
+        ? 'Das Angebot ist noch ein Entwurf. Senden Sie es an den Kunden oder nehmen Sie es direkt an.'
+        : 'Das Angebot liegt beim Kunden. Sagt er zu, nehmen Sie es hier an.'
+    case 'direkt_auftrag':
+      return 'Der Betrag liegt unter der Freigabe-Schwelle. Sie können direkt einen Auftrag anlegen.'
+    case 'abnahme_starten':
+      return 'Die Arbeiten sind fertig. Machen Sie jetzt die Abnahme mit dem Kunden.'
+    case 'auftrag_abschliessen':
+      return 'Der Auftrag läuft. Wenn alles erledigt ist, schließen Sie ihn ab.'
+    case 'rechnung_erstellen':
+      return ctx.naechsterAbschlagSenden
+        ? 'Der nächste Abschlag ist fällig. Erstellen Sie die Abschlagsrechnung.'
+        : 'Die Arbeit ist erledigt. Erstellen Sie die Rechnung.'
+    case 'rechnung_versenden':
+      return ctx.korrektur
+        ? 'Die Korrektur ist fertig. Senden Sie sie an den Kunden.'
+        : 'Die Rechnung ist fertig. Senden Sie sie an den Kunden.'
+    case 'als_bezahlt':
+      if (ctx.eingehend) return 'Überweisen Sie die Partner-Rechnung und markieren Sie sie danach.'
+      return ui === 'ueberfaellig' || ctx.ueberfaellig
+        ? 'Die Rechnung ist überfällig. Erinnern Sie den Kunden oder markieren Sie den Eingang.'
+        : 'Die Rechnung ist offen. Sobald das Geld da ist, markieren Sie sie als bezahlt.'
+    case 'mahnung_senden':
+      return 'Die Rechnung ist überfällig. Erinnern Sie den Kunden.'
+    case 'bewertung_einholen':
+      return null
+    default:
+      return null
+  }
+}

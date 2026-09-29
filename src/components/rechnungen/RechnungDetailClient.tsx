@@ -11,7 +11,7 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { openActionConfirm, ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { actionBusy, useTransition } from '@/components/ui/action-busy'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { primaryCta } from '@/lib/vorgang/primary-cta'
+import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
 import { gesendetDetailSubline, rechnungStatusDisplay } from '@/lib/status/status-display'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -933,6 +933,20 @@ export function RechnungDetailClient({
           />
         ),
         meta: headMeta,
+        amount: detail.brutto != null ? formatEurBetrag(detail.brutto) : null,
+        nextStep: (() => {
+          if (!primaryAction || darfStornoZuruecknehmen) return null
+          const ctx = {
+            ueberfaellig,
+            eingehend: isEingehend,
+            korrektur: Boolean(String(detail.korrektur_von ?? '').trim()),
+          }
+          const cta = primaryCta('rechnung', detail.status, ctx)
+          if (belegTyp === 'gutschrift' && cta?.id === 'rechnung_versenden') {
+            return 'Die Gutschrift ist fertig. Senden Sie sie an den Kunden.'
+          }
+          return naechsterSchrittText('rechnung', detail.status, cta, ctx)
+        })(),
         actions: (
           <DetailActionsBar
             sheetTitle="Rechnung"

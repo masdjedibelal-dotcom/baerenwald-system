@@ -14,7 +14,7 @@ import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { primaryCta } from '@/lib/vorgang/primary-cta'
+import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -1206,6 +1206,26 @@ export function AuftragDetailClient({
     },
   ]
 
+  const auftragCtaCtx = {
+    abnahmeFaellig: detail.status === 'abnahme',
+    rechnungBezahlt:
+      detail.status === 'abgeschlossen' && naechsteRechnungAktion === null,
+    naechsterAbschlagSenden: Boolean(
+      hatAbschlagsplan &&
+        naechsteRechnungAktion &&
+        (naechsteRechnungAktion.art === 'erstellen' ||
+          naechsteRechnungAktion.art === 'versenden') &&
+        naechsteRechnungAktion.abschlag
+    ),
+    naechsteRechnungAktion:
+      detail.status === 'abgeschlossen'
+        ? naechsteRechnungAktion === null
+          ? null
+          : naechsteRechnungAktion?.art
+        : undefined,
+  }
+  const auftragCta = istStorniert ? null : primaryCta('auftrag', detail.status, auftragCtaCtx)
+
   return (
     <EntityDetailLayout
       phase="auftrag"
@@ -1237,29 +1257,13 @@ export function AuftragDetailClient({
           <StatusBadge status={detail.status} label={auftragStatus.label} />
         ),
         meta: headMeta,
+        amount: auftragWertLabel && auftragWertLabel !== '—' ? auftragWertLabel : null,
+        nextStep: naechsterSchrittText('auftrag', detail.status, auftragCta, auftragCtaCtx),
         actions: (
           <DetailActionsBar
             sheetTitle="Auftrag"
             primary={(() => {
-              if (istStorniert) return null
-              const cta = primaryCta('auftrag', detail.status, {
-                abnahmeFaellig: detail.status === 'abnahme',
-                rechnungBezahlt:
-                  detail.status === 'abgeschlossen' && naechsteRechnungAktion === null,
-                naechsterAbschlagSenden: Boolean(
-                  hatAbschlagsplan &&
-                    naechsteRechnungAktion &&
-                    (naechsteRechnungAktion.art === 'erstellen' ||
-                      naechsteRechnungAktion.art === 'versenden') &&
-                    naechsteRechnungAktion.abschlag
-                ),
-                naechsteRechnungAktion:
-                  detail.status === 'abgeschlossen'
-                    ? naechsteRechnungAktion === null
-                      ? null
-                      : naechsteRechnungAktion?.art
-                    : undefined,
-              })
+              const cta = auftragCta
               if (!cta) return null
               const draftArt =
                 naechsteRechnungAktion?.rechnungId != null

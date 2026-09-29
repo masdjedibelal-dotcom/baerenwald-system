@@ -11398,6 +11398,37 @@ font-size: var(--fs-meta);
     line-height: 1.4;
 }
 
+/* P21: Betrag im Kopf + Karte „Nächster Schritt“ */
+.dh-amount {
+  flex-shrink: 0;
+  font-size: var(--fs-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.detail-next-step {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border-left: 3px solid var(--green);
+  background: var(--green-50);
+  font-size: var(--fs-text);
+  color: var(--text);
+}
+
+.detail-next-step__label {
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--green-dark);
+}
+
 .detail-head-sub {
 margin-top: 3px;
     font-size: var(--fs-meta);

@@ -41,6 +41,10 @@ export type DetailHeadProps = {
   /** Icon-Aktionen rechts im Titel (z. B. Portal-Login) — immer sichtbar, nicht im ⋯ */
   titleTrailing?: ReactNode
   actions?: ReactNode
+  /** P21: Betrag im Kopf (z. B. „23.800 €“) */
+  amount?: ReactNode
+  /** P21: ein Satz „Was als Nächstes zu tun ist“ — Knopf dazu ist die Haupt-Aktion */
+  nextStep?: string | null
   /** Stärkerer Projekt-Kopf mit Trennlinie */
   variant?: 'default' | 'project'
   className?: string
@@ -55,10 +59,11 @@ export function DetailHead({
   titleBadges,
   titleTrailing,
   actions,
+  amount,
   variant = 'project',
   className,
 }: DetailHeadProps) {
-  const hasMetaRow = Boolean(badges || meta)
+  const hasMetaRow = Boolean(badges || meta || amount)
 
   return (
     <header className={cn('detail-head', variant === 'project' && 'detail-head--project', className)}>
@@ -75,7 +80,8 @@ export function DetailHead({
         {hasMetaRow ? (
           <div className="dh-meta vgid-meta">
             {badges}
-            {badges && meta ? <span className="sep" aria-hidden>
+            {amount ? <span className="dh-amount">{amount}</span> : null}
+            {(badges || amount) && meta ? <span className="sep" aria-hidden>
               ·
             </span> : null}
             {meta}
@@ -365,9 +371,16 @@ export function EntityDetailLayout({
             meta={undefined}
             sub={undefined}
             actions={head.actions}
+            amount={head.amount}
             variant={head.variant}
             className={head.className}
           />
+          {head.nextStep ? (
+            <div className="detail-next-step" role="status">
+              <span className="detail-next-step__label">Nächster Schritt</span>
+              <span className="detail-next-step__text">{head.nextStep}</span>
+            </div>
+          ) : null}
           {banner ? <div className="detail-entity-banner">{banner}</div> : null}
           {isMobile && quickBar?.length ? <DetailQuickBar actions={quickBar} /> : null}
         </div>

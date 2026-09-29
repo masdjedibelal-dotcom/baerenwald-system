@@ -18,7 +18,7 @@ import {
   angebotDarfDirektAuftragOhneHvFreigabe,
   resolveAnfrageFreigabeRegeln,
 } from '@/lib/anfragen/anfrage-akut-schwelle'
-import { primaryCta } from '@/lib/vorgang/primary-cta'
+import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
@@ -538,10 +538,13 @@ export function AngebotDetailPageClient({
     })
   }, [detail.id, router, refresh, startTransition])
 
+  const angebotCta = useMemo(
+    () => primaryCta('angebot', statusEinfach || detail.status, { unterSchwelleDirektAuftrag }),
+    [statusEinfach, detail.status, unterSchwelleDirektAuftrag]
+  )
+
   const primaryAction = useMemo((): DetailActionDef | null => {
-    const cta = primaryCta('angebot', statusEinfach || detail.status, {
-      unterSchwelleDirektAuftrag,
-    })
+    const cta = angebotCta
     if (!cta) return null
     if (cta.id === 'angebot_versenden') {
       return {
@@ -568,7 +571,7 @@ export function AngebotDetailPageClient({
       }
     }
     return null
-  }, [statusEinfach, detail.status, pending, unterSchwelleDirektAuftrag, runDirektAuftrag])
+  }, [angebotCta, pending, runDirektAuftrag])
 
   const secondaryAction = useMemo((): DetailActionDef | null => {
     if (kannBearbeiten) {
@@ -774,6 +777,8 @@ export function AngebotDetailPageClient({
           />
         ),
         meta: headMeta,
+        amount: summenMail.bruttoMin > 0 ? formatEurBetrag(summenMail.bruttoMin) : null,
+        nextStep: naechsterSchrittText('angebot', statusEinfach || detail.status, angebotCta),
         actions: (
           <DetailActionsBar
             sheetTitle="Angebot"
