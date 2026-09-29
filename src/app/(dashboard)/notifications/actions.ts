@@ -510,7 +510,7 @@ async function collectCrmNotificationItems(opts?: {
     supabase
       .from('partner_positions_anfragen')
       .select(
-        'id, auftrag_id, titel, created_at, handwerker:handwerker_id(name), auftraege:auftrag_id(titel, projekt_name)'
+        'id, auftrag_id, titel, created_at, handwerker:handwerker_id(name), auftraege:auftrag_id(titel)'
       )
       .eq('status', 'offen')
       .gte('created_at', since)
@@ -1067,11 +1067,11 @@ async function collectCrmNotificationItems(opts?: {
       const hw = one(row.handwerker as { name?: string | null } | { name?: string | null }[] | null)
       const auf = one(
         row.auftraege as
-          | { titel?: string | null; projekt_name?: string | null }
-          | { titel?: string | null; projekt_name?: string | null }[]
+          | { titel?: string | null }
+          | { titel?: string | null }[]
           | null
       )
-      const projekt = auf?.titel?.trim() || auf?.projekt_name?.trim() || null
+      const projekt = auf?.titel?.trim() || null
       const hwName = hw?.name?.trim() || 'Partner'
       const posTitel = (row.titel as string)?.trim()
       items.push({

@@ -58,7 +58,7 @@ export async function listDuplikatKandidaten(leadId: string): Promise<
   const { data: lead, error } = await supabase
     .from('leads')
     .select(
-      'id, telefon, email, melder_telefon, melder_email, objekt_id, kunde_id, created_at, situation'
+      'id, kontakt_telefon, kontakt_email, melder_telefon, melder_email, kunde_objekt_id, kunde_id, created_at, situation'
     )
     .eq('id', id)
     .maybeSingle()
@@ -71,7 +71,7 @@ export async function listDuplikatKandidaten(leadId: string): Promise<
 
   const { data: rows, error: error2 } = await supabase
     .from('leads')
-    .select('id, situation, telefon, email, melder_telefon, melder_email, objekt_id, kunde_id, created_at')
+    .select('id, situation, kontakt_telefon, kontakt_email, melder_telefon, melder_email, kunde_objekt_id, kunde_id, created_at')
     .neq('id', id)
     .gte('created_at', sinceIso)
     .is('zusammengefuehrt_in', null)
@@ -79,26 +79,26 @@ export async function listDuplikatKandidaten(leadId: string): Promise<
     .limit(80)
   if (error2) logDbError('app/anfragen/duplikat-actions:leads', error2)
 
-  const tel = String(lead.telefon || lead.melder_telefon || '')
+  const tel = String(lead.kontakt_telefon || lead.melder_telefon || '')
     .replace(/\D/g, '')
     .slice(-8)
-  const mail = String(lead.email || lead.melder_email || '')
+  const mail = String(lead.kontakt_email || lead.melder_email || '')
     .trim()
     .toLowerCase()
-  const objekt = String(lead.objekt_id || '').trim()
+  const objekt = String(lead.kunde_objekt_id || '').trim()
   const kunde = String(lead.kunde_id || '').trim()
 
   const kandidaten: { id: string; label: string }[] = []
   for (const r of rows ?? []) {
-    const rTel = String(r.telefon || r.melder_telefon || '')
+    const rTel = String(r.kontakt_telefon || r.melder_telefon || '')
       .replace(/\D/g, '')
       .slice(-8)
-    const rMail = String(r.email || r.melder_email || '')
+    const rMail = String(r.kontakt_email || r.melder_email || '')
       .trim()
       .toLowerCase()
     const matchTel = Boolean(tel && rTel && tel === rTel)
     const matchMail = Boolean(mail && rMail && mail === rMail)
-    const matchObj = Boolean(objekt && r.objekt_id && objekt === String(r.objekt_id))
+    const matchObj = Boolean(objekt && r.kunde_objekt_id && objekt === String(r.kunde_objekt_id))
     const matchKunde = Boolean(kunde && r.kunde_id && kunde === String(r.kunde_id) && (matchTel || matchMail))
     if (!(matchTel || matchMail || matchObj || matchKunde)) continue
     kandidaten.push({

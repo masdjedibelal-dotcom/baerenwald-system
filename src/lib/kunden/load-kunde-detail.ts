@@ -274,7 +274,7 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
     const { data: angs, error: eAng } = await supabase
       .from('angebote')
       .select(
-        'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url, leistungsumfang, notizen'
+        'id, lead_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url, leistungsumfang, notizen'
       )
       .in('lead_id', leadIds)
     if (eAng) logDbError('lib/kunden/load-kunde-detail:angebote', eAng)
@@ -290,12 +290,13 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
 
   if (auftragIds.length) {
     const [angRes, einRes, abnahmeRes] = await Promise.all([
+      // Angebot hängt am Auftrag (auftraege.angebot_id), nicht umgekehrt.
       supabase
-        .from('angebote')
+        .from('auftraege')
         .select(
-          'id, lead_id, auftrag_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url, leistungsumfang, notizen'
+          'id, angebot:angebot_id(id, lead_id, status, status_einfach, gueltig_bis, gesamt_fix, gesamt_min, gesamt_max, created_at, pdf_url, leistungsumfang, notizen)'
         )
-        .in('auftrag_id', auftragIds),
+        .in('id', auftragIds),
       supabase
         .from('einbehalte')
         .select('id, auftrag_id, einbehalt_betrag, status, freigabe_datum, handwerker(name, firma)')
@@ -304,11 +305,12 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
     ])
 
     if (!angRes.error && angRes.data) {
-      for (const raw of angRes.data as AngebotKurz[]) {
-        const aid = raw.auftrag_id
-        if (!aid) continue
+      for (const row of angRes.data as { id: string; angebot: AngebotKurz | AngebotKurz[] | null }[]) {
+        const ang = Array.isArray(row.angebot) ? row.angebot[0] : row.angebot
+        if (!ang) continue
+        const aid = String(row.id)
         if (!angeboteByAuftrag.has(aid)) angeboteByAuftrag.set(aid, [])
-        angeboteByAuftrag.get(aid)!.push(raw)
+        angeboteByAuftrag.get(aid)!.push({ ...ang, auftrag_id: aid })
       }
     } else if (angRes.error) console.warn('loadKundeDetail angebote(auftraege)', angRes.error.message)
 
@@ -429,8 +431,8 @@ export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | 
         .limit(40)
     : { data: [] as KundeDetailPayload['email_logs'] }
   const byKunde = await supabase
-    .from('email_logs')
-    .select('id, typ, to_email, subject, created_at, angebot_id')
+    .from('email_log')
+    .select('id, typ, to_email:an_email, subject:betreff, created_at, angebot_id')
     .eq('kunde_id', id)
     .order('created_at', { ascending: false })
     .limit(40)

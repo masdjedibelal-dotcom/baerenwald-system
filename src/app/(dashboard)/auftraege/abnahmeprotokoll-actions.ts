@@ -1642,12 +1642,12 @@ export async function freigebenAbnahmeprotokoll(
   if (hwId) {
     const { data: auftrag, error } = await supabaseAdmin
       .from('auftraege')
-      .select('titel, projekt_name, lead_id')
+      .select('titel, lead_id')
       .eq('id', auftragId)
       .maybeSingle()
     if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', error)
     const projekt =
-      String(auftrag?.titel ?? auftrag?.projekt_name ?? '').trim() || 'Auftrag'
+      String(auftrag?.titel ?? '').trim() || 'Auftrag'
     await notifyPartnerUnified({
       handwerkerId: hwId,
       typ: 'erinnerung',
@@ -1789,12 +1789,12 @@ export async function ablehnenAbnahmeprotokoll(input: {
   if (hwId) {
     const { data: auftrag, error } = await supabaseAdmin
       .from('auftraege')
-      .select('titel, projekt_name')
+      .select('titel')
       .eq('id', input.auftragId)
       .maybeSingle()
     if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', error)
     const projekt =
-      String(auftrag?.titel ?? auftrag?.projekt_name ?? '').trim() || 'Auftrag'
+      String(auftrag?.titel ?? '').trim() || 'Auftrag'
     await notifyPartnerUnified({
       handwerkerId: hwId,
       typ: 'entfernt',

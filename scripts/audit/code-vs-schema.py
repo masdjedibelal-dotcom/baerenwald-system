@@ -47,5 +47,5 @@ for repo in [os.path.join(ROOT,"baerenwald-system"),os.path.join(ROOT,"baerenwal
                 if bad:
                     line=t[:m.start()].count("\n")+1
                     res.append((os.path.basename(repo),os.path.relpath(p,repo)+":"+str(line),name,sorted(set(bad))))
-for r in res: print(r[0][:6],r[1],r[2],r[3])
+for r in res: print(r[0],r[1],r[2],r[3])
 print(len(res))

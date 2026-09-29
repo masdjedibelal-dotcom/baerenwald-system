@@ -132,7 +132,7 @@ export async function loadMelderLeadForAuskunft(leadId: string) {
       `
       id, created_at, updated_at, kanal, status, anlass,
       melder_name, melder_einheit, melder_telefon, melder_email,
-      notizen, kontakt_nachricht, plz, strasse, hausnummer, ort, funnel_daten,
+      notizen, kontakt_nachricht, plz, strasse, hausnummer, funnel_daten,
       auftraggeber:auftraggeber_kunde_id(name, org_anzeigename),
       kunden_objekte:kunde_objekt_id(titel, plz, ort)
     `

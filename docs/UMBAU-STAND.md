@@ -22,7 +22,8 @@ Einstieg für jede Umbau-Sitzung. Plan und Pakete: Claude Doc „Bärenwald Fach
 | Paket | Status | Branch | Notiz |
 |---|---|---|---|
 | P01 Kundenportal vollständig | in Abnahme | `umbau/p01-kundenportal` (CRM + Portal) | Prod-Migration `20261212120000_auftrag_positionen_kunde_akzeptiert_at.sql` wartet auf Freigabe |
-| P02 Partner-Portal vollständig | offen | | Rest-Grundlinie Portal: 7 Einträge, alle Partner |
+| P02 Partner-Portal vollständig | fertig, Abnahme mit Block A | `umbau/p02-partnerportal` (Portal) | Portal-Spaltenprüfung: 0 Verstöße, Maximum 0 |
+| P03 CRM vollständig | in Arbeit | `umbau/p03-crm` (CRM) | |
 
 ## Nächstes Paket: P02
 

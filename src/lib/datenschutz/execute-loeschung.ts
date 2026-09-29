@@ -206,7 +206,6 @@ async function anonymisiereMelderLeadFelder(
       plz: null,
       strasse: null,
       hausnummer: null,
-      ort: null,
     })
     .eq('id', leadId)
   if (error) logDbError('lib/datenschutz/execute-loeschung:leads', error)
@@ -246,16 +245,7 @@ async function clearFotosForAuftrag(auftragId: string): Promise<{ urls: string[]
     await supabaseAdmin.from('vor_baubeginn_protokolle').update({ foto_urls: [] }).eq('id', (row as { id: string }).id)
   }
 
-  const { data: ns, error: error4 } = await supabaseAdmin.from('nachtraege').select('id, foto_urls').eq('auftrag_id', auftragId)
-  if (error4) logDbError('lib/datenschutz/execute-loeschung:nachtraege', error4)
-  for (const row of ns ?? []) {
-    const fu = (row as { foto_urls?: string[] | null }).foto_urls
-    if (Array.isArray(fu)) urls.push(...fu.filter(Boolean))
-    if (fu !== undefined) {
-      const { error: __dbErr2 } = await supabaseAdmin.from('nachtraege').update({ foto_urls: [] }).eq('id', (row as { id: string }).id)
-      if (__dbErr2) logDbError('lib/datenschutz/execute-loeschung:nachtraege', __dbErr2)
-    }
-  }
+  // nachtraege hat keine Foto-Spalte (Prod-Schema 29.09.2026) → nichts zu löschen.
 
   const uniq = Array.from(new Set(urls))
   await deleteStorageObjectsFromUrls(uniq)

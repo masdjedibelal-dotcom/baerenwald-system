@@ -75,8 +75,8 @@ export async function GET(req: Request) {
       .limit(4),
     supabase
       .from('kunden_dokumente')
-      .select('id, titel, dateiname, kunde_id')
-      .or(`titel.ilike.${pattern},dateiname.ilike.${pattern}`)
+      .select('id, name, kunde_id')
+      .ilike('name', pattern)
       .limit(4),
   ])
 
@@ -244,7 +244,7 @@ export async function GET(req: Request) {
   }
 
   for (const d of kundenDok.data ?? []) {
-    const titel = (d.titel as string) || (d.dateiname as string) || 'Dokument'
+    const titel = (d.name as string) || 'Dokument'
     push(
       'dokumente',
       `kd-${d.id}`,

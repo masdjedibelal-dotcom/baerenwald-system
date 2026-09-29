@@ -1093,7 +1093,6 @@ export async function updateRegiePositionInPruefung(input: {
       stundensatz,
       stundensatz_kunde: stundensatzKunde,
       preis_partner: stundensatz,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', pos.id)
   if (__dbErr) {

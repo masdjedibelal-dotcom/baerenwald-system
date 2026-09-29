@@ -137,12 +137,7 @@ export async function hardDeleteLeadCascade(
     if (error) logDbError('lib/portal/soft-delete-lead:rechnungen', error)
     for (const r of data ?? []) rechnungIdSet.add(String(r.id))
   }
-  // Direkt am Lead hängende Rechnungen
-  {
-    const { data, error } = await supabaseAdmin.from('rechnungen').select('id').eq('lead_id', id)
-    if (error) logDbError('lib/portal/soft-delete-lead:rechnungen', error)
-    for (const r of data ?? []) rechnungIdSet.add(String(r.id))
-  }
+  // rechnungen hat kein lead_id — Rechnungen hängen an Auftrag/Angebot (oben erfasst).
   const rechnungIds = Array.from(rechnungIdSet)
 
   let positionIds: string[] = []
