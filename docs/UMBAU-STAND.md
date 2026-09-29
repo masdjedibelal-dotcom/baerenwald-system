@@ -29,7 +29,18 @@ Einstieg für jede Umbau-Sitzung. Plan und Pakete: Claude Doc „Bärenwald Fach
 
 Branches bauen aufeinander auf: `umbau/p05-liste-auftrag` enthält P01–P05. Lokale Builds beider Apps: grün (29.09.2026).
 
-## Nächstes Paket: P06 Auftrag erteilen
+| P06 Auftrag erteilen | fertig | `umbau/p06-auftrag-erteilen` (CRM + Portal) | Migration `20261213120000_…`; Portal ruft `POST /api/auftraege/aus-angebot` |
+| P07 Rechenkern | fertig | `umbau/p07-rechenkern` (CRM + Portal) | Liste = Detail: `auftragSummenAusPositionen` |
+| P08 Rechnung nach Versand | fertig | `umbau/p08-rechnung-versand` (CRM) | Storno immer mit Gutschrift, kein Zurücknehmen |
+| P09 Abschlag/Schluss | fertig | `umbau/p09-abschlag-schluss` (CRM) | `AbschlagStellenSheet`, `planMitNeuemAbschlag` |
+| P10 Angebots-Versionen | fertig | `umbau/p10-angebot-versionen` (CRM) | `angebotWarBeimKunden` in wizard-actions |
+
+## Nächstes Paket: P11 Einsatz im CRM (Block B2)
+
+Entschieden: Einsatz = Anweisung (Titel, Text, wann, wo) + EK je Partner (netto/brutto wegen §13b); Partner nimmt an/lehnt ab,
+meldet in einem Schritt fertig (Fotos, Dokumente, Text), dann Rechnung mit Freitext-Positionen. Auftrag „läuft“ wird aus Einsätzen abgeleitet.
+
+## (alt) P06 Auftrag erteilen
 
 Erst nach Abnahme von Block A. Einstieg: `createAuftragFromAngebot` (CRM `src/app/(dashboard)/angebote/actions.ts`) und
 `acceptKundeAngebot` (Portal `src/app/actions/portal-angebot.ts`) → eine Datenbank-Funktion.

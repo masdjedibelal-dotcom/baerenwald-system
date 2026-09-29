@@ -164,3 +164,84 @@
    2. `20261212130000_p03_fehlende_tabellen_spalten.sql`
 3. Merge von `umbau/p05-liste-auftrag` nach `main` in CRM und Portal, dann Deploy.
 4. Gegenprobe: `TARGET=prod python3 scripts/audit/code-vs-schema.py` → nur noch Streichlisten-Einträge.
+
+# Block B1 – Geld und Auftrag (P06–P10)
+
+Stand: CRM `umbau/p10-angebot-versionen`, Portal `umbau/p07-rechenkern` (enthalten jeweils alle vorherigen Pakete).
+
+## P06 – Auftrag erteilen = eine Funktion
+
+### Was ist anders
+
+1. Nimmt ein Kunde oder die HV ein Angebot im Portal an, legt jetzt das CRM den Auftrag an, **genauso vollständig wie bei Annahme im CRM**:
+   - Positionen und Partner-Zuweisung,
+   - Zahlungsplan und Verträge,
+   - Auftragsbestätigung per Mail, Meilensteine.
+2. Scheitert das, wird die Annahme zurückgesetzt, und der Kunde sieht eine Meldung. Es gibt **keinen halben Auftrag** mehr.
+3. **Datenbank-Regel:** höchstens ein Auftrag je Angebot.
+
+### So testen Sie (Staging)
+
+1. Staging-CRM: ein Angebot an einen Portal-Kunden senden.
+2. Über „Kundenportal öffnen“ das Angebot annehmen.
+3. Im CRM hat der Auftrag Positionen, die Partner-Zuweisung (falls im Angebot), einen Zahlungsplan (falls gewählt) und einen Eintrag im Verlauf.
+
+### Für Prod nötig
+
+- Migration `20261213120000_p06_ein_auftrag_je_angebot.sql`.
+- Im Portal müssen `NEXT_PUBLIC_CRM_URL` und `PDF_SERVICE_SECRET` stimmen.
+  - **Achtung:** Lokal steht dort `dashboard.baerenwaldmuenchen.de`. Diese Adresse hat keinen DNS-Eintrag.
+  - In Netlify prüfen, welche CRM-Adresse das Prod-Portal nutzt, sonst scheitern auch die Portal-PDFs.
+
+## P07 – Ein Rechenkern
+
+### Was ist anders
+
+1. Die **Vorgangsliste zeigt je Auftrag denselben Betrag wie das Auftragsdetail.** Bisher wurde der Zeilenbetrag noch einmal mit der Menge multipliziert.
+   - In Prod betraf das 13 von 26 Aufträgen, zum Beispiel 188.674 € statt 7.681 €.
+   - Nachlass und Regie (Stunden × Kundensatz) rechnen jetzt richtig.
+2. **Auftragsänderungen im Kundenportal** nutzen denselben Kern, ohne Doppel-Multiplikation.
+
+### So testen Sie
+
+- Vorgänge → Filter „Auftrag“ → Betrag eines Auftrags merken → Auftrag öffnen: Der Betrag unter „Leistungen“ ist identisch.
+
+## P08 – Rechnung nach Versand
+
+### Was ist anders
+
+1. **„Stornieren“ einer versendeten, bezahlten oder überfälligen Rechnung** erzeugt immer eine Storno-Gutschrift als Beleg für den Kunden. Ein Entwurf wird einfach verworfen.
+2. **„Storno zurücknehmen“ gibt es nicht mehr.** Ein Storno ist endgültig.
+3. **Korrektur:** Ändert man Fälligkeit oder Zahlungsbedingungen im Korrektur-Assistenten, entsteht Storno plus neue Rechnung. Ein stilles Überschreiben des versendeten PDFs gibt es nicht mehr.
+4. **Bleibt:** Die Karte „Zahlungsziel“ verschiebt nur die interne Fälligkeit (Stundung, Mahnungen), das PDF bleibt unverändert.
+
+### Hinweis
+
+- In `RechnungDetailClient.tsx` liegt eine nicht committete Änderung von Cursor: „Rechnung komplett stornieren ohne Storno-Gutschrift“. Die widerspricht der Entscheidung und ist nicht übernommen.
+- Die Server-Aktion dahinter erzeugt ab P08 ohnehin eine Gutschrift.
+
+## P09 – Abschlag und Schluss ohne Zahlungsplan
+
+### Was ist anders
+
+1. Im Auftrag → Zahlung gibt es jetzt **„Abschlag stellen“** (Prozent oder Betrag brutto) und **„Schlussrechnung“**. Einen Plan vorher anlegen ist nicht mehr nötig.
+2. **Die Schlussrechnung zieht gestellte Abschläge automatisch ab** und rechnet sich neu, wenn ein Abschlag dazukommt.
+3. **Die Vorlagen 50/50, 30/70 und 30/40/30 sind entfernt.**
+
+### So testen Sie (auf Staging von Claude schon geprüft)
+
+- Auftrag „PRODSIM-Fugenlose Badsanierung“ → Zahlung → „Abschlag stellen“ → 10 %.
+- Ergebnis: Zeile „2. Abschlag 3.350,50 €“, die Schlussrechnung sinkt von 13.402,02 € auf 10.051,51 €.
+
+## P10 – Angebots-Versionen
+
+### Was ist anders
+
+1. **Ein Angebot, das schon beim Kunden war, wird beim Bearbeiten nicht mehr überschrieben.** Es entsteht eine neue Version mit neuer Nummer.
+2. **Die alte Version** gilt als „ersetzt“ und verweist auf die neue, genau wie bei einer Annahme im Portal.
+3. **Ausnahmen:** Entwürfe werden weiter direkt gespeichert, Auftrags-Korrektur und Nachtrag bleiben unverändert.
+
+### So testen Sie
+
+1. Gesendetes Angebot → „Angebot bearbeiten“ → eine Position ändern → Speichern.
+2. Es gibt eine neue Angebotsnummer. Die alte steht als ersetzt da.
