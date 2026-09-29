@@ -21,18 +21,23 @@ Einstieg für jede Umbau-Sitzung. Plan und Pakete: Claude Doc „Bärenwald Fach
 
 | Paket | Status | Branch | Notiz |
 |---|---|---|---|
-| P01 Kundenportal vollständig | in Abnahme | `umbau/p01-kundenportal` (CRM + Portal) | Prod-Migration `20261212120000_auftrag_positionen_kunde_akzeptiert_at.sql` wartet auf Freigabe |
-| P02 Partner-Portal vollständig | fertig, Abnahme mit Block A | `umbau/p02-partnerportal` (Portal) | Portal-Spaltenprüfung: 0 Verstöße, Maximum 0 |
-| P03 CRM vollständig | in Arbeit | `umbau/p03-crm` (CRM) | |
+| P01 Kundenportal vollständig | fertig, in Abnahme | `umbau/p01-kundenportal` | Migration `20261212120000_…` |
+| P02 Partner-Portal vollständig | fertig, in Abnahme | `umbau/p02-partnerportal` (Portal) | Portal-Spaltenprüfung 0/0 |
+| P03 CRM vollständig | fertig, in Abnahme | `umbau/p03-crm` | Migration `20261212130000_…`; CRM-Prüfung im Build, 29 Streichlisten-Ausnahmen |
+| P04 Nichts hängt | fertig, in Abnahme | `umbau/p04-nichts-haengt` | `src/lib/actions/safe-action.ts` in beiden Repos |
+| P05 Liste und Auftrag | fertig, in Abnahme | `umbau/p05-liste-auftrag` | Block-A-Stand = dieser Branch in beiden Repos |
 
-## Nächstes Paket: P02
+Branches bauen aufeinander auf: `umbau/p05-liste-auftrag` enthält P01–P05. Lokale Builds beider Apps: grün (29.09.2026).
 
-Offene Portal-Einträge (Grundlinie): `partner-abnahmeprotokoll.ts` (`auftrag_positionen.updated_at`, `auftrag_abnahmeprotokolle.handwerker_bestaetigt_at`),
-`partner-auto-dokumente.ts` (`angebot_handwerker.updated_at`), `partner-hw-kalkulation.ts` (`angebote.gesamt_preis`),
-`ensure-partner-angebot-handwerker-for-auftrag.ts` und `sync-angebot-handwerker.ts` (`auftrag_positionen.gewerk_id`),
-`load-partner-compliance-data.ts` (`handwerker_vertraege.auftrag_titel`). Danach Grundlinie 0 und Maximum 0.
+## Nächstes Paket: P06 Auftrag erteilen
+
+Erst nach Abnahme von Block A. Einstieg: `createAuftragFromAngebot` (CRM `src/app/(dashboard)/angebote/actions.ts`) und
+`acceptKundeAngebot` (Portal `src/app/actions/portal-angebot.ts`) → eine Datenbank-Funktion.
 
 ## Bekannte Stolperstellen
+
+- `staging`-Branches beider Repos stehen seit 26.08.2026 auf einem toten Seitenzweig (191/50 Konflikte zu main). Test-Stand wird per Reset auf den Block-Branch gesetzt, alter Stand als `staging-backup-2026-09-29`.
+- Staging-Storage: 6 Buckets fehlten, am 29.09. angelegt.
 
 - Staging hinkte Prod um 3 Migrationen hinterher; am 29.09. nachgezogen (`lead_dokumente`, `stundensatz_kunde`, `auftrag_partner_aufgaben`). Vor jeder Abnahme Schema-Snapshot beider Ziele vergleichen.
 - Portal-Build hat die Prüfung „keine Hex-Farben im Code“: Farben für Bibliotheken (QR, PDF) über `PALETTE` in `src/lib/tokens/palette.ts`, nie `var(--…)`.
