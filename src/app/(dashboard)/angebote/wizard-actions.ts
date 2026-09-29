@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidateAngebotDetail, revalidateAuftragList, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { writeAngebotStatus } from '@/lib/status/write-angebot-status'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { ensureAngebotsnummerFuerVersand } from '@/lib/angebot-utils'
 import { createClient } from '@/lib/supabase-server'
@@ -275,7 +276,22 @@ async function saveAngebotWizardDraftInner(
   const objektAnlageId = input.meta.objekt_anlage_id?.trim() || null
   const ansprechpartnerId = input.meta.ansprechpartner_id?.trim() || null
 
-  if (input.angebotId) {
+  // P10 (Entscheidung 29.09.2026): Ein Angebot, das beim Kunden war, wird nicht überschrieben.
+  // Bearbeiten erzeugt eine neue Version mit neuer Nummer; die alte gilt als „ersetzt“.
+  // Ausnahmen: Auftrags-Korrektur und Nachtrag (eigene Wege).
+  let ersetztAngebotId: string | null = null
+  if (input.angebotId && !input.auftragKorrekturId?.trim() && !input.nachtragZuAuftragId?.trim()) {
+    const db0 = opts?.asSystem ? supabaseAdmin : createClient()
+    const { data: alt, error: altErr } = await db0
+      .from('angebote')
+      .select('status, status_einfach, gesendet_kunde_at, gesendet_am')
+      .eq('id', input.angebotId)
+      .maybeSingle()
+    if (altErr) logDbError('app/angebote/wizard-actions:angebote-version', altErr)
+    if (alt && angebotWarBeimKunden(alt)) ersetztAngebotId = input.angebotId
+  }
+
+  if (input.angebotId && !ersetztAngebotId) {
     const upd = await updateAngebot(
       input.angebotId,
       {
@@ -376,6 +392,14 @@ async function saveAngebotWizardDraftInner(
   }, { asSystem: opts?.asSystem })
   if (!created.ok) return created
   const db = opts?.asSystem ? supabaseAdmin : createClient()
+  if (ersetztAngebotId) {
+    // Wie im Portal: ersetzte Version = status abgelehnt, status_einfach ersetzt, Verweis auf die neue.
+    const { error: ersErr } = await writeAngebotStatus(db, ersetztAngebotId, 'abgelehnt', {
+      status_einfach: 'ersetzt',
+      ersetzt_durch: created.id,
+    })
+    if (ersErr) logDbError('app/angebote/wizard-actions:angebote-ersetzt', ersErr)
+  }
   const { data: nrRow, error } = await db
     .from('angebote')
     .select('angebotsnr')
@@ -792,4 +816,18 @@ export async function loadAngebotWizardBootstrapKopie(
   }
 
   return { ok: true, bootstrap }
+}
+
+/** War das Angebot beim Kunden (versendet, abgelaufen, nachgefasst)? Dann neue Version statt Überschreiben. */
+function angebotWarBeimKunden(a: {
+  status?: string | null
+  status_einfach?: string | null
+  gesendet_kunde_at?: string | null
+  gesendet_am?: string | null
+}): boolean {
+  const st = String(a.status ?? '').toLowerCase()
+  const se = String(a.status_einfach ?? '').toLowerCase()
+  if (['kunde_akzeptiert', 'angenommen', 'abgelehnt', 'ersetzt', 'storniert'].includes(st)) return false
+  if (['angenommen', 'abgelehnt', 'ersetzt', 'storniert'].includes(se)) return false
+  return Boolean(a.gesendet_kunde_at || a.gesendet_am) || ['gesendet', 'gesendet_kunde', 'abgelaufen'].includes(st) || se === 'gesendet'
 }
