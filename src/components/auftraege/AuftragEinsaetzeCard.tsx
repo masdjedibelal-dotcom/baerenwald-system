@@ -6,7 +6,10 @@ import {
   createEinsatz,
   listEinsaetze,
   loadEinsatzFormular,
+  mitteilungErledigt,
+  regieUebernehmen,
   zurueckziehenEinsatz,
+  type EinsatzMitteilung,
   type EinsatzPartnerOption,
   type EinsatzStatus,
   type EinsatzZeile,
@@ -55,6 +58,14 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const [saving, setSaving] = useState(false)
   const [partner, setPartner] = useState<EinsatzPartnerOption[]>([])
   const [form, setForm] = useState<Form | null>(null)
+  // P13: Regie übernehmen (Standard-Aufschlag 20 %, änderbar)
+  const [regie, setRegie] = useState<{
+    m: EinsatzMitteilung
+    titel: string
+    stunden: number
+    partnersatz: number
+    aufschlag: number
+  } | null>(null)
 
   const laden = useCallback(async () => {
     const res = await safeAction(listEinsaetze(auftragId))
@@ -126,7 +137,39 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
     await laden()
   }
 
+  async function regieSpeichern() {
+    if (!regie) return
+    setSaving(true)
+    const res = await safeAction(
+      regieUebernehmen({
+        mitteilungId: regie.m.id,
+        titel: regie.titel,
+        stunden: regie.stunden,
+        partnersatz: regie.partnersatz,
+        aufschlagProzent: regie.aufschlag,
+      })
+    )
+    setSaving(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    toast.success('Regie übernommen. Auftrag jetzt über „Auftrag bearbeiten“ erneut an den Kunden senden.')
+    setRegie(null)
+    await laden()
+  }
+
+  async function erledigt(id: string) {
+    const res = await safeAction(mitteilungErledigt(id))
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    await laden()
+  }
+
   const setF = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f))
+  const kundensatz = regie ? Math.round(regie.partnersatz * (1 + regie.aufschlag / 100) * 100) / 100 : 0
   const ok = Boolean(form?.handwerkerId && form.titel.trim())
 
   return (
@@ -186,6 +229,35 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                         ))}
                       </div>
                     ) : null}
+                    {e.mitteilungen
+                      .filter((m) => m.status === 'offen')
+                      .map((m) => (
+                        <div key={m.id} style={{ marginTop: 6, fontSize: 'var(--fs-meta)' }}>
+                          <b>{m.typ === 'regie' ? `Regie ${m.stunden ?? ''} Std` : 'Behinderung'}:</b> {m.text}
+                          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                            {m.typ === 'regie' ? (
+                              <MockBtn
+                                sm
+                                kind="primary"
+                                onClick={() => {
+                                  setRegie({
+                                    m,
+                                    titel: `Regie: ${m.text.slice(0, 60)}`,
+                                    stunden: m.stunden ?? 1,
+                                    partnersatz: 0,
+                                    aufschlag: 20,
+                                  })
+                                }}
+                              >
+                                Als Regie übernehmen
+                              </MockBtn>
+                            ) : null}
+                            <MockBtn sm kind="ghost" onClick={() => { erledigt(m.id) }}>
+                              {m.typ === 'regie' ? 'Verwerfen' : 'Erledigt'}
+                            </MockBtn>
+                          </div>
+                        </div>
+                      ))}
                     {e.rechnung_eingereicht_at ? (
                       <div style={{ fontSize: 'var(--fs-meta)' }}>
                         Partner-Rechnung
@@ -289,6 +361,61 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         ) : (
           <p style={{ color: 'var(--text-3)' }}>Wird geladen …</p>
         )}
+      </EditorSheet>
+
+      <EditorSheet
+        open={Boolean(regie)}
+        onClose={() => setRegie(null)}
+        title="Regie übernehmen"
+        crumb={regie ? regie.m.text : undefined}
+        secondary={{ label: 'Abbrechen', disabled: saving, kind: 'ghost' }}
+        primary={{
+          label: 'In den Auftrag übernehmen',
+          icon: 'check',
+          disabled: !regie || saving || !(regie.stunden > 0) || !(regie.partnersatz > 0),
+          busy: saving,
+          onClick: () => { regieSpeichern() },
+        }}
+      >
+        {regie ? (
+          <>
+            <MockField label="Bezeichnung">
+              <MockInput value={regie.titel} onChange={(ev) => setRegie({ ...regie, titel: ev.target.value })} />
+            </MockField>
+            <MockField label="Stunden">
+              <ClearableNumberInput
+                className="txt"
+                min={0}
+                value={regie.stunden}
+                onValueChange={(v) => setRegie({ ...regie, stunden: Number(v) || 0 })}
+                style={{ textAlign: 'right' }}
+              />
+            </MockField>
+            <MockField label="Partnersatz € je Stunde (EK)">
+              <ClearableNumberInput
+                className="txt"
+                min={0}
+                value={regie.partnersatz}
+                onValueChange={(v) => setRegie({ ...regie, partnersatz: Number(v) || 0 })}
+                style={{ textAlign: 'right' }}
+              />
+            </MockField>
+            <MockField label="Aufschlag %">
+              <ClearableNumberInput
+                className="txt"
+                min={0}
+                value={regie.aufschlag}
+                onValueChange={(v) => setRegie({ ...regie, aufschlag: Number(v) || 0 })}
+                style={{ textAlign: 'right' }}
+              />
+            </MockField>
+            <p style={{ margin: 0, fontSize: 'var(--fs-text)' }}>
+              Kundensatz {formatEuro(kundensatz)} je Stunde, Position{' '}
+              <b>{formatEuro(Math.round(regie.stunden * kundensatz * 100) / 100)} netto</b>. Der Kunde muss nicht
+              zustimmen; danach den Auftrag erneut senden.
+            </p>
+          </>
+        ) : null}
       </EditorSheet>
     </>
   )

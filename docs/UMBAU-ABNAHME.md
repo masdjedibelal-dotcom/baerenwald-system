@@ -245,3 +245,48 @@ Stand: CRM `umbau/p10-angebot-versionen`, Portal `umbau/p07-rechenkern` (enthalt
 
 1. Gesendetes Angebot → „Angebot bearbeiten“ → eine Position ändern → Speichern.
 2. Es gibt eine neue Angebotsnummer. Die alte steht als ersetzt da.
+
+# Block B2 – Einsatz (P11–P13)
+
+## P11 – Einsatz im CRM
+
+### Was ist anders
+
+1. Im Auftrag → Übersicht steht ganz oben die Karte **„Einsätze“**.
+2. Über **„Einsatz“** legst du im Sheet „Einsatz anlegen“ fest: Partner, Titel, Anweisung, Termin, Ort, Kontakt vor Ort und EK netto oder brutto.
+   - Ort, Kontakt und Titel sind aus der Anfrage vorbelegt.
+3. **„Senden“** legt den Einsatz an und schickt dem Partner die Mail „Neuer Einsatz“.
+   - Die Mail enthält keine Positionen und keine Verkaufspreise.
+4. **Die Karte zeigt je Einsatz** Partner, Titel, Termin, EK und Status (Gesendet, Angenommen, Abgelehnt, Fertig).
+   - Nach „Fertig“ erscheinen dort auch Beschreibung, Fotos, Dokumente und die Partner-Rechnung.
+5. **„Zurückziehen“** geht, solange der Partner noch nicht angenommen hat.
+
+### So testen Sie (auf Staging von Claude schon geprüft)
+
+1. Auftrag „PRODSIM-Fugenlose Badsanierung“ → Übersicht → „Einsatz“ → Elektro Muster GmbH, EK 1.200 netto → „Senden“.
+2. Ergebnis: Die Karte zeigt den Einsatz mit Status „Gesendet“, und die Mail liegt im Staging-Mail-Catcher (E-Mail-Protokoll).
+
+### Für Prod nötig
+
+- Migration `20261214120000_p11_einsaetze.sql`: neue Tabelle, ändert nichts Bestehendes.
+
+## P12 – Einsatz im Partner-Portal
+
+### Was ist anders
+
+1. Auf der Startseite des Partner-Portals steht **„Ihre Einsätze“** mit Anweisung, Termin, Ort, Kontakt und Vergütung.
+2. **„Annehmen“ oder „Ablehnen“:** Beim Ablehnen ist ein Grund Pflicht, das CRM sieht ihn.
+3. **„Fertig melden“ in einem Schritt:** Fotos und Dokumente (zusammen höchstens 4 MB) und eine optionale Beschreibung.
+4. **„Rechnung senden“ nach der Fertigmeldung:** PDF hochladen oder Freitext-Positionen mit Betrag eintragen.
+5. **Doppelklicks sind abgesichert:** Ein Statuswechsel gilt nur, wenn der vorherige Status noch stimmt.
+
+### So testen Sie (Staging)
+
+1. Im Staging-CRM über den Partner „Elektro Muster GmbH“ „Partnerportal öffnen“ → Startseite → „Ihre Einsätze“.
+2. Annehmen → Fertig melden mit einem Foto → Rechnung mit einer Position senden.
+3. Im CRM am Auftrag: Status „Fertig“, Foto als Link, Partner-Rechnung mit Betrag.
+
+### Nicht von Claude geklickt
+
+- Die Partner-Seite selbst. Ohne Partner-Login kann ich sie nicht öffnen.
+- Typen und alle Build-Prüfungen sind grün, und der Weg ist über die CRM-Seite abgesichert.
