@@ -245,7 +245,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                                     titel: `Regie: ${m.text.slice(0, 60)}`,
                                     stunden: m.stunden ?? 1,
                                     partnersatz: 0,
-                                    aufschlag: 20,
+                                    aufschlag: 0,
                                   })
                                 }}
                               >
