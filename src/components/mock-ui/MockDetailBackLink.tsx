@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 /** Nur Zurück-Link — ohne Brotkrumen-Pfad. */
 export function MockDetailBackLink({
   href,
-  label = 'Zurück zu den Suchergebnissen',
+  label = 'Zurück',
   className,
 }: {
   href: string

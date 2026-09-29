@@ -65,7 +65,6 @@ import {
   type RechnungWizardBootstrap,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
-  rechnungDarfHardGeloeschtWerden,
   rechnungDarfOhneErsatzStorniertWerden,
   rechnungKorrekturModus,
   resolveRechnungKorrekturUi,
@@ -446,6 +445,30 @@ export function RechnungDetailClient({
     })
   }
 
+  function handleStornoOhneErsatz() {
+    const nr = detail.rechnungsnummer?.trim() || 'Rechnung'
+    openActionConfirm({
+      title: 'Rechnung stornieren?',
+      body: `${nr} wird storniert. Dazu entsteht eine Storno-Gutschrift als Entwurf, die Sie danach an den Kunden senden. Eine neue Rechnung entsteht nicht.`,
+      confirmLabel: 'Stornieren',
+      cancelLabel: 'Abbrechen',
+      danger: true,
+      onConfirm: () => {
+        void actionBusy.run('Rechnung wird storniert…', async () => {
+          const r = await storniereRechnungOhneErsatz(detail.id)
+          if (!r.ok) {
+            toast.systemError(r)
+            return
+          }
+          toast.success(TOAST.rechnung_storniert_ohne_ersatz)
+          setDetail((d) => ({ ...d, status: 'storniert' }))
+          if (r.gutschriftId) router.push(`/rechnungen/${r.gutschriftId}`)
+          else refresh()
+        })
+      },
+    })
+  }
+
   const primaryAction = useMemo((): DetailActionDef | null => {
     if (darfStornoZuruecknehmen) {
       return {
@@ -584,7 +607,7 @@ export function RechnungDetailClient({
     ]
 
     // Gesendet/Bezahlt: Korrektur nur über Sekundär-CTA „Rechnung korrigieren“
-    // (Storno-Gutschrift + neue RE). Kein zweites Menü „Storno / Korrektur“.
+    // (Storno-Gutschrift + neue RE). Kein zweites Menü „Korrektur“.
     if (korrekturModus !== 'storno_neu' && !secondaryAction) {
       items.push({
         label: 'Korrektur',
@@ -592,6 +615,19 @@ export function RechnungDetailClient({
         disabled: korrekturDisabled,
         hint: korrekturHint,
         onClick: () => handleKorrigieren(),
+      })
+    }
+
+    const darfSoftStorno =
+      !isEingehend &&
+      belegTyp === 'rechnung' &&
+      rechnungDarfOhneErsatzStorniertWerden(detail.status)
+    if (darfSoftStorno) {
+      items.push({
+        label: 'Stornieren',
+        icon: <MockIcon ctx="btn" n="x" size={16} />,
+        onClick: handleStornoOhneErsatz,
+        hint: 'Mit Storno-Gutschrift, ohne neue Rechnung',
       })
     }
 
@@ -613,6 +649,7 @@ export function RechnungDetailClient({
           ] as ActionsMenuItem[])
         : [])
     )
+    // Hart löschen nur Entwurf — gesendete/stornierte Rechnungen nicht anbieten.
     return items
   }, [
     isEingehend,
@@ -864,7 +901,7 @@ export function RechnungDetailClient({
           ? '/vorgaenge?tab=rechnung&richtung=eingehend'
           : '/vorgaenge?tab=rechnung&lifecycle=offen'
       }
-      crumbBackLabel="Zurück zu den Suchergebnissen"
+      crumbBackLabel="Zurück"
       crumbSectionLabel="Rechnungen"
       breadcrumbTitle={crumbTitle}
       className="space-y-4 pb-0"

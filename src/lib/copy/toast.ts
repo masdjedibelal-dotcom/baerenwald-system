@@ -271,6 +271,7 @@ export const TOAST = {
   statusAktualisiert: "Status aktualisiert",
   status_auf_neu_gesetzt: "Status auf Neu gesetzt",
   storno_angelegt_korrektur_gespeichert_noch_nicht: "Storno angelegt — Korrektur gespeichert (noch nicht versendet)",
+  rechnung_storniert_ohne_ersatz: "Rechnung storniert, Storno-Gutschrift angelegt",
   team_gespeichert: "Team gespeichert",
   telefon_ist_pflicht: "Telefon ist Pflicht.",
   termin_geloescht: "Termin gelöscht",

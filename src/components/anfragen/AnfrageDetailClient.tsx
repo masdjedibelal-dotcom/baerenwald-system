@@ -977,7 +977,7 @@ export function AnfrageDetailClient({
       phase="anfrage"
       projektKontext={projektKontext}
       crumbBackHref="/vorgaenge?tab=anfrage"
-      crumbBackLabel="Zurück zu den Suchergebnissen"
+      crumbBackLabel="Zurück"
       crumbSectionLabel="Anfragen"
       breadcrumbTitle={vorhabenTitel}
       wiedervorlageDatum={lead.wiedervorlage_datum}

@@ -207,11 +207,13 @@ export function rechnungDarfHardGeloeschtWerden(status: RechnungStatus | string 
   return (status ?? '').toLowerCase() === 'entwurf'
 }
 
-/** Soft-Storno ohne Ersatz — nur gesendet, nicht bezahlt. */
+/** Storno ohne neue Rechnung (mit Storno-Gutschrift) — nach Versand. */
 export function rechnungDarfOhneErsatzStorniertWerden(
   status: RechnungStatus | string | null | undefined
 ): boolean {
-  return (status ?? '').toLowerCase() === 'gesendet'
+  // P08: Storno geht auch nach Versand — immer mit Storno-Gutschrift.
+  const st = (status ?? '').toLowerCase()
+  return st === 'gesendet' || st === 'ueberfaellig' || st === 'bezahlt'
 }
 
 export type RechnungKorrekturSibling = {
