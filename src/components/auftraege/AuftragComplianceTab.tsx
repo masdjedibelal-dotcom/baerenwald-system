@@ -85,7 +85,7 @@ export function AuftragComplianceTab({
       <MockEmpty
         icon="shield-check"
         title="Compliance nicht konfiguriert"
-        hint="Lege unter Einstellungen → Compliance Dokumenttypen an."
+        hint="Legen Sie unter Einstellungen → Compliance Dokumenttypen an."
       />
     )
   }

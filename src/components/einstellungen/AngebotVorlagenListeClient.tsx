@@ -100,7 +100,7 @@ export function AngebotVorlagenListeClient({ vorlagen }: { vorlagen: AngebotVorl
         <MockEmpty
           icon="file-text"
           title="Noch keine Vorlagen"
-          hint="Lege eine Angebot-Vorlage an, um sie hier zu sehen."
+          hint="Legen Sie eine Angebots-Vorlage an, um sie hier zu sehen."
           action={
             <Link href="/einstellungen/vorlagen/neu" className="btn primary sm">
               + Neue Vorlage

@@ -72,7 +72,7 @@ export async function requestCrmPasswordReset(
       ok: false,
       message:
         'Diese E-Mail gehört zum Kunden- oder Partner-Portal (MeinBärenwald), nicht zum CRM. ' +
-        'Passwort dort unter baerenwaldmuenchen.de zurücksetzen — für das CRM brauchst du eine separate CRM-Einladung.',
+        'Passwort dort unter baerenwaldmuenchen.de zurücksetzen — für das CRM brauchen Sie eine eigene CRM-Einladung.',
     }
   }
 
@@ -95,7 +95,7 @@ export async function requestCrmPasswordReset(
     betreff: 'Bärenwald CRM — Passwort zurücksetzen',
     html: `
       <p>Hallo,</p>
-      <p>du hast ein neues Passwort für das <strong>Bärenwald CRM</strong> angefordert.</p>
+      <p>Sie haben ein neues Passwort für das <strong>Bärenwald CRM</strong> angefordert.</p>
       <p style="margin:24px 0">
         <a href="${actionLink}" style="display:inline-block;padding:12px 20px;background:${C.green};color:${C.white};text-decoration:none;border-radius:8px;font-weight:600">
           Neues CRM-Passwort setzen
@@ -106,7 +106,7 @@ export async function requestCrmPasswordReset(
         Falls du nur das Kundenportal meinst, nutze
         <a href="https://baerenwaldmuenchen.de/portal/login">baerenwaldmuenchen.de/portal</a>.
       </p>
-      <p style="font-size:13px;color:${C.grayNeutral3}">Wenn du das nicht warst, ignoriere diese E-Mail.</p>
+      <p style="font-size:13px;color:${C.grayNeutral3}">Wenn Sie das nicht waren, ignorieren Sie diese E-Mail.</p>
     `,
   })
 

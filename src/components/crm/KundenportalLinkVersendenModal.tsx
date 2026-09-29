@@ -109,7 +109,7 @@ export function KundenportalLinkVersendenModal({
       kundeId,
       to: mailTo[0]!,
       cc: [...mailCc, ...mailTo.slice(1)],
-      betreff: betreff.trim() || defaultPortalInviteBetreff('du'),
+      betreff: betreff.trim() || defaultPortalInviteBetreff('sie'),
       text,
       anrede,
     }))

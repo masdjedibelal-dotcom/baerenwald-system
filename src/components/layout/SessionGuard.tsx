@@ -237,8 +237,8 @@ export function SessionGuard() {
   const isIdle = modal.kind === 'idle'
   const title = isIdle ? 'Noch angemeldet?' : 'Sitzung abgelaufen'
   const body = isIdle
-    ? `Du warst länger inaktiv. In ${modal.secondsLeft} Sekunden wirst du automatisch abgemeldet.`
-    : `Deine Sitzung ist nicht mehr gültig. Du wirst in ${modal.secondsLeft} Sekunden zur Anmeldung weitergeleitet.`
+    ? `Sie waren länger inaktiv. In ${modal.secondsLeft} Sekunden werden Sie automatisch abgemeldet.`
+    : `Ihre Sitzung ist nicht mehr gültig. In ${modal.secondsLeft} Sekunden geht es zur Anmeldung.`
 
   return createPortal(
     <div className="confirm-popup-overlay session-guard-overlay" role="presentation">

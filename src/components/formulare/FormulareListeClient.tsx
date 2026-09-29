@@ -137,7 +137,7 @@ export function FormulareListeClient({
           <MockEmpty
             icon="forms"
             title="Noch keine Formular-Vorlagen"
-            hint="Lege ein Formular an, um Checklisten und Abnahmen zu standardisieren."
+            hint="Legen Sie ein Formular an, um Checklisten und Abnahmen zu vereinheitlichen."
             action={
               <MockBtn kind="primary" sm type="button" onClick={() => setCreateOpen(true)}>
                 Formular anlegen

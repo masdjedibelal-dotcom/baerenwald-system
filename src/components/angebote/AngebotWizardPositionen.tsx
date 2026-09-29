@@ -951,7 +951,7 @@ export function AngebotWizardPositionen({
         {listenZeilen.length === 0 ? (
           <div className="pos-empty">
             <p className="font-medium text-bw-text-mid">Noch keine Positionen</p>
-            <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">Wähle unten eine Hinzufüge-Option</p>
+            <p className="mt-1 text-[length:var(--fs-meta)] text-bw-text-muted">Wählen Sie unten, was Sie hinzufügen möchten.</p>
           </div>
         ) : (
           listenZeilen.map((z, i) => (

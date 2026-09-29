@@ -54,12 +54,38 @@ function pushToast(type: ToastType, message: string, opts?: ToastOpts): string {
   return toastApi.push(type, message, opts)
 }
 
+/**
+ * P24: Erfolgsmeldungen nur für Unsichtbares. Was man nach dem Speichern ohnehin
+ * am Bildschirm sieht („Gespeichert“, „Status aktualisiert“ …), zeigt keinen Toast.
+ */
+const SICHTBARE_ERFOLGE = new Set([
+  'Status aktualisiert',
+  'Notiz hinzugefügt',
+  'Vorschau geöffnet',
+  'In Formular übernommen',
+  'Konditionen übernommen',
+  'Zahlungsziel aktualisiert',
+  'Dokument hochgeladen',
+])
+
+function istSichtbarerErfolg(msg: string): boolean {
+  const m = msg.trim()
+  if (SICHTBARE_ERFOLGE.has(m)) return true
+  if (!/(^|\s)gespeichert$/i.test(m)) return false
+  // Entwürfe und Fehlschläge weiter melden — dort sieht man das Ergebnis nicht.
+  return !/^(entwurf|nicht|korrektur)/i.test(m)
+}
+
 export const toast = {
   success: (
     msg: string,
     opts?: { id?: string; action?: ToastAction; durationMs?: number }
   ) => {
     if (opts?.id) releaseLoadingBusy(opts.id)
+    if (!opts?.action && istSichtbarerErfolg(msg)) {
+      if (opts?.id) toastApi?.dismiss(opts.id)
+      return ''
+    }
     return pushToast('success', msg, {
       id: opts?.id,
       action: opts?.action,

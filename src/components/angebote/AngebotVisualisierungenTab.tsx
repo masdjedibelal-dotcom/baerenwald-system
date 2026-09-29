@@ -30,7 +30,7 @@ export function AngebotVisualisierungenTab({
 
       {!sessions.length ? (
         <Card>
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Visualisierungen. Erstelle die erste mit Ist-Fotos und einem Prompt.</p>
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">Noch keine Visualisierungen. Erstellen Sie die erste mit Ist-Fotos und einem Prompt.</p>
         </Card>
       ) : (
         <ul className="divide-y divide-bw-border rounded-xl border border-bw-border bg-white">

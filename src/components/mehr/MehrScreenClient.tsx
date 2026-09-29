@@ -26,7 +26,7 @@ export function MehrScreenClient({
   function handleLogout() {
     openActionConfirm({
       title: 'Wirklich abmelden?',
-      body: 'Du wirst aus dem CRM ausgeloggt.',
+      body: 'Sie werden aus dem CRM abgemeldet.',
       confirmLabel: 'Abmelden',
       cancelLabel: 'Abbrechen',
       danger: true,

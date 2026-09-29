@@ -229,7 +229,7 @@ export function AuftragPositionenGewerkView({
       <MockEmpty
         icon="tool"
         title="Keine Leistungen"
-        hint="Lege Gewerke und Leistungen an — gruppiert wie im Angebots-Wizard."
+        hint="Legen Sie Gewerke und Leistungen an, gruppiert wie im Angebots-Assistenten."
         action={
           <MockBtn kind="primary" sm type="button" onClick={() => onAddLeistung('')}>
             + Leistung

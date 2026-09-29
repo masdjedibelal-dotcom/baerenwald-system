@@ -232,7 +232,7 @@ export function AngebotPositionenV3Tab({
         <MockEmpty
           icon="clipboard-list"
           title="Noch keine Gewerke"
-          hint="Lege zuerst ein Gewerk an und füge danach Positionen hinzu."
+          hint="Legen Sie zuerst ein Gewerk an und fügen Sie danach Positionen hinzu."
           action={
             <AuftragGewerkAddRow
               gewerke={gewerkOpts}

@@ -878,7 +878,7 @@ export function AnfrageDetailClient({
             ? () =>
                 toast.message('Warte auf HV / Hausmeister', {
                   description:
-                    'HV muss freigeben oder die Hausmeister-Prüfung abschließen — danach kannst du disponieren.',
+                    'Die Hausverwaltung muss freigeben oder die Hausmeister-Prüfung abschließen. Danach können Sie disponieren.',
                 })
             : hatPartnerEinholung
               ? undefined

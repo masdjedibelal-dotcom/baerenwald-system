@@ -26,7 +26,7 @@ export function handwerkerEinreichungAntwortBetreff(
   return buildPartnerSubject({
     gewerk: gewerkName,
     ereignis:
-      typ === 'rueckfrage' ? 'Rückfrage zu deinem Angebot' : 'Angebot nicht übernommen',
+      typ === 'rueckfrage' ? 'Rückfrage zu Ihrem Angebot' : 'Angebot nicht übernommen',
   })
 }
 
@@ -40,10 +40,10 @@ export function handwerkerEinreichungAntwortPreviewHtml(opts: {
   anfrageId: string
 }): string {
   const istRueckfrage = opts.typ === 'rueckfrage'
-  const titel = istRueckfrage ? 'Rückfrage zu deinem Angebot' : 'Angebot nicht übernommen'
+  const titel = istRueckfrage ? 'Rückfrage zu Ihrem Angebot' : 'Angebot nicht übernommen'
   const intro = istRueckfrage
-    ? 'zu deinem eingereichten Angebot haben wir noch eine <strong>Rückfrage</strong>. Bitte prüfe unsere Nachricht und reiche bei Bedarf ein aktualisiertes Angebot im Partner-Portal ein.'
-    : 'vielen Dank für dein Angebot. Leider können wir es in der vorliegenden Form <strong>nicht übernehmen</strong>. Du kannst im Partner-Portal ein neues Angebot mit Preis und PDF einreichen.'
+    ? 'zu Ihrem eingereichten Angebot haben wir noch eine <strong>Rückfrage</strong>. Bitte prüfen Sie unsere Nachricht und reichen Sie bei Bedarf ein aktualisiertes Angebot im Partner-Portal ein.'
+    : 'vielen Dank für Ihr Angebot. Leider können wir es in der vorliegenden Form <strong>nicht übernehmen</strong>. Sie können im Partner-Portal ein neues Angebot mit Preis und PDF einreichen.'
   const portalHref = `${partnerSiteBaseUrl()}/partner/login?next=${encodeURIComponent(`/partner?section=angebote&id=${opts.anfrageId}`)}`
 
   return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"/></head>

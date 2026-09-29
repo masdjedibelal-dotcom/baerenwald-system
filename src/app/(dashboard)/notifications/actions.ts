@@ -170,11 +170,11 @@ function ctaLabel(typ: CrmNotificationTyp): string {
 function typHint(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
-      return 'Neue Anfrage aus dem Meldeformular oder Portal. Öffne die Anfrage, um Kontakt und Details zu prüfen.'
+      return 'Neue Anfrage aus dem Meldeformular oder Portal. Öffnen Sie die Anfrage, um Kontakt und Details zu prüfen.'
     case 'hm_befund_freigabe':
       return 'Der Hausmeister hat die Prüfung abgeschlossen und an Bärenwald übergeben (Angebot oder Akut). Vorbefund liegt am Vorgang.'
     case 'handwerker_update':
-      return 'Der Partner hat ein Update zu einer Leistung geschickt (Text und/oder Fotos). Unter Leistungen siehst du den Eintrag.'
+      return 'Der Partner hat ein Update zu einer Leistung geschickt (Text und/oder Fotos). Unter Leistungen sehen Sie den Eintrag.'
     case 'handwerker_angenommen':
       return 'Der Partner hat die Angebots-Anfrage im Portal angenommen.'
     case 'handwerker_abgelehnt':
@@ -184,7 +184,7 @@ function typHint(typ: CrmNotificationTyp): string {
     case 'hw_rechnung_eingegangen':
       return 'Der Partner hat eine Eingangsrechnung hochgeladen — unter Vorgänge → Rechnung → Eingehend prüfen.'
     case 'hw_auftrag_erledigt':
-      return 'Partner meldet Auftrag erledigt. Abnahme ist optional — du kannst den Auftrag direkt abschließen.'
+      return 'Der Partner meldet den Auftrag als erledigt. Machen Sie die Abnahme oder schließen Sie den Auftrag ab.'
     case 'vorgang_angenommen':
       return 'Der Partner hat die Leistungsanfrage im Portal angenommen.'
     case 'vorgang_abgelehnt':
@@ -206,7 +206,7 @@ function typHint(typ: CrmNotificationTyp): string {
     case 'partner_compliance_pruefung':
       return 'Compliance-Dokument (z. B. Handwerkskarte) wartet auf Freigabe in Akte/Partner-Profil.'
     case 'partner_compliance_geloescht':
-      return 'Partner hat eine Compliance-Unterlage gelöscht. Datei bleibt sichtbar, bis du endgültig löschst.'
+      return 'Partner hat eine Compliance-Unterlage gelöscht. Die Datei bleibt sichtbar, bis Sie sie endgültig löschen.'
     case 'partner_unterlage':
       return 'Partner hat Unterlagen am Auftrag hochgeladen — unter Akte → Dokumente prüfen.'
     case 'partner_fachdoku':

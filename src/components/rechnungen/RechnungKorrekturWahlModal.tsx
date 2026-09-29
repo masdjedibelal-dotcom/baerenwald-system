@@ -104,7 +104,7 @@ export function RechnungKorrekturWahlModal({
       open={open}
       onClose={() => !pending && onClose()}
       title="Rechnung korrigieren"
-      subtitle="Was möchtest du tun?"
+      subtitle="Was möchten Sie tun?"
       size="md"
       secondary={{ label: 'Abbrechen', onClick: onClose, disabled: pending, kind: 'ghost' }}
       primary={{

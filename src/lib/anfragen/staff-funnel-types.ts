@@ -117,7 +117,7 @@ export const STAFF_ANLIEGEN: {
   {
     id: 'kaputt',
     label: 'Reparatur & Notfall',
-    hint: 'Sanitär, Heizung, Elektro, Dach — am Ende wählst du, wie schnell wir kommen sollen',
+    hint: 'Sanitär, Heizung, Elektro, Dach — am Ende wählen Sie, wie schnell wir kommen sollen',
     icon: '02-reparatur',
     situation: 'kaputt',
   },
@@ -201,7 +201,7 @@ export const STAFF_SITUATIONEN: {
   {
     value: 'kaputt',
     label: 'Reparatur & Notfall',
-    hint: 'Sanitär, Heizung, Elektro, Dach — am Ende wählst du, wie schnell wir kommen sollen',
+    hint: 'Sanitär, Heizung, Elektro, Dach — am Ende wählen Sie, wie schnell wir kommen sollen',
     icon: '02-reparatur',
   },
   {

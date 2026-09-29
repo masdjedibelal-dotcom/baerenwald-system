@@ -679,7 +679,7 @@ export function AnfrageNeuForm({
       <Card title="Vorhaben">
         <div className="space-y-5">
           <div>
-            <p className="form-field-label mb-2">Was planst du?</p>
+            <p className="form-field-label mb-2">Was ist geplant?</p>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
               {SITUATIONEN.map((s) => (
                 <label

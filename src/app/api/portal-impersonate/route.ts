@@ -102,7 +102,7 @@ export async function POST(request: Request) {
           {
             ok: false,
             error:
-              'Kunde hat noch kein Portal-Konto. Nutze „Mieter-Ansicht“ bei einer Meldung mit Status-Link.',
+              'Kunde hat noch kein Portal-Konto. Nutzen Sie die „Mieter-Ansicht“ bei einer Meldung mit Status-Link.',
           },
           { status: 422 }
         )

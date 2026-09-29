@@ -184,7 +184,7 @@ export function buildAnfrageSchwellenHinweis(input: {
         detail:
           status === 'beschluss_ausstehend'
             ? 'Parkzustand Beschluss — Freigabe im HV-Portal nach Beschluss abschließen.'
-            : 'Preisindikation liegt unter der Freigabe-Schwelle. Warte auf HV-Freigabe oder markiere als Akut, wenn sofort disponiert werden muss.',
+            : 'Die Preisindikation liegt unter der Freigabe-Schwelle. Warten Sie auf die Freigabe der Hausverwaltung oder markieren Sie die Anfrage als akut, wenn sofort disponiert werden muss.',
       }
     }
     if (status === 'freigegeben' || status === 'nicht_noetig' || !status) {

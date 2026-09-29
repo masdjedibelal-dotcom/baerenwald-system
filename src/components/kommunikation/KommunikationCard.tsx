@@ -114,7 +114,7 @@ export function KommunikationCard({
         </div>
 
         {pending && rows.length === 0 ? (
-          <p className="px-4 pb-6 text-sm text-bw-text-muted">Lade …</p>
+          <p className="px-4 pb-6 text-sm text-bw-text-muted">Wird geladen …</p>
         ) : sichtbar.length === 0 ? (
           <p className="px-4 pb-6 text-sm text-bw-text-muted">
             {ausgehend.length === 0

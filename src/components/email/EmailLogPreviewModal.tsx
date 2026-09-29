@@ -57,7 +57,7 @@ export function EmailLogPreviewModal({
       size="lg"
       secondary={{ label: 'Schließen', onClick: onClose }}
     >
-      {pending && !row ? <p className="text-sm text-bw-text-muted">Lade Vorschau …</p> : null}
+      {pending && !row ? <p className="text-sm text-bw-text-muted">Vorschau wird geladen …</p> : null}
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       {row ? (
         <div className="space-y-4">

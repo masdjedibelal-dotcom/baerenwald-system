@@ -70,8 +70,8 @@ export function defaultPartnerPortalInviteBetreff(): string {
 
 export function defaultPartnerPortalInviteText(): string {
   return (
-    'hier ist dein Zugang zum Partner-Portal von Bärenwald.\n\n' +
-    'Registriere dich mit deiner bei uns hinterlegten E-Mail-Adresse — danach siehst du Anfragen, Aufträge, Angebote und Dokumente.'
+    'hier ist Ihr Zugang zum Partner-Portal von Bärenwald.\n\n' +
+    'Registrieren Sie sich mit Ihrer bei uns hinterlegten E-Mail-Adresse. Danach sehen Sie Anfragen, Aufträge, Angebote und Dokumente.'
   )
 }
 

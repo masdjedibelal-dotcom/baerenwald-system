@@ -65,7 +65,7 @@ export function buildHandwerkerAuftragNachricht(input: HandwerkerNachrichtInput)
     lines.push('', 'Partner-Portal:', input.portalLink.trim())
   }
 
-  lines.push('', 'Gib uns Bescheid, wenn du kannst oder Fragen hast.', '', 'Viele Grüße', 'Bärenwald München')
+  lines.push('', 'Geben Sie uns Bescheid, ob Sie können oder Fragen haben.', '', 'Viele Grüße', 'Bärenwald München')
 
   return lines.join('\n')
 }

@@ -53,7 +53,7 @@ export function AnfrageZahlungTab({
           <div className="zahlplan-empty__text">
             {onWeitereRechnung
               ? 'Weitere Rechnung legt eine neue Rechnung am Vorgang an — ohne Umweg über den Auftrag.'
-              : 'Zahlung entsteht mit Rechnung nach Auftrag. Über ein Angebot legst du den nächsten Schritt fest.'}
+              : 'Zahlungen entstehen mit der Rechnung nach dem Auftrag. Über ein Angebot legen Sie den nächsten Schritt fest.'}
           </div>
         </div>
       </MockCard>

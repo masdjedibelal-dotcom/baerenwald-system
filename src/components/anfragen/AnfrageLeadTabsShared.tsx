@@ -436,7 +436,7 @@ export function AngeboteListeTab({
         <MockEmpty
           icon="file-text"
           title="Noch kein Angebot"
-          hint="Erstelle ein Angebot basierend auf den Projektdetails. Über „+ Angebot erstellen“ oben."
+          hint="Erstellen Sie ein Angebot aus den Projektdetails, oben über „Angebot erstellen“."
         />
       ) : (
         <div className="space-y-2">

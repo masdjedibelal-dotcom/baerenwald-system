@@ -505,8 +505,8 @@ function firmennameZeile(props: AngebotHtmlInput): string {
 function mailAnredeAusProps(props: AngebotHtmlInput): AngebotMailAnrede {
   if (props.mail_anrede === 'sie' || props.mail_anrede === 'du') return props.mail_anrede
   const b = props.begruessung?.trim() ?? ''
-  if (/Sehr geehrte/i.test(b)) return 'sie'
-  return 'du'
+  if (/^Hallo\b/i.test(b)) return 'du'
+  return 'sie'
 }
 
 

@@ -297,7 +297,7 @@ export function HandwerkerEinreichungPruefung({
 
         {z.hw_crm_notiz?.trim() && !kannPruefen ? (
           <p className="text-[length:var(--fs-meta)] text-bw-text-muted whitespace-pre-wrap rounded-field border border-status-contact-bg bg-status-contact-bg px-2 py-1.5">
-            <span className="font-medium text-status-contact-text">Deine letzte Nachricht:</span>{' '}
+            <span className="font-medium text-status-contact-text">Ihre letzte Nachricht:</span>{' '}
             {z.hw_crm_notiz.trim()}
           </p>
         ) : null}

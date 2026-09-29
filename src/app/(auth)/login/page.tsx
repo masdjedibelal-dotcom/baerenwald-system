@@ -63,11 +63,11 @@ function LoginPageContent() {
           return
         }
         if (urlError === 'session') {
-          setError('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.')
+          setError('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.')
           return
         }
         if (urlError === 'idle') {
-          setError('Du wurdest wegen Inaktivität abgemeldet. Bitte melde dich erneut an.')
+          setError('Sie wurden wegen Inaktivität abgemeldet. Bitte melden Sie sich erneut an.')
           return
         }
         const { data, error: userErr } = await supabase.auth.getUser()
@@ -152,7 +152,7 @@ function LoginPageContent() {
       return
     }
     setInfo(
-      'Falls ein CRM-Konto mit dieser E-Mail existiert, erhältst du einen Link zum Zurücksetzen.'
+      'Falls ein CRM-Konto mit dieser E-Mail existiert, erhalten Sie einen Link zum Zurücksetzen.'
     )
   }
 
@@ -233,7 +233,7 @@ function LoginPageContent() {
             <>
               <h2 className="crm-login__welcome">Willkommen zurück</h2>
               <p className="crm-login__welcome-sub">
-                {staging ? 'Staging — Admin ist vorausgefüllt.' : 'Melde dich mit deinem Konto an.'}
+                {staging ? 'Staging — Admin ist vorausgefüllt.' : 'Melden Sie sich mit Ihrem Konto an.'}
               </p>
 
               {staging ? (
