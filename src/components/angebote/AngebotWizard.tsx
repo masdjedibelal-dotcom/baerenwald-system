@@ -1371,7 +1371,7 @@ export function AngebotWizard({
                 toast.info('Bitte zuerst Kunde und Positionen ergänzen.')
                 return
               }
-              void openPruefenSheet()
+              openPruefenSheet()
             },
           },
         ]}
@@ -1386,7 +1386,7 @@ export function AngebotWizard({
           label: 'Weiter: Prüfen',
           onClick: () => {
             if (saving) return
-            void openPruefenSheet()
+            openPruefenSheet()
           },
           busy: saving,
           getGaps: getAngebotSendGaps,
