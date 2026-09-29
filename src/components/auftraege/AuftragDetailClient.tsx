@@ -1,6 +1,7 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
+import { AuftragEinsaetzeCard } from '@/components/auftraege/AuftragEinsaetzeCard'
 import {
   DetailShell,
   EntityDetailLayout,
@@ -817,6 +818,7 @@ export function AuftragDetailClient({
 
   const stammdatenInhalt = (
     <>
+      <AuftragEinsaetzeCard auftragId={detail.id} />
       <AuftragStammdatenCard
         detail={detail}
         lead={_leadDetail ?? null}

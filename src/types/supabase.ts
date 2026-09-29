@@ -2881,6 +2881,93 @@ export type Database = {
           },
         ]
       }
+      einsaetze: {
+        Row: {
+          abgelehnt_at: string | null
+          ablehnung_grund: string | null
+          angenommen_at: string | null
+          anweisung: string | null
+          auftrag_id: string
+          created_at: string
+          ek_art: string
+          ek_betrag: number | null
+          erstellt_von: string | null
+          fertig_at: string | null
+          fertig_dateien: Json
+          fertig_text: string | null
+          gesendet_at: string
+          handwerker_id: string
+          id: string
+          kontakt_vor_ort: string | null
+          ort: string | null
+          rechnung_betrag: number | null
+          rechnung_eingereicht_at: string | null
+          rechnung_pdf_url: string | null
+          rechnung_positionen: Json | null
+          status: string
+          termin_bis: string | null
+          termin_von: string | null
+          titel: string
+          updated_at: string
+        }
+        Insert: {
+          abgelehnt_at?: string | null
+          ablehnung_grund?: string | null
+          angenommen_at?: string | null
+          anweisung?: string | null
+          auftrag_id: string
+          created_at?: string
+          ek_art?: string
+          ek_betrag?: number | null
+          erstellt_von?: string | null
+          fertig_at?: string | null
+          fertig_dateien?: Json
+          fertig_text?: string | null
+          gesendet_at?: string
+          handwerker_id: string
+          id?: string
+          kontakt_vor_ort?: string | null
+          ort?: string | null
+          rechnung_betrag?: number | null
+          rechnung_eingereicht_at?: string | null
+          rechnung_pdf_url?: string | null
+          rechnung_positionen?: Json | null
+          status?: string
+          termin_bis?: string | null
+          termin_von?: string | null
+          titel: string
+          updated_at?: string
+        }
+        Update: {
+          abgelehnt_at?: string | null
+          ablehnung_grund?: string | null
+          angenommen_at?: string | null
+          anweisung?: string | null
+          auftrag_id?: string
+          created_at?: string
+          ek_art?: string
+          ek_betrag?: number | null
+          erstellt_von?: string | null
+          fertig_at?: string | null
+          fertig_dateien?: Json
+          fertig_text?: string | null
+          gesendet_at?: string
+          handwerker_id?: string
+          id?: string
+          kontakt_vor_ort?: string | null
+          ort?: string | null
+          rechnung_betrag?: number | null
+          rechnung_eingereicht_at?: string | null
+          rechnung_pdf_url?: string | null
+          rechnung_positionen?: Json | null
+          status?: string
+          termin_bis?: string | null
+          termin_von?: string | null
+          titel?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_log: {
         Row: {
           an_email: string | null
