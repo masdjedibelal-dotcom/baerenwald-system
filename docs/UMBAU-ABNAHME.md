@@ -394,3 +394,25 @@ Das kommt jeweils in einer eigenen Sitzung:
 - **P23 Assistenten in drei Schritten**
 - **P24 Texte**
 - **P25 Rest:** Plus-Knopf und die gekürzte Aktion unten
+
+## Nachtrag P08/P13 (Antworten vom 29.09.2026)
+
+### Was ist anders
+
+- **Rechnung nach Versand stornieren:** Bei offenen, überfälligen und bezahlten Rechnungen gibt es im Menü „…“ den Punkt „Stornieren“.
+  - Die Rechnung wird storniert.
+  - Eine Storno-Gutschrift entsteht als Entwurf und öffnet sich direkt, damit Sie sie an den Kunden senden.
+  - Eine neue Rechnung entsteht nicht. Wer eine neue Rechnung braucht, nimmt weiter „Rechnung korrigieren“.
+- **Regie:** Der Aufschlag ist nicht mehr mit 20 % vorbelegt.
+- **Zurück-Link:** heißt jetzt auch bei Rechnung und Anfrage nur „Zurück“.
+
+### Geprüft
+
+- Lokal gegen staging an der Test-Rechnung `…0073` ausprobiert: Das Original steht auf „Storniert“, die Gutschrift über −23.800,00 € ist als Entwurf angelegt.
+
+### Offen
+
+- Netlify, Portal-Produktion:
+  - `NEXT_PUBLIC_CRM_URL=https://baerenwald-backend.netlify.app`
+  - `CRM_DASHBOARD_URL` auf denselben Wert, falls gesetzt
+  - Danach neu bauen.
