@@ -357,10 +357,6 @@ const STAMM_ITEMS: NeuItem[] = [
   { ic: 'tool', label: COPY_ROLE.partner, overlay: 'handwerker' },
 ]
 
-const PLAN_ITEMS: NeuItem[] = [
-  { ic: 'calendar-event', label: 'Termin', overlay: 'termin' },
-  { ic: 'clipboard-list', label: 'To-do', overlay: 'todo' },
-]
 
 const BUSY_LABEL: Record<FabOverlayArt, string> = {
   anfrage: 'Anfrage wird geöffnet…',
@@ -417,17 +413,7 @@ export function MockNeuPopover({ open, onClose }: { open: boolean; onClose: () =
             </span>
           </MockBtn>
         ))}
-        <div className="neu-pop-sep" />
-        {PLAN_ITEMS.map((it) => (
-          <MockBtn className="neu-pop-item" key={it.label} type="button" onClick={() => go(it)}>
-            <span className="neu-pop-ico">
-              <MockIcon ctx="default" n={it.ic} size={18} />
-            </span>
-            <span className="neu-pop-txt">
-              <span className="l">{it.label}</span>
-            </span>
-          </MockBtn>
-        ))}
+        {/* Termin und To-do entfallen (Kalender/To-dos gestrichen, Block C) */}
         <MockBtn className="neu-pop-cancel md:hidden" type="button" onClick={onClose}>
           Abbrechen
         </MockBtn>

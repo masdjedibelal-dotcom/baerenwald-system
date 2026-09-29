@@ -21681,3 +21681,24 @@ display: flex;
   .pb-mobile-fab-extra { padding-bottom: 4rem; }
   .zahlung-row--next { box-shadow: inset 3px 0 0 var(--green), var(--shadow-mobile); }
 }
+
+/* Aktionsmodell: seltene Felder unter „Mehr Angaben“ (einheitlich für alle Formulare) */
+.form-mehr {
+  border-top: 0.5px solid var(--border);
+  padding-top: 12px;
+}
+.form-mehr__summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: var(--fs-text);
+  font-weight: 600;
+  color: var(--green-dark);
+}
+.form-mehr__summary::-webkit-details-marker { display: none; }
+.form-mehr__summary::before { content: '+'; font-weight: 700; }
+.form-mehr[open] > .form-mehr__summary::before { content: '–'; }
+.form-mehr__body { margin-top: 8px; }

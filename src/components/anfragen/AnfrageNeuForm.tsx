@@ -654,25 +654,6 @@ export function AnfrageNeuForm({
               <MockInput name="ort" value={ort} onChange={(e) => setOrt(e.target.value)} autoComplete="address-level2" />
             </Field>
           </div>
-          <Field label="Kundentyp">
-            <MockSelect name="kundentyp" value={kundentyp} onChange={(e) => setKundentyp(e.target.value)}>
-              <option value="">Bitte wählen</option>
-              {KUNDENTYP_OPTIONS.map((k) => (
-                <option key={k.value} value={k.value}>
-                  {k.label}
-                </option>
-              ))}
-            </MockSelect>
-          </Field>
-          <Field label="Kanal">
-            <MockSelect name="kanal" value={kanal} onChange={(e) => setKanal(e.target.value)}>
-              {Object.entries(KANAL_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </MockSelect>
-          </Field>
         </div>
       </Card>
 
@@ -721,30 +702,65 @@ export function AnfrageNeuForm({
             </div>
           ) : null}
 
-          <label className="checkbox-row mt-4 rounded-card border border-bw-border bg-bw-surface px-3 py-3">
-            <MockCheckbox
-              checked={istBauprojekt}
-              onChange={(e) => {
-                setBauprojektManuell(true)
-                setIstBauprojekt(e.target.checked)
-              }}
-            />
-            <span>
-              <span className="font-medium text-bw-text">Bauprojekt / Bauauftrag</span>
-              <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                Aktiviert Bautagesberichte, Leistungs-Compliance und Baustellen-Unterlagen.
-              </span>
-            </span>
-          </label>
-
-          <VorgangArtWiederkehrField
-            value={wiederkehr}
-            onChange={setWiederkehr}
-            className="mt-4"
-          />
         </div>
       </Card>
 
+
+      <Card title="Beschreibung">
+        <div className="space-y-4">
+          <SheetEditableField
+            label="Anmerkungen vom Kunden"
+            value={freitext}
+            onSave={setFreitext}
+            multiline
+            rows={3}
+            placeholder="Was hat der Kunde noch erwähnt?"
+          />
+        </div>
+      </Card>
+      {/* Aktionsmodell 30.09.2026: Seltenes unter „Mehr Angaben“ — Pflicht ist nur Kontakt + Vorhaben */}
+      <details className="form-mehr">
+        <summary className="form-mehr__summary">Mehr Angaben</summary>
+        <div className="form-mehr__body space-y-4">
+          <Card title="Einordnung">
+            <div className="space-y-4">
+              <Field label="Kundentyp">
+                <MockSelect name="kundentyp" value={kundentyp} onChange={(e) => setKundentyp(e.target.value)}>
+                  <option value="">Bitte wählen</option>
+                  {KUNDENTYP_OPTIONS.map((k) => (
+                    <option key={k.value} value={k.value}>
+                      {k.label}
+                    </option>
+                  ))}
+                </MockSelect>
+              </Field>
+              <Field label="Kanal">
+                <MockSelect name="kanal" value={kanal} onChange={(e) => setKanal(e.target.value)}>
+                  {Object.entries(KANAL_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </MockSelect>
+              </Field>
+              <label className="checkbox-row mt-4 rounded-card border border-bw-border bg-bw-surface px-3 py-3">
+                <MockCheckbox
+                  checked={istBauprojekt}
+                  onChange={(e) => {
+                    setBauprojektManuell(true)
+                    setIstBauprojekt(e.target.checked)
+                  }}
+                />
+                <span>
+                  <span className="font-medium text-bw-text">Bauprojekt / Bauauftrag</span>
+                  <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
+                    Aktiviert Bautagesberichte, Leistungs-Compliance und Baustellen-Unterlagen.
+                  </span>
+                </span>
+              </label>
+
+            </div>
+          </Card>
       {showDetails ? (
         <Card title="Details">
           <div className="space-y-4">
@@ -890,27 +906,20 @@ export function AnfrageNeuForm({
           </Field>
         </div>
       </Card>
-
-      <Card title="Notizen">
-        <div className="space-y-4">
-          <SheetEditableField
-            label="Anmerkungen vom Kunden"
-            value={freitext}
-            onSave={setFreitext}
-            multiline
-            rows={3}
-            placeholder="Was hat der Kunde noch erwähnt?"
-          />
-          <SheetEditableField
-            label="Interne Notiz"
-            value={interneNotiz}
-            onSave={setInterneNotiz}
-            multiline
-            rows={3}
-            placeholder="Interne Bemerkungen zum Gespräch…"
-          />
+          <Card title="Intern">
+            <div className="space-y-4">
+              <SheetEditableField
+                label="Interne Notiz"
+                value={interneNotiz}
+                onSave={setInterneNotiz}
+                multiline
+                rows={3}
+                placeholder="Interne Bemerkungen zum Gespräch…"
+              />
+            </div>
+          </Card>
         </div>
-      </Card>
+      </details>
 
       {!isBearbeiten ? (
         <div className="rounded-card border border-bw-border bg-bw-surface px-3 py-3">
