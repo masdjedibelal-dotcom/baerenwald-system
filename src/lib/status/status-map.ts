@@ -60,17 +60,19 @@ export const ANGEBOT_STATUS_MAP = {
 /** Auftrag */
 export const AUFTRAG_STATUS_MAP = {
   offen: { label: 'Offen' },
-  in_arbeit: { label: 'In Arbeit' },
+  // P14: Zielbild-Vokabular (offen · läuft · abgenommen); gespeicherte Werte unverändert
+  in_arbeit: { label: 'Läuft' },
   abnahme: { label: 'Abnahme' },
-  abgeschlossen: { label: 'Abgeschlossen' },
+  abgeschlossen: { label: 'Abgenommen' },
   storniert: { label: 'Storniert' },
 } as const satisfies Record<string, StatusMapEntry>
 
 /** Rechnung */
 export const RECHNUNG_STATUS_MAP = {
-  ausstehend: { label: 'Offen' },
+  ausstehend: { label: 'Rechnung fehlt' },
   entwurf: { label: 'Entwurf' },
-  gesendet: { label: 'Gesendet' },
+  // P14: Zielbild Entwurf · offen · bezahlt · storniert; „Überfällig“ bleibt Anzeige
+  gesendet: { label: 'Offen' },
   bezahlt: { label: 'Bezahlt' },
   storniert: { label: 'Storniert' },
   korrektur_entwurf: { label: 'Korrektur Entwurf' },
