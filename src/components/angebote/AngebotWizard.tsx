@@ -313,8 +313,9 @@ export function AngebotWizard({
    * Wiederkehrend (Wartung/Winterdienst) → immer Einfach, ohne Komplex-Schritt.
    */
   const needsTypGate = !bootstrap?.angebotId && !istAuftragKorrektur && !istNachtrag
+  // Nur noch einmalige Leistungen (30.09.2026) — die Frage „Wiederkehrend?“ entfällt.
   const [typGateStep, setTypGateStep] = useState<'art' | 'layout' | null>(
-    () => (needsTypGate ? 'art' : null)
+    () => (needsTypGate ? 'layout' : null)
   )
   const typConfirmed = typGateStep === null
   const [sheet, setSheet] = useState<WizardSheetId>(() => {
@@ -1929,8 +1930,7 @@ export function AngebotWizard({
                 lineHeight: 1.45,
               }}
             >
-              Entscheidet, ob du nur Positionen oder zusätzlich Gewerke anlegen kannst — nur bei
-              einmaligen Projekten relevant.
+              Nur Positionen oder zusätzlich nach Gewerken gegliedert?
             </p>
             <div className="doctype-row doctype-row--stack">
               <MockBtn className="doctype-radio-opt doctype-radio-opt--block" type="button" onClick={() => {
@@ -1954,9 +1954,6 @@ export function AngebotWizard({
                 </span>
               </MockBtn>
             </div>
-            <MockBtn kind="ghost" type="button" style={{ marginTop: 12 }} onClick={() => setTypGateStep('art')}>
-              Zurück
-            </MockBtn>
           </>
         )}
       </EditorSheet>

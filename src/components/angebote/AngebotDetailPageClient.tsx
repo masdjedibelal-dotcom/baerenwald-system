@@ -201,10 +201,6 @@ export function AngebotDetailPageClient({
 
   useEffect(() => {
     const raw = searchParams.get('tab')
-    if ((raw ?? '').trim().toLowerCase() === 'visualisierungen') {
-      router.replace(`/angebote/${detail.id}/visualisierung`)
-      return
-    }
     if (isLegacyDetailTabAlias(raw)) {
       const resolved = resolveAngebotDetailTabFromQuery(raw) ?? ANGEBOT_DETAIL_DEFAULT_TAB
       const q = new URLSearchParams(searchParams.toString())

@@ -23,11 +23,6 @@ import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marke
 import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatWochentagDatumLang } from '@/lib/utils'
-import { useAssistent } from '@/components/assistent/AssistentProvider'
-import {
-  buildDashboardKpiSnapshot,
-  DASHBOARD_KPI_ANALYSE_PROMPT,
-} from '@/lib/dashboard/dashboard-kpi-snapshot'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { DateInput } from '@/components/ui/DateInput'
 import { C } from '@/lib/tokens/colors'
@@ -476,7 +471,6 @@ rankingHandwerker: RankingZeile[]
 }) {
   const router = useRouter()
   const isMobile = useIsMobile()
-  const { openAutoSession } = useAssistent()
 
   const greeting = useMemo(() => {
     const h = new Date().getHours()
@@ -496,26 +490,6 @@ rankingHandwerker: RankingZeile[]
     document.querySelector<HTMLElement>('main.page')?.scrollTo(0, 0)
   }, [])
 
-  function openKpiAnalyse() {
-    const snapshot = buildDashboardKpiSnapshot({
-      zeitraumFilter,
-      kpis,
-      marketing,
-      umsatzMonate,
-      funnel,
-      gewerk,
-      rankingHandwerker,
-      rankingKunden,
-    })
-    openAutoSession({
-      title: 'KI · Dashboard-Analyse',
-      intro:
-        'Ich analysiere jetzt die aktuell sichtbaren KPIs und Charts — aus Sicht eines Analysten für dich als Geschäftsführer.',
-      contextExtra: snapshot,
-      autoPrompt: DASHBOARD_KPI_ANALYSE_PROMPT,
-    })
-  }
-
   return (
     <div className="dashboard-page min-w-0">
       <header className="dash-hero mb-[22px] flex min-w-0 flex-wrap items-end justify-between gap-3">
@@ -527,9 +501,6 @@ rankingHandwerker: RankingZeile[]
         </div>
         <div className="dash-hero__filters flex min-w-0 flex-wrap items-center justify-end gap-2">
           <DashboardZeitraumChips filter={zeitraumFilter} />
-          <MockBtn className="ki-assist-icon-btn" type="button" title="KPIs mit KI analysieren" aria-label="KPIs mit KI analysieren" onClick={openKpiAnalyse}>
-            <MockIcon ctx="btn" n="sparkles" size={16} />
-          </MockBtn>
         </div>
       </header>
 

@@ -10,7 +10,6 @@ import { updateAngebotProjektFelder } from '@/app/(dashboard)/angebote/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
-import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { AngebotDetail, AngebotPosition, AuftragPosition, Gewerk, LeadDetail } from '@/lib/types'
@@ -146,7 +145,8 @@ export function AngebotLeistungenTab({
 }) {
   const [zuweisungIds, setZuweisungIds] = useState<string[] | null>(null)
 
-  const kannZuweisen = angebotDarfImWizardBearbeitetWerden(String(detail.status))
+  // Partner-Angebote einholen entfällt (30.09.2026) — Partner werden am Auftrag per Einsatz beauftragt.
+  const kannZuweisen = false
 
   const leistungPositionen = useMemo(
     () => (detail.positionen ?? []).filter((p) => !istGewerkBeschreibungPosition(p)),

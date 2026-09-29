@@ -1417,14 +1417,7 @@ export function AuftragDetailClient({
                           },
                         ]
                       : []),
-                    ...(detail.angebot_id && detail.lead_id
-                      ? [
-                          {
-                            label: 'Nachtrag erstellen',
-                            onClick: openNachtragAngebot,
-                          },
-                        ]
-                      : []),
+                    // „Nachtrag erstellen“ entfällt (30.09.2026) — Änderungen über „Auftrag bearbeiten“ oder Regie im Einsatz.
                   ]
                 : []
             }

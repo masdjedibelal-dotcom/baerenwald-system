@@ -856,9 +856,7 @@ export function AnfrageDetailClient({
   )
 
   const leistungRows = leistungenFromAnfrage(lead.funnel_daten)
-  const hatLeistungen = leistungRows.length > 0
   const internEinholungRows = einholungRows.filter((r) => r.ist_intern_gehaeuse !== false)
-  const hatPartnerEinholung = einholungRows.length > 0
   const openHandwerkerVorabAnfragen = () => {
     void ensureWizardData().then((ok) => {
       if (ok) setAnfragenOpen(true)
@@ -880,9 +878,7 @@ export function AnfrageDetailClient({
                   description:
                     'Die Hausverwaltung muss freigeben oder die Hausmeister-Prüfung abschließen. Danach können Sie disponieren.',
                 })
-            : hatPartnerEinholung
-              ? undefined
-              : openHandwerkerVorabAnfragen
+            : undefined // Partner-LV einholen entfällt (30.09.2026) — Partner kommen über Einsätze
       }
       dokumentActionLabel={
         istAkut
@@ -900,11 +896,7 @@ export function AnfrageDetailClient({
             loadEinholungen()
             refresh()
           }}
-          showCta={
-            istAkut || wartetAufHvFreigabe
-              ? hatPartnerEinholung
-              : hatLeistungen || hatPartnerEinholung
-          }
+          showCta={false}
         />
       }
     />
