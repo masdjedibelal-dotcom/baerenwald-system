@@ -1224,11 +1224,69 @@ async function collectCrmNotificationItems(opts?: {
     }
   }
 
+  await collectEinsatzItems(supabase, since, items)
+
   items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   if (enrichKunden) {
     await applyUpdateZeilenAnzeige(supabase, items)
   }
   return items
+}
+
+/**
+ * Einsätze (Umbau P11–P13): Partner hat angenommen, abgelehnt, fertig gemeldet, Rechnung
+ * geschickt oder Regie/Behinderung gemeldet → Glocke im CRM. Nutzt die vorhandenen Glocken-Typen.
+ */
+async function collectEinsatzItems(
+  supabase: ReturnType<typeof createClient>,
+  since: string,
+  items: CrmNotificationItem[]
+): Promise<void> {
+  const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null)
+  const [eRes, mRes] = await Promise.all([
+    supabase
+      .from('einsaetze')
+      .select('id, auftrag_id, titel, status, angenommen_at, abgelehnt_at, fertig_at, rechnung_eingereicht_at, ablehnung_grund, handwerker(name, firma)')
+      .or(`angenommen_at.gte.${since},abgelehnt_at.gte.${since},fertig_at.gte.${since},rechnung_eingereicht_at.gte.${since}`)
+      .limit(PER_SOURCE_LIMIT),
+    supabase
+      .from('einsatz_mitteilungen')
+      .select('id, auftrag_id, typ, text, stunden, created_at, handwerker(name, firma)')
+      .eq('status', 'offen')
+      .gte('created_at', since)
+      .limit(PER_SOURCE_LIMIT),
+  ])
+  if (eRes.error) logDbError('app/notifications/actions:einsaetze', eRes.error)
+  if (mRes.error) logDbError('app/notifications/actions:einsatz_mitteilungen', mRes.error)
+
+  for (const row of (eRes.data ?? []) as Record<string, unknown>[]) {
+    const hw = one(row.handwerker as { name?: string | null; firma?: string | null } | null)
+    const name = hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
+    const href = `/auftraege/${String(row.auftrag_id)}`
+    const titel = String(row.titel ?? '')
+    const push = (key: string, typ: CrmNotificationTyp, title: string, subtitle: string, at: unknown) => {
+      if (!at || String(at) < since) return
+      items.push({ sourceKey: `einsatz_${key}:${String(row.id)}`, typ, title, subtitle, href, createdAt: String(at), gelesen: false })
+    }
+    push('angenommen', 'handwerker_angenommen', `${name}: Einsatz angenommen`, titel, row.angenommen_at)
+    push('abgelehnt', 'handwerker_abgelehnt', `${name}: Einsatz abgelehnt`, String(row.ablehnung_grund ?? '') || titel, row.abgelehnt_at)
+    push('fertig', 'hw_auftrag_erledigt', `${name}: Einsatz fertig gemeldet`, titel, row.fertig_at)
+    push('rechnung', 'hw_rechnung_eingegangen', `${name}: Rechnung zum Einsatz`, titel, row.rechnung_eingereicht_at)
+  }
+  for (const row of (mRes.data ?? []) as Record<string, unknown>[]) {
+    const hw = one(row.handwerker as { name?: string | null; firma?: string | null } | null)
+    const name = hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
+    const regie = row.typ === 'regie'
+    items.push({
+      sourceKey: `einsatz_mitteilung:${String(row.id)}`,
+      typ: 'partner_positions_meldung',
+      title: regie ? `${name}: Regie ${row.stunden ?? ''} Std gemeldet` : `${name}: Behinderung gemeldet`,
+      subtitle: String(row.text ?? '').slice(0, 120),
+      href: `/auftraege/${String(row.auftrag_id)}`,
+      createdAt: String(row.created_at ?? since),
+      gelesen: false,
+    })
+  }
 }
 
 type UpdatePhase = 'Anfrage' | 'Angebot' | 'Auftrag' | 'Rechnung'
