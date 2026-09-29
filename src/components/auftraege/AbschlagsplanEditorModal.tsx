@@ -13,12 +13,10 @@ import {
   neueZahlungsplanZeile,
   normalizeAbschlagsplanSchluss,
   validateZahlungsplanGegenGesamt,
-  zahlungsplanVorlage30_40_30,
-  zahlungsplanVorlage30_70,
-  zahlungsplanVorlage50_50,
   type Zahlungsplan,
   type ZahlungsplanAbschlagTyp,
   type ZahlungsplanZeile,
+  planMitSchlussrechnung,
 } from '@/lib/rechnungen/zahlungsplan'
 import { cn } from '@/lib/utils'
 
@@ -31,11 +29,6 @@ type EditorRate = {
   faellig_am: string
 }
 
-const PRESETS: { name: string; build: () => Zahlungsplan }[] = [
-  { name: '30 / 40 / 30', build: zahlungsplanVorlage30_40_30 },
-  { name: '50 / 50', build: zahlungsplanVorlage50_50 },
-  { name: 'Anzahlung 30% + Rest', build: zahlungsplanVorlage30_70 },
-]
 
 function planToRates(plan: Zahlungsplan): EditorRate[] {
   return plan.zeilen.map((z) => ({
@@ -128,7 +121,7 @@ export function AbschlagsplanEditorModal({
     () =>
       initial?.zeilen?.length
         ? planToRates(initial)
-        : planToRates(zahlungsplanVorlage30_40_30()),
+        : planToRates(planMitSchlussrechnung(null)),
     [initial]
   )
   const [rates, setRates] = useState<EditorRate[]>(baseline)
@@ -189,10 +182,6 @@ export function AbschlagsplanEditorModal({
     )
   }
 
-  function applyPreset(build: () => Zahlungsplan) {
-    if (frozen.size > 0) return
-    setRates(planToRates(build()))
-  }
 
   function add() {
     setRates((prev) => {
@@ -291,15 +280,6 @@ export function AbschlagsplanEditorModal({
         onClick: () => onSave(ratesToPlan(rates, initial, frozenIds)),
       }}
     >
-      <div className="zahlplan-editor-presets">
-        {PRESETS.map((p) => (
-          <MockBtn className="zahlplan-preset-chip" key={p.name} type="button" disabled={frozen.size > 0} title={frozen.size > 0
-                ? 'Vorlagen gesperrt — gestellte/bezahlte Raten'
-                : 'Vorlage übernehmen und danach individuell anpassen'} onClick={() => applyPreset(p.build)}>
-            {p.name}
-          </MockBtn>
-        ))}
-      </div>
 
       <div className="zahlplan-editor-list">
         {rates.map((r) => {

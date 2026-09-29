@@ -1,6 +1,7 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
+import { AbschlagStellenSheet } from '@/components/vorgang/AbschlagStellenSheet'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
@@ -35,6 +36,8 @@ import {
   type RechnungAbschlagLink,
   type ZahlplanRateStatus,
   type Zahlungsplan,
+  planMitNeuemAbschlag,
+  planMitSchlussrechnung,
 } from '@/lib/rechnungen/zahlungsplan'
 import {
   aktuelleMahnstufeNummer,
@@ -189,6 +192,7 @@ export function VorgangZahlungTab({
   )
   const [plan, setPlan] = useState<Zahlungsplan>(initial)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [abschlagOpen, setAbschlagOpen] = useState(false)
   const [openRateId, setOpenRateId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -648,6 +652,39 @@ export function VorgangZahlungTab({
 
   const interactive = !readOnly && variant !== 'angebot'
   const canEditPlan = interactive && variant === 'auftrag' && Boolean(auftragId)
+  const hatSchlusszeile = plan.zeilen.some((z) => z.typ === 'rest')
+  /** P09: Abschlag/Schluss direkt stellen — der Plan entsteht im Hintergrund. */
+  const planAktionen = canEditPlan ? (
+    <span style={{ display: 'inline-flex', gap: 8 }}>
+      <MockBtn sm kind="secondary" icon="plus" onClick={() => setAbschlagOpen(true)}>
+        Abschlag stellen
+      </MockBtn>
+      {!hatSchlusszeile ? (
+        <MockBtn
+          sm
+          kind="secondary"
+          icon="file-invoice"
+          disabled={pending}
+          onClick={() => speichern(planMitSchlussrechnung(hasPlan ? plan : null))}
+        >
+          Schlussrechnung
+        </MockBtn>
+      ) : null}
+    </span>
+  ) : null
+  const abschlagSheet = canEditPlan ? (
+    <AbschlagStellenSheet
+      open={abschlagOpen}
+      onClose={() => setAbschlagOpen(false)}
+      gesamtNetto={gesamtNetto}
+      gesamtBrutto={totalBrutto}
+      saving={pending}
+      onSave={(a) => {
+        setAbschlagOpen(false)
+        speichern(planMitNeuemAbschlag(hasPlan ? plan : null, a))
+      }}
+    />
+  ) : null
 
   function renderRateRow(row: RateRow) {
     const belege = row.belege ?? []
@@ -719,22 +756,13 @@ export function VorgangZahlungTab({
           icon="calculator"
           className="zahlplan-shell dshell-framed"
           actions={
-            canEditPlan ? (
-              <MockBtn
-                sm
-                kind="secondary"
-                icon="plus"
-                onClick={() => setEditorOpen(true)}
-              >
-                Abschlagsplan
-              </MockBtn>
-            ) : null
+            planAktionen
           }
         >
           <div className="zahlplan-empty">
             <MockIcon ctx="empty" n="calculator" size={26} />
             <div className="zahlplan-empty__title">
-              {variant === 'angebot' ? 'Kein Zahlungsvorschlag' : 'Noch kein Abschlagsplan'}
+              {variant === 'angebot' ? 'Kein Zahlungsvorschlag' : 'Noch keine Abschläge'}
             </div>
             <div className="zahlplan-empty__text">
               {variant === 'angebot' ? (
@@ -744,14 +772,15 @@ export function VorgangZahlungTab({
                 </>
               ) : (
                 <>
-                  Auftragssumme <b>{formatEurBetrag(totalBrutto || gesamtNetto)}</b> — optional in
-                  Abschläge aufteilen, danach je Rate eine Rechnung erstellen.
+                  Auftragssumme <b>{formatEurBetrag(totalBrutto || gesamtNetto)}</b>. Abschläge über
+                  „Abschlag stellen“. Die Schlussrechnung zieht sie automatisch ab.
                 </>
               )}
             </div>
           </div>
           {afterTable}
         </MockCard>
+        {abschlagSheet}
         {canEditPlan ? (
           <AbschlagsplanEditorModal
             open={editorOpen}
@@ -777,15 +806,18 @@ export function VorgangZahlungTab({
         className="zahlplan-shell dshell-framed"
         actions={
           canEditPlan ? (
-            <MockBtn
-              sm
-              kind="secondary"
-              icon="pencil"
-              title="Abschlagsplan bearbeiten"
-              onClick={() => setEditorOpen(true)}
-            >
-              Bearbeiten
-            </MockBtn>
+            <span style={{ display: 'inline-flex', gap: 8 }}>
+              {planAktionen}
+              <MockBtn
+                sm
+                kind="ghost"
+                icon="pencil"
+                title="Abschläge bearbeiten"
+                onClick={() => setEditorOpen(true)}
+              >
+                Bearbeiten
+              </MockBtn>
+            </span>
           ) : variant === 'angebot' ? (
             <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>Vorschlag</span>
           ) : null
@@ -896,6 +928,7 @@ export function VorgangZahlungTab({
         ctas={openRate ? buildCtas(openRate) : []}
       />
 
+      {abschlagSheet}
       {canEditPlan ? (
         <AbschlagsplanEditorModal
           open={editorOpen}

@@ -1302,3 +1302,40 @@ export function zahlungsplanLabelFuerAngebot(plan: Zahlungsplan | null): string 
 export function resolveAnredeKey(_anrede?: AngebotMailAnrede | null): AngebotMailAnrede {
   return 'sie'
 }
+
+/**
+ * P09 (Entscheidung 29.09.2026): Abschlag ohne vorher angelegten Zahlungsplan.
+ * Hängt einen Abschlag an (vor die Schlusszeile) und stellt sicher, dass es eine Schlusszeile gibt.
+ * Der Plan bleibt internes Werkzeug; die Schlussrechnung zieht gestellte Abschläge ab.
+ */
+export function planMitNeuemAbschlag(
+  plan: Zahlungsplan | null | undefined,
+  abschlag: { typ: 'prozent' | 'betrag'; wert: number }
+): Zahlungsplan {
+  const zeilen = plan?.zeilen ?? []
+  const rest = zeilen.filter((z) => z.typ === 'rest')
+  const raten = zeilen.filter((z) => z.typ !== 'rest')
+  const neu = neueZahlungsplanZeile({
+    titel: `${raten.length + 1}. Abschlag`,
+    typ: abschlag.typ,
+    wert: abschlag.wert,
+    faellig_am: plusDaysIso(14),
+  })
+  const schluss = rest.length
+    ? rest
+    : [neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0, faellig_am: null })]
+  return { modus: 'abschlagsplan', zeilen: [...raten, neu, ...schluss] }
+}
+
+/** P09: Schlussrechnung = Restzeile (Gesamt minus gestellte Abschläge). */
+export function planMitSchlussrechnung(plan: Zahlungsplan | null | undefined): Zahlungsplan {
+  const zeilen = plan?.zeilen ?? []
+  if (zeilen.some((z) => z.typ === 'rest')) return { modus: 'abschlagsplan', zeilen }
+  return {
+    modus: 'abschlagsplan',
+    zeilen: [
+      ...zeilen,
+      neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0, faellig_am: plusDaysIso(14) }),
+    ],
+  }
+}

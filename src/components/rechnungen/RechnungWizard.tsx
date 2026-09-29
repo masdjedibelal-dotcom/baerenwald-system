@@ -102,9 +102,6 @@ import {
   emptyZahlungsplan,
   neueZahlungsplanZeile,
   zahlplanAbgerechnetAusLinks,
-  zahlungsplanVorlage30_40_30,
-  zahlungsplanVorlage30_70,
-  zahlungsplanVorlage50_50,
   type Zahlungsplan,
   type ZahlungsplanAbschlagTyp,
   type ZahlungsplanZeile,
@@ -134,11 +131,8 @@ import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type Rechnungsart = 'abschlag' | 'schluss'
 
-const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = [
-{ name: '30 / 40 / 30', build: zahlungsplanVorlage30_40_30 },
-  { name: '50 / 50', build: zahlungsplanVorlage50_50 },
-  { name: 'Anzahlung 30% + Rest', build: zahlungsplanVorlage30_70 },
-]
+/** P09: keine Vorlagen (50/50 usw.) mehr — Abschläge einzeln stellen. */
+const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = []
 
 /** Form ohne IDs/Titel — zum Erkennen der aktiven Vorlage. */
 function planShapeKey(plan: Zahlungsplan): string {
@@ -1782,26 +1776,8 @@ export function RechnungWizard({
                       flexWrap: 'wrap',
                     }}
                   >
-                    <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                      Vorlage:
-                    </span>
-                    {PLAN_PRESETS.map((p) => (
-                      <MockBtn className={cn(
-                          'zahlplan-preset-chip',
-                          matchingPlanPresetName(plan) === p.name && 'is-on'
-                        )} key={p.name} type="button" onClick={() => {
-                          const next = p.build()
-                          setPlan(next)
-                          setAktivRate(next.zeilen[0]?.id ?? null)
-                        }}>
-                        {p.name}
-                      </MockBtn>
-                    ))}
-                    <MockBtn className={cn(
-                        'zahlplan-preset-chip',
-                        hasPlan && !matchingPlanPresetName(plan) && 'is-on'
-                      )} type="button" onClick={() => setPlanEditorOpen(true)}>
-                      Individuell
+                    <MockBtn className="zahlplan-preset-chip" type="button" onClick={() => setPlanEditorOpen(true)}>
+                      Abschläge bearbeiten
                     </MockBtn>
                     <MockBtn sm kind="ghost" onClick={clearPlan}>
                       Löschen
