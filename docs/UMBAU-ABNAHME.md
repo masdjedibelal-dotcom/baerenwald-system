@@ -416,3 +416,29 @@ Das kommt jeweils in einer eigenen Sitzung:
   - `NEXT_PUBLIC_CRM_URL=https://baerenwald-backend.netlify.app`
   - `CRM_DASHBOARD_URL` auf denselben Wert, falls gesetzt
   - Danach neu bauen.
+
+# Block D – Rest (30.09.2026)
+
+### Was ist anders
+
+- **P21, Nächster Schritt:** Anfrage, Angebot, Auftrag und Rechnung zeigen oben die Karte „Nächster Schritt“ mit einem Satz, der zur grünen Hauptaktion passt. Der Betrag steht im Kopf neben dem Status.
+- **P23, Angebots-Assistent:** oben die Schritte „1 Kunde · 2 Positionen · 3 Prüfen und senden“. Unten steht „Weiter: Prüfen“. Der dritte Schritt zeigt Kunde, Empfänger, Summe, Gültigkeit und das echte PDF, und erst dort wird gesendet.
+- **P24, Texte:** „Sie“ im ganzen CRM, im Partner-Portal, im Kundenportal und in den Mails an Partner. Das Angebots-PDF fällt nicht mehr auf „du“ zurück. Meldungen sind kurze Sätze statt Ketten wie „X — Y“. „Gespeichert“, „Status aktualisiert“ und Ähnliches erscheinen nicht mehr als Meldung, weil man es ohnehin sieht. Die öffentliche Website bleibt bei „du“.
+- **P25, Handy:** Die Aktionsleiste unten zeigt Kurzformen („Bearbeiten“, „Annehmen“, „Bezahlt“) statt abgeschnittener Texte. Der Chip „Kundenakte“ ist 44 px hoch. Auf dem Desktop verdeckt der Plus-Knopf keine Detailseiten mehr.
+- **Eine Wahrheit für „offen“:** Dashboard, Kennzahlen und Vorgänge-Liste zählen gleich. Vorher zeigte das Dashboard zum Beispiel 25 offene Angebote, weil es Entwürfe, Versionen und abgelaufene Angebote aus dem Zeitraum mitzählte.
+- **Knöpfe reagieren wieder:**
+  - Im Sammel-Commit `b3ef4c563` von Cursor gingen CSS-Regeln verloren, deren Klassen weiter benutzt werden. Betroffen waren unter anderem die Auswahllisten (Optionen klebten in einer Zeile), gestapelte Sheets und ein Sheet hinter einer Rückfrage.
+  - Die Regeln sind wiederhergestellt.
+  - „Angebot ablehnen“ zeigt den fehlenden Grund jetzt im Sheet. Vorher stand die Meldung unsichtbar dahinter.
+
+### So testen Sie
+
+1. Dashboard und Vorgänge-Liste öffnen. Die vier Zahlen oben entsprechen den Tabs der Liste.
+2. Ein gesendetes Angebot öffnen und auf „Ablehnen“ klicken. Die Auswahlliste für den Grund zeigt die Optionen untereinander. Ohne Grund erscheint der Hinweis im Sheet.
+3. Aus einer Anfrage „Angebot erstellen“ wählen. Oben stehen die drei Schritte, und „Weiter: Prüfen“ zeigt das PDF.
+4. Auf dem Handy ein Angebot öffnen und nach unten scrollen. Die Knöpfe unten sind nicht abgeschnitten.
+
+### Noch nicht
+
+- **P22, Vorgang als eine Seite mit Phasenleiste:** eigene Sitzung.
+- **Rechnungs-Assistent in drei Schritten:** analog zum Angebot, eigene Sitzung.
