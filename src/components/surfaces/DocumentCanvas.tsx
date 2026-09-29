@@ -534,7 +534,7 @@ export function DocumentCanvas({
                 'document-canvas__outline-chip',
                 s.complete && 'document-canvas__outline-chip--done'
               )}
-              onClick={() => onJumpSection(s.id)}
+              onClick={() => (s.onClick ? s.onClick() : onJumpSection(s.id))}
               disabled={interactionLocked}
             >
               <MockIcon

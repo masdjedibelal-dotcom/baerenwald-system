@@ -8,6 +8,8 @@ export type DocCanvasSection = {
   label: string
   /** true = Haken „vollständig“ */
   complete: boolean
+  /** P23: Schritt öffnet ein Sheet statt zum Abschnitt zu springen */
+  onClick?: () => void
 }
 
 export type DocCanvasGap = {

@@ -21612,3 +21612,9 @@ display: flex;
 @media (max-width: 639px) {
 .ap-merge-row__pair { grid-template-columns: 1fr; }
 }
+
+/* P23: Schritt „Prüfen und senden“ im Assistenten */
+.wizard-pruefen {
+  display: grid;
+  gap: 16px;
+}

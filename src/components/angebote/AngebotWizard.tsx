@@ -151,6 +151,7 @@ type WizardSheetId =
   | 'zahlung'
   | 'versand'
   | 'vorschau'
+  | 'pruefen'
   | null
 
 /** Bestehende HW-Zuweisung aus Bootstrap-Positionen (handwerker_id pro Gewerk). */
@@ -1026,6 +1027,16 @@ export function AngebotWizard({
     }
   }
 
+  /** P23: Schritt 3 „Prüfen und senden“ — Entwurf speichern, PDF zeigen, dann senden. */
+  async function openPruefenSheet() {
+    const id = await ensureDraftForPreview()
+    if (!id) {
+      toast.error(TOAST.entwurf_pruefen)
+      return
+    }
+    setSheet('pruefen')
+  }
+
   async function openVorschauSheet() {
     const id = await ensureDraftForPreview()
     if (!id) {
@@ -1342,6 +1353,28 @@ export function AngebotWizard({
         manageHistory={false}
         draftDirty={draftDirty}
         lastSavedAt={lastSavedAt}
+        sections={[
+          {
+            id: 'kunde',
+            label: '1 Kunde',
+            complete: Boolean(kundeId?.trim()) && versandComplete,
+            onClick: () => setSheet('kunde'),
+          },
+          { id: 'positionen', label: '2 Positionen', complete: hatLeistungszeile },
+          {
+            id: 'pruefen',
+            label: '3 Prüfen und senden',
+            complete: false,
+            onClick: () => {
+              if (saving) return
+              if (getAngebotSendGaps().length > 0) {
+                toast.info('Bitte zuerst Kunde und Positionen ergänzen.')
+                return
+              }
+              void openPruefenSheet()
+            },
+          },
+        ]}
         draftAction={{
           onClick: () => {
             if (saving) return
@@ -1350,15 +1383,60 @@ export function AngebotWizard({
           busy: saving,
         }}
         primaryAction={{
-          label: COPY_BUTTON.angebotSenden,
+          label: 'Weiter: Prüfen',
           onClick: () => {
             if (saving) return
-            void handleFinishVersenden()
+            void openPruefenSheet()
           },
           busy: saving,
           getGaps: getAngebotSendGaps,
         }}
       />
+
+      <EditorSheet
+        open={sheet === 'pruefen'}
+        onClose={closeSheet}
+        title="Prüfen und senden"
+        context="canvas"
+        size="lg"
+        primary={{
+          label: COPY_BUTTON.angebotSenden,
+          onClick: () => {
+            if (saving) return
+            setSheet(null)
+            void handleFinishVersenden()
+          },
+          busy: saving,
+        }}
+      >
+        <div className="wizard-pruefen">
+          <div className="gfc">
+            <div className="gfc-row">
+              <span className="gfc-l">Kunde</span>
+              <span className="gfc-v">{name?.trim() && name !== '—' ? name : '—'}</span>
+            </div>
+            <div className="gfc-row">
+              <span className="gfc-l">An</span>
+              <span className="gfc-v">{mailTo.filter(Boolean).join(', ') || sheetEmail || '—'}</span>
+            </div>
+            <div className="gfc-row">
+              <span className="gfc-l">Summe brutto</span>
+              <span className="gfc-v">{formatEurBetrag(mailSummen.bruttoMin)}</span>
+            </div>
+            {meta.gueltig_bis ? (
+              <div className="gfc-row">
+                <span className="gfc-l">Gültig bis</span>
+                <span className="gfc-v">{formatDatum(meta.gueltig_bis)}</span>
+              </div>
+            ) : null}
+          </div>
+          <AngebotWizardPdfPreview
+            angebotId={angebotId}
+            loading={previewLoading || saving || !angebotId}
+            kundeName={name}
+          />
+        </div>
+      </EditorSheet>
 
       <EditorSheet
         open={sheet === 'kunde'}
