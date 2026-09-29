@@ -1,5 +1,6 @@
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import type { VorgangPhase } from '@/lib/vorgang/types'
+import { zaehleOffeneVorgaenge } from '@/lib/vorgang/vorgang-offen'
 
 export type VorgaengeKpis = {
   offeneAnfragen: number
@@ -10,34 +11,12 @@ export type VorgaengeKpis = {
   bestandAktiv: number
 }
 
-/** Spec §8 — KPI-Karten über der Vorgänge-Liste. */
+/** Spec §8 — KPI-Karten über der Vorgänge-Liste. Offen-Zahlen = Tab „Offen“ (vorgang-offen.ts). */
 export function computeVorgaengeKpis(rows: VorgangListeRow[]): VorgaengeKpis {
-  let offeneAnfragen = 0
-  let offeneAngebote = 0
-  let aktiveAuftraege = 0
-  let offeneRechnungen = 0
+  const offen = zaehleOffeneVorgaenge(rows)
   let bestandAktiv = 0
-
   for (const r of rows) {
     const u = r.unterstatus.toLowerCase()
-    if (
-      r.phase === 'anfrage' &&
-      u !== 'abgebrochen' &&
-      u !== 'abgeschlossen' &&
-      u !== 'storniert'
-    ) {
-      offeneAnfragen++
-    }
-    if (r.phase === 'angebot' && (u === 'entwurf' || u === 'gesendet')) offeneAngebote++
-    if (r.phase === 'auftrag' && (u === 'offen' || u === 'in_arbeit' || u === 'abnahme')) {
-      aktiveAuftraege++
-    }
-    if (
-      r.phase === 'rechnung' &&
-      (u === 'ausstehend' || u === 'entwurf' || u === 'gesendet')
-    ) {
-      offeneRechnungen++
-    }
     if (
       r.ist_wiederkehrend &&
       !(
@@ -51,8 +30,13 @@ export function computeVorgaengeKpis(rows: VorgangListeRow[]): VorgaengeKpis {
       bestandAktiv++
     }
   }
-
-  return { offeneAnfragen, offeneAngebote, aktiveAuftraege, offeneRechnungen, bestandAktiv }
+  return {
+    offeneAnfragen: offen.anfrage,
+    offeneAngebote: offen.angebot,
+    aktiveAuftraege: offen.auftrag,
+    offeneRechnungen: offen.rechnung,
+    bestandAktiv,
+  }
 }
 
 export function countVorgaengeByPhase(rows: VorgangListeRow[]): Record<VorgangPhase, number> {

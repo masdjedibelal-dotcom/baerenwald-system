@@ -3,12 +3,7 @@ import { createClient } from '@/lib/supabase-server'
 import { DashboardClient } from '@/components/dashboard/DashboardClient'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
-import {
-  isAktiverAuftragStatus,
-  isOffeneAnfrageStatus,
-  isOffeneRechnungStatus,
-  isOffenesAngebotStatus,
-} from '@/lib/dashboard-mock-mapping'
+import { isAktiverAuftragStatus } from '@/lib/dashboard-mock-mapping'
 import {
   buildGewerkUmsatz,
   buildHandwerkerRanking,
@@ -28,6 +23,8 @@ import {
   loadDashboardMarketingSafe,
 } from '@/lib/dashboard/dashboard-marketing'
 import type { LeadWithAngebote } from '@/lib/types'
+import { loadVorgaengeListe } from '@/lib/vorgang/load-vorgaenge-liste'
+import { zaehleOffeneVorgaenge } from '@/lib/vorgang/vorgang-offen'
 
 export const dynamic = 'force-dynamic'
 /** Netlify Serverless: Dashboard darf Marketing-APIs nicht unbegrenzt warten lassen. */
@@ -269,25 +266,14 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
   const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
   const rechnungenZ = rechnungen.filter((r) => inZeitraum(r.created_at, zeitraumRange))
 
-  /** Wie Vorgänge-Liste: mit Angebot zählt die Phase als Angebot, nicht als offene Anfrage. */
-  const leadIdsMitAngebot = new Set(
-    angebote
-      .map((a) => String(a.lead_id ?? '').trim())
-      .filter(Boolean)
-  )
-
-  const offeneAnfragenCount = leadsZ.filter((l) => {
-    if (!isOffeneAnfrageStatus(l.status as string)) return false
-    if (leadIdsMitAngebot.has(String(l.id))) return false
-    return true
-  }).length
-  const offeneAngeboteCount = angeboteZ.filter((a) =>
-    isOffenesAngebotStatus(a.status as string, a.status_einfach as string | null)
-  ).length
-  const aktiveAuftraegeCount = auftraegeZ.filter((a) =>
-    isAktiverAuftragStatus(a.status as string)
-  ).length
-  const offeneRechnungenCount = rechnungenZ.filter((r) => isOffeneRechnungStatus(r.status)).length
+  // Offen-Zahlen = genau das, was die Vorgänge-Liste unter „Offen“ zeigt (eine Quelle, kein Zeitraum:
+  // „offen“ ist ein Stand, kein Zeitraum).
+  const { rows: vorgangRows } = await loadVorgaengeListe({ pageSize: 100, fetchAllPages: true })
+  const offen = zaehleOffeneVorgaenge(vorgangRows)
+  const offeneAnfragenCount = offen.anfrage
+  const offeneAngeboteCount = offen.angebot
+  const aktiveAuftraegeCount = offen.auftrag
+  const offeneRechnungenCount = offen.rechnung
 
   const vorname = (profil?.name as string | undefined)?.split(/\s+/)[0] ?? 'Team'
 

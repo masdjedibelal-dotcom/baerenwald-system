@@ -48,6 +48,7 @@ import {
   parseVorgangWertLabelEuro,
 } from '@/lib/vorgang/vorgaenge-liste-summe'
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
+import { isVorgangErledigt, vorgangStatusKind } from '@/lib/vorgang/vorgang-offen'
 import {
   matchesRechnungStatusFilterKey,
   resolveRechnungKorrekturUi,
@@ -148,35 +149,7 @@ const EXPORT_FIELDS: ExportField[] = [
 
 type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
 
-function statusKind(row: VorgangListeRow): string {
-  const u = row.unterstatus.toLowerCase()
-  // Storno-Gutschrift: eigener Badge-Look unter Erledigt
-  if (row.belegTyp === 'gutschrift') return 'storniert'
-  // Abgeschlossener Auftrag ohne RE — in Rechnung/Offen, nicht als „fertig“
-  if (row.phase === 'rechnung' && u === 'ausstehend') return 'neu'
-  if (row.phase === 'rechnung') {
-    const d = rechnungStatusDisplay(row.unterstatus, {
-      ueberfaellig: row.ueberfaellig,
-      eingehend: row.rechnungRichtung === 'eingehend',
-    })
-    return variantToMockBadgeKind(d.variant)
-  }
-  if (
-    u === 'storniert' ||
-    u === 'abgebrochen' ||
-    u === 'abgelehnt' ||
-    u === 'abgelaufen' ||
-    u === 'ersetzt'
-  ) {
-    return 'storniert'
-  }
-  if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen' || u === 'hm_erledigt') {
-    return 'fertig'
-  }
-  if (u === 'neu' || u === 'entwurf' || u === 'offen') return 'neu'
-  if (u === 'gesendet' || u === 'abnahme' || u === 'kontaktiert' || u === 'termin') return 'warten'
-  return 'aktiv'
-}
+const statusKind = vorgangStatusKind
 
 function statusFilterKey(row: VorgangListeRow): string {
   return row.unterstatus
@@ -224,11 +197,6 @@ function dateKey(row: VorgangListeRow): string {
   return row.updatedAt.replace(/\D/g, '')
 }
 
-/** Abgeschlossen / verloren / storniert → Erledigt-Bucket; sonst Offen. */
-function isVorgangErledigt(row: VorgangListeRow): boolean {
-  const kind = statusKind(row)
-  return kind === 'storniert' || kind === 'fertig'
-}
 
 /** Parse Anzeige „1.234 €“ / „207 – 813 €“ → Euro-Zahl für Wert-Filter/Sort. */
 function wertEuro(row: VorgangListeRow): number | null {
