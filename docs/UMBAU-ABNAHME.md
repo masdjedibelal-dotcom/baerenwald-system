@@ -290,3 +290,65 @@ Stand: CRM `umbau/p10-angebot-versionen`, Portal `umbau/p07-rechenkern` (enthalt
 
 - Die Partner-Seite selbst. Ohne Partner-Login kann ich sie nicht öffnen.
 - Typen und alle Build-Prüfungen sind grün, und der Weg ist über die CRM-Seite abgesichert.
+
+## P13 – Regie und Behinderung als Mitteilung
+
+### Was ist anders
+
+1. **Partner-Portal:** Bei einem angenommenen Einsatz gibt es „Regie oder Behinderung“.
+   - **Regie:** Stunden, Beschreibung, optional ein Foto.
+   - **Behinderung:** Beschreibung.
+2. **CRM:** Offene Mitteilungen erscheinen in der Einsatz-Karte unter dem jeweiligen Einsatz.
+   - **„Als Regie übernehmen“** öffnet ein Sheet mit Stunden, Partnersatz und Aufschlag (vorbelegt 20 %). Es zeigt Kundensatz und Betrag live und legt eine Regie-Position im Auftrag an. Der Kunde muss nicht zustimmen.
+   - **„Verwerfen“** (Regie) bzw. **„Erledigt“** (Behinderung) schließt die Mitteilung.
+3. **Danach** den Auftrag wie gewohnt über „Auftrag bearbeiten“ erneut an den Kunden senden.
+
+### So testen Sie (Staging, von Claude für den CRM-Teil geprüft)
+
+1. Partner meldet Regie, 3 Std → im CRM „Als Regie übernehmen“ → Partnersatz 50 €.
+2. Ergebnis: Kundensatz 60 €, Position 180 € netto. Die Mitteilung steht auf „übernommen“.
+
+### Rückfrage
+
+- Gibt es einen festen Standard-Aufschlag für Regie? In den Einstellungen habe ich keinen gefunden, deshalb sind 20 % vorbelegt (änderbar).
+
+### Für Prod nötig
+
+- Migration `20261214130000_p13_einsatz_mitteilungen.sql`: neue Tabelle.
+
+# Block B3 – Status und Mail (so weit ohne Prod-Datenumbau)
+
+## P15 (Teil) – Einsatz-Ereignisse in der Glocke
+
+### Was ist anders
+
+- Die CRM-Glocke meldet, wenn ein Partner einen Einsatz annimmt, ablehnt (mit Grund), fertig meldet oder eine Rechnung schickt. Offene Regie- und Behinderungs-Meldungen erscheinen dort ebenfalls.
+- Auf Staging geprüft: „Elektro Muster GmbH: Einsatz angenommen“.
+
+## P14 (Texte) – Status-Vokabular des Zielbilds
+
+### Was ist anders
+
+- **Auftrag:** „Läuft“ statt „In Arbeit“, „Abgenommen“ statt „Abgeschlossen“.
+- **Rechnung:** „Offen“ statt „Gesendet“, „Rechnung fehlt“ statt des doppelten „Offen“ für Aufträge ohne Rechnung.
+- In Liste, Detail und Portal, weil der Text zentral steht.
+
+### Bewusst noch nicht
+
+- **Die gespeicherten Status (35 → 17) umschlüsseln:** Das ändert echte Daten und braucht Probelauf und Backup. Eigene Sitzung.
+- **Ein gemeinsames Ereignis-Protokoll und ein Mail-Weg für CRM und Portal:** eigene Sitzung.
+
+# Block C – Entfernen (Einstiege)
+
+## P16/P17 (Einstiege)
+
+### Was ist anders
+
+- **Navigation im CRM:** nur noch Dashboard, Vorgänge, Kunden, Partner und Einstellungen. Kalender und KI Analytics sind raus, auch unter „Mehr“ auf dem Handy.
+- **Kopfzeile:** kein Knopf „KI-Hilfe“ mehr.
+- **Dashboard:** Die Karte „Marketing & Sichtbarkeit“ mit den „Fehler“-Kacheln ist raus.
+
+### Bewusst noch nicht
+
+- **Den Code und die Tabellen dieser Bereiche löschen:** Copilot, KI-Hub, Kalender, To-dos, Bewertungen, SLA, Anlagen, Prüfpflichten, Einbehalt, Bürgschaft, Kostenträger. Das kommt in einer eigenen Sitzung, mit Backup und nachdem Block A–C abgenommen sind.
+- **Die alte Partner-Ansicht mit Positionen (P18):** bleibt, bis du die Einsätze abgenommen hast.

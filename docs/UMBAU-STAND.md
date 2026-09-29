@@ -35,7 +35,24 @@ Branches bauen aufeinander auf: `umbau/p05-liste-auftrag` enthält P01–P05. Lo
 | P09 Abschlag/Schluss | fertig | `umbau/p09-abschlag-schluss` (CRM) | `AbschlagStellenSheet`, `planMitNeuemAbschlag` |
 | P10 Angebots-Versionen | fertig | `umbau/p10-angebot-versionen` (CRM) | `angebotWarBeimKunden` in wizard-actions |
 
-## Nächstes Paket: P11 Einsatz im CRM (Block B2)
+| P11 Einsatz CRM | fertig | `umbau/p11-einsatz-crm` | Migration `20261214120000_…`; `AuftragEinsaetzeCard` |
+| P12 Einsatz Portal | fertig | `umbau/p13-regie-mitteilung` (Portal) | `PartnerEinsaetzeSection`, `write-einsatz-status` |
+| P13 Regie/Behinderung | fertig | `umbau/p13-regie-mitteilung` | Migration `20261214130000_…`; Aufschlag 20 % vorbelegt (Rückfrage) |
+| P15 (Teil) Glocke Einsätze | fertig | `umbau/p13-regie-mitteilung` (CRM) | `collectEinsatzItems` |
+| P14 (Texte) | fertig | `umbau/p14-status-texte` | nur Labels; Daten-Umschlüsselung offen |
+| P16/P17 (Einstiege) | fertig | `umbau/p16-einstiege-raus` (CRM) | Code/Tabellen noch da |
+
+Staging: CRM und Portal = `umbau/staging-b2` bzw. neuer (per „ours“-Merge, kein Force).
+
+## Nächste Sitzungen
+
+1. Abnahme Block A–C durch Belal auf Staging.
+2. P14 Daten (35 → 17 Status) mit Probelauf auf Kopie, dann Prod mit Backup.
+3. P15 Ereignis-Protokoll + ein Mail-Weg.
+4. Löschen (Code + Tabellen) nach Backup, P18 alte Partner-Positionsansicht.
+5. Block D Oberfläche (P19–P25).
+
+## (alt) Nächstes Paket: P11 Einsatz im CRM (Block B2)
 
 Entschieden: Einsatz = Anweisung (Titel, Text, wann, wo) + EK je Partner (netto/brutto wegen §13b); Partner nimmt an/lehnt ab,
 meldet in einem Schritt fertig (Fotos, Dokumente, Text), dann Rechnung mit Freitext-Positionen. Auftrag „läuft“ wird aus Einsätzen abgeleitet.
