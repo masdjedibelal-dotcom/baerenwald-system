@@ -60,14 +60,7 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
       nav('/handwerker', 'tool', COPY_ROLE.partner),
     ],
   },
-  {
-    id: 'organisation',
-    label: 'Organisation',
-    items: [
-      nav('/kalender', 'calendar', 'Kalender'),
-      nav('/ki-analytics', 'sparkles', 'KI Analytics'),
-    ],
-  },
+  // P16/P17: Kalender und KI Analytics entfallen (Streichliste)
 ]
 
 /** @deprecated Legacy-Flat-Listen — aus SIDEBAR_NAV_GROUPS abgeleitet */
@@ -98,8 +91,6 @@ export const MEHR_TILE_NAV: Array<{
   desc: string
 }> = [
   { href: '/handwerker', iconName: 'tool', label: COPY_ROLE.partner, desc: 'Ausführungspartner' },
-  { href: '/kalender', iconName: 'calendar', label: 'Kalender', desc: 'Termine & Planung' },
-  { href: '/ki-analytics', iconName: 'sparkles', label: 'KI Analytics', desc: 'Empfehlungen & Funnel' },
   { href: '/einstellungen', iconName: 'settings', label: 'Einstellungen', desc: 'Firma & Team' },
 ]
 

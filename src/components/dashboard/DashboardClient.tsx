@@ -550,7 +550,7 @@ rankingHandwerker: RankingZeile[]
       </section>
 
       <section className="dash-sec" aria-label="Marketing">
-        <DashboardMarketingCard data={marketing} />
+        {/* P16: Marketing-Kacheln entfernt (Anbindung defekt, KI-Analytics auf Streichliste) */}
       </section>
 
       <section className="dash-sec dash-sec--zahlen" aria-label="Auswertung">
