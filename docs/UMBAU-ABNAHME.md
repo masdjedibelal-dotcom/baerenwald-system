@@ -352,3 +352,45 @@ Stand: CRM `umbau/p10-angebot-versionen`, Portal `umbau/p07-rechenkern` (enthalt
 
 - **Den Code und die Tabellen dieser Bereiche löschen:** Copilot, KI-Hub, Kalender, To-dos, Bewertungen, SLA, Anlagen, Prüfpflichten, Einbehalt, Bürgschaft, Kostenträger. Das kommt in einer eigenen Sitzung, mit Backup und nachdem Block A–C abgenommen sind.
 - **Die alte Partner-Ansicht mit Positionen (P18):** bleibt, bis du die Einsätze abgenommen hast.
+
+# Block D – Details (Teil)
+
+## P19/P25 (Sheets und Handy)
+
+### Was ist anders
+
+- **Sheets:** Jedes Sheet mit einer Hauptaktion hat unten links „Abbrechen“. Der Fuß sieht damit überall gleich aus.
+- **Position bearbeiten:** Das Preisfeld mit „€“ davor und die USt-Auswahl stehen sauber nebeneinander.
+- **Angebot öffnen:** Die Frage „Änderungen speichern?“ kommt nicht mehr, wenn man ein Angebot nur öffnet und gleich wieder schließt.
+- **Handy, Auftrag und Angebot:** Hinter dem Titel ist kein Foto mehr. Lange Titel brechen um. Die Tabs blenden rechts aus, damit man sieht, dass weitere folgen.
+- **Zurück-Link:** heißt nur noch „Zurück“.
+
+### So testest du
+
+1. Auf dem Handy einen Auftrag öffnen. Der Kopf ist ruhig und zeigt kein Foto, und die Tabs laufen rechts weich aus.
+2. Ein Angebot öffnen und sofort schließen. Es kommt keine Speichern-Frage.
+3. In einem Angebot eine Position bearbeiten. Das Preisfeld steht mit „€“ neben der USt.
+4. Irgendein Bearbeiten-Sheet öffnen. Unten stehen „Abbrechen“ und die Hauptaktion.
+
+### Bleibt
+
+- Aufbau, Farben und Arbeitsflächen. Es wurden nur Details geändert.
+
+### Geprüft
+
+- Typprüfung und alle Build-Prüfungen sind grün.
+- Auftrag lokal in Handygröße gegen die staging-Daten angesehen.
+
+### Weg zurück
+
+- Commit `f34ea3c97` zurücknehmen.
+
+### Bewusst noch nicht
+
+Das kommt jeweils in einer eigenen Sitzung:
+
+- **P21 Aufgaben-Karte und Hauptaktion je Stand**
+- **P22 Vorgang als eine Arbeitsfläche**
+- **P23 Assistenten in drei Schritten**
+- **P24 Texte**
+- **P25 Rest:** Plus-Knopf und die gekürzte Aktion unten

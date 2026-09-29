@@ -41,16 +41,17 @@ Branches bauen aufeinander auf: `umbau/p05-liste-auftrag` enthält P01–P05. Lo
 | P15 (Teil) Glocke Einsätze | fertig | `umbau/p13-regie-mitteilung` (CRM) | `collectEinsatzItems` |
 | P14 (Texte) | fertig | `umbau/p14-status-texte` | nur Labels; Daten-Umschlüsselung offen |
 | P16/P17 (Einstiege) | fertig | `umbau/p16-einstiege-raus` (CRM) | Code/Tabellen noch da |
+| P19/P25 (Teil) Details | fertig | `umbau/p19-sheets` (CRM) | Sheet-Fuß, Preisfeld, Speichern-Frage, Handy-Kopf, Tab-Hinweis |
 
-Staging: CRM und Portal = `umbau/staging-b2` bzw. neuer (per „ours“-Merge, kein Force).
+Staging: CRM = `umbau/staging-d` (enthält alles bis P19/P25), Portal = `umbau/staging-c` (per „ours“-Merge, kein Force).
 
 ## Nächste Sitzungen
 
-1. Abnahme Block A–C durch Belal auf Staging.
+1. Abnahme Block A–C und Block D (Teil) durch Belal auf Staging.
 2. P14 Daten (35 → 17 Status) mit Probelauf auf Kopie, dann Prod mit Backup.
 3. P15 Ereignis-Protokoll + ein Mail-Weg.
 4. Löschen (Code + Tabellen) nach Backup, P18 alte Partner-Positionsansicht.
-5. Block D Oberfläche (P19–P25).
+5. Block D Rest: P21 Aufgaben-Karte, P22 Vorgang-Arbeitsfläche, P23 Assistenten in 3 Schritten, P24 Texte, P25 Plus-Knopf und gekürzte Aktion.
 
 ## (alt) Nächstes Paket: P11 Einsatz im CRM (Block B2)
 
