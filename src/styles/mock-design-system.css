@@ -9055,6 +9055,16 @@ border: none; background: none; cursor: pointer; color: var(--text-4); padding: 
 max-height: 260px; overflow-y: auto; padding: 4px;
 }
 
+.cbx-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; border: none; background: transparent; border-radius: 7px;
+  font-size: var(--fs-text, 13.5px); font-family: inherit; color: var(--text); text-align: left; cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .cbx-item { min-height: 44px; }
+}
+
 .cbx-item.hi {
 background: var(--bg-soft);
 }
@@ -21617,4 +21627,57 @@ display: flex;
 .wizard-pruefen {
   display: grid;
   gap: 16px;
+}
+
+/* ─── Wiederhergestellt (30.09.2026): Regeln, die im Sammel-Commit b3ef4c563 verloren gingen,
+   deren Klassen aber noch benutzt werden. Ohne sie fingen Sheet-Ebenen Klicks ab. ─── */
+.cbx-item:hover { background: var(--bg-soft); }
+.editor-sheet-overlay--stack {
+  z-index: 360;
+  background: var(--overlay-scrim-strong, rgba(20, 24, 31, 0.32));
+  -webkit-backdrop-filter: blur(var(--overlay-blur, 18px));
+  backdrop-filter: blur(var(--overlay-blur, 18px));
+}
+.editor-sheet-overlay--behind-confirm {
+  pointer-events: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.detail-mobile-action-bar__more {
+  width: 52px;
+  height: 52px;
+  min-height: 52px;
+  border-radius: 999px;
+  border: 0.5px solid var(--border-strong, var(--border));
+  background: var(--card, #fff);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(22, 32, 27, 0.06);
+}
+.timeline { position: relative; padding-left: 18px; }
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--border);
+}
+.freigabe-settings-card__body.is-muted { opacity: 0.55; pointer-events: none; }
+.kw-flip { transform: scaleY(-1); }
+.doc-icon-offer { @apply bg-orange-50; }
+.doc-icon-invoice { @apply bg-green-50; }
+.doc-icon-protocol { @apply bg-blue-50; }
+.doc-icon-other { @apply bg-gray-50; }
+.pos-v2-advanced { @apply mt-4 border-t border-bw-border/60 pt-3; }
+.zahlung-row { cursor: pointer; }
+.zahlung-row:hover { background: var(--bg-soft, #f4f5f4); }
+.zahlung-row--next {
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  box-shadow: inset 3px 0 0 var(--green);
+}
+.zahlung-row--next:hover { background: color-mix(in srgb, var(--green) 14%, transparent); }
+@media (max-width: 767px) {
+  .pb-mobile-fab-extra { padding-bottom: 4rem; }
+  .zahlung-row--next { box-shadow: inset 3px 0 0 var(--green), var(--shadow-mobile); }
 }

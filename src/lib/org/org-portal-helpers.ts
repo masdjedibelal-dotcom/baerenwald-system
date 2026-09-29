@@ -90,11 +90,11 @@ export const KOSTENTRAEGER_LABELS: Record<string, string> = {
 }
 
 export const ORG_FREIGABE_LABELS: Record<OrgFreigabeStatus, string> = {
-  nicht_noetig: 'nicht erforderlich',
-  ausstehend: 'ausstehend',
+  nicht_noetig: 'Nicht erforderlich',
+  ausstehend: 'Ausstehend',
   beschluss_ausstehend: 'Wartet auf Beschluss',
-  freigegeben: 'erteilt',
-  abgelehnt: 'abgelehnt',
+  freigegeben: 'Erteilt',
+  abgelehnt: 'Abgelehnt',
 }
 
 export const EINLADUNG_STATUS_LABELS: Record<string, string> = {

@@ -449,10 +449,11 @@ export function AngebotDetailPageClient({
         setAblehnenGrund('')
         setAblehnenNotiz('')
         setAblehnenKonkurrenz('')
+        clearFieldErrors()
         setAblehnenOpen(true)
       },
     }
-  }, [statusEinfach, auftragId])
+  }, [statusEinfach, auftragId, clearFieldErrors])
 
   const kundeEmail =
     lead?.auftraggeber?.email?.trim() ||
@@ -1039,15 +1040,17 @@ export function AngebotDetailPageClient({
       >
         <div className="space-y-4">
           <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-            Markiert das Angebot als abgelehnt und kann den zugehörigen Lead schließen.
+            Markiert das Angebot als abgelehnt und schließt die Anfrage.
           </p>
+          {/* Fehler hier im Sheet zeigen — sonst steht er unsichtbar hinter dem Sheet */}
+          {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
           <Combobox label="Grund" id="ablehnung_grund" name="ablehnung_grund" required options={[
               { value: '', label: 'Grund wählen' },
               ...KUNDE_ABLEHNUNG_GRUND_OPTIONS.map((v) => ({
                 value: v,
                 label: KUNDE_ABLEHNUNG_GRUND_LABELS[v],
               })),
-            ]} value={ablehnenGrund == null ? '' : String(ablehnenGrund)} placeholder="Auswählen…" onChange={(next) => { setAblehnenGrund(next as KundeAblehnungGrund | ''); }} />
+            ]} value={ablehnenGrund == null ? '' : String(ablehnenGrund)} placeholder="Auswählen…" onChange={(next) => { setAblehnenGrund(next as KundeAblehnungGrund | ''); clearFieldErrors() }} />
           {(ablehnenGrund === 'konkurrenz' || ablehnenGrund === 'zu_teuer') && (
             <MockField label="Konkurrenzpreis (€, optional)"><MockInput type="number" min={0} step="0.01" value={ablehnenKonkurrenz} onChange={(e) => setAblehnenKonkurrenz(e.target.value)} /></MockField>
           )}
