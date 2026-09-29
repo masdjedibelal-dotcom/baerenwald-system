@@ -128,8 +128,8 @@ export function rechnungKorrekturModus(status: RechnungStatus | string | null | 
  *
  * Korrektur MIT Storno (gesendet/bezahlt + Diff): Positionen, Steuer, Daten,
  * PDF-Texte, Ansprechpartner (Empfängerblock), Objekt/Leistungsort.
- * Nur Korrektur OHNE Storno: Mail-Betreff/-Einleitung, Fälligkeit, Zahlungsbedingungen
- * (nicht in diesem Fingerprint → Update am Original).
+ * Nur Korrektur OHNE Storno: Mail-Betreff/-Text (nicht auf dem PDF → Update am Original).
+ * Fälligkeit und Zahlungsbedingungen stehen auf dem PDF und gehören seit P08 zum Fingerprint.
  */
 export type RechnungMaterialSnapshot = {
   positionen: AngebotPosition[] | unknown
@@ -177,6 +177,9 @@ export function rechnungMaterialFingerprint(s: RechnungMaterialSnapshot): string
     leistungszeitraum_bis: normText(s.leistungszeitraum_bis).slice(0, 10),
     einleitung: normText(s.einleitung),
     hinweise: normText(s.hinweise),
+    // Stehen auf dem versendeten PDF → Änderung nur über Storno + neue Rechnung (P08).
+    faellig_am: normText(s.faellig_am).slice(0, 10),
+    zahlungsbedingungen: normText(s.zahlungsbedingungen),
     ansprechpartner_id: normText(s.ansprechpartner_id),
     kunde_objekt_id: normText(s.kunde_objekt_id),
   })
@@ -324,13 +327,13 @@ export function resolveRechnungKorrekturKette(input: {
 /**
  * Soft-Storno darf zurückgenommen werden, wenn storniert und keine Gutschrift mit Bezug existiert.
  */
+/** Ein Storno ist endgültig (Entscheidung 29.09.2026) — nie zurücknehmen. */
 export function rechnungDarfStornoZurueckgenommenWerden(
-  status: RechnungStatus | string | null | undefined,
-  rechnungId: string,
-  siblings: RechnungKorrekturSibling[]
+  _status: RechnungStatus | string | null | undefined,
+  _rechnungId: string,
+  _siblings: RechnungKorrekturSibling[]
 ): boolean {
-  if ((status ?? '').toLowerCase() !== 'storniert') return false
-  return !hatStornoGutschriftZuRechnung(rechnungId, siblings)
+  return false
 }
 
 /** Nachfolger-RE nach Korrektur (Storno + neue Nr.). */

@@ -727,7 +727,9 @@ export async function abbrecheRechnungKorrekturSession(input: {
  */
 export async function storniereRechnungOhneErsatz(
   rechnungId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; gutschriftId?: string } | { ok: false; message: string }> {
+  // P08 (Entscheidung 29.09.2026): Storno immer mit Beleg. Entwurf = verwerfen,
+  // versendet/bezahlt/überfällig = Storno-Gutschrift an den Kunden, Original storniert.
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
   const { data: orig, error } = await gate.db
@@ -739,63 +741,26 @@ export async function storniereRechnungOhneErsatz(
 
   if (error || !orig) return { ok: false, message: 'Rechnung nicht gefunden.' }
   const status = String(orig.status)
-  if (status === 'bezahlt') {
-    return {
-      ok: false,
-      message:
-        'Bezahlte Rechnung: bitte „Rechnung korrigieren“ (Storno-Gutschrift) auf der Rechnungsseite nutzen.',
-    }
+  if (status === 'entwurf') return updateRechnungStatus(rechnungId, 'storniert')
+  if (status === 'gesendet' || status === 'bezahlt' || status === 'ueberfaellig') {
+    const g = await createGutschriftFromRechnung(rechnungId)
+    if (!g.ok) return g
+    return { ok: true, gutschriftId: g.id }
   }
-  if (status !== 'gesendet' && status !== 'entwurf') {
-    return {
-      ok: false,
-      message: 'Ohne Ersatz nur bei Entwurf oder gesendeten, noch nicht bezahlten Rechnungen.',
-    }
-  }
-  return updateRechnungStatus(rechnungId, 'storniert')
+  return { ok: false, message: 'Diese Rechnung kann nicht storniert werden.' }
 }
 
 /**
  * Soft-Storno zurücknehmen (nur wenn keine Storno-Gutschrift mit Bezug existiert).
  */
 export async function nehmeRechnungStornoZurueck(
-  rechnungId: string
+  _rechnungId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return { ok: false, message: gate.message }
-  const supabase = gate.db
-  const { data: orig, error } = await supabase
-    .from('rechnungen')
-    .select('id, status, beleg_typ')
-    .eq('id', rechnungId)
-    .maybeSingle()
-  if (error) logDbError('app/rechnungen/actions:rechnungen', error)
-
-  if (error || !orig) return { ok: false, message: 'Rechnung nicht gefunden.' }
-  if (String(orig.status) !== 'storniert') {
-    return { ok: false, message: 'Nur stornierte Rechnungen können zurückgenommen werden.' }
+  // Ein Storno ist endgültig (P08). Fehler? Neue Rechnung erstellen.
+  return {
+    ok: false,
+    message: 'Ein Storno ist endgültig. Bitte bei Bedarf eine neue Rechnung erstellen.',
   }
-  if (String(orig.beleg_typ ?? 'rechnung') === 'gutschrift') {
-    return { ok: false, message: 'Gutschriften werden so nicht zurückgenommen.' }
-  }
-
-  const { data: gutschriften, error: error2 } = await supabase
-    .from('rechnungen')
-    .select('id')
-    .eq('bezug_rechnung_id', rechnungId)
-    .eq('beleg_typ', 'gutschrift')
-    .limit(1)
-  if (error2) logDbError('app/rechnungen/actions:rechnungen', error2)
-
-  if ((gutschriften ?? []).length > 0) {
-    return {
-      ok: false,
-      message:
-        'Es existiert bereits eine Storno-Gutschrift. Bitte die Nachfolger-Rechnung nutzen — Soft-Storno ist nicht rückgängig.',
-    }
-  }
-
-  return updateRechnungStatus(rechnungId, 'gesendet')
 }
 
 export type UpdateRechnungStatusResult =
