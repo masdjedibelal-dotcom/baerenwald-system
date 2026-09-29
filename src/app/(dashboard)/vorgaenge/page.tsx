@@ -18,11 +18,12 @@ type PageProps = {
 
 export default async function VorgaengePage({ searchParams }: PageProps) {
   try {
-    const sp = (await searchParams) ?? {}
-    const page = Math.max(1, Number.parseInt(String(sp.seite ?? '1'), 10) || 1)
+    // Alle Vorgänge laden: Filter, Zähler, Summe und Sortierung gelten dann für die ganze Liste,
+    // nicht nur für eine 50er-Seite (Umbau P05). Bei heute < 100 Vorgängen unkritisch.
+    await searchParams
     const supabase = createClient()
-    const [{ rows, error, pagination }, hw] = await Promise.all([
-      loadVorgaengeListe({ page, pageSize: 50, fetchAllPages: false }),
+    const [{ rows, error }, hw] = await Promise.all([
+      loadVorgaengeListe({ pageSize: 100, fetchAllPages: true }),
       loadHwEingangsrechnungen(supabase),
     ])
 
@@ -47,7 +48,7 @@ export default async function VorgaengePage({ searchParams }: PageProps) {
         <VorgaengeListeClient
           rows={rows}
           hwEingangsrechnungen={hw.rows}
-          serverPagination={pagination ?? null}
+          serverPagination={null}
         />
       </Suspense>
     )

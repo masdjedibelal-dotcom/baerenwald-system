@@ -183,6 +183,15 @@ function statusFilterKey(row: VorgangListeRow): string {
 }
 
 function statusLabel(row: VorgangListeRow): string {
+  // Rechnung: Text aus derselben Quelle wie Farbe und Detail (z. B. „Überfällig“ statt „Gesendet“).
+  if (row.phase === 'rechnung' && row.belegTyp !== 'gutschrift' && String(row.unterstatus).toLowerCase() !== 'ausstehend') {
+    return rechnungStatusDisplay(row.unterstatus, {
+      ueberfaellig: row.ueberfaellig,
+      eingehend: row.rechnungRichtung === 'eingehend',
+      korrektur_von: row.korrektur_von,
+      korrektur_art: row.korrektur_art,
+    }).label
+  }
   const ui = resolveRechnungKorrekturUi({
     status: row.unterstatus,
     korrektur_von: row.korrektur_von,
@@ -515,7 +524,7 @@ export function VorgaengeListeClient({
         wertLabel:
           hw.betragBrutto == null
             ? null
-            : `${formatEuro(hw.betragBrutto, { rounded: true, decimals: 0 })}`,
+            : `${formatEuro(hw.betragBrutto)}`,
         listenSummeEuro:
           hw.betragBrutto == null ? null : Math.round(hw.betragBrutto),
         listeSummeZaehlen: true,
@@ -1459,6 +1468,7 @@ export function VorgaengeListeClient({
                       fontWeight: 500,
                       fontVariantNumeric: 'tabular-nums',
                       fontSize: 'var(--fs-text)',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {v.wertLabel ?? '—'}
@@ -1541,7 +1551,7 @@ export function VorgaengeListeClient({
             <div className="vg-aggregate__sum">
               <span>Summe</span>
               <b>
-                {formatNumber(berechneVorgaengeListenSumme(filtered), { decimals: 0 })}
+                {formatEuro(berechneVorgaengeListenSumme(filtered))}
               </b>
             </div>
             {selectedCount > 0 ? (

@@ -63,7 +63,7 @@ export async function loadAuftragKorrekturKontext(
 
   const { data: rechnungen, error: rErr } = await client
     .from('rechnungen')
-    .select('status, richtung, beleg_typ')
+    .select('status, richtung, beleg_typ, rechnung_art')
     .eq('auftrag_id', auftragId)
   if (rErr) logDbError('lib/angebote/auftrag-korrektur:rechnungen', rErr)
 

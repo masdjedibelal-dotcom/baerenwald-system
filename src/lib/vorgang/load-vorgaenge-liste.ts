@@ -711,7 +711,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       if (!rechnungId) return null
       const rechnung = leadRechnungen.find((r) => r.id === rechnungId)
       if (rechnung?.brutto == null) return null
-      return `${formatEuro(Number(rechnung.brutto), { rounded: true, decimals: 0 })}`
+      return `${formatEuro(Number(rechnung.brutto))}`
     }
 
     const leadListenSummeEuro = computeLeadListenSummeEuro({
@@ -941,7 +941,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     const wertLabel =
       r.brutto == null
         ? null
-        : `${formatEuro(Number(r.brutto), { rounded: true, decimals: 0 })}`
+        : `${formatEuro(Number(r.brutto))}`
     const listenSummeEuro =
       r.brutto == null ? null : Math.round(Number(r.brutto))
     rows.push({
@@ -988,7 +988,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     const wertLabel =
       r.brutto == null
         ? null
-        : `${formatEuro(Number(r.brutto), { rounded: true, decimals: 0 })}`
+        : `${formatEuro(Number(r.brutto))}`
     const listenSummeEuro =
       r.brutto == null ? null : Math.round(Number(r.brutto))
     rows.push({
