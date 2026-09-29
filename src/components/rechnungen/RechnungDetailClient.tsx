@@ -319,14 +319,23 @@ export function RechnungDetailClient({
       if (isEingehend) {
         toast.success(
           r.partnerUeberwiesenNotified
-            ? 'Als überwiesen markiert — Partner benachrichtigt'
+            ? 'Als überwiesen markiert, Partner benachrichtigt'
             : 'Als überwiesen markiert'
         )
       } else {
+        // Aktionsmodell: Rückgängig statt eigenem Menüpunkt „Als unbezahlt markieren“
         toast.success(
           r.zahlungsbestaetigungGesendet
-            ? 'Bezahlt — Zahlungsbestätigung per E-Mail gesendet'
-            : 'Als bezahlt markiert (ohne Kunden-Mail)'
+            ? 'Bezahlt. Die Zahlungsbestätigung ging per E-Mail raus.'
+            : 'Als bezahlt markiert',
+          {
+            action: {
+              label: 'Rückgängig',
+              onClick: () => {
+                setStatus('gesendet')
+              },
+            },
+          }
         )
       }
     }

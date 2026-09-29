@@ -329,6 +329,46 @@ export function buildUmsatzverlauf(
   return months
 }
 
+/**
+ * Eine Wahrheit für Umsatz (30.09.2026): Netto gestellter Rechnungen (offen oder bezahlt),
+ * nach Rechnungsdatum. Stornierte Rechnungen und Storno-Gutschriften heben sich auf und
+ * fallen beide heraus; Entwürfe zählen nicht.
+ */
+export function istUmsatzRechnung(r: {
+  status?: string | null
+  beleg_typ?: string | null
+}): boolean {
+  const st = String(r.status ?? '').toLowerCase()
+  const typ = String(r.beleg_typ ?? 'rechnung').toLowerCase()
+  return typ === 'rechnung' && (st === 'gesendet' || st === 'bezahlt')
+}
+
+export function buildUmsatzAusRechnungen(
+  rechnungen: Array<{
+    status?: string | null
+    beleg_typ?: string | null
+    rechnungsdatum?: string | null
+    created_at: string
+    netto?: number | null
+  }>,
+  opts: BuildUmsatzverlaufOpts = {}
+): UmsatzMonat[] {
+  const now = opts.now ?? new Date()
+  const months = buildMonthBuckets(opts.range, opts.monateCount ?? 6, now)
+  const byKey = new Map(months.map((m) => [m.key, m]))
+  for (const r of rechnungen) {
+    if (!istUmsatzRechnung(r)) continue
+    const d = new Date(String(r.rechnungsdatum || r.created_at))
+    if (Number.isNaN(d.getTime())) continue
+    const bucket = byKey.get(monthKey(d))
+    if (!bucket) continue
+    const netto = Number(r.netto) || 0
+    if (String(r.status).toLowerCase() === 'bezahlt') bucket.abgeschlossen += netto
+    else bucket.offen += netto
+  }
+  return months
+}
+
 /** @deprecated Nutze buildUmsatzverlauf(..., { monateCount: 12 }) */
 export function buildUmsatzverlauf12m(
   auftraege: Parameters<typeof buildUmsatzverlauf>[0],
@@ -566,6 +606,35 @@ export function buildGewerkUmsatz(
 
   const gesamtRounded = Math.round(gesamt * 100) / 100
   return { zeilen, gesamt: gesamtRounded }
+}
+
+/** Umsatz nach Gewerk aus derselben Quelle wie der Umsatzverlauf (istUmsatzRechnung). */
+export function buildGewerkUmsatzAusRechnungen(
+  rechnungen: Array<{
+    positionen?: unknown
+    status?: string | null
+    beleg_typ?: string | null
+    netto?: number | null
+  }>,
+  gewerkeKatalog: DashboardGewerkKatalog[] = []
+): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
+  const lookup = buildGewerkLookup(gewerkeKatalog)
+  const map = new Map<string, number>()
+  for (const r of rechnungen) {
+    if (!istUmsatzRechnung(r)) continue
+    const netto = Number(r.netto) || 0
+    if (!(netto > 0)) continue
+    addScaledToGewerkMap(map, gewerkAnteileFromPositionen(r.positionen, lookup), netto)
+  }
+  const gesamt = Array.from(map.values()).reduce((x, y) => x + y, 0)
+  const zeilen = Array.from(map.entries())
+    .map(([name, netto]) => ({
+      name,
+      netto: Math.round(netto * 100) / 100,
+      anteil: gesamt > 0 ? Math.round((netto / gesamt) * 100) : 0,
+    }))
+    .sort((x, y) => y.netto - x.netto)
+  return { zeilen, gesamt: Math.round(gesamt * 100) / 100 }
 }
 
 export type RankingZeile = {

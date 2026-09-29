@@ -25,9 +25,24 @@ export default async function DashboardLayout({
 }) {
   try {
     const supabase = createClient()
-    const {
+    let {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser()
+    // Kurzes Anmelde-Limit (429) ist keine abgelaufene Sitzung — einmal nachfassen statt ausloggen.
+    if (!user && authError?.status === 429) {
+      await new Promise((r) => setTimeout(r, 900))
+      const retry = await supabase.auth.getUser()
+      user = retry.data.user
+      authError = retry.error
+      if (!user && authError?.status === 429) {
+        return (
+          <div className="p-6 text-[length:var(--fs-text)]">
+            Gerade sehr viele Anfragen. Bitte laden Sie die Seite in ein paar Sekunden neu.
+          </div>
+        )
+      }
+    }
 
     if (!user) {
       if (isDevAuthSkipEnabled()) {

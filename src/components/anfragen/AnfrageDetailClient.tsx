@@ -651,7 +651,7 @@ export function AnfrageDetailClient({
     if (wartetAufHvFreigabe) return null
     if (!matrixCta) return null
     return {
-      label: matrixCta.label,
+      label: angeboteListe.length > 0 ? 'Angebot öffnen' : matrixCta.label,
       icon: matrixCta.icon,
       onClick: primaryCtaAction,
       disabled: pending,
@@ -665,6 +665,7 @@ export function AnfrageDetailClient({
     openDirektBeauftragen,
     pending,
     primaryCtaAction,
+    angeboteListe.length,
   ])
 
   const hvWarteStatusPill = wartetAufHvFreigabe ? (
@@ -1039,7 +1040,9 @@ export function AnfrageDetailClient({
             ? null
             : istAkut
               ? 'Notfall: Beauftragen Sie direkt einen Partner.'
-              : naechsterSchrittText('anfrage', lead.status, matrixCta),
+              : angeboteListe.length > 0
+                ? 'Ein Angebot ist angelegt. Öffnen Sie es und senden Sie es an den Kunden.'
+                : naechsterSchrittText('anfrage', lead.status, matrixCta),
         actions: wartetAufHvFreigabe ? (
           hvWarteStatusPill
         ) : (
