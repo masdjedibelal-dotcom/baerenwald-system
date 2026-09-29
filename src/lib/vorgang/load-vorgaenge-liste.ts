@@ -5,7 +5,7 @@ import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadPreisAnzeige } 
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { createClient } from '@/lib/supabase-server'
 import { leadAuftraggeberEmbed, leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
-import type { LeadKanal } from '@/lib/types'
+import type { AngebotPosition, LeadKanal } from '@/lib/types'
 import { betragAnzeigeBrutto, nettoZuBrutto } from '@/lib/angebot-einfach'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import {
@@ -26,6 +26,11 @@ import {
   parseZahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
 import { formatEuro } from '@/lib/format/geld-datum'
+import {
+  gesamtrabattAbzugFromModus,
+  parseGesamtrabattMetaFromPosition,
+  ZEILE_SLUG_GESAMTRABATT,
+} from '@/lib/dokument-zeilen'
 
 export type { VorgangListeRow } from '@/lib/vorgang/types'
 
@@ -353,7 +358,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     auftragIds.length
       ? await (() => { const db = createClient(); return db
             .from('auftrag_positionen')
-            .select('auftrag_id, handwerker_id, handwerker_status, preis_fix, menge, aenderung_typ, gewerk_slug')
+            .select('auftrag_id, handwerker_id, handwerker_status, preis_fix, menge, aenderung_typ, gewerk_slug, beschreibung')
             .in('auftrag_id', auftragIds)
             .order('created_at', { ascending: false })
             .limit(scoped ? 800 : 2000) })()
@@ -594,6 +599,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       menge?: number | null
       aenderung_typ?: string | null
       gewerk_slug?: string | null
+      beschreibung?: string | null
     }>,
     (p) => p.auftrag_id
   )
@@ -743,7 +749,22 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
           return s + unit * menge
         }, 0)
         if (posNetto > 0) {
-          const brutto = nettoZuBrutto(posNetto, 19)
+          // Nachlass-Zeile (`__gesamtrabatt__`, Regel in `beschreibung`) wie im Auftragsdetail abziehen.
+          const rabatt = pos.find(
+            (p) =>
+              p.gewerk_slug === ZEILE_SLUG_GESAMTRABATT &&
+              String(p.aenderung_typ ?? '').toLowerCase() !== 'entfernt'
+          )
+          let nachlass = 0
+          if (rabatt) {
+            const { modus, wert } = parseGesamtrabattMetaFromPosition({
+              gewerk_slug: rabatt.gewerk_slug,
+              beschreibung: rabatt.beschreibung ?? '',
+              gesamt_min: Number(rabatt.preis_fix) || 0,
+            } as AngebotPosition)
+            nachlass = gesamtrabattAbzugFromModus(modus, wert, posNetto, nettoZuBrutto(posNetto, 19))
+          }
+          const brutto = nettoZuBrutto(Math.max(0, posNetto - nachlass), 19)
           return `${formatEuro(brutto)}`
         }
         const leadAngs = angeboteByLead.get(lead.id) ?? []
