@@ -21824,3 +21824,13 @@ display: flex;
 @media (max-width: 767px) {
   .dash-funnel-row { grid-template-columns: 100px minmax(0, 1fr) 80px; }
 }
+
+/* Design 01.10.2026: Etiketten in Listen-Zellen nie über die Spalte hinaus — kürzen mit … */
+.lc-pills { min-width: 0; overflow: hidden; }
+.lc-pills > .meta-tag {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+}

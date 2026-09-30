@@ -72,7 +72,6 @@ const HW_COLS: ResizableColDef[] = [
   { id: 'gewerk', defaultWidth: 140, minWidth: 100, maxWidth: 260 },
   { id: 'telefon', defaultWidth: 130, minWidth: 100, maxWidth: 200 },
   { id: 'email', defaultWidth: 200, minWidth: 130, maxWidth: 340 },
-  { id: 'bewertung', defaultWidth: 88, minWidth: 72, maxWidth: 140 },
   { id: 'portal', defaultWidth: 72, minWidth: 56, maxWidth: 100 },
   { id: 'menu', defaultWidth: 40, minWidth: 40, maxWidth: 40, fixed: true },
 ]
@@ -541,17 +540,6 @@ export function HandwerkerListeClient({
           >
             Email
           </MockSortHead>
-          <MockSortHead
-            col="bewertung"
-            sortCol={sortCol}
-            sortDir={sortDirNum}
-            onSort={(c) => toggleSort(c as SortCol)}
-            right
-            resizable
-            onResizePointerDown={(e) => startResize(resizeOffset + 4, e)}
-          >
-            Bewertung
-          </MockSortHead>
           <div
             className="lc-desk"
             style={{ textAlign: 'center', fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}
@@ -695,12 +683,6 @@ export function HandwerkerListeClient({
                   }}
                 >
                   {mail || '—'}
-                </div>
-                <div className="lc-desk" style={{ textAlign: 'center' }}>
-                  <span className="rating" style={{ color: 'var(--text-4)' }}>
-                    <MockIcon ctx="default" n="star-filled" size={12} />
-                    —
-                  </span>
                 </div>
                 <div
                   className="lc-desk"
