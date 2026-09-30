@@ -376,7 +376,7 @@ export function AuftragLeistungenTab({
               }).length
               return (
                 <>
-                  Bautagebuch
+                  Tagebuch
                   {n > 0 ? <span className="lt-view-seg__count">{n}</span> : null}
                 </>
               )

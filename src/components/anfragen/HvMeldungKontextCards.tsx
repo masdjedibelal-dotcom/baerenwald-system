@@ -1,5 +1,6 @@
 'use client'
 
+import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -48,11 +49,11 @@ const FREIGABE_BADGE: Record<
   OrgFreigabeStatus,
   { label: string; tone: 'yel' | 'grn' | 'muted' | 'red' }
 > = {
-  ausstehend: { label: 'Ausstehend', tone: 'yel' },
-  beschluss_ausstehend: { label: 'Wartet auf Beschluss', tone: 'yel' },
-  freigegeben: { label: 'Freigegeben', tone: 'grn' },
-  nicht_noetig: { label: 'Nicht nötig', tone: 'muted' },
-  abgelehnt: { label: 'Abgelehnt', tone: 'red' },
+  ausstehend: { label: ORG_FREIGABE_LABELS.ausstehend, tone: 'yel' },
+  beschluss_ausstehend: { label: ORG_FREIGABE_LABELS.beschluss_ausstehend, tone: 'yel' },
+  freigegeben: { label: ORG_FREIGABE_LABELS.freigegeben, tone: 'grn' },
+  nicht_noetig: { label: ORG_FREIGABE_LABELS.nicht_noetig, tone: 'muted' },
+  abgelehnt: { label: ORG_FREIGABE_LABELS.abgelehnt, tone: 'red' },
 }
 
 function PropRow({ label, value }: { label: string; value: ReactNode }) {

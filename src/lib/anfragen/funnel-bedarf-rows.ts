@@ -1,3 +1,4 @@
+import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import type { ProjektUebersichtExtraRow } from '@/components/crm/EntityProjektUebersichtCard'
 import {
   isEchterFreitext,
@@ -245,11 +246,7 @@ export function buildFunnelBedarfExtraRows(lead: FunnelBedarfLeadPick): {
 }
 
 const ORG_FREIGABE_KURZ: Record<string, string> = {
-  ausstehend: 'Ausstehend',
-  beschluss_ausstehend: 'Wartet auf Beschluss',
-  freigegeben: 'Freigegeben',
-  abgelehnt: 'Abgelehnt',
-  nicht_noetig: 'Nicht nötig',
+  ...ORG_FREIGABE_LABELS,
 }
 
 /** Objekt-Zeile: Titel nur wenn er sich von der Straße unterscheidet. */

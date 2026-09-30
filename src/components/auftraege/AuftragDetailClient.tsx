@@ -1,5 +1,6 @@
 'use client'
 
+import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { posBoardLinesFromAngebotPositionen } from '@/lib/posboard/pos-board-line'
 
 import { MockBtn } from '@/components/mock-ui'
@@ -1249,8 +1250,8 @@ export function AuftragDetailClient({
             status="termin"
             label={
               freigabeStatus === 'beschluss_ausstehend'
-                ? 'Wartet auf Beschluss'
-                : 'Wartet auf Freigabe'
+                ? ORG_FREIGABE_LABELS.beschluss_ausstehend
+                : ORG_FREIGABE_LABELS.ausstehend
             }
           />
         ) : null,

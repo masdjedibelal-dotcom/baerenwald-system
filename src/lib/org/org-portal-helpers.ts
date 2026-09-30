@@ -90,10 +90,11 @@ export const KOSTENTRAEGER_LABELS: Record<string, string> = {
 }
 
 export const ORG_FREIGABE_LABELS: Record<OrgFreigabeStatus, string> = {
-  nicht_noetig: 'Nicht erforderlich',
-  ausstehend: 'Ausstehend',
-  beschluss_ausstehend: 'Wartet auf Beschluss',
-  freigegeben: 'Erteilt',
+  // Flow-Vereinfachung 30.09.2026: ein Wartezustand „Wartet auf Zustimmung“ — einzige Quelle
+  nicht_noetig: 'Nicht nötig',
+  ausstehend: 'Wartet auf Zustimmung',
+  beschluss_ausstehend: 'Wartet auf Zustimmung',
+  freigegeben: 'Zugestimmt',
   abgelehnt: 'Abgelehnt',
 }
 

@@ -1,12 +1,6 @@
-import { notFound } from 'next/navigation'
-import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
-import { AuftragAbnahmeMaengelFlowClient } from '@/components/auftraege/AuftragAbnahmeMaengelFlowClient'
+import { redirect } from 'next/navigation'
 
-export default async function AuftragAbnahmeMaengelPage({ params }: { params: { id: string } }) {
-  const detail = await loadAuftragDetail(params.id)
-  if (!detail) notFound()
-
-  const kundeName = detail.kunden?.name?.trim() || 'Kunde'
-
-  return <AuftragAbnahmeMaengelFlowClient auftragId={params.id} kundeName={kundeName} />
+/** Mängel-Nacharbeit entfällt (30.09.2026): Mängel stehen im Abnahmeprotokoll — fertig. */
+export default function AuftragAbnahmeMaengelPage({ params }: { params: { id: string } }) {
+  redirect(`/auftraege/${params.id}`)
 }

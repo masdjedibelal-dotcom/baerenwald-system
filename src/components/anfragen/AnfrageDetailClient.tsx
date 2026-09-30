@@ -669,7 +669,7 @@ export function AnfrageDetailClient({
   ])
 
   const hvWarteStatusPill = wartetAufHvFreigabe ? (
-    <MockBadge kind="warten">Warte auf HV / Hausmeister</MockBadge>
+    <MockBadge kind="warten">Wartet auf Zustimmung</MockBadge>
   ) : null
 
   // Aktionsmodell: „Ohne Angebot beauftragen“ steht im „…“, nicht als zweiter Knopf.
@@ -903,7 +903,7 @@ export function AnfrageDetailClient({
           ? openDirektBeauftragen
           : wartetAufHvFreigabe
             ? () =>
-                toast.message('Warte auf HV / Hausmeister', {
+                toast.message('Wartet auf Zustimmung', {
                   description:
                     'Die Hausverwaltung muss freigeben oder die Hausmeister-Prüfung abschließen. Danach können Sie disponieren.',
                 })
@@ -913,7 +913,7 @@ export function AnfrageDetailClient({
         istAkut
           ? 'Direkt beauftragen'
           : wartetAufHvFreigabe
-            ? 'Warte auf HV / Hausmeister'
+            ? 'Wartet auf Zustimmung'
             : 'LV anfragen'
       }
       emptyTitle="Noch keine Leistungen"
