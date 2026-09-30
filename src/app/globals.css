@@ -215,11 +215,9 @@
    */
   @media (min-width: 768px) {
     :root {
-      --app-font-scale: clamp(
-        1.25,
-        calc(1.22 + (100vw - 1024px) / 9000),
-        1.42
-      );
+      /* Fester Wert: die frühere clamp()-Formel addierte Länge + Zahl, war damit ungültig,
+         und alle --fs-* fielen auf dem Desktop auf 16px zurück (keine Abstufung mehr). */
+      --app-font-scale: 1.1;
       --fs-caption: calc(11.5px * var(--app-font-scale));
       --fs-meta: calc(12.5px * var(--app-font-scale));
       --fs-text: calc(14px * var(--app-font-scale));

@@ -271,55 +271,61 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         }
       >
         {detail ? (
-          <>
-            <div className="einsatz-kopf">
-              <MockBadge kind={(STATUS[detail.status] ?? STATUS.gesendet).kind}>
-                {(STATUS[detail.status] ?? STATUS.gesendet).label}
-              </MockBadge>
-              <span className="einsatz-kopf__meta">
-                {[
-                  [datum(detail.termin_von), datum(detail.termin_bis)].filter(Boolean).join(' bis '),
-                  detail.ort ?? '',
-                  detail.ek_betrag != null ? `EK ${formatEuro(detail.ek_betrag)} ${detail.ek_art}` : '',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
+          <div className="einsatz-blatt">
+            <div className="einsatz-karte">
+              <div className="einsatz-kopf">
+                <MockBadge kind={(STATUS[detail.status] ?? STATUS.gesendet).kind}>
+                  {(STATUS[detail.status] ?? STATUS.gesendet).label}
+                </MockBadge>
+                <span className="einsatz-kopf__meta">
+                  {[
+                    [datum(detail.termin_von), datum(detail.termin_bis)].filter(Boolean).join(' bis '),
+                    detail.ort ?? '',
+                    detail.ek_betrag != null ? `EK ${formatEuro(detail.ek_betrag)} ${detail.ek_art}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </div>
+              {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
             </div>
-            {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
-            <div className="einsatz-verlauf__titel">Verlauf</div>
-            <p className="einsatz-verlauf__hinweis">Nur für Bärenwald. Der Kunde sieht das nicht.</p>
-            <ol className="einsatz-verlauf">
-              {verlauf(detail).map((v) => (
-                <li key={v.key} className={`einsatz-eintrag${v.neu ? ' einsatz-eintrag--neu' : ''}`}>
-                  <div className="einsatz-eintrag__kopf">
-                    <span className="einsatz-eintrag__art">{v.art}</span>
-                    <span className="einsatz-eintrag__datum">{datum(v.at)}</span>
-                  </div>
-                  {v.text ? <div className="einsatz-eintrag__text">{v.text}</div> : null}
-                  {v.dateien.length ? (
-                    <div className="einsatz-eintrag__dateien">
-                      {v.dateien.map((d) => (
-                        <a key={d.url} href={d.url} target="_blank" rel="noreferrer">
-                          {d.name}
-                        </a>
-                      ))}
+            <div className="einsatz-gruppe">
+              <div className="einsatz-gruppe__kopf">
+                <span className="einsatz-gruppe__titel">Verlauf</span>
+                <span className="einsatz-gruppe__hinweis">Nur intern, der Kunde sieht das nicht.</span>
+              </div>
+              <ol className="einsatz-verlauf">
+                {verlauf(detail).map((v) => (
+                  <li key={v.key} className={`einsatz-eintrag${v.neu ? ' einsatz-eintrag--neu' : ''}`}>
+                    <div className="einsatz-eintrag__kopf">
+                      <span className="einsatz-eintrag__art">{v.art}</span>
+                      <span className="einsatz-eintrag__datum">{datum(v.at)}</span>
                     </div>
-                  ) : null}
-                  {v.m && v.m.typ === 'regie' && v.m.status === 'offen' ? (
-                    <div className="einsatz-eintrag__aktionen">
-                      <MockBtn sm kind="primary" onClick={() => { regie((v.m as EinsatzMitteilung).id, 'angenommen') }}>
-                        Annehmen
-                      </MockBtn>
-                      <MockBtn sm kind="secondary" onClick={() => { regie((v.m as EinsatzMitteilung).id, 'abgelehnt') }}>
-                        Ablehnen
-                      </MockBtn>
-                    </div>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-          </>
+                    {v.text ? <div className="einsatz-eintrag__text">{v.text}</div> : null}
+                    {v.dateien.length ? (
+                      <div className="einsatz-eintrag__dateien">
+                        {v.dateien.map((d) => (
+                          <a key={d.url} href={d.url} target="_blank" rel="noreferrer">
+                            {d.name}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                    {v.m && v.m.typ === 'regie' && v.m.status === 'offen' ? (
+                      <div className="einsatz-eintrag__aktionen">
+                        <MockBtn sm kind="primary" onClick={() => { regie((v.m as EinsatzMitteilung).id, 'angenommen') }}>
+                          Annehmen
+                        </MockBtn>
+                        <MockBtn sm kind="secondary" onClick={() => { regie((v.m as EinsatzMitteilung).id, 'abgelehnt') }}>
+                          Ablehnen
+                        </MockBtn>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
         ) : null}
       </EditorSheet>
 

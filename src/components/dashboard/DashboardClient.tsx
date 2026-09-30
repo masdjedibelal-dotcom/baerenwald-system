@@ -33,7 +33,6 @@ export type DashboardKpi = {
   href: string
 }
 
-const UMSATZ_BAR_FILL = C.green
 
 const ZEITRAUM_PRESETS = DASHBOARD_ZEITRAUM_OPTIONS.filter((o) => o.value !== 'benutzerdefiniert')
 
@@ -116,76 +115,28 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
   const max = Math.max(1, ...totals)
   const total = totals.reduce((s, n) => s + n, 0)
 
-  const W = 360
-  const H = 168
-  const padL = 8
-  const padR = 8
-  const padT = 12
-  const padB = 28
-  const innerW = W - padL - padR
-  const innerH = H - padT - padB
-  const n = Math.max(1, safeMonths.length)
-  const slot = innerW / n
-  const barW = Math.min(28, Math.max(12, slot * 0.55))
-
-  function yAt(v: number) {
-    return padT + innerH - (v / max) * innerH
-  }
-
   return (
     <MockCard title="Umsatzverlauf" icon="activity">
-        <div className="mb-3">
-          <div className="text-[length:var(--fs-head)] font-semibold tracking-tight tabular-nums">
-            {formatEurBetrag(total)}
-          </div>
+      <div className="mb-3">
+        <div className="text-[length:var(--fs-head)] font-semibold tracking-tight tabular-nums">
+          {formatEurBetrag(total)}
         </div>
-        <div className="w-full">
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            className="h-44 w-full"
-            role="img"
-            aria-label="Umsatzverlauf Balkendiagramm"
-          >
-            {[0.25, 0.5, 0.75, 1].map((t) => (
-              <line
-                key={t}
-                x1={padL}
-                x2={W - padR}
-                y1={yAt(max * t)}
-                y2={yAt(max * t)}
-                stroke="var(--border)"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            ))}
-            {safeMonths.map((m, i) => {
-              const gesamt = umsatzMonatGesamt(m)
-              const cx = padL + slot * i + slot / 2
-              const x = cx - barW / 2
-              const h = gesamt > 0 ? Math.max((gesamt / max) * innerH, 0.5) : 0
-              const y = padT + innerH - h
-              return (
-                <g key={m.key}>
-                  {gesamt > 0 ? (
-                    <rect x={x} y={y} width={barW} height={h} rx={2} fill={UMSATZ_BAR_FILL}>
-                      <title>{`${m.label}: ${formatEurBetrag(gesamt)}`}</title>
-                    </rect>
-                  ) : null}
-                  <text
-                    x={cx}
-                    y={H - 8}
-                    textAnchor="middle"
-                    className="fill-[var(--text-3)]"
-                    style={{ fontSize: 11 }}
-                  >
-                    {m.label}
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
-        </div>
-
+      </div>
+      {/* HTML statt SVG: füllt die Kartenbreite, Beschriftung in Textgröße der App */}
+      <div className="dash-umsatz" role="img" aria-label="Umsatzverlauf Balkendiagramm">
+        {safeMonths.map((m) => {
+          const gesamt = umsatzMonatGesamt(m)
+          const pct = gesamt > 0 ? Math.max((gesamt / max) * 100, 1) : 0
+          return (
+            <div key={m.key} className="dash-umsatz__monat" title={`${m.label}: ${formatEurBetrag(gesamt)}`}>
+              <div className="dash-umsatz__saeule">
+                {pct > 0 ? <div className="dash-umsatz__balken" style={{ height: `${pct}%` }} /> : null}
+              </div>
+              <span className="dash-umsatz__label">{m.label}</span>
+            </div>
+          )
+        })}
+      </div>
     </MockCard>
   )
 }

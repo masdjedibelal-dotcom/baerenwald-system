@@ -238,6 +238,7 @@ export function MockSortHead({
     <div
       role="columnheader"
       className="col-head"
+      data-col={col}
       onClick={() => onSort(col)}
       style={{
         cursor: 'pointer',
