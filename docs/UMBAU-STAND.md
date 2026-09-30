@@ -50,7 +50,11 @@ Branches bauen aufeinander auf: `umbau/p05-liste-auftrag` enthält P01–P05. Lo
 | Eine Wahrheit „offen“ + Klick-Fixes | fertig | `umbau/wahrheiten-offen` | `src/lib/vorgang/vorgang-offen.ts`; verlorene CSS aus `b3ef4c563` zurück |
 | Entlastung | fertig | `umbau/entlastung` | Auswahl Belal 30.09. (Memory `entlastung-streichungen`) |
 
-Staging: CRM = `umbau/staging-g` (enthält alles), Portal = `umbau/staging-e` (per „ours“-Merge, kein Force).
+| Block A+B | fertig | `umbau/ab-schlank` (CRM + Portal) | Aktionsmodell, Status aus status-map, Dashboard aus Rechnungen, Phasenleiste |
+| Flow-Vereinfachung 1–4 | fertig | `umbau/ab-schlank` | P18, Rechnung ohne Korrektur-Modus, Direktauftrag=Angebot, Tagebuch, HV ein Zustand |
+
+Staging: CRM = `umbau/staging-j`, Portal = `umbau/staging-j` (per „ours“-Merge, kein Force).
+Nächstes: Design-Fundament (Tokens, 3 Oberflächen, Build-Prüfung) — Entscheidungen im Memory `flow-vereinfachung`/`aktionsmodell`.
 
 ## Nächste Sitzungen
 

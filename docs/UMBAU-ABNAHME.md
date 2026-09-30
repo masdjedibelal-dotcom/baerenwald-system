@@ -442,3 +442,61 @@ Das kommt jeweils in einer eigenen Sitzung:
 
 - **P22, Vorgang als eine Seite mit Phasenleiste:** eigene Sitzung.
 - **Rechnungs-Assistent in drei Schritten:** analog zum Angebot, eigene Sitzung.
+
+# Block A + B: Schlank und eine Wahrheit (30.09.2026)
+
+### Was ist anders
+
+- **Aktionen je Seite:** Grün steht der fällige Statuswechsel, daneben „Bearbeiten“. Im „…“ steht nur, was gerade passt.
+  - **Rechnung:** PDF, Erinnerung, Stornieren bzw. Entwurf verwerfen.
+  - **Angebot:** Als neues Angebot, Ablehnen, PDF, Entwurf löschen.
+  - **Auftrag:** Abnahme mit Protokoll.
+  - **Anfrage:** Ohne Angebot beauftragen, Absagen, Löschen mit Rückgängig.
+  - Ausgegraute Knöpfe gibt es nicht mehr.
+- **Status-Wörter aus einer Quelle:**
+  - Anfrage: Neu, In Arbeit, Abgesagt.
+  - Angebot: Entwurf, Beim Kunden, Angenommen, Abgelehnt.
+  - Auftrag: Läuft, Fertig, Storniert.
+  - Rechnung: Entwurf, Offen, Bezahlt, Storniert.
+  - Der Status-Filter der Liste richtet sich nach diesen Wörtern.
+- **Dashboard:**
+  - Umsatz, Umsatz nach Gewerk und das Kunden-Ranking rechnen alle mit gestellten Rechnungen.
+  - Der Funnel betrachtet eine einzige Gruppe von Anfragen: Anfrage → Angebot → Auftrag.
+- **Zeitangaben:** stimmen jetzt. „vor 12h“ ist behoben, Datumsangaben stehen in deutscher Zeit.
+- **Fehlermeldungen:** zeigen den echten Grund in ganzen Sätzen, zum Beispiel „Die Summe der Rechnungen übersteigt die Auftragssumme …“.
+- **Phasenleiste:** „Anfrage · Angebot · Auftrag · Rechnung“ steht oben in jeder Detailseite.
+- **Rechnungs-Assistent:** hat wie das Angebot drei Schritte mit „Prüfen und senden“ und PDF-Vorschau.
+- **Anfrage-Formular:** Seltenes steht unter „Mehr Angaben“.
+- **Angebots-Gültigkeit:** kommt aus den Firmen-Einstellungen.
+- **Menü „Neu“:** ohne Termin und To-do.
+- **Anmelde-Limit:** Man wird nicht mehr ausgeloggt, die Seite versucht es erneut.
+
+## Flow-Vereinfachung (30.09.2026)
+
+### Was ist anders
+
+- **Partner nur über Einsätze (P18):**
+  - Im CRM gibt es kein „Zuweisen“ an Positionen mehr.
+  - Im Partner-Portal gibt es nur noch die Einsätze auf der Übersicht, der Menüpunkt „Vorgänge“ ist weg.
+  - Das HV-Portal zeigt „Serviceabos“ und „Marktplatz“ (In Kürze) nicht mehr.
+- **Rechnung:**
+  - Den Korrektur-Modus gibt es nicht mehr. Nach dem Versand heißt es „Stornieren“, danach schlägt der Auftrag die neue Rechnung vor.
+  - Der Assistent nimmt immer die nächste offene Rate.
+- **Ein Weg zum Auftrag:** „Ohne Angebot beauftragen“ legt intern ein Angebot an und nimmt es sofort an, ohne Mail an den Kunden.
+- **Auftrag bearbeiten:** geht direkt an den Positionen, solange noch keine Rechnung gestellt ist, auch wenn ein Angebot dahintersteht.
+- **Tagebuch:** Es gibt nur noch das Tagebuch.
+- **Mängel:** Keine Mängel-Nacharbeit mehr, die Mängel stehen im Protokoll.
+- **HV-Freigabe:** heißt überall „Wartet auf Zustimmung“.
+
+### So testen Sie
+
+1. Einen Auftrag öffnen. Oben steht die Phasenleiste. „Auftrag bearbeiten“ öffnet die Positionen, und in den Leistungen gibt es kein „Zuweisen“.
+2. Eine gesendete Rechnung öffnen. Im „…“ stehen PDF, Erinnerung und Stornieren, einen Knopf „Rechnung korrigieren“ gibt es nicht mehr.
+3. Eine Anfrage öffnen, im „…“ auf „Ohne Angebot beauftragen“ und Leistungen eintragen. Es entsteht ein Auftrag mit Angebot.
+4. Im Partner-Portal anmelden. Zu sehen sind nur noch die Einsätze.
+5. Das Dashboard mit der Liste vergleichen. Die vier Zahlen sind gleich, der Umsatz stammt aus gestellten Rechnungen.
+
+### Bleibt vorerst
+
+- Der Code der entfallenen Wege bleibt vorerst stehen und wird in der Lösch-Sitzung mit Backup entfernt.
+- Produktion ist unverändert.
