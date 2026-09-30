@@ -21834,3 +21834,38 @@ display: flex;
   text-overflow: ellipsis;
   display: inline-block;
 }
+
+/* Einsätze am Auftrag: Zeile je Partner-Auftrag, Blatt mit Verlauf (intern) */
+.einsatz-liste { display: flex; flex-direction: column; }
+.einsatz-zeile {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 10px 8px; margin: 0 -8px; box-sizing: content-box;
+  background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: var(--r-sm);
+  text-align: left; font: inherit; color: inherit; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.einsatz-zeile:last-child { border-bottom: 0; }
+.einsatz-zeile:hover { background: var(--bg-soft); }
+.einsatz-zeile__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.einsatz-zeile__titel { font-weight: 600; }
+.einsatz-zeile__sub { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.einsatz-zeile__meta { color: var(--text-3); font-size: var(--fs-meta); }
+.einsatz-zeile__rechts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.einsatz-kopf { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.einsatz-kopf__meta { color: var(--text-3); font-size: var(--fs-meta); }
+.einsatz-anweisung { margin: 0; white-space: pre-wrap; }
+.einsatz-verlauf__titel { font-weight: 600; margin-top: 8px; }
+.einsatz-verlauf__hinweis { margin: -8px 0 0; color: var(--text-3); font-size: var(--fs-meta); }
+.einsatz-verlauf { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.einsatz-eintrag {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 0 10px 14px; border-left: 2px solid var(--border); position: relative;
+}
+.einsatz-eintrag--neu { border-left-color: var(--blue-tx); }
+.einsatz-eintrag__kopf { display: flex; justify-content: space-between; gap: 8px; }
+.einsatz-eintrag__art { font-weight: 500; }
+.einsatz-eintrag--neu .einsatz-eintrag__art::after { content: ' · neu'; color: var(--blue-tx); font-weight: 500; }
+.einsatz-eintrag__datum { color: var(--text-3); font-size: var(--fs-meta); flex-shrink: 0; }
+.einsatz-eintrag__text { white-space: pre-wrap; }
+.einsatz-eintrag__dateien { display: flex; flex-wrap: wrap; gap: 8px; font-size: var(--fs-meta); }
+.einsatz-eintrag__aktionen { display: flex; gap: 6px; margin-top: 4px; }

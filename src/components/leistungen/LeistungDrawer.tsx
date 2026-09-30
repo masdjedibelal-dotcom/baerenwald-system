@@ -6,7 +6,6 @@ import type { ReactNode } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DetailProp } from '@/components/ui/detail-prop'
-import { LeistungHandwerkerUpdatesAccordion } from '@/components/leistungen/LeistungHandwerkerUpdatesAccordion'
 import type { LeistungDrawerAction, LeistungRow } from '@/components/leistungen/types'
 
 function Section({
@@ -30,8 +29,8 @@ function Section({
 }
 
 /**
- * Leistungs-Drawer: Position · Zuweisung · optional Nachtrag-Freigabe.
- * Freigabe: Footer Bestätigen / Ablehnen. Zuweisen: Primary-Button im Header.
+ * Leistungs-Drawer: Position · optional Nachtrag-Freigabe.
+ * Partner und ihre Updates stehen am Einsatz (Karte „Einsätze“), nicht an der Position.
  */
 export function LeistungDrawer({
   open,
@@ -179,64 +178,6 @@ export function LeistungDrawer({
         </div>
       </Section>
 
-      <Section title="Zuweisung" icon="link">
-        <div className="props">
-          <DetailProp label="Ausführung">{row.handwerkerName ?? '—'}</DetailProp>
-          {row.anfrageStatusLabel ? (
-            <DetailProp label="Anfrage">
-              <StatusBadge
-                status={
-                  row.brauchtFreigabe
-                    ? 'offen'
-                    : row.anerkennungStatus === 'abgelehnt'
-                      ? 'storniert'
-                      : row.anerkennungStatus === 'anerkannt'
-                        ? 'abgenommen'
-                        : 'gesendet'
-                }
-                label={row.anfrageStatusLabel}
-              />
-            </DetailProp>
-          ) : null}
-          {row.zeitraumLabel ? (
-            <DetailProp label="Zeitraum">{row.zeitraumLabel}</DetailProp>
-          ) : null}
-          {row.partnerSiehtLabel ? (
-            <DetailProp label="Partner sieht">
-              {row.partnerSiehtLabel}
-              {!row.partnerAufgabeTitel ? (
-                <span className="text-bw-text-muted"> (LV)</span>
-              ) : null}
-            </DetailProp>
-          ) : null}
-        </div>
-      </Section>
-
-      {!brauchtFreigabe && (row.istRegie || (row.handwerkerUpdates && row.handwerkerUpdates.length > 0)) ? (
-        <Section title="Partner-Updates" icon="camera">
-          {row.regieSollIstLabel ? (
-            <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
-              {row.regieSollIstLabel}
-              {row.istRegie
-                ? ' — Grundlage für die Rechnung (nach Prüfung).'
-                : null}
-            </p>
-          ) : row.istRegie ? (
-            <p className="mb-2 text-[length:var(--fs-meta)] text-bw-text-muted">
-              Noch keine Zeiten aus dem Bautagebuch — Rechnung nutzt die Schätzung, bis Updates
-              vorliegen.
-            </p>
-          ) : null}
-          {(row.handwerkerUpdates ?? []).length === 0 ? (
-            <MockEmpty title="Keine Einträge." />
-          ) : (
-            <LeistungHandwerkerUpdatesAccordion
-              updates={row.handwerkerUpdates ?? []}
-              variant="list"
-            />
-          )}
-        </Section>
-      ) : null}
     </EditorSheet>
   )
 }

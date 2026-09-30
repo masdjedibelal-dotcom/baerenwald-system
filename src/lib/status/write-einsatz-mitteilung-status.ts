@@ -23,3 +23,13 @@ export async function writeEinsatzMitteilungStatus(
     .eq('status', 'offen')
     .select('auftrag_id')
 }
+
+/** Partner-Updates gelten als gelesen, sobald jemand den Einsatz öffnet (offen → erledigt). */
+export async function markEinsatzUpdatesGesehen(db: SupabaseClient, einsatzId: string) {
+  return db
+    .from('einsatz_mitteilungen')
+    .update({ status: 'erledigt' satisfies EinsatzMitteilungStatus, erledigt_at: new Date().toISOString() })
+    .eq('einsatz_id', einsatzId)
+    .eq('typ', 'update')
+    .eq('status', 'offen')
+}

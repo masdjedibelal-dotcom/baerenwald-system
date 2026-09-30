@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from 'react'
 
 import {
   createEinsatz,
+  einsatzUpdatesGesehen,
   listEinsaetze,
   loadEinsatzFormular,
-  mitteilungErledigt,
-  regieUebernehmen,
+  regieEntscheiden,
   zurueckziehenEinsatz,
   type EinsatzMitteilung,
   type EinsatzPartnerOption,
@@ -20,21 +20,71 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { DateInput } from '@/components/ui/DateInput'
 import { safeAction } from '@/lib/actions/safe-action'
-import { formatEuro } from '@/lib/format/geld-datum'
+import { formatDatum, formatEuro } from '@/lib/format/geld-datum'
 import { toast } from '@/components/ui/app-toast'
 
 const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
   gesendet: { label: 'Gesendet', kind: 'warten' },
-  angenommen: { label: 'Angenommen', kind: 'aktiv' },
+  angenommen: { label: 'Läuft', kind: 'aktiv' },
   abgelehnt: { label: 'Abgelehnt', kind: 'storniert' },
   fertig: { label: 'Fertig', kind: 'fertig' },
 }
 
+const MELDUNG_LABEL: Record<EinsatzMitteilung['typ'], string> = {
+  update: 'Update',
+  regie: 'Regie',
+  behinderung: 'Update',
+}
+
+const REGIE_STAND: Record<EinsatzMitteilung['status'], string> = {
+  offen: '',
+  uebernommen: ' (angenommen)',
+  erledigt: ' (abgelehnt)',
+}
+
 function datum(iso: string | null): string {
-  const d = String(iso ?? '').slice(0, 10)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return ''
-  const [y, m, t] = d.split('-')
-  return `${t}.${m}.${y}`
+  return iso ? formatDatum(iso) : ''
+}
+
+type VerlaufEintrag = {
+  key: string
+  at: string
+  art: string
+  text: string
+  dateien: { name: string; url: string }[]
+  neu: boolean
+  m?: EinsatzMitteilung
+}
+
+/** Alles, was zu einem Einsatz passiert ist, neueste Meldung oben. */
+function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
+  const liste: VerlaufEintrag[] = [
+    { key: 'gesendet', at: e.gesendet_at, art: 'An Partner gesendet', text: '', dateien: [], neu: false },
+  ]
+  if (e.status === 'abgelehnt') {
+    liste.push({ key: 'abgelehnt', at: e.gesendet_at, art: 'Abgelehnt', text: e.ablehnung_grund ?? '', dateien: [], neu: false })
+  }
+  for (const m of e.mitteilungen) {
+    const art =
+      m.typ === 'regie'
+        ? `Regie${m.stunden ? `, ${String(m.stunden).replace('.', ',')} Std` : ''}${REGIE_STAND[m.status]}`
+        : MELDUNG_LABEL[m.typ]
+    liste.push({ key: m.id, at: m.created_at, art, text: m.text, dateien: m.dateien, neu: m.status === 'offen', m })
+  }
+  if (e.fertig_at) {
+    liste.push({ key: 'fertig', at: e.fertig_at, art: 'Erledigt gemeldet', text: e.fertig_text ?? '', dateien: e.fertig_dateien, neu: false })
+  }
+  if (e.rechnung_eingereicht_at) {
+    liste.push({
+      key: 'rechnung',
+      at: e.rechnung_eingereicht_at,
+      art: `Rechnung${e.rechnung_betrag != null ? ` ${formatEuro(e.rechnung_betrag)}` : ''}`,
+      text: '',
+      dateien: e.rechnung_pdf_url ? [{ name: 'PDF öffnen', url: e.rechnung_pdf_url }] : [],
+      neu: false,
+    })
+  }
+  return liste.sort((a, b) => String(b.at).localeCompare(String(a.at)))
 }
 
 type Form = {
@@ -50,7 +100,8 @@ type Form = {
 }
 
 /**
- * Einsätze am Auftrag (Umbau P11): wer führt aus, was, wann, wo, zu welchem EK — und in welchem Stand.
+ * Einsätze am Auftrag: je Partner-Auftrag eine Zeile mit Stand und „neu“-Zähler.
+ * Antippen öffnet den Einsatz mit Verlauf (Updates, Zusatzarbeit, Behinderung, Erledigt, Rechnung).
  */
 export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const [einsaetze, setEinsaetze] = useState<EinsatzZeile[] | null>(null)
@@ -58,14 +109,20 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const [saving, setSaving] = useState(false)
   const [partner, setPartner] = useState<EinsatzPartnerOption[]>([])
   const [form, setForm] = useState<Form | null>(null)
-  // P13: Regie übernehmen (Standard-Aufschlag 20 %, änderbar)
-  const [regie, setRegie] = useState<{
-    m: EinsatzMitteilung
-    titel: string
-    stunden: number
-    partnersatz: number
-    aufschlag: number
-  } | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
+  // Updates, die in dieser Sitzung geöffnet wurden: zählen in der Zeile nicht mehr als neu.
+  const [gesehen, setGesehen] = useState<Set<string>>(new Set())
+  const detail = einsaetze?.find((e) => e.id === detailId) ?? null
+  const setDetail = (e: EinsatzZeile | null) => setDetailId(e?.id ?? null)
+
+  async function detailOeffnen(e: EinsatzZeile) {
+    setDetail(e)
+    if (!e.mitteilungen.some((m) => m.typ === 'update' && m.status === 'offen')) return
+    const res = await safeAction(einsatzUpdatesGesehen(e.id))
+    if (!res.ok) return
+    // Im offenen Blatt bleibt „neu“ sichtbar, die Zeile zählt ab jetzt nicht mehr mit.
+    setGesehen((g) => new Set([...g, e.id]))
+  }
 
   const laden = useCallback(async () => {
     const res = await safeAction(listEinsaetze(auftragId))
@@ -134,42 +191,23 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       toast.error(res.message)
       return
     }
+    setDetail(null)
     await laden()
   }
 
-  async function regieSpeichern() {
-    if (!regie) return
-    setSaving(true)
-    const res = await safeAction(
-      regieUebernehmen({
-        mitteilungId: regie.m.id,
-        titel: regie.titel,
-        stunden: regie.stunden,
-        partnersatz: regie.partnersatz,
-        aufschlagProzent: regie.aufschlag,
-      })
-    )
-    setSaving(false)
+  async function regie(id: string, entscheidung: 'angenommen' | 'abgelehnt') {
+    const res = await safeAction(regieEntscheiden(id, entscheidung))
     if (!res.ok) {
       toast.error(res.message)
       return
     }
-    toast.success('Regie übernommen. Auftrag jetzt über „Auftrag bearbeiten“ erneut an den Kunden senden.')
-    setRegie(null)
-    await laden()
-  }
-
-  async function erledigt(id: string) {
-    const res = await safeAction(mitteilungErledigt(id))
-    if (!res.ok) {
-      toast.error(res.message)
-      return
+    if (entscheidung === 'angenommen') {
+      toast.success('Regie angenommen. Neue Positionen über „Auftrag bearbeiten“ eintragen und neu senden.')
     }
     await laden()
   }
 
   const setF = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f))
-  const kundensatz = regie ? Math.round(regie.partnersatz * (1 + regie.aufschlag / 100) * 100) / 100 : 0
   const ok = Boolean(form?.handwerkerId && form.titel.trim())
 
   return (
@@ -188,105 +226,102 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
             Noch kein Partner eingesetzt. Über „Einsatz“ bekommt ein Partner die Anweisung mit EK.
           </p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="einsatz-liste">
             {einsaetze.map((e) => {
               const st = STATUS[e.status] ?? STATUS.gesendet
-              const wann = [datum(e.termin_von), datum(e.termin_bis)].filter(Boolean).join(' bis ')
+              const neu = e.mitteilungen.filter(
+                (m) => m.status === 'offen' && !(m.typ !== 'regie' && gesehen.has(e.id))
+              ).length
+              const letzte = e.mitteilungen[e.mitteilungen.length - 1]
+              const meta = letzte
+                ? `${MELDUNG_LABEL[letzte.typ]} vom ${datum(letzte.created_at)}`
+                : [
+                    [datum(e.termin_von), datum(e.termin_bis)].filter(Boolean).join(' bis '),
+                    e.ek_betrag != null ? `EK ${formatEuro(e.ek_betrag)} ${e.ek_art}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
               return (
-                <div
-                  key={e.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    paddingBottom: 10,
-                    borderBottom: '1px solid var(--border)',
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600 }}>{e.partner_name}</div>
-                    <div style={{ color: 'var(--text-2)' }}>{e.titel}</div>
-                    <div style={{ color: 'var(--text-3)', fontSize: 'var(--fs-meta)' }}>
-                      {[wann, e.ek_betrag != null ? `EK ${formatEuro(e.ek_betrag)} ${e.ek_art}` : '']
-                        .filter(Boolean)
-                        .join(', ')}
-                    </div>
-                    {e.status === 'abgelehnt' && e.ablehnung_grund ? (
-                      <div style={{ color: 'var(--red-tx)', fontSize: 'var(--fs-meta)' }}>
-                        Grund: {e.ablehnung_grund}
-                      </div>
-                    ) : null}
-                    {e.status === 'fertig' && e.fertig_text ? (
-                      <div style={{ fontSize: 'var(--fs-meta)', whiteSpace: 'pre-wrap' }}>{e.fertig_text}</div>
-                    ) : null}
-                    {e.fertig_dateien.length ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 'var(--fs-meta)' }}>
-                        {e.fertig_dateien.map((d) => (
-                          <a key={d.url} href={d.url} target="_blank" rel="noreferrer">
-                            {d.name}
-                          </a>
-                        ))}
-                      </div>
-                    ) : null}
-                    {e.mitteilungen
-                      .filter((m) => m.status === 'offen')
-                      .map((m) => (
-                        <div key={m.id} style={{ marginTop: 6, fontSize: 'var(--fs-meta)' }}>
-                          <b>{m.typ === 'regie' ? `Regie ${m.stunden ?? ''} Std` : 'Behinderung'}:</b> {m.text}
-                          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                            {m.typ === 'regie' ? (
-                              <MockBtn
-                                sm
-                                kind="primary"
-                                onClick={() => {
-                                  setRegie({
-                                    m,
-                                    titel: `Regie: ${m.text.slice(0, 60)}`,
-                                    stunden: m.stunden ?? 1,
-                                    partnersatz: 0,
-                                    aufschlag: 0,
-                                  })
-                                }}
-                              >
-                                Als Regie übernehmen
-                              </MockBtn>
-                            ) : null}
-                            <MockBtn sm kind="ghost" onClick={() => { erledigt(m.id) }}>
-                              {m.typ === 'regie' ? 'Verwerfen' : 'Erledigt'}
-                            </MockBtn>
-                          </div>
-                        </div>
-                      ))}
-                    {e.rechnung_eingereicht_at ? (
-                      <div style={{ fontSize: 'var(--fs-meta)' }}>
-                        Partner-Rechnung
-                        {e.rechnung_betrag != null ? ` ${formatEuro(e.rechnung_betrag)}` : ''}
-                        {e.rechnung_pdf_url ? (
-                          <>
-                            {' '}
-                            <a href={e.rechnung_pdf_url} target="_blank" rel="noreferrer">
-                              PDF öffnen
-                            </a>
-                          </>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                <MockBtn key={e.id} type="button" className="einsatz-zeile" onClick={() => { detailOeffnen(e) }}>
+                  <span className="einsatz-zeile__text">
+                    <span className="einsatz-zeile__titel">{e.partner_name}</span>
+                    <span className="einsatz-zeile__sub">{e.titel}</span>
+                    {meta ? <span className="einsatz-zeile__meta">{meta}</span> : null}
+                  </span>
+                  <span className="einsatz-zeile__rechts">
+                    {neu > 0 ? <MockBadge kind="neu">{neu} neu</MockBadge> : null}
                     <MockBadge kind={st.kind}>{st.label}</MockBadge>
-                    {e.status === 'gesendet' || e.status === 'abgelehnt' ? (
-                      <MockBtn sm kind="ghost" onClick={() => { zurueckziehen(e.id) }}>
-                        Zurückziehen
-                      </MockBtn>
-                    ) : null}
-                  </div>
-                </div>
+                  </span>
+                </MockBtn>
               )
             })}
           </div>
         )}
       </MockCard>
+
+      <EditorSheet
+        open={Boolean(detail)}
+        onClose={() => setDetail(null)}
+        title={detail?.partner_name ?? 'Einsatz'}
+        crumb={detail?.titel}
+        secondary={
+          detail && (detail.status === 'gesendet' || detail.status === 'abgelehnt')
+            ? { label: 'Zurückziehen', kind: 'ghost', onClick: () => { zurueckziehen(detail.id) } }
+            : null
+        }
+      >
+        {detail ? (
+          <>
+            <div className="einsatz-kopf">
+              <MockBadge kind={(STATUS[detail.status] ?? STATUS.gesendet).kind}>
+                {(STATUS[detail.status] ?? STATUS.gesendet).label}
+              </MockBadge>
+              <span className="einsatz-kopf__meta">
+                {[
+                  [datum(detail.termin_von), datum(detail.termin_bis)].filter(Boolean).join(' bis '),
+                  detail.ort ?? '',
+                  detail.ek_betrag != null ? `EK ${formatEuro(detail.ek_betrag)} ${detail.ek_art}` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </div>
+            {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
+            <div className="einsatz-verlauf__titel">Verlauf</div>
+            <p className="einsatz-verlauf__hinweis">Nur für Bärenwald. Der Kunde sieht das nicht.</p>
+            <ol className="einsatz-verlauf">
+              {verlauf(detail).map((v) => (
+                <li key={v.key} className={`einsatz-eintrag${v.neu ? ' einsatz-eintrag--neu' : ''}`}>
+                  <div className="einsatz-eintrag__kopf">
+                    <span className="einsatz-eintrag__art">{v.art}</span>
+                    <span className="einsatz-eintrag__datum">{datum(v.at)}</span>
+                  </div>
+                  {v.text ? <div className="einsatz-eintrag__text">{v.text}</div> : null}
+                  {v.dateien.length ? (
+                    <div className="einsatz-eintrag__dateien">
+                      {v.dateien.map((d) => (
+                        <a key={d.url} href={d.url} target="_blank" rel="noreferrer">
+                          {d.name}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                  {v.m && v.m.typ === 'regie' && v.m.status === 'offen' ? (
+                    <div className="einsatz-eintrag__aktionen">
+                      <MockBtn sm kind="primary" onClick={() => { regie((v.m as EinsatzMitteilung).id, 'angenommen') }}>
+                        Annehmen
+                      </MockBtn>
+                      <MockBtn sm kind="secondary" onClick={() => { regie((v.m as EinsatzMitteilung).id, 'abgelehnt') }}>
+                        Ablehnen
+                      </MockBtn>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </>
+        ) : null}
+      </EditorSheet>
 
       <EditorSheet
         open={open}
@@ -363,60 +398,6 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         )}
       </EditorSheet>
 
-      <EditorSheet
-        open={Boolean(regie)}
-        onClose={() => setRegie(null)}
-        title="Regie übernehmen"
-        crumb={regie ? regie.m.text : undefined}
-        secondary={{ label: 'Abbrechen', disabled: saving, kind: 'ghost' }}
-        primary={{
-          label: 'In den Auftrag übernehmen',
-          icon: 'check',
-          disabled: !regie || saving || !(regie.stunden > 0) || !(regie.partnersatz > 0),
-          busy: saving,
-          onClick: () => { regieSpeichern() },
-        }}
-      >
-        {regie ? (
-          <>
-            <MockField label="Bezeichnung">
-              <MockInput value={regie.titel} onChange={(ev) => setRegie({ ...regie, titel: ev.target.value })} />
-            </MockField>
-            <MockField label="Stunden">
-              <ClearableNumberInput
-                className="txt"
-                min={0}
-                value={regie.stunden}
-                onValueChange={(v) => setRegie({ ...regie, stunden: Number(v) || 0 })}
-                style={{ textAlign: 'right' }}
-              />
-            </MockField>
-            <MockField label="Partnersatz € je Stunde (EK)">
-              <ClearableNumberInput
-                className="txt"
-                min={0}
-                value={regie.partnersatz}
-                onValueChange={(v) => setRegie({ ...regie, partnersatz: Number(v) || 0 })}
-                style={{ textAlign: 'right' }}
-              />
-            </MockField>
-            <MockField label="Aufschlag %">
-              <ClearableNumberInput
-                className="txt"
-                min={0}
-                value={regie.aufschlag}
-                onValueChange={(v) => setRegie({ ...regie, aufschlag: Number(v) || 0 })}
-                style={{ textAlign: 'right' }}
-              />
-            </MockField>
-            <p style={{ margin: 0, fontSize: 'var(--fs-text)' }}>
-              Kundensatz {formatEuro(kundensatz)} je Stunde, Position{' '}
-              <b>{formatEuro(Math.round(regie.stunden * kundensatz * 100) / 100)} netto</b>. Der Kunde muss nicht
-              zustimmen; danach den Auftrag erneut senden.
-            </p>
-          </>
-        ) : null}
-      </EditorSheet>
     </>
   )
 }

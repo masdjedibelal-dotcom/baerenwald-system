@@ -8,7 +8,10 @@ import { getMailBranding } from '@/lib/get-mail-branding'
 import { buildEinsatzPartnerMail } from '@/lib/mail/einsatz-partner-mail'
 import { sendMail } from '@/lib/mail-service'
 import { buildPartnerDashboardLink } from '@/lib/portal-utils'
-import { writeEinsatzMitteilungStatus } from '@/lib/status/write-einsatz-mitteilung-status'
+import {
+  markEinsatzUpdatesGesehen,
+  writeEinsatzMitteilungStatus,
+} from '@/lib/status/write-einsatz-mitteilung-status'
 
 /** Bucket der Partner-Uploads (Portal `PARTNER_UPLOAD_BUCKET`). */
 const PARTNER_UPLOAD_BUCKET = 'handwerker-uploads'
@@ -45,13 +48,19 @@ export type EinsatzZeile = {
   mitteilungen: EinsatzMitteilung[]
 }
 
-/** Regie oder Behinderung, vom Partner gemeldet (P13). */
+/**
+ * Meldung des Partners am Einsatz: Update (Text, Fotos) oder Regie (Stunden, Text).
+ * Nur intern, der Kunde sieht das nie (Kunde: Bautagebuch).
+ * „offen“ heißt: Update ungelesen bzw. Regie noch nicht entschieden.
+ * „behinderung“ nur noch in Altdaten, wird wie ein Update gezeigt.
+ */
 export type EinsatzMitteilung = {
   id: string
-  typ: 'regie' | 'behinderung'
+  typ: 'update' | 'regie' | 'behinderung'
   text: string
   stunden: number | null
   status: 'offen' | 'uebernommen' | 'erledigt'
+  dateien: { name: string; url: string }[]
   created_at: string
 }
 
@@ -130,22 +139,24 @@ export async function listEinsaetze(
     const { data: s } = await bucket.createSignedUrl(p, 60 * 60)
     return s?.signedUrl ?? null
   }
-  for (const e of einsaetze) {
-    e.fertig_dateien = (
+  const signiereDateien = async (liste: unknown): Promise<{ name: string; url: string }[]> =>
+    (
       await Promise.all(
-        e.fertig_dateien.map(async (d) => {
+        (Array.isArray(liste) ? liste : []).map(async (d) => {
           const raw = d as { name?: string; url?: string; path?: string }
           const url = await signiert(raw.url ?? raw.path)
           return url ? { name: raw.name || 'Datei', url } : null
         })
       )
     ).filter((x): x is { name: string; url: string } => Boolean(x))
+  for (const e of einsaetze) {
+    e.fertig_dateien = await signiereDateien(e.fertig_dateien)
     e.rechnung_pdf_url = await signiert(e.rechnung_pdf_url)
   }
   if (einsaetze.length) {
     const { data: mitt, error: mErr } = await gate.db
       .from('einsatz_mitteilungen')
-      .select('id, einsatz_id, typ, text, stunden, status, created_at')
+      .select('id, einsatz_id, typ, text, stunden, status, dateien, created_at')
       .eq('auftrag_id', auftragId)
       .order('created_at', { ascending: true })
     if (mErr) logDbError('app/auftraege/einsatz-actions:mitteilungen', mErr)
@@ -154,10 +165,11 @@ export async function listEinsaetze(
       if (!ziel) continue
       ziel.mitteilungen.push({
         id: String(m.id),
-        typ: m.typ === 'behinderung' ? 'behinderung' : 'regie',
+        typ: m.typ === 'behinderung' || m.typ === 'regie' ? m.typ : 'update',
         text: String(m.text ?? ''),
         stunden: m.stunden == null ? null : Number(m.stunden),
         status: (String(m.status) as EinsatzMitteilung['status']) || 'offen',
+        dateien: await signiereDateien(m.dateien),
         created_at: String(m.created_at ?? ''),
       })
     }
@@ -166,81 +178,41 @@ export async function listEinsaetze(
 }
 
 /**
- * Regie als Auftragsposition übernehmen (P13, Entscheidung 29.09.2026):
- * Kundensatz = Partnersatz + Aufschlag; keine Zustimmung des Kunden nötig.
- * Danach den Auftrag wie gewohnt erneut an den Kunden senden.
+ * Regie-Meldung des Partners bestätigen oder ablehnen (nur Rückmeldung an den Partner).
+ * Es entsteht keine Position: den Auftrag bearbeitet Bärenwald danach selbst und sendet ihn neu.
+ * In der Datenbank: angenommen = „uebernommen“, abgelehnt = „erledigt“.
  */
-export async function regieUebernehmen(input: {
-  mitteilungId: string
-  titel: string
-  stunden: number
-  partnersatz: number
-  aufschlagProzent: number
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return { ok: false, message: gate.message }
-  if (!(input.stunden > 0) || !(input.partnersatz > 0)) {
-    return { ok: false, message: 'Bitte Stunden und Partnersatz angeben.' }
-  }
-  const { data: m, error } = await gate.db
-    .from('einsatz_mitteilungen')
-    .select('id, auftrag_id, handwerker_id, typ, text, status')
-    .eq('id', input.mitteilungId)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/einsatz-actions:regie-load', error)
-  if (!m || m.typ !== 'regie') return { ok: false, message: 'Regie-Mitteilung nicht gefunden.' }
-  if (m.status !== 'offen') return { ok: false, message: 'Diese Mitteilung ist bereits bearbeitet.' }
-
-  const r2 = (n: number) => Math.round(n * 100) / 100
-  const kundensatz = r2(input.partnersatz * (1 + Math.max(0, input.aufschlagProzent) / 100))
-  const titel = input.titel.trim() || `Regie: ${String(m.text).slice(0, 60)}`
-  const { data: pos, error: pErr } = await gate.db
-    .from('auftrag_positionen')
-    .insert({
-      auftrag_id: m.auftrag_id,
-      handwerker_id: m.handwerker_id,
-      gewerk_name: 'Regie',
-      leistung_name: titel,
-      beschreibung: String(m.text),
-      typ: 'regie',
-      verguetung: 'aufwand',
-      einheit: 'Std',
-      menge: input.stunden,
-      geschaetzt_std: input.stunden,
-      stundensatz: input.partnersatz,
-      stundensatz_kunde: kundensatz,
-      preis_partner: r2(input.stunden * input.partnersatz),
-      preis_fix: r2(input.stunden * kundensatz),
-      anerkennung_status: 'anerkannt',
-      sort_order: 9000,
-    })
-    .select('id')
-    .single()
-  if (pErr || !pos) {
-    logDbError('app/auftraege/einsatz-actions:regie-insert', pErr)
-    return { ok: false, message: 'Regie konnte nicht übernommen werden.' }
-  }
-  const { error: uErr } = await writeEinsatzMitteilungStatus(gate.db, input.mitteilungId, 'uebernommen', {
-    position_id: pos.id,
-  })
-  if (uErr) logDbError('app/auftraege/einsatz-actions:regie-status', uErr)
-  revalidatePath(`/auftraege/${String(m.auftrag_id)}`)
-  return { ok: true }
-}
-
-/** Behinderung zur Kenntnis genommen / Regie verworfen. */
-export async function mitteilungErledigt(
-  mitteilungId: string
+export async function regieEntscheiden(
+  mitteilungId: string,
+  entscheidung: 'angenommen' | 'abgelehnt'
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
-  const { data: m, error } = await writeEinsatzMitteilungStatus(gate.db, mitteilungId, 'erledigt')
+  const { data: m, error } = await writeEinsatzMitteilungStatus(
+    gate.db,
+    mitteilungId,
+    entscheidung === 'angenommen' ? 'uebernommen' : 'erledigt'
+  )
   if (error) {
-    logDbError('app/auftraege/einsatz-actions:mitteilung-erledigt', error)
+    logDbError('app/auftraege/einsatz-actions:regie-entscheiden', error)
     return { ok: false, message: 'Konnte nicht gespeichert werden.' }
   }
-  const auftragId = m?.[0]?.auftrag_id
-  if (auftragId) revalidatePath(`/auftraege/${String(auftragId)}`)
+  if (!m?.length) return { ok: false, message: 'Diese Regie ist bereits entschieden.' }
+  revalidatePath(`/auftraege/${String(m[0].auftrag_id)}`)
+  return { ok: true }
+}
+
+/** Einsatz geöffnet: neue Partner-Updates gelten als gelesen. */
+export async function einsatzUpdatesGesehen(
+  einsatzId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const { error } = await markEinsatzUpdatesGesehen(gate.db, einsatzId)
+  if (error) {
+    logDbError('app/auftraege/einsatz-actions:updates-gesehen', error)
+    return { ok: false, message: 'Konnte nicht gespeichert werden.' }
+  }
   return { ok: true }
 }
 
