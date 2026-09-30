@@ -2,7 +2,7 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import Link from 'next/link'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
@@ -47,15 +47,11 @@ export function AnfrageZahlungTab({
         className="zahlplan-shell dshell-framed"
         actions={cta}
       >
-        <div className="zahlplan-empty">
-          <MockIcon ctx="empty" n="calculator" size={26} />
-          <div className="zahlplan-empty__title">Noch keine Zahlung</div>
-          <div className="zahlplan-empty__text">
-            {onWeitereRechnung
-              ? 'Weitere Rechnung legt eine neue Rechnung am Vorgang an — ohne Umweg über den Auftrag.'
-              : 'Zahlungen entstehen mit der Rechnung nach dem Auftrag. Über ein Angebot legen Sie den nächsten Schritt fest.'}
-          </div>
-        </div>
+        <MockEmpty
+          icon="receipt"
+          title="Noch keine Rechnung"
+          hint="Rechnungen entstehen aus dem Auftrag."
+        />
       </MockCard>
     )
   }

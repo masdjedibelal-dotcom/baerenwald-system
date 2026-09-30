@@ -2,6 +2,7 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import type { HTMLAttributes, ReactNode } from 'react'
 interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode
+  icon?: string
   action?: ReactNode
   children: ReactNode
   /** Nur bei explizit `true`: Klick auf Kopfzeile klappt ein/aus. */
@@ -15,6 +16,7 @@ interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
 
 export function Card({
   title,
+  icon,
   action,
   children,
   className = '',
@@ -27,6 +29,7 @@ export function Card({
   return (
     <MockCard
       title={title}
+      icon={icon}
       actions={action}
       collapsible={collapsible}
       defaultOpen={defaultOpen}

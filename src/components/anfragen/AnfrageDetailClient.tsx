@@ -799,7 +799,7 @@ export function AnfrageDetailClient({
       })
     }
     const verloren = statusActions.find((a) => a.id === 'verloren')
-    if (verloren && !hatAuftrag && !istAkut) {
+    if (verloren && !hatAuftrag) {
       items.push({
         label: 'Absagen',
         danger: true,
@@ -958,8 +958,6 @@ export function AnfrageDetailClient({
       render: () => (
         <AnfrageZahlungTab
           rechnungen={projektKontext?.rechnungen ?? []}
-          onWeitereRechnung={openWeitereRechnung}
-          weitereRechnungDisabled={pending}
         />
       ),
     },

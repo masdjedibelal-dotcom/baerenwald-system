@@ -251,8 +251,9 @@ export function VorgaengeListeClient({
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   /** Aufgeklappte Korrektur-Ketten entfallen — eine Card pro Vorgang. */
+  // Beim Kunden eingebettet ist die Kunden-Spalte doppelt.
   const visibleCols: Record<DataColId, boolean> = {
-    kunde: true,
+    kunde: !restrictKundeId,
     titel: true,
     phase: true,
     wert: true,
@@ -536,11 +537,13 @@ export function VorgaengeListeClient({
 
   const showHwEingang = filter === 'rechnung' && rechnungRichtung === 'eingehend'
   /** Offen/Erledigt-Toggle bei „Alle“ und „Rechnung“. */
-  const showLifecycleToggle = filter === 'alle' || filter === 'rechnung'
+  // Eingebettet (Kunde, Partner, Objekt): einfach alle Vorgänge, ohne Phasen-Chips und Offen/Erledigt.
+  const showLifecycleToggle = !embedded && (filter === 'alle' || filter === 'rechnung')
   const effectiveLifecycleCounts = lifecycleCounts
 
   /** Erledigt-Filter unter „Alle“ und „Rechnung“; andere Phasen nur Offen. */
   const lifecycleRows = useMemo(() => {
+    if (embedded) return baseRows
     let next = baseRows
     if (filter === 'rechnung') {
       next = next.filter((v) => {
@@ -560,7 +563,7 @@ export function VorgaengeListeClient({
       )
     }
     return next
-  }, [baseRows, lifecycle, filter, rechnungRichtung])
+  }, [baseRows, lifecycle, filter, rechnungRichtung, embedded])
 
   const statusOptions = useMemo(() => {
     // Optionen aus den tatsächlich sichtbaren Status-Wörtern der aktuellen Ansicht
@@ -1015,6 +1018,9 @@ export function VorgaengeListeClient({
     <div>
       <div className="listbar">
         <div className="listbar-main">
+          {embedded ? (
+            <div className="listbar-chips" />
+          ) : (
           <div className="listbar-chips" role="group" aria-label="Phase">
             {VORGANG_FILTERS.filter((p): boolean => p !== 'bestand').map((p) => (
               <MockChip
@@ -1058,6 +1064,7 @@ export function VorgaengeListeClient({
               </>
             ) : null}
           </div>
+          )}
           <MockListbarChrome
             title="Listen-Aktionen"
             activeHint={activeFilterCount}
@@ -1321,7 +1328,7 @@ export function VorgaengeListeClient({
                   ? 'Keine erledigten Vorgänge'
                   : 'Keine offenen Vorgänge'
             }
-            hint={vorgaengeEmptyHint({ showLifecycleToggle, lifecycle, filter })}
+            hint={embedded ? undefined : vorgaengeEmptyHint({ showLifecycleToggle, lifecycle, filter })}
             action={
               showLifecycleToggle && lifecycle !== 'offen' ? (
                 <MockBtn kind="ghost" onClick={() => setLifecycleFilter('offen')}>
@@ -1350,13 +1357,13 @@ export function VorgaengeListeClient({
               } else if (v.phase === 'rechnung') runDuplicateRechnung(v.entityId, router)
               else toast.info(TOAST.kopieren_fuer_diesen_typ_noch_nicht_verfuegbar)
             }
-            const edit = () => openDetail(v)
+            // Aktionsmodell: Kopieren nur beim Angebot, Löschen nur solange Entwurf bzw. neue Anfrage.
+            const kopierbar = v.phase === 'angebot'
+            const loeschbar = label === 'Entwurf' || (v.phase === 'anfrage' && label === 'Neu')
             const rowMenu: EntityMenuItem[] = [
               { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(v) },
-              { icon: 'pencil', label: 'Bearbeiten', onClick: edit },
-              { icon: 'copy', label: 'Duplizieren', onClick: copy },
-              'sep',
-              { icon: 'trash', label: 'Löschen', danger: true, onClick: del },
+              ...(kopierbar ? [{ icon: 'copy', label: 'Als neues Angebot', onClick: copy }] : []),
+              ...(loeschbar ? (['sep', { icon: 'trash', label: 'Löschen', danger: true, onClick: del }] as EntityMenuItem[]) : []),
             ]
             const row = (
               <div
@@ -1464,16 +1471,13 @@ export function VorgaengeListeClient({
                 <SwipeRow
                   disabled={!isMobile}
                   leftActions={
-                    isMobile
+                    isMobile && loeschbar
                       ? [{ icon: 'trash', label: 'Löschen', onClick: del, tone: 'danger' }]
                       : undefined
                   }
                   rightActions={
-                    isMobile
-                      ? [
-                          { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
-                          { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
-                        ]
+                    isMobile && kopierbar
+                      ? [{ icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' }]
                       : undefined
                   }
                 >

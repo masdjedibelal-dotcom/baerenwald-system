@@ -152,14 +152,8 @@ export function KundeDetailClient({
   )
   const istSpam = Boolean(kunde.ist_spam)
 
-  const detailMenuItems = useMemo((): ActionsMenuItem[] => {
-    return [
-      {
-        label: 'Mit anderem Kunden zusammenführen',
-        onClick: () => setMergePickerOpen(true),
-      },
-    ]
-  }, [])
+  // Entlastung 01.10.2026: „Mit anderem Kunden zusammenführen“ entfällt (Code folgt in der Lösch-Sitzung).
+  const detailMenuItems = useMemo((): ActionsMenuItem[] => [], [])
 
   useEffect(() => {
     void (async () => {
@@ -659,14 +653,6 @@ export function KundeDetailClient({
               onClick: () => {
                 showRouteBusy('Angebot wird geöffnet…')
                 router.push(createAngebotHref(kunde.id))
-              },
-            }}
-            secondary={{
-              label: 'Rechnung erstellen',
-              icon: 'receipt',
-              onClick: () => {
-                showRouteBusy('Rechnung wird geöffnet…')
-                router.push(createRechnungHref(kunde.id))
               },
             }}
             menuItems={detailMenuItems}

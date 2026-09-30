@@ -32,7 +32,7 @@
     --placeholder: var(--text-3);
     /* Form-Inputs: abgesetzt vom Sheet/Card-Weiß; Border klarer als --border-strong */
     --input-bg: var(--bg-soft);
-    --input-border: #bdb8b0;
+    --input-border: #cfcbc4;
     /* Sheets / Modals: Hintergrund weich blurren, nicht grau zudecken */
     --overlay-scrim: rgba(20, 24, 31, 0.22);
     --overlay-scrim-strong: rgba(20, 24, 31, 0.32);
@@ -259,7 +259,7 @@
       --card-mobile: #ffffff;
       --bg-soft: #f3f5f3;
       --input-bg: var(--bg-soft);
-      --input-border: rgba(22, 32, 27, 0.22);
+      --input-border: rgba(22, 32, 27, 0.16);
       /* Mobil: mehr Blur, leichter Scrim — Hintergrund bleibt sichtbar */
       --overlay-scrim: rgba(20, 24, 31, 0.26);
       --overlay-scrim-strong: rgba(20, 24, 31, 0.36);

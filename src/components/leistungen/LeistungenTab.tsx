@@ -2,6 +2,7 @@
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
+import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { useMemo, useState, type ReactNode } from 'react'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -393,18 +394,21 @@ export function LeistungenTab({
     return (
       <div className="lt-root space-y-3">
         <LeistungenMaengelCard maengel={maengel} />
-        <MockEmpty
-          icon="clipboard-list"
-          title={emptyTitle}
-          hint={emptyHint ?? hint ?? undefined}
-          action={
-            onOpenDokument ? (
-              <MockBtn type="button" kind="secondary" onClick={onOpenDokument}>
-                {dokLabel}
-              </MockBtn>
-            ) : undefined
-          }
-        />
+        {/* Leere Tabs einheitlich: Karte mit Titel, darin derselbe Leerzustand */}
+        <MockCard title="Leistungen" icon="tool">
+          <MockEmpty
+            icon="clipboard-list"
+            title={emptyTitle}
+            hint={emptyHint ?? hint ?? undefined}
+            action={
+              onOpenDokument ? (
+                <MockBtn type="button" kind="secondary" onClick={onOpenDokument}>
+                  {dokLabel}
+                </MockBtn>
+              ) : undefined
+            }
+          />
+        </MockCard>
         {belowTable}
       </div>
     )

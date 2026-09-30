@@ -484,6 +484,7 @@ export function AuftragDokumenteTab({
         className="dshell-framed"
         collapsible={false}
         title={`Dokumente · ${zeilen.length}`}
+        icon="files"
       >
         {!isMobile ? (
           <>

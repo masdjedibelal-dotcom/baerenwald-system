@@ -464,7 +464,7 @@ export function AngebotDetailPageClient({
   }
   if (dangerAction) {
     angebotMenuItems.push({
-      label: 'Ablehnen',
+      label: 'Kunde hat abgelehnt',
       icon: <MockIcon ctx="btn" n="x" size={16} />,
       onClick: () => dangerAction.onClick?.(),
     })
@@ -1047,36 +1047,14 @@ export function AngebotDetailPageClient({
       <EditorSheet
         open={ablehnenOpen}
         onClose={() => setAblehnenOpen(false)}
-        title="Angebot ablehnen"
+        title="Kunde hat abgelehnt"
         size="md"
-      >
-        <div className="space-y-4">
-          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-            Markiert das Angebot als abgelehnt und schließt die Anfrage.
-          </p>
-          {/* Fehler hier im Sheet zeigen — sonst steht er unsichtbar hinter dem Sheet */}
-          {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
-          <Combobox label="Grund" id="ablehnung_grund" name="ablehnung_grund" required options={[
-              { value: '', label: 'Grund wählen' },
-              ...KUNDE_ABLEHNUNG_GRUND_OPTIONS.map((v) => ({
-                value: v,
-                label: KUNDE_ABLEHNUNG_GRUND_LABELS[v],
-              })),
-            ]} value={ablehnenGrund == null ? '' : String(ablehnenGrund)} placeholder="Auswählen…" onChange={(next) => { setAblehnenGrund(next as KundeAblehnungGrund | ''); clearFieldErrors() }} />
-          {(ablehnenGrund === 'konkurrenz' || ablehnenGrund === 'zu_teuer') && (
-            <MockField label="Konkurrenzpreis (€, optional)"><MockInput type="number" min={0} step="0.01" value={ablehnenKonkurrenz} onChange={(e) => setAblehnenKonkurrenz(e.target.value)} /></MockField>
-          )}
-          <MockField label="Notiz (optional)"><MockInput value={ablehnenNotiz} onChange={(e) => setAblehnenNotiz(e.target.value)} /></MockField>
-        </div>
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <MockBtn type="button" kind="secondary" onClick={() => setAblehnenOpen(false)}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn
-            type="button"
-            kind="danger"
-            loading={pending}
-            onClick={() => {
+        secondary={{ label: 'Abbrechen', kind: 'ghost', disabled: pending }}
+        primary={{
+          label: 'Als abgelehnt speichern',
+          busy: pending,
+          disabled: pending,
+          onClick: () => {
               if (!ablehnenGrund) {
                 applyFieldErrors({ _form: TOAST.bitte_einen_ablehnungsgrund_waehlen })
                 return
@@ -1104,10 +1082,26 @@ export function AngebotDetailPageClient({
                 setAblehnenOpen(false)
                 refresh()
               })
-            }}
-          >
-            Ablehnen
-          </MockBtn>
+            },
+        }}
+      >
+        <div className="space-y-4">
+          <p className="text-[length:var(--fs-text)] text-bw-text-muted">
+            Das Angebot wird als abgelehnt gespeichert und der Vorgang geschlossen.
+          </p>
+          {/* Fehler hier im Sheet zeigen — sonst steht er unsichtbar hinter dem Sheet */}
+          {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
+          <Combobox label="Grund" id="ablehnung_grund" name="ablehnung_grund" required options={[
+              { value: '', label: 'Grund wählen' },
+              ...KUNDE_ABLEHNUNG_GRUND_OPTIONS.map((v) => ({
+                value: v,
+                label: KUNDE_ABLEHNUNG_GRUND_LABELS[v],
+              })),
+            ]} value={ablehnenGrund == null ? '' : String(ablehnenGrund)} placeholder="Auswählen…" onChange={(next) => { setAblehnenGrund(next as KundeAblehnungGrund | ''); clearFieldErrors() }} />
+          {(ablehnenGrund === 'konkurrenz' || ablehnenGrund === 'zu_teuer') && (
+            <MockField label="Konkurrenzpreis (€, optional)"><MockInput type="number" min={0} step="0.01" value={ablehnenKonkurrenz} onChange={(e) => setAblehnenKonkurrenz(e.target.value)} /></MockField>
+          )}
+          <MockField label="Notiz (optional)"><MockInput value={ablehnenNotiz} onChange={(e) => setAblehnenNotiz(e.target.value)} /></MockField>
         </div>
       </EditorSheet>
 

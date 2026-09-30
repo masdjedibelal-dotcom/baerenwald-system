@@ -816,14 +816,14 @@ background: var(--green);
   box-shadow: var(--sh-2);
 }
 
-.btn.btn-assistent:hover {
+.btn-assistent:hover {
 background: var(--green-dark, #1A3D2B);
   border-color: transparent;
   color: #fff;
   box-shadow: var(--sh-2);
 }
 
-.btn.btn-assistent.is-open {
+.btn-assistent.is-open {
 box-shadow: var(--sh-2);
 }
 
@@ -1023,7 +1023,7 @@ width: 26px;
 }
 
 /* MediaThumb als MockBtn — feste Shell-Größe, kein .btn height:32 */
-.btn.media-thumb-btn {
+.media-thumb-btn {
 height: auto;
   min-height: 0;
   padding: 0;
@@ -1034,7 +1034,7 @@ height: auto;
   align-items: stretch;
   gap: 0;
 }
-.btn.media-thumb-btn:hover {
+.media-thumb-btn:hover {
 background: transparent;
   border-color: transparent;
 }
@@ -4391,13 +4391,13 @@ font-size: var(--fs-meta);
 .grid-2, .grid-3 { grid-template-columns: 1fr; }
 }
 
-.btn.kpi-tile {
+.kpi-tile {
   height: auto;
   min-height: 64px;
   white-space: normal;
   overflow: visible;
 }
-.btn.detail-quickbar__btn {
+.detail-quickbar__btn {
   height: auto;
   min-height: 64px;
   white-space: normal;
@@ -4450,7 +4450,7 @@ margin-bottom: 22px;
     justify-content: flex-start;
     touch-action: pan-x;
   }
-  .dashboard-page .btn.kpi-tile {
+  .dashboard-page .kpi-tile {
     height: auto;
     min-height: 78px;
     white-space: normal;
@@ -7155,7 +7155,7 @@ list-style: none;
 
 /* Mobile .btn { min-height: 44px; white-space: nowrap } darf Katalog nicht beschneiden */
 @media (pointer: coarse), (max-width: 767px) {
-  .btn.sofortmassnahme-faelle__katalog-btn {
+  .sofortmassnahme-faelle__katalog-btn {
     height: auto;
     min-height: 0;
     min-width: 0;
@@ -20567,7 +20567,7 @@ display: flex;
     justify-content: space-between;
     gap: 4px;
   }
-.cal-toolbar__arrow.btn {
+.cal-toolbar__arrow {
     width: 40px;
     min-width: 40px;
     height: 40px;
@@ -21358,12 +21358,12 @@ display: inline-flex;
 }
 
 .ap-list__head {
-  background: var(--bg-soft);
+  /* wie die Kopfzeilen der übrigen Tabellen: ruhig, normale Schreibweise, keine graue Fläche */
+  background: transparent;
   font-size: var(--fs-meta);
   font-weight: 600;
-  color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: var(--text-2);
+  border-bottom: 0.5px solid var(--border);
 }
 
 .ap-list__row + .ap-list__row {
@@ -21392,10 +21392,10 @@ display: flex;
 }
 
 /* ── Detail-Listen: Hit ohne .btn-Chrome (sonst Box-in-Box + nowrap) ── */
-.btn.ap-list__hit,
-.btn.ap-mobile-card__hit,
-.ap-list__hit.btn,
-.ap-mobile-card__hit.btn {
+.ap-list__hit,
+.ap-mobile-card__hit,
+.ap-list__hit,
+.ap-mobile-card__hit {
   height: auto;
   min-height: 0;
   min-width: 0;
@@ -21413,10 +21413,10 @@ display: flex;
   justify-content: flex-start;
 }
 
-.btn.ap-list__hit:hover,
-.btn.ap-mobile-card__hit:hover,
-.btn.ap-list__hit:active,
-.btn.ap-mobile-card__hit:active {
+.ap-list__hit:hover,
+.ap-mobile-card__hit:hover,
+.ap-list__hit:active,
+.ap-mobile-card__hit:active {
   background: transparent;
   border: none;
   box-shadow: none;
@@ -21424,8 +21424,8 @@ display: flex;
 }
 
 /* Desktop: Hit spannt die Datenspalten; Kinder folgen dem Parent-Grid */
-.ap-list__row .ap-list__hit.btn,
-.ap-list__row--select .ap-list__hit.btn {
+.ap-list__row .ap-list__hit,
+.ap-list__row--select .ap-list__hit {
   display: grid;
   grid-column: 1 / -2;
   grid-template-columns: subgrid;
@@ -21435,7 +21435,7 @@ display: flex;
   text-align: left;
 }
 
-.ap-list__row--select .ap-list__hit.btn {
+.ap-list__row--select .ap-list__hit {
   grid-column: 2 / -2;
 }
 
@@ -21485,7 +21485,7 @@ display: flex;
   box-shadow: none;
 }
 
-.ap-mobile-card--row .ap-mobile-card__hit.btn {
+.ap-mobile-card--row .ap-mobile-card__hit {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -21922,4 +21922,72 @@ display: flex;
     pointer-events: none;
     background: linear-gradient(to right, transparent, var(--bg-mobile));
   }
+}
+
+/* Blätter (Sheets) ruhig: weiße Fläche, helle Feldränder, Felder mit Luft, Zwischenüberschriften normal geschrieben */
+.editor-sheet__body { background: var(--card); }
+.editor-sheet__body > .field + .field,
+.editor-sheet__body > .field + :is(p, div),
+.editor-sheet__body > :is(p, div) + .field { margin-top: 16px; }
+.editor-sheet__body :is(input.input, input.txt, textarea.input, textarea.txt, select.input, select.txt, .combobox-trigger) {
+  border-color: var(--border-strong);
+}
+.editor-sheet__body :is(input.input, input.txt, textarea.input, textarea.txt, select.input, select.txt):focus {
+  border-color: var(--green);
+}
+.editor-sheet__body .form-section-h {
+  font-size: var(--fs-text);
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin-bottom: 8px;
+}
+
+
+/* Design 01.10.2026: keine SPERR-GROSSBUCHSTABEN mehr in Beschriftungen (Apple-ruhig) */
+.sidebar-section,
+.search-drop .pop-h,
+.search-sheet-body .pop-h,
+.vgid-portal-fold > summary,
+.vgp-table-row--head > span,
+.vgp-table-here,
+.angebot-ki__lbl,
+.detail-soft-block__h,
+.mkt-funnel-h,
+.section-h,
+.form-section-h,
+.marge-bar .k,
+.pt2-sub .g,
+.vg-grp,
+.popover .pop-h,
+.cmdk-group,
+.neu-pop-head,
+.prop-l,
+.filter-range__title,
+.hw-zuw-ek-head,
+.hw-anfrage-section-head,
+.pos-v3-table .pos-v3-gewerk-name,
+.zahlplan-gruppe__h,
+.zahlplan-shell > .card-h .title,
+.zahlplan-shell > .card-h .card-title,
+.dshell-cards .zahlplan-shell > .card-h .title,
+.dshell-cards .zahlplan-shell > .card-h .card-title,
+.list-row.zahlplan-row .zahlplan-row__faellig-label,
+.rate-drawer-sec-h,
+.lt-maengel__title,
+.lt-maengel__cols,
+.ldr-sec-h,
+.lt-mobile-gewerk__name,
+.abschluss-canvas-sec__h,
+.ki-pos-draft__head {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Tabellen: Etiketten (Typ, Gewerk) auf derselben Höhe wie der Text der Zeile */
+@media (min-width: 768px) {
+  .list-row > .lc-pills { display: flex; align-items: center; align-self: center; gap: 4px; }
+  .list-row > .lc-pills > .meta-tag { line-height: 1.4; }
 }

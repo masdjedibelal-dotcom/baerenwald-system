@@ -155,7 +155,7 @@ export function ObjektAkteDetailClient({
         <ObjektUebersichtKpiCard
           kpis={kpis}
           jahr={jahr}
-          onHistorieClick={() => setTab('historie')}
+          onHistorieClick={() => setTab('vorgaenge')}
           onBerichtClick={() => setBerichtOpen(true)}
         />
       ) : null}
@@ -297,19 +297,7 @@ export function ObjektAkteDetailClient({
         />
       ),
     },
-    {
-      id: 'historie',
-      label: 'Historie',
-      icon: 'history',
-      count: historieRows.length || undefined,
-      render: () => (
-        <ObjektHistorieSection
-          rows={historieRows}
-          einheiten={einheiten.map((e) => ({ id: e.id, bezeichnung: e.bezeichnung }))}
-          anlagen={akte.anlagen.map((a) => ({ id: a.id, bezeichnung: a.bezeichnung }))}
-        />
-      ),
-    },
+    // Historie entfällt: zeigte dieselben Vorgänge wie der Tab „Vorgänge“ (eine Wahrheit, 01.10.2026).
     {
       id: 'vorgaenge',
       label: 'Vorgänge',

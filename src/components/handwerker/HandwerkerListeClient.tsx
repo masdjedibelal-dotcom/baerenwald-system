@@ -591,7 +591,6 @@ export function HandwerkerListeClient({
             const rowMenu: EntityMenuItem[] = [
               { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(h.id) },
               { icon: 'pencil', label: 'Bearbeiten', onClick: edit },
-              { icon: 'copy', label: 'Duplizieren', onClick: copy },
               'sep',
               { icon: 'trash', label: 'Löschen', danger: true, onClick: del },
             ]
@@ -706,7 +705,6 @@ export function HandwerkerListeClient({
                   isMobile
                     ? [
                         { icon: 'pencil', label: 'Bearbeiten', onClick: edit, tone: 'primary' },
-                        { icon: 'copy', label: 'Kopieren', onClick: copy, tone: 'accent' },
                       ]
                     : undefined
                 }
