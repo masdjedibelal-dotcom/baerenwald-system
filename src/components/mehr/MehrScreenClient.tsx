@@ -2,13 +2,11 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
-import { createClient } from '@/lib/supabase'
+import { abmelden } from '@/lib/auth/abmelden-client'
 import { MEHR_TILE_NAV } from '@/lib/nav-config'
 
 export function MehrScreenClient({
@@ -23,26 +21,13 @@ export function MehrScreenClient({
   const router = useRouter()
   const [logoutLoading, setLogoutLoading] = useState(false)
 
-  function handleLogout() {
-    openActionConfirm({
-      title: 'Wirklich abmelden?',
-      body: 'Sie werden aus dem CRM abgemeldet.',
-      confirmLabel: 'Abmelden',
-      cancelLabel: 'Abbrechen',
-      danger: true,
-      busyLabel: null,
-      onConfirm: async () => {
-        setLogoutLoading(true)
-        try {
-          const supabase = createClient()
-          await supabase.auth.signOut({ scope: 'local' })
-          router.replace('/login')
-          afterServerActionRefresh()
-        } finally {
-          setLogoutLoading(false)
-        }
-      },
-    })
+  async function handleLogout() {
+    setLogoutLoading(true)
+    try {
+      await abmelden(router)
+    } finally {
+      setLogoutLoading(false)
+    }
   }
 
   return (

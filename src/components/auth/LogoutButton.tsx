@@ -3,34 +3,20 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { LogOut } from 'lucide-react'
-import { createClient } from '@/lib/supabase'
+import { abmelden } from '@/lib/auth/abmelden-client'
 import { MockBtn } from '@/components/mock-ui'
-import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 
 export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
-  function handleLogout() {
-    openActionConfirm({
-      title: 'Wirklich abmelden?',
-      body: 'Sie werden aus dem CRM abgemeldet.',
-      confirmLabel: 'Abmelden',
-      cancelLabel: 'Abbrechen',
-      danger: true,
-      busyLabel: null,
-      onConfirm: async () => {
-        setLoading(true)
-        try {
-          const supabase = createClient()
-          await supabase.auth.signOut({ scope: 'local' })
-          router.replace('/login')
-          router.refresh()
-        } finally {
-          setLoading(false)
-        }
-      },
-    })
+  async function handleLogout() {
+    setLoading(true)
+    try {
+      await abmelden(router)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

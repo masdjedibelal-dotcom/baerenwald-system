@@ -3,12 +3,11 @@
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockPopover } from '@/components/mock-ui/MockPopover'
-import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase'
+import { abmelden } from '@/lib/auth/abmelden-client'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
 import { TopBarSearch } from '@/components/layout/TopBarSearch'
 import { CrmNotificationsBell } from '@/components/notifications/CrmNotificationsBell'
@@ -131,26 +130,13 @@ export function TopBar({ user }: TopBarProps) {
   const [logoutLoading, setLogoutLoading] = useState(false)
 
   async function handleLogout() {
-    openActionConfirm({
-      title: 'Wirklich abmelden?',
-      body: 'Sie werden aus dem CRM abgemeldet.',
-      confirmLabel: 'Abmelden',
-      cancelLabel: 'Abbrechen',
-      danger: true,
-      busyLabel: null,
-      onConfirm: async () => {
-        setLogoutLoading(true)
-        setMenuOpen(false)
-        try {
-          const supabase = createClient()
-          await supabase.auth.signOut({ scope: 'local' })
-          router.replace('/login')
-          router.refresh()
-        } finally {
-          setLogoutLoading(false)
-        }
-      },
-    })
+    setLogoutLoading(true)
+    setMenuOpen(false)
+    try {
+      await abmelden(router)
+    } finally {
+      setLogoutLoading(false)
+    }
   }
 
   function goEinstellungen() {
