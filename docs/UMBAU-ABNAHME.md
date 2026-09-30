@@ -500,3 +500,29 @@ Das kommt jeweils in einer eigenen Sitzung:
 
 - Der Code der entfallenen Wege bleibt vorerst stehen und wird in der Lösch-Sitzung mit Backup entfernt.
 - Produktion ist unverändert.
+
+# Design-Fundament (30.09.2026)
+
+### Was ist anders
+
+- **Einheitliche Grund-Werte:** Radien in 4 Stufen, Schriftstärken 400/500/600, kurze Übergänge 150/250 ms, Schatten in 3 Stufen.
+  - 317 Radien, 138 Gewichte, 197 Übergänge und 67 Schatten laufen jetzt über diese Werte.
+  - Die Build-Prüfung `check-design-tokens` verhindert neue freie Werte.
+- **Stammdaten in Detailseiten:** stehen als ruhige Zeilen mit Bezeichnung und Wert da, ohne graue Kästen. Beim Überfahren oder Antippen erscheint das Feld.
+- **Handy:**
+  - Die Tab-Leiste bleibt immer stehen, die Aktionsleiste liegt fest darüber. Nichts springt mehr beim Scrollen.
+  - „+“ sitzt oben in der Kopfleiste. Die Tab-Leiste enthält nur noch Navigation.
+- **Desktop:** Kein schwebender Plus-Knopf mehr, „+“ sitzt oben.
+- **Abmelden:** ohne Rückfrage.
+
+### So testen Sie
+
+1. Eine Rechnung oder einen Auftrag öffnen. Die Stammdaten wirken ruhig, ein Klick in einen Wert zeigt das Feld.
+2. Auf dem Handy scrollen. Tab-Leiste und Aktionsleiste bleiben stehen.
+3. Oben auf „+“ tippen. Das Menü „Neu“ öffnet sich.
+
+### Bewusst noch nicht
+
+- **Ebenen (z-index):** bleiben unverändert, weil ein Risiko für verdeckte Knöpfe besteht.
+- **Dialoge von 60 auf 3 Arten:** eigenes Paket beim Löschen der alten Wege, weil dann viele Dialoge ohnehin wegfallen.
+- **Rückfragen:** Von 18 echten sind 15 berechtigt (Versenden, Stornieren, Löschen). Abmelden ist weg.
