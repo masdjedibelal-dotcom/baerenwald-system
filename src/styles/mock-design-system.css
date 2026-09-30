@@ -21702,3 +21702,36 @@ display: flex;
 .form-mehr__summary::before { content: '+'; font-weight: 700; }
 .form-mehr[open] > .form-mehr__summary::before { content: '–'; }
 .form-mehr__body { margin-top: 8px; }
+
+/* P22: Phasenleiste im Vorgang (ein Vorgang = eine Leiste, 30.09.2026) */
+.detail-phase-bar {
+  gap: 0;
+  margin: 4px 0 10px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--bg-soft);
+  width: fit-content;
+  max-width: 100%;
+}
+.detail-phase-bar .phase-strip__chev { display: none; }
+.detail-phase-bar .phase-strip__active,
+.detail-phase-bar .phase-strip__link,
+.detail-phase-bar .phase-strip__empty {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: var(--fs-meta);
+}
+.detail-phase-bar .phase-strip__active {
+  background: var(--card);
+  color: var(--green-dark);
+  box-shadow: 0 1px 2px rgba(22, 32, 27, 0.08);
+}
+.detail-phase-bar .phase-strip__link { color: var(--text-2); }
+@media (max-width: 767px) {
+  .detail-phase-bar .phase-strip__active,
+  .detail-phase-bar .phase-strip__link,
+  .detail-phase-bar .phase-strip__empty { min-height: 44px; }
+}

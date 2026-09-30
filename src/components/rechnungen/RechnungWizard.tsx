@@ -347,7 +347,7 @@ export function RechnungWizard({
   const [abschlussMitVersand, setAbschlussMitVersand] = useState(false)
   const [abschlussBusy, setAbschlussBusy] = useState(false)
   const [sheet, setSheet] = useState<
-    'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | 'abschluss' | null
+    'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | 'abschluss' | 'pruefen' | null
   >(null)
   const [planEditorOpen, setPlanEditorOpen] = useState(false)
 
@@ -985,6 +985,22 @@ export function RechnungWizard({
     return persistEinzel(opts)
   }
 
+  /** P23/A6: Schritt 3 „Prüfen und senden“ — Entwurf speichern, PDF zeigen, dort senden. */
+  async function openPruefenSheet() {
+    setPreviewLoading(true)
+    setSheet('pruefen')
+    try {
+      const id = await persistDraft({ manageBusy: false, silent: false })
+      if (!id) {
+        setSheet(null)
+        return
+      }
+      setPreviewRechnungId(id)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   async function openVorschauSheet() {
     setPreviewLoading(true)
     setSheet('vorschau')
@@ -1463,6 +1479,28 @@ export function RechnungWizard({
         manageHistory={false}
         draftDirty={draftDirty}
         lastSavedAt={lastSavedAt}
+        sections={[
+          {
+            id: 'kunde',
+            label: '1 Kunde',
+            complete: Boolean(kundeId?.trim()) && versandComplete,
+            onClick: () => setSheet('kunde'),
+          },
+          { id: 'positionen', label: '2 Positionen', complete: hatLeistungszeile },
+          {
+            id: 'pruefen',
+            label: '3 Prüfen und senden',
+            complete: false,
+            onClick: () => {
+              if (saving) return
+              if (getRechnungSendGaps().length > 0) {
+                toast.info('Bitte zuerst Kunde und Positionen ergänzen.')
+                return
+              }
+              openPruefenSheet()
+            },
+          },
+        ]}
         draftAction={{
           onClick: () => {
             if (saving || (hasPlan && !planOk)) return
@@ -1472,12 +1510,60 @@ export function RechnungWizard({
           disabled: hasPlan && !planOk,
         }}
         primaryAction={{
-          label: COPY_BUTTON.rechnungErstellen,
-          onClick: requestVersenden,
+          label: 'Weiter: Prüfen',
+          onClick: () => {
+            if (saving) return
+            openPruefenSheet()
+          },
           busy: saving,
           getGaps: getRechnungSendGaps,
         }}
       />
+
+      <EditorSheet
+        open={sheet === 'pruefen'}
+        onClose={closeSheet}
+        title="Prüfen und senden"
+        context="canvas"
+        size="lg"
+        primary={{
+          label: istKorrekturVersand ? 'Korrektur senden' : 'Rechnung senden',
+          onClick: () => {
+            if (saving) return
+            setSheet(null)
+            void handleFinish(true)
+          },
+          busy: saving,
+          disabled: previewLoading || !vorschauRechnungId,
+        }}
+      >
+        <div className="wizard-pruefen">
+          <div className="gfc">
+            <div className="gfc-row">
+              <span className="gfc-l">Kunde</span>
+              <span className="gfc-v">{kundeName?.trim() || '—'}</span>
+            </div>
+            <div className="gfc-row">
+              <span className="gfc-l">An</span>
+              <span className="gfc-v">{mailTo.filter(Boolean).join(', ') || kundeEmail || '—'}</span>
+            </div>
+            <div className="gfc-row">
+              <span className="gfc-l">Betrag brutto</span>
+              <span className="gfc-v">{formatEurBetrag(rBrutto)}</span>
+            </div>
+          </div>
+          {istKorrekturMitStorno ? (
+            <p className="text-[length:var(--fs-meta)] text-bw-text-muted">
+              Storno-Gutschrift und neue Rechnung gehen als zwei PDFs an den Kunden.
+            </p>
+          ) : null}
+          <RechnungWizardPdfPreview
+            rechnungId={vorschauRechnungId}
+            loading={previewLoading || !vorschauRechnungId}
+            kundeName={kundeName}
+          />
+        </div>
+      </EditorSheet>
 
       <EditorSheet
         open={sheet === 'kunde'}

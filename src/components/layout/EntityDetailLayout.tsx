@@ -12,6 +12,7 @@ import {
 } from '@/components/vorgang/VorgangResolverBanner'
 import { AkteRueckwegChip } from '@/components/vorgang/AkteRueckwegChip'
 import { DetailQuickBar, type QuickBarAction } from '@/components/vorgang/DetailQuickBar'
+import { PhaseStrip } from '@/components/vorgang/PhaseStrip'
 import type { WiedervorlageEntity } from '@/app/(dashboard)/vorgaenge/wiedervorlage-actions'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { ResolvedVorgang } from '@/lib/vorgang/types'
@@ -318,6 +319,7 @@ export type EntityDetailLayoutProps = {
  */
 export function EntityDetailLayout({
   resolvedVorgang,
+  projektKontext,
   head,
   quickBar,
   crumbBackHref,
@@ -363,6 +365,8 @@ export function EntityDetailLayout({
             </div>
           </div>
           {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
+          {/* P22: ein Vorgang — Phasenleiste Anfrage → Angebot → Auftrag → Rechnung */}
+          {projektKontext ? <PhaseStrip kontext={projektKontext} className="detail-phase-bar" /> : null}
           <DetailHead
             title={head.title}
             badges={head.badges}

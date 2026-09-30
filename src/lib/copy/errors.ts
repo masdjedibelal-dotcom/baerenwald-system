@@ -1,6 +1,6 @@
 /**
  * Fehler- / Systemtexte + userMessage()-Helfer.
- * Toasts ≤ 8 Wörter; Technik nur ins Log (logDbError), nie roh anzeigen.
+ * Nutzertexte vollständig anzeigen; Technik nur ins Log (logDbError), nie roh anzeigen.
  */
 import { logDbError } from '@/lib/errors/log-db-error'
 
@@ -42,7 +42,9 @@ function extractRaw(error: unknown): string | null {
 
 function looksTechnical(text: string): boolean {
   if (TECH_RE.test(text)) return true
-  if (text.length > 120) return true
+  // Verständliche Sätze (z. B. „Die Summe der Rechnungen … übersteigt …“) nicht verschlucken —
+  // sonst sieht der Nutzer nur „Speichern fehlgeschlagen“ und weiß nicht, was zu tun ist.
+  if (text.length > 280) return true
   if (/^[A-Z]{2,}_[A-Z0-9_]+$/.test(text)) return true
   return false
 }
@@ -56,8 +58,8 @@ export function userMessage(error: unknown, fallback: string = COPY_ERROR.generi
   return clipToast(raw)
 }
 
-/** Toast-Budget ≤ 8 Wörter (harte Kürzung nur als Schutz). */
-export function clipToast(text: string, maxWords = 8): string {
+/** Schutz gegen Endlos-Texte — ganze Sätze bleiben erhalten (vorher 8 Wörter, mitten im Satz). */
+export function clipToast(text: string, maxWords = 40): string {
   const words = text.trim().split(/\s+/).filter(Boolean)
   if (words.length <= maxWords) return text.trim()
   return `${words.slice(0, maxWords).join(' ')}…`
