@@ -17,7 +17,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
-import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
@@ -654,15 +653,6 @@ export function RechnungDetailClient({
     <div className="space-y-6">
       {korrekturKette ? <RechnungKorrekturKetteCard kette={korrekturKette} /> : null}
       {stammdatenInhalt}
-      {!isEingehend ? (
-        <VorgangPhasenVerlauf
-          kontext={projektKontext}
-          fromRef={{ kind: 'rechnung', id: detail.id }}
-          lead={lead}
-          extras={phasenExtras}
-          onSaved={() => refresh()}
-        />
-      ) : null}
     </div>
   )
 

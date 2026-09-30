@@ -17,7 +17,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
-import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
@@ -943,12 +942,6 @@ export function AnfrageDetailClient({
       render: () => (
         <div className="space-y-6">
           {stammdatenInhalt}
-          <VorgangPhasenVerlauf
-            kontext={projektKontext}
-            fromRef={{ kind: 'anfrage', id: lead.id }}
-            lead={lead}
-            onSaved={() => refresh()}
-          />
         </div>
       ),
     },

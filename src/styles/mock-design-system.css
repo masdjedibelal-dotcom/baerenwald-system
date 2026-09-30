@@ -629,9 +629,14 @@ box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 12%, transparent);
   border-color: color-mix(in srgb, var(--green) 45%, var(--border));
 }
 
-.topbar-search-field input {
+.topbar-search-field input,
+.topbar-search-field input.input {
 flex: 1;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  box-shadow: none;
   border: none;
   outline: none;
   background: transparent;
@@ -4465,11 +4470,9 @@ margin-bottom: 0;
 
 .dash-sec__title {
 margin: 0 0 12px;
-  font-size: var(--fs-meta);
+  font-size: var(--fs-title);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text);
 }
 
 .dash-sec__title-row {
@@ -7844,11 +7847,11 @@ display: grid;
     margin-bottom: 0;
   }
 .dshell-cards .card:not(.dshell-framed):not([style*='padding: 0']):not([style*='padding:0']) > .card-h .title {
-    font-size: var(--fs-meta);
+    /* Design 01.10.2026: ruhige Titel in normaler Schreibweise statt SPERR-GROSSBUCHSTABEN */
+    font-size: var(--fs-title);
     font-weight: 600;
-    color: var(--text-2);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    color: var(--text);
+    letter-spacing: -0.01em;
   }
 .dshell-cards .card:not(.dshell-framed):not([style*='padding: 0']):not([style*='padding:0']) > .card-b {
     padding: 14px 16px 16px;
@@ -11432,10 +11435,8 @@ font-size: var(--fs-meta);
 }
 
 .detail-next-step__label {
-  font-size: var(--fs-caption);
+  font-size: var(--fs-meta);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--green-dark);
 }
 
@@ -21746,11 +21747,80 @@ display: flex;
   padding-left: 8px;
   padding-right: 8px;
 }
-.detail-entity-body .sheet-editable-field--inline + .sheet-editable-field--inline {
-  border-top: 0.5px solid var(--border);
-  padding-top: 10px;
-}
 .detail-entity-body .sheet-editable-field--inline .lt-field-lbl {
   font-size: var(--fs-meta);
   color: var(--text-3);
+}
+
+/* Design 01.10.2026: Phasenleiste ohne Pfeile (Segment-Optik) */
+.detail-phase-bar .phase-strip__chev,
+.detail-phase-bar .mock-icon { display: none; }
+
+/* Design 01.10.2026: Stammdaten = eine Darstellung — Zeilen „Bezeichnung | Wert“ mit Trennlinie */
+.detail-entity-body .card-b .vgid > .vgid-meta { display: none; }
+.detail-entity-body .card-b .detail-soft-block {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.detail-entity-body .card-b .props { display: block; }
+.detail-entity-body .card-b :is(.props > .prop, .vgid > .sheet-editable-field--inline) {
+  border-top: 0.5px solid var(--border);
+  padding: 8px 0;
+  margin: 0;
+}
+.detail-entity-body .card-b .vgid > .sheet-editable-field--inline { border-top: 0; padding-top: 0; }
+.detail-entity-body .card-b .props > .prop:not(.prop--inline-edit),
+.detail-entity-body .card-b .sheet-editable-field--inline > .full {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+}
+.detail-entity-body .card-b .prop--inline-edit > .sheet-editable-field--inline { border: 0; padding: 0; }
+.detail-entity-body .card-b :is(.prop-l, .sheet-editable-field--inline .lt-field-lbl) {
+  margin: 0;
+  font-size: var(--fs-text);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-3);
+}
+.detail-entity-body .card-b .prop-v { font-size: var(--fs-text); font-weight: 400; color: var(--text); }
+.detail-entity-body .card-b .sheet-editable-field--inline :is(input.input, input.txt) { min-height: 32px; height: 32px; }
+@media (max-width: 767px) {
+  .detail-entity-body .card-b .props > .prop:not(.prop--inline-edit),
+  .detail-entity-body .card-b .sheet-editable-field--inline > .full {
+    grid-template-columns: 1fr;
+    row-gap: 2px;
+  }
+}
+
+/* Design 01.10.2026: Vertriebs-Funnel als ruhige Zeilen */
+.dash-funnel-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) 90px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: var(--fs-text);
+}
+.dash-funnel-row__label { color: var(--text-2); }
+.dash-funnel-row__track {
+  height: 10px;
+  border-radius: var(--r-pill);
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+.dash-funnel-row__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--green);
+}
+.dash-funnel-row__num { text-align: right; font-weight: 600; color: var(--text); }
+.dash-funnel-row__pct { font-weight: 400; color: var(--text-3); margin-left: 4px; }
+@media (max-width: 767px) {
+  .dash-funnel-row { grid-template-columns: 100px minmax(0, 1fr) 80px; }
 }

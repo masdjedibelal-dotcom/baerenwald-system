@@ -1,6 +1,6 @@
 'use client'
 
-import { MockBtn, MockChip, MockTable } from '@/components/mock-ui'
+import { MockBtn, MockChip } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useMemo, useState } from 'react'
@@ -10,7 +10,6 @@ import { DashboardLazyMount } from '@/components/dashboard/DashboardLazyMount'
 import {
   buildDashboardZeitraumHref,
   DASHBOARD_ZEITRAUM_OPTIONS,
-  gewerkColor,
   type DashboardZeitraumFilter,
   type DashboardZeitraumPreset,
   type FunnelStufe,
@@ -187,34 +186,6 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
           </svg>
         </div>
 
-        <MockTable wrapClassName="mt-4 overflow-x-auto" className="w-full min-w-[280px] border-collapse text-fs-caption leading-tight">
-            <thead>
-              <tr className="border-b border-[var(--border)]">
-                <th className="px-1 py-1 text-left font-medium text-[var(--text-3)]"> </th>
-                {safeMonths.map((m) => (
-                  <th
-                    key={m.key}
-                    className="px-1 py-1 text-right font-medium tabular-nums text-[var(--text-3)]"
-                  >
-                    {m.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-[var(--border)] font-semibold last:border-0">
-                <td className="whitespace-nowrap px-1 py-1 text-[var(--text-2)]">Gesamt</td>
-                {safeMonths.map((m) => (
-                  <td
-                    key={m.key}
-                    className="whitespace-nowrap px-1 py-1 text-right tabular-nums text-[var(--text)]"
-                  >
-                    {formatEuro(umsatzMonatGesamt(m), { rounded: true, decimals: 0 })}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-        </MockTable>
     </MockCard>
   )
 }
@@ -226,7 +197,6 @@ function VertriebsFunnel({
   stufen: FunnelStufe[]
   conversionGesamt: number
 }) {
-  const isMobile = useIsMobile()
   const safeStufen = Array.isArray(stufen) ? stufen : []
   const maxCount = Math.max(1, ...safeStufen.map((s) => Number(s.count) || 0), 1)
 
@@ -242,43 +212,18 @@ function VertriebsFunnel({
       }
       bodyClassName="space-y-2"
     >
+        {/* Design 01.10.2026: eine ruhige Zeile je Stufe — Bezeichnung · Balken · Zahl (eine Farbe) */}
         {safeStufen.map((s) => {
-          const width = Math.max(28, Math.round((s.count / maxCount) * 100))
+          const width = Math.max(4, Math.round((s.count / maxCount) * 100))
           return (
-            <div key={s.key}>
-              {isMobile ? (
-                <div className="vfunnel-row">
-                  <span className="vfunnel-label">{s.label}</span>
-                  <div className="vfunnel-track">
-                    <div
-                      className="vfunnel-bar"
-                      style={{
-                        width: `${width}%`,
-                        background: s.color,
-                      }}
-                    >
-                      <span className="vfunnel-nums tabular-nums">
-                        {s.count}
-                        <span className="vfunnel-pct"> · {s.rate}%</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="relative flex items-center justify-between rounded-card px-3 py-2.5 text-white"
-                  style={{
-                    width: `${width}%`,
-                    minWidth: '40%',
-                    background: s.color,
-                  }}
-                >
-                  <span className="text-[length:var(--fs-text)] font-medium">{s.label}</span>
-                  <span className="text-[length:var(--fs-text)] font-semibold tabular-nums">
-                    {s.count} <span className="font-normal opacity-80">· {s.rate}%</span>
-                  </span>
-                </div>
-              )}
+            <div key={s.key} className="dash-funnel-row">
+              <span className="dash-funnel-row__label">{s.label}</span>
+              <span className="dash-funnel-row__track">
+                <span className="dash-funnel-row__fill" style={{ width: `${width}%` }} />
+              </span>
+              <span className="dash-funnel-row__num tabular-nums">
+                {s.count} <span className="dash-funnel-row__pct">{s.rate}%</span>
+              </span>
             </div>
           )
         })}
@@ -318,12 +263,12 @@ function GewerkUmsatzCard({
                     <span className="text-[var(--text-3)]">({z.anteil}%)</span>
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-pill bg-[var(--bg-2)]">
+                <div className="h-2 overflow-hidden rounded-pill bg-[var(--bg-soft)]">
                   <div
                     className="h-full rounded-pill transition-[width]"
                     style={{
                       width: `${Math.max(z.anteil, z.netto > 0 ? 2 : 0)}%`,
-                      background: gewerkColor(i),
+                      background: C.green,
                     }}
                   />
                 </div>

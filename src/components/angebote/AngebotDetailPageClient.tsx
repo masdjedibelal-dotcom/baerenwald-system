@@ -22,7 +22,6 @@ import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
-import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
@@ -735,14 +734,6 @@ export function AngebotDetailPageClient({
       render: () => (
         <div className="space-y-6">
           {stammdatenInhalt}
-          {lead ? (
-            <VorgangPhasenVerlauf
-              kontext={projektKontext}
-              fromRef={{ kind: 'angebot', id: detail.id }}
-              lead={lead}
-              onSaved={() => refresh()}
-            />
-          ) : null}
         </div>
       ),
     },

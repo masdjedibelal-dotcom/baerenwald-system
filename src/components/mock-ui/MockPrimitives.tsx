@@ -55,6 +55,27 @@ export type MockBtnProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'childr
   icon?: string
 }
 
+/** Tailwind-Hilfsklassen (Layout/Abstand/Text) — machen aus einem Knopf keinen „eigenen“ Baustein. */
+const UTILITY_CLASS_RE =
+  /^!?-?(?:[a-z]+:)*(?:m[trblxy]?|p[trblxy]?|w|h|min-w|max-w|min-h|max-h|gap(?:-[xy])?|space-[xy]|flex|inline-flex|grid|inline-grid|items|justify|self|place|content|shrink|grow|basis|order|col|row|text|font|leading|tracking|truncate|whitespace|break|rounded(?:-[a-z]+)?|bg|border(?:-[a-z]+)?|shadow|opacity|hidden|block|inline|inline-block|contents|absolute|relative|fixed|sticky|static|inset(?:-[xy])?|top|left|right|bottom|z|overflow(?:-[xy])?|cursor|transition|duration|ease|underline|no-underline|italic|uppercase|lowercase|capitalize|normal-case|sr-only|aspect|object|ring(?:-[a-z]+)?|outline|pointer-events|select|visible|invisible|tabular-nums|line-clamp|fill|stroke|translate-[xy]|scale|rotate|animate)(?:-.+)?$|^(?:w-full|h-full|flex-1|flex-col|flex-row|flex-wrap|min-w-0|mx-auto|ml-auto|mr-auto)$/
+
+/**
+ * Nach dem Sammel-Umbau (b3ef4c563) wurde aus jedem `<button className="eigene-klasse">` ein MockBtn —
+ * und bekam `.btn` (feste 32 px Höhe, Rahmen, weißer Grund, kein Umbruch). Das hat Suchtreffer,
+ * Phasen-Zeilen, Kopfleisten-Icons u. a. zerlegt. Regel: eigene Komponenten-Klasse ohne Knopf-Art → kein `.btn`.
+ */
+/** Hilfsklassen, mit denen sich ein Knopf selbst gestaltet (Abstand, Größe, Fläche, Rahmen). */
+const SELBST_GESTALTET_RE =
+  /^(?:[a-z]+:)*(?:p[trblxy]?-|text-(?:xs|sm|base|lg|xl|2xl|\[)|bg-|border|rounded|h-|min-h-|shadow)/
+
+function istEigenerBaustein(className: string | undefined): boolean {
+  if (!className) return false
+  const teile = className.split(/\s+/).filter(Boolean)
+  if (teile.some((t) => t === 'btn')) return false
+  // eigene Komponenten-Klasse (z. B. editor-sheet__icon-btn) oder selbst gestaltet per Tailwind
+  return teile.some((t) => !UTILITY_CLASS_RE.test(t) || SELBST_GESTALTET_RE.test(t))
+}
+
 export const MockBtn = forwardRef<HTMLButtonElement, MockBtnProps>(function MockBtn(
   {
     kind,
@@ -86,7 +107,7 @@ export const MockBtn = forwardRef<HTMLButtonElement, MockBtnProps>(function Mock
       disabled={disabled || loading}
       {...props}
       className={cn(
-        'btn',
+        !(resolvedKind || isSm || icon || fullWidth) && istEigenerBaustein(className) ? '' : 'btn',
         resolvedKind || '',
         isSm && 'sm',
         icon && !children && 'icon',

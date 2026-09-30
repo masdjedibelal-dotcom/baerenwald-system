@@ -922,7 +922,7 @@ export function VorgaengeListeClient({
       </div>
       <div className="form-section-h">Phase</div>
       <div className="chiprow" style={{ marginBottom: 16 }}>
-        {VORGANG_FILTERS.map((p) => (
+        {VORGANG_FILTERS.filter((p): boolean => p !== 'bestand').map((p) => (
           <MockChip
             key={p}
             active={filter === p}
@@ -1016,7 +1016,7 @@ export function VorgaengeListeClient({
       <div className="listbar">
         <div className="listbar-main">
           <div className="listbar-chips" role="group" aria-label="Phase">
-            {VORGANG_FILTERS.map((p) => (
+            {VORGANG_FILTERS.filter((p): boolean => p !== 'bestand').map((p) => (
               <MockChip
                 key={p}
                 active={filter === p}

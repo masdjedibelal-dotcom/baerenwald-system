@@ -30,7 +30,6 @@ import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCar
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
 import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { auftragHatGestellteKundenrechnung } from '@/lib/angebote/auftrag-korrektur-gate'
-import { VorgangPhasenVerlauf } from '@/components/vorgang/VorgangPhasenVerlauf'
 import {
   gewichteterFortschrittProzent,
   normalizeLeistungStatus,
@@ -1132,13 +1131,6 @@ export function AuftragDetailClient({
   const uebersichtInhalt = (
     <div className="space-y-6">
       {stammdatenInhalt}
-      <VorgangPhasenVerlauf
-        kontext={projektKontext}
-        fromRef={{ kind: 'auftrag', id: detail.id }}
-        lead={_leadDetail}
-        extras={phasenExtras}
-        onSaved={() => refresh()}
-      />
     </div>
   )
 
