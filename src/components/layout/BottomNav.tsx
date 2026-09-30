@@ -38,11 +38,7 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
         </Link>
       ))}
 
-      <MockBtn className="bottomnav-cta" type="button" aria-label="Neu erstellen" title="Neu erstellen" onClick={() => onNeuOpen?.()}>
-        <span className="bottomnav-cta-fab">
-          <MockIcon ctx="sidebar" n="plus" size={22} />
-        </span>
-      </MockBtn>
+      {/* Design 30.09.2026: „+“ sitzt oben in der Kopfleiste — Tab-Leiste nur Navigation */}
 
       {right.map((item) => (
         <Link

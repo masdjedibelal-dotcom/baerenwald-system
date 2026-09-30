@@ -82,17 +82,18 @@
     --type-meta: var(--fs-meta);
     --type-caption: var(--fs-caption);
     /* Elevation: nahe + weiche Schicht (ruhig, Mock-grün-getönt) */
-    --shadow:
-      0 1px 2px rgba(22, 32, 27, 0.05),
-      0 4px 14px -6px rgba(22, 32, 27, 0.08);
+    --shadow: var(--sh-1);
     /* Mobile etwas mehr Volumen (kein Hover) */
-    --shadow-mobile:
-      0 1px 2px rgba(22, 32, 27, 0.06),
-      0 8px 20px -8px rgba(22, 32, 27, 0.12);
+    --shadow-mobile: var(--sh-1);
+    /* 3 Höhenstufen (+ Leiste unten) — Build-Prüfung check-design-tokens */
+    --sh-1: 0 1px 2px rgba(22, 32, 27, 0.06);
+    --sh-2: 0 8px 24px -8px rgba(22, 32, 27, 0.16);
+    --sh-3: 0 24px 60px -12px rgba(22, 32, 27, 0.2);
+    --sh-up: 0 -8px 24px -16px rgba(16, 24, 40, 0.28);
     --dur-fast: 150ms;
     --dur: 250ms;
     --ease: cubic-bezier(0.2, 0, 0, 1);
-    --shadow-pop: 0 16px 40px -12px rgba(22, 32, 27, 0.12), 0 4px 10px -4px rgba(22, 32, 27, 0.06);
+    --shadow-pop: var(--sh-2);
 
     --sidebar-w: 44px;
     --topbar-h: 44px;
@@ -270,9 +271,7 @@
       --border: rgba(22, 32, 27, 0.08);
       --border-strong: rgba(22, 32, 27, 0.12);
       --border-2: rgba(22, 32, 27, 0.08);
-      --shadow-mobile:
-        0 1px 2px rgba(22, 32, 27, 0.04),
-        0 6px 16px -8px rgba(22, 32, 27, 0.08);
+      --shadow-mobile: var(--sh-1);
       --sp-row: 14px;
     }
 

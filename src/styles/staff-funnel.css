@@ -565,7 +565,7 @@
     position: sticky;
     bottom: 0;
     z-index: 20;
-    box-shadow: 0 -8px 24px rgba(16, 24, 40, 0.08);
+    box-shadow: var(--sh-up);
   }
 }
 

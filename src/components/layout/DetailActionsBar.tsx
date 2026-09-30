@@ -184,7 +184,8 @@ export function DetailActionsBar({
       return
     }
     root.classList.add('has-detail-mobile-cta')
-    root.classList.toggle('detail-cta-mode', scrolled)
+    // Design 30.09.2026: Tab-Leiste bleibt stehen (kein Austausch beim Scrollen)
+    root.classList.remove('detail-cta-mode')
     return () => {
       root.classList.remove('has-detail-mobile-cta', 'detail-cta-mode')
     }
@@ -219,9 +220,8 @@ export function DetailActionsBar({
       ? createPortal(
           <div
             className={cn(
+              // Immer sichtbar über der Tab-Leiste — keine springende Leiste mehr
               'detail-mobile-action-bar md:hidden',
-              !scrolled && 'detail-mobile-action-bar--hidden',
-              scrolled && 'detail-mobile-action-bar--nav-replaced',
               resolved.layout === 'solo' && 'detail-mobile-action-bar--solo',
               resolved.layout === 'pair' && 'detail-mobile-action-bar--pair',
               resolved.layout === 'triple' && 'detail-mobile-action-bar--triple',
@@ -229,7 +229,7 @@ export function DetailActionsBar({
             )}
             role="toolbar"
             aria-label="Aktionen"
-            aria-hidden={!scrolled}
+            aria-hidden={false}
           >
             <div
               className={cn(

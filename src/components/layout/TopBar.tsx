@@ -192,7 +192,18 @@ export function TopBar({ user }: TopBarProps) {
                 <MockIcon ctx="btn" n="plus" size={14} />
                 <span className="topbar-cta-label">{cta.label}</span>
               </MockBtn>
-            ) : null}
+            ) : (
+              // Design 30.09.2026: „+“ oben statt schwebendem Knopf (Apple-Muster)
+              <MockBtn
+                className="topbar-icon-btn topbar-neu"
+                type="button"
+                aria-label="Neu erstellen"
+                title="Neu erstellen"
+                onClick={() => document.dispatchEvent(new Event('open-neu'))}
+              >
+                <MockIcon ctx="btn" n="plus" size={18} />
+              </MockBtn>
+            )}
 
             {/* P16: KI-Assistent entfällt (Streichliste) — Einstieg entfernt */}
             <CrmNotificationsBell />
