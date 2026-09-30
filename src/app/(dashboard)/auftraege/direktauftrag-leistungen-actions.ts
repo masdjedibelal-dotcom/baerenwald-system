@@ -2,18 +2,20 @@
 
 import { revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-import { randomBytes } from 'crypto'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
-import { replaceAuftragPositionenFromPosBoard } from '@/app/(dashboard)/auftraege/auftrag-posboard-actions'
+import { createAngebot } from '@/app/(dashboard)/angebote/actions'
+import { acceptAngebotAndCreateAuftrag } from '@/app/(dashboard)/angebote/angebot-flow-actions'
+import { posBoardLinesToAngebotPositionen } from '@/lib/posboard/pos-board-line'
+import { summenAusPositionen } from '@/lib/angebot-positionen'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 
 /**
- * Direkt beauftragen: Auftrag aus Anfrage mit PosBoard-Leistungen (ohne Angebot, ohne HW).
- * Handwerker-Zuweisung danach im Auftrag unter Leistungen.
+ * Direkt beauftragen: Angebot aus den Leistungen anlegen und sofort annehmen (ohne Kunden-Mail).
+ * Partner danach über „Einsatz“ im Auftrag.
  */
 export async function createDirektauftragMitLeistungen(input: {
   leadId: string
@@ -74,52 +76,42 @@ export async function createDirektauftragMitLeistungen(input: {
       : `Direktauftrag${gewerk ? ` — ${gewerk}` : ''}`
     ).slice(0, 240)
 
-  const kundenToken = randomBytes(32).toString('hex')
-  const insertRow: Record<string, unknown> = {
-    angebot_id: null,
-    lead_id: leadId,
-    kunde_id: kundeId,
-    status: 'offen',
-    titel,
-    notizen: istAkut ? 'Direktauftrag (Akut) — Leistungen ohne Angebot' : 'Direktauftrag — Leistungen ohne Angebot',
-    start_datum: null,
+  // Flow-Vereinfachung 30.09.2026: ein Weg zum Auftrag. Direktauftrag = Angebot mit den Leistungen,
+  // sofort angenommen (ohne Kunden-Mail). So hat jeder Auftrag ein Angebot — Summen, Rechnung und
+  // Portal laufen über dieselbe Kette.
+  const positionen = posBoardLinesToAngebotPositionen(lines)
+  const summen = summenAusPositionen(positionen, 19)
+  const angebotRes = await createAngebot(
+    {
+      lead_id: leadId,
+      kunde_id: kundeId,
+      positionen,
+      gesamt_min: summen.nettoMin,
+      gesamt_max: summen.nettoMax,
+      notizen: istAkut ? 'Direktauftrag (Akut)' : 'Direktauftrag',
+      leistungsumfang: titel,
+    },
+    { asSystem: true }
+  )
+  if (!angebotRes.ok) return angebotRes
+
+  const annahme = await acceptAngebotAndCreateAuftrag(angebotRes.id, {
+    start_datum: new Date().toISOString().slice(0, 10),
     end_datum: null,
-    kunden_token: kundenToken,
-    fortschritt: 0,
-    betreuer_id: user.id,
-    erstellt_von: user.id,
-  }
+    send_kunden_email: false,
+    // Wie bisher beim Direktauftrag: keine Freigabe-Prüfung; Akut-Bypass setzt der Lead-Update unten
+    asSystem: true,
+  })
+  if (!annahme.ok) return annahme
+  const auftragId = annahme.auftragId
+
+  const auftragPatch: Record<string, unknown> = { titel, betreuer_id: user.id }
   if (istAkut) {
-    insertRow.ist_notfall = true
-    insertRow.notfall_verguetung = 'aufwand'
+    auftragPatch.ist_notfall = true
+    auftragPatch.notfall_verguetung = 'aufwand'
   }
-
-  let { data: auftrag, error: aErr } = await supabaseAdmin
-    .from('auftraege')
-    .insert(insertRow)
-    .select('id')
-    .single()
-  if (aErr) logDbError('app/auftraege/direktauftrag-leistungen-actions:auftraege', aErr)
-
-  if (aErr && /ist_notfall|notfall_verguetung/i.test(aErr.message)) {
-    delete insertRow.ist_notfall
-    delete insertRow.notfall_verguetung
-    const retry = await supabaseAdmin.from('auftraege').insert(insertRow).select('id').single()
-    auftrag = retry.data
-    aErr = retry.error
-  }
-
-  if (aErr || !auftrag?.id) {
-    return { ok: false, message: aErr?.message ?? 'Auftrag konnte nicht angelegt werden.' }
-  }
-
-  const auftragId = String(auftrag.id)
-  const posRes = await replaceAuftragPositionenFromPosBoard(auftragId, lines)
-  if (!posRes.ok) {
-    const { error: __dbErr1 } = await supabaseAdmin.from('auftraege').delete().eq('id', auftragId)
-    if (__dbErr1) logDbError('app/auftraege/direktauftrag-leistungen-actions:auftraege', __dbErr1)
-    return posRes
-  }
+  const { error: patchErr } = await supabaseAdmin.from('auftraege').update(auftragPatch).eq('id', auftragId)
+  if (patchErr) logDbError('app/auftraege/direktauftrag-leistungen-actions:auftraege', patchErr)
 
   const leadUpdate: Record<string, unknown> = {
     vorgang_phase: 'in_bearbeitung',
@@ -137,7 +129,7 @@ export async function createDirektauftragMitLeistungen(input: {
     auftrag_id: auftragId,
     typ: 'notiz',
     titel: 'Direktauftrag angelegt',
-    beschreibung: `${lines.length} Leistung${lines.length === 1 ? '' : 'en'} — Handwerker unter Leistungen zuweisen.`,
+    beschreibung: `${lines.length} Leistung${lines.length === 1 ? '' : 'en'}. Partner über „Einsatz“ beauftragen.`,
     erstellt_von: user.id,
     sichtbar_fuer_kunde: false,
   })

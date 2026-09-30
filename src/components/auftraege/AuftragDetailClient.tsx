@@ -1,5 +1,7 @@
 'use client'
 
+import { posBoardLinesFromAngebotPositionen } from '@/lib/posboard/pos-board-line'
+
 import { MockBtn } from '@/components/mock-ui'
 import { AuftragEinsaetzeCard } from '@/components/auftraege/AuftragEinsaetzeCard'
 import {
@@ -464,10 +466,9 @@ export function AuftragDetailClient({
   }, [detail.angebot_id, detail.id, detail.lead_id])
 
   const openLeistungenOhneAngebot = useCallback(() => {
-    if (detail.angebot_id) return
     setLeistungenOhneAngebotKey((k) => k + 1)
     setLeistungenOhneAngebotOpen(true)
-  }, [detail.angebot_id])
+  }, [])
 
   const openNachtragAngebot = useCallback(() => {
     if (!detail.angebot_id || !detail.lead_id) {
@@ -838,13 +839,13 @@ export function AuftragDetailClient({
     [detail.angebot_id, rechnungenListe]
   )
 
-  /** Direktauftrag ohne Angebot: PosBoard direkt auf auftrag_positionen */
+  /**
+   * Flow-Vereinfachung 30.09.2026: Auftrag direkt bearbeiten (PosBoard auf auftrag_positionen),
+   * solange noch keine Kundenrechnung gestellt ist — auch mit Angebot. Danach: Regie im Einsatz.
+   */
   const kannLeistungenOhneAngebot = useMemo(
-    () =>
-      !detail.angebot_id &&
-      detail.status !== 'storniert' &&
-      !auftragHatGestellteKundenrechnung(rechnungenListe),
-    [detail.angebot_id, detail.status, rechnungenListe]
+    () => detail.status !== 'storniert' && !auftragHatGestellteKundenrechnung(rechnungenListe),
+    [detail.status, rechnungenListe]
   )
 
   const openLeistungenDokument = useCallback(() => {
@@ -1332,18 +1333,10 @@ export function AuftragDetailClient({
                 detail.status === 'offen' ||
                 detail.status === 'in_arbeit' ||
                 detail.status === 'abnahme'
-              if (laeuft && kannAuftragKorrektur) {
-                return {
-                  label: COPY_BUTTON.auftragBearbeiten,
-                  shortLabel: 'Bearbeiten',
-                  icon: 'pencil',
-                  onClick: openAngebotKorrektur,
-                  disabled: pending,
-                }
-              }
+              // Direkt am Auftrag bearbeiten — kein Umweg über die Angebots-Korrektur mehr
               if (laeuft && kannLeistungenOhneAngebot) {
                 return {
-                  label: COPY_BUTTON.leistungenBearbeiten,
+                  label: COPY_BUTTON.auftragBearbeiten,
                   shortLabel: 'Bearbeiten',
                   icon: 'pencil',
                   onClick: openLeistungenOhneAngebot,
@@ -1544,6 +1537,7 @@ export function AuftragDetailClient({
           auftragId={detail.id}
           titel={projektName}
           positionen={detail.auftrag_positionen ?? []}
+          fallbackLines={posBoardLinesFromAngebotPositionen(angebotDetail?.positionen ?? [])}
           gewerke={gewerke as Gewerk[]}
           preislisten={preislisten}
           firm={firm}

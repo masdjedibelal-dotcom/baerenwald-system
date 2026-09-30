@@ -28,10 +28,13 @@ export function AuftragLeistungenBearbeitenWizard({
   firm: _firm,
   onClose,
   onDone,
+  fallbackLines,
 }: {
   auftragId: string
   titel: string
   positionen: AuftragPosition[]
+  /** Wenn der Auftrag noch keine eigenen Positionen hat (Altdaten): aus dem Angebot vorbelegen */
+  fallbackLines?: PosBoardLine[]
   gewerke?: Gewerk[]
   preislisten?: Preisliste[]
   firm?: FirmenEinstellungen
@@ -41,8 +44,9 @@ export function AuftragLeistungenBearbeitenWizard({
   const [pending, startTransition] = useLocalTransition()
   const seeded = useMemo(() => {
     const lines = auftragPositionenToPosBoardLines(positionen)
-    return lines.length ? lines : [neuePosBoardLine()]
-  }, [positionen])
+    if (lines.length) return lines
+    return fallbackLines?.length ? fallbackLines : [neuePosBoardLine()]
+  }, [positionen, fallbackLines])
   const [lines, setLinesState] = useState<PosBoardLine[]>(seeded)
   const [draftDirty, setDraftDirty] = useState(false)
 

@@ -181,9 +181,7 @@ export async function saveAuftragLeistungenOhneAngebot(input: {
   if (error) logDbError('app/auftraege/auftrag-posboard-actions:auftraege', error)
   if (error || !auftrag) return { ok: false, message: COPY_ERROR.notFound }
 
-  if (String(auftrag.angebot_id ?? '').trim()) {
-    return { ok: false, message: COPY_ERROR.leistungenOhneAngebotNurDirekt }
-  }
+  // Flow-Vereinfachung 30.09.2026: auch mit Angebot direkt bearbeitbar (Sperre = gestellte Rechnung, s. u.)
   if ((auftrag.status ?? '') === 'storniert') {
     return { ok: false, message: COPY_ERROR.forbidden }
   }
