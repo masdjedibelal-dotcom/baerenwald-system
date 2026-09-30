@@ -434,11 +434,7 @@ export function AuftragLeistungenTab({
               </div>
             )
           })()}
-          <AuftragPartnerPositionsPruefungPanel
-            auftragId={detail.id}
-            disabled={disabled}
-            onChanged={onSaved}
-          />
+          {/* P18 (30.09.2026): Partner nur noch über Einsätze — kein Positions-Prüf-Panel, kein Zuweisen */}
           <LeistungenTab
             phase="auftrag"
             rows={rows}
@@ -457,63 +453,11 @@ export function AuftragLeistungenTab({
                 ? undefined
                 : [
                     {
-                      id: 'zuweisen',
-                      label: 'Zuweisen',
-                      onClick: (ids, clearSelection) => {
-                        clearBulkSelAfterZuweisung.current = clearSelection
-                        setZuweisungIds(ids)
-                      },
-                    },
-                    {
-                      id: 'abwaehlen',
-                      label: 'Abwählen',
-                      onClick: (ids, clearSelection) => abwaehlenZuweisung(ids, clearSelection),
-                    },
-                    {
                       id: 'erledigt',
                       label: 'Erledigt',
                       onClick: (ids, clearSelection) => markErledigt(ids, clearSelection),
                     },
                   ]
-            }
-            drawerActionsForRow={
-              disabled
-                ? undefined
-                : (row) =>
-                    row.brauchtFreigabe
-                      ? []
-                      : [
-                          ...(row.handwerkerId
-                            ? [
-                                {
-                                  id: 'abwaehlen',
-                                  label: 'Abwählen',
-                                  icon: 'user-x',
-                                  onClick: () => abwaehlenZuweisung([row.id]),
-                                },
-                              ]
-                            : []),
-                          ...(row.partnerAufgabeId && row.handwerkerId
-                            ? [
-                                {
-                                  id: 'partner-aufgabe',
-                                  label: 'Partner-Aufgabe',
-                                  icon: 'file-text',
-                                  onClick: () =>
-                                    setPartnerAufgabeEdit({
-                                      aufgabeId: row.partnerAufgabeId!,
-                                      handwerkerId: row.handwerkerId!,
-                                    }),
-                                },
-                              ]
-                            : []),
-                          {
-                            id: 'zuweisen',
-                            label: 'Zuweisen',
-                            icon: 'user',
-                            onClick: () => setZuweisungIds([row.id]),
-                          },
-                        ]
             }
             onNachtragEntscheiden={disabled ? undefined : decideNachtrag}
             nachtragDecidePending={pendingNachtrag}
