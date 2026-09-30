@@ -102,6 +102,7 @@ import {
   emptyZahlungsplan,
   neueZahlungsplanZeile,
   zahlplanAbgerechnetAusLinks,
+  zahlplanRateStatus,
   type Zahlungsplan,
   type ZahlungsplanAbschlagTyp,
   type ZahlungsplanZeile,
@@ -497,9 +498,12 @@ export function RechnungWizard({
     if (rechnungsart === 'schluss') {
       setAktivRate(plan.zeilen[plan.zeilen.length - 1]?.id ?? null)
     } else {
-      setAktivRate(plan.zeilen[0]?.id ?? null)
+      // Flow-Vereinfachung: immer die nächste noch offene Rate — nie eine schon gestellte
+      const links = bootstrap.rechnungenAbschlag ?? []
+      const naechste = plan.zeilen.find((z) => zahlplanRateStatus(z.id, links) === 'geplant')
+      setAktivRate((naechste ?? plan.zeilen[plan.zeilen.length - 1])?.id ?? null)
     }
-  }, [hasPlan, plan.zeilen, aktivRate, rechnungsart, rateLocked])
+  }, [hasPlan, plan.zeilen, aktivRate, rechnungsart, rateLocked, bootstrap.rechnungenAbschlag])
 
   const positionenBerechnet = useMemo(
     () => dokumentZeilenToAngebotPositionen(zeilen, firm, gewerke),

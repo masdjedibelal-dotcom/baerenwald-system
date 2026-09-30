@@ -514,16 +514,8 @@ export function RechnungDetailClient({
         disabled: pending,
       }
     }
-    if (rechnungKorrekturModus(detail.status) === 'storno_neu') {
-      return {
-        label: 'Rechnung korrigieren',
-        shortLabel: 'Korrigieren',
-        icon: 'pencil',
-        onClick: handleKorrigieren,
-        disabled: pending,
-        title: 'Storno-Gutschrift + neue Rechnung — Original bleibt bis Versand gültig',
-      }
-    }
+    // Flow-Vereinfachung 30.09.2026: kein Korrektur-Modus mehr. Nach Versand: „Stornieren“ im „…“,
+    // danach schlägt der Auftrag die neue Rechnung als nächsten Schritt vor.
     return null
   }, [detail.status, pending, isEingehend])
 
