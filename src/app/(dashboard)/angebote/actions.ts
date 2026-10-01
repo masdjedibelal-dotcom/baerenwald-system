@@ -2064,6 +2064,7 @@ export async function sendAngebotToKunde(
     : mailAngebot(
         {
           name: kundenAnrede.name,
+          kunde: kundenAnrede,
           positionen: posMail,
           titel: leistungsumfang,
           gesamt_min: mailReverseCharge ? summenMail.nettoMin : summenMail.bruttoMin,
@@ -2275,6 +2276,7 @@ async function previewAngebotKundeMailInner(input: {
   const tpl = mailAngebot(
     {
       name: kundenAnrede.name,
+      kunde: kundenAnrede,
       positionen: posMail,
       titel: leistungsumfang,
       gesamt_min: mailReverseCharge ? nettoAnzeige : bruttoAnzeige,

@@ -47,7 +47,7 @@ export function EntityHandwerkerBankCard({
           !disabled ? (
             <MockBtn
               sm
-              kind="ghost"
+              kind="secondary"
               icon="pencil"
               title="Bearbeiten"
               onClick={() => setSheetOpen(true)}

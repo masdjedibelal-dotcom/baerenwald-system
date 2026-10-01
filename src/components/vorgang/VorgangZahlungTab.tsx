@@ -820,7 +820,7 @@ export function VorgangZahlungTab({
               {planAktionen}
               <MockBtn
                 sm
-                kind="ghost"
+                kind="secondary"
                 icon="pencil"
                 title="Abschläge bearbeiten"
                 onClick={() => setEditorOpen(true)}

@@ -179,6 +179,7 @@ export function AngebotVersandSection({
     return mailAngebot(
       {
         name: vorname,
+        kunde: { name: kundeName, vorname: kunde?.vorname ?? null, nachname: kunde?.nachname ?? null },
         positionen: posMail,
         titel,
         gesamt_min: summenMail.bruttoMin,

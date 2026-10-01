@@ -49,7 +49,7 @@ export function InlineEditSection({
         </MockBtn>
       </div>
     ) : hideEditTrigger ? null : (
-      <MockBtn sm kind="ghost" icon="pencil" title={editLabel} onClick={onStartEdit} />
+      <MockBtn sm kind="secondary" icon="pencil" title={editLabel} onClick={onStartEdit} />
     )
   ) : null
 

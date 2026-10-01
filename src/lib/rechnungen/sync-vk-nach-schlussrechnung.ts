@@ -1,6 +1,6 @@
 /**
- * Schlussrechnung teurer als Auftragssumme → Auftrag + verknüpftes Angebot
- * still anheben (nur hoch, nie runter; keine Positionen löschen).
+ * Schlussrechnung teurer als Auftragssumme → Auftrag still anheben (nur hoch, nie runter;
+ * keine Positionen löschen). Das angenommene Angebot bleibt unverändert (01.10.2026).
  */
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
@@ -264,7 +264,7 @@ export async function raiseAuftragVkFuerSchlussrechnung(input: {
   const fromWizard = filterLeistungsPositionen(input.wizardPositionen)
   if (fromWizard.length) {
     await appendOrUpdateAuftragPositionen(auftragId, auftragPos, fromWizard)
-    if (angebotId) await mergeAngebotPositionen(angebotId, fromWizard)
+    // Das angenommene Angebot bleibt unverändert (Dokument, das der Kunde angenommen hat) — nur der Auftrag zieht mit.
   }
 
   ;({ vkNetto, angebotId, auftragPos } = await loadAuftragVkNetto(auftragId))
@@ -273,15 +273,10 @@ export async function raiseAuftragVkFuerSchlussrechnung(input: {
     if (delta > 0.5) {
       const deltaPos = deltaAnpassungPos(delta)
       await appendOrUpdateAuftragPositionen(auftragId, auftragPos, [deltaPos])
-      if (angebotId) await mergeAngebotPositionen(angebotId, [deltaPos])
       vkNetto = Math.round((vkNetto + delta) * 100) / 100
     }
   }
 
-  // Listen lesen angebote.gesamt_* — nach Positions-Anhebung immer nachziehen
-  if (angebotId) {
-    await syncAngebotGesamtFelder(angebotId)
-  }
 
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,

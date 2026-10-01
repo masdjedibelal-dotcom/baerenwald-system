@@ -157,7 +157,7 @@ export function ObjektAkteDetailClient({
         actions={
           <MockBtn
             sm
-            kind="ghost"
+            kind="secondary"
             icon="pencil"
             title="Objektdaten bearbeiten"
             onClick={() => setObjektModalOpen(true)}

@@ -22161,3 +22161,31 @@ display: flex;
 .app .uppercase,
 .document-canvas .uppercase,
 .editor-sheet .uppercase { text-transform: none; letter-spacing: 0; }
+
+/* Bezeichnungen in Wertelisten überall gleich (Einstellungen wie Detailseiten) */
+.card-b .props .prop-l,
+.card-b .prop > .prop-l { font-size: var(--fs-text); font-weight: 400; color: var(--text-3); }
+
+/* Handy: seitlich scrollende Reihen laufen weich aus statt hart abgeschnitten */
+@media (max-width: 767px) {
+  .chiprow,
+  .listbar-chips,
+  .dshell-tabs-mobile {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    padding-right: 24px;
+  }
+  /* Phasen-Pfeile passen auf das Handy: kompakter, gleich breit */
+  .phase-steps { overflow: visible; }
+  .phase-steps__step { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 8px 0 14px; height: 30px; font-size: var(--fs-caption); gap: 3px; }
+  .phase-steps__step:first-child { padding-left: 8px; }
+  .phase-steps__step > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Leistungen in Karte: Tabelle ohne eigenen Rahmen, Summen mit Innenabstand */
+.lt-karte .lt-wrap { border: 0; border-radius: 0; box-shadow: none; }
+.lt-karte .lt-foot { padding: 12px 16px; border-top: 0.5px solid var(--border); }
+@media (max-width: 767px) { .lt-karte .lt-mobile { padding: 0 12px; } }
+.lt-karte > .card-b { padding: 0; }
+.lt-karte .lt, .lt-karte .lt-wrap { border: 0; border-radius: 0; box-shadow: none; margin: 0; }
+.lt-karte .lt-grouphead { text-transform: none; letter-spacing: 0; }

@@ -183,7 +183,7 @@ export function RechnungZahlungszielCard({
           {bearbeitbar ? (
             <MockBtn
               sm
-              kind="ghost"
+              kind="secondary"
               icon="pencil"
               title="Zahlungsziel (Tage) bearbeiten"
               onClick={openSheet}

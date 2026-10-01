@@ -1,3 +1,4 @@
+import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 import { buildPartnerSubject, buildSubject } from '@/lib/mail/build-subject'
@@ -466,12 +467,14 @@ export function mailAngebot(
     reverseCharge?: boolean
     /** Titel des Angebots (Leistungsumfang) — sonst erste Position */
     titel?: string | null
+    /** Für die gemeinsame Begrüßungsregel (Sie: Vor- und Nachname) */
+    kunde?: KundeAnredeKontext | null
   },
   b: MailBranding
 ): { betreff: string; html: string } {
   const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
   const anredeKey = anrede === 'sie' ? 'sie' : 'du'
-  const begruessung = esc(mailBegruessungZeile(anrede, data.name))
+  const begruessung = esc(mailBegruessungZeile(anrede, data.name, data.kunde ?? null))
   // Beträge kommen brutto (bei §13b netto) — passend zum Hinweis „inkl. MwSt.“
   const istRange = data.gesamt_min !== data.gesamt_max
   const betragText = istRange

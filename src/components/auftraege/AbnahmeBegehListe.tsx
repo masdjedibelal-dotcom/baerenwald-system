@@ -308,6 +308,7 @@ export function AbnahmeBegehListe({
       </MockBtn>
 
       <EditorSheet
+        primary={{ label: 'Speichern', onClick: confirmAdd, disabled: Boolean(addMode === 'katalog' ? !pickId : !draftTitel.trim() && !draftNotiz.trim()) }}
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="Leistung hinzufügen"
@@ -323,9 +324,6 @@ export function AbnahmeBegehListe({
               draftInput={[draftTitel.trim(), draftNotiz.trim()].filter(Boolean).join('\n') || null}
               onBeforeOpen={() => setAddMode('frei')}
             />
-            <MockBtn className="editor-sheet__confirm" type="button" disabled={addMode === 'katalog' ? !pickId : !draftTitel.trim() && !draftNotiz.trim()} onClick={confirmAdd} aria-label="Speichern" title="Speichern">
-              <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
-            </MockBtn>
           </div>
         }
       >
@@ -380,6 +378,7 @@ export function AbnahmeBegehListe({
       </EditorSheet>
 
       <EditorSheet
+        primary={{ label: 'Speichern', onClick: confirmEdit, disabled: Boolean(!editTitel.trim()) }}
         open={Boolean(editId)}
         onClose={() => setEditId(null)}
         title="Leistung bearbeiten"
@@ -394,9 +393,6 @@ export function AbnahmeBegehListe({
               extraHint={leistungKiHint}
               draftInput={[editTitel.trim(), editNotiz.trim()].filter(Boolean).join('\n') || null}
             />
-            <MockBtn className="editor-sheet__confirm" type="button" disabled={!editTitel.trim()} onClick={confirmEdit} aria-label="Speichern" title="Speichern">
-              <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
-            </MockBtn>
           </div>
         }
       >
@@ -656,6 +652,7 @@ export function AbnahmeMaengelCheckliste({
       </MockBtn>
 
       <EditorSheet
+        primary={{ label: 'Speichern', onClick: confirm, disabled: Boolean(uploading || (!draftTitel.trim() && !draftNotiz.trim() && !draftFotos.length)) }}
         open={editIdx != null}
         onClose={() => setEditIdx(null)}
         title={isNew || editIdx === -1 ? 'Mangel hinzufügen' : 'Mangel bearbeiten'}
@@ -670,10 +667,6 @@ export function AbnahmeMaengelCheckliste({
               extraHint="Abnahmeprotokoll: Mängel klar und prüfbar (Ort + Mangel). Ein Punkt oder Liste."
               draftInput={[draftTitel.trim(), draftNotiz.trim()].filter(Boolean).join('\n') || null}
             />
-            <MockBtn className="editor-sheet__confirm" type="button" disabled={uploading ||
-                (!draftTitel.trim() && !draftNotiz.trim() && !draftFotos.length)} onClick={confirm} aria-label="Speichern" title="Speichern">
-              <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
-            </MockBtn>
           </div>
         }
       >

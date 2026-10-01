@@ -226,7 +226,8 @@ export function EditorSheet({
   onConfirmRef.current = onConfirm
 
   const confirmPlacement =
-    confirmPlacementProp ?? (compose ? 'header' : 'footer')
+    // Hauptaktion immer als fester Knopf unten — kleine Haken oben verrutschten beim Klick (Test 01.10.2026)
+    confirmPlacementProp ?? 'footer'
   const confirmLabel =
     confirmLabelProp ?? (compose ? composeLabel : 'Speichern')
   const hasStructuredFooter = Boolean(primaryProp || secondaryProp || dangerProp)

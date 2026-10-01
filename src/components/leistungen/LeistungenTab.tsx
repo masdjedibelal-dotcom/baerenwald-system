@@ -252,9 +252,7 @@ export function LeistungenTab({
                     {anfrage ? ` · ${anfrage}` : ''}
                   </span>
                 </span>
-              ) : phase === 'auftrag' ? (
-                <span className="lt-card__dim">Kein Partner</span>
-              ) : (
+              ) : phase === 'auftrag' ? null : (
                 <span className="lt-card__dim">{row.mengeLabel}</span>
               )}
               {hwName || anfrage || phase === 'auftrag' ? (
@@ -449,6 +447,8 @@ export function LeistungenTab({
         </div>
       ) : null}
 
+      {/* Wie die anderen Tabs: Karte mit Titel, Tabelle (bzw. mobil die Karten) und Summen darin */}
+      <MockCard title="Leistungen" icon="tool" flush className="lt-karte">
       {/* Mobil: gestapelte Cards inkl. Handwerker-Anfrage-Status */}
       <div className="lt-mobile">
         {allowBulk ? (
@@ -509,7 +509,7 @@ export function LeistungenTab({
             ? gewerkGroups.map((g) => (
                 <div key={g.name} className="lt-group">
                   <div className="lt-grouphead">
-                    <span className="g-name">{g.name.toUpperCase()}</span>
+                    <span className="g-name">{g.name}</span>
                     <span className="g-meta">{g.items.length}</span>
                   </div>
                   {g.items.map(renderLeistungRow)}
@@ -556,6 +556,7 @@ export function LeistungenTab({
           </div>
         )}
       </div>
+      </MockCard>
 
       {belowTable}
 

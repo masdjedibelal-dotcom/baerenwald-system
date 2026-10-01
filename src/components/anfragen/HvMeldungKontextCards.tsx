@@ -179,7 +179,7 @@ export function HvMeldungKontextCards({
             ) : null}
             <MockBtn
               sm
-              kind="ghost"
+              kind="secondary"
               icon="pencil"
               title="Melder & Leistungsort bearbeiten"
               onClick={() => setEditOpen(true)}
@@ -252,11 +252,7 @@ export function HvMeldungKontextCards({
         onClose={() => setEditOpen(false)}
         title="Melder & Leistungsort"
         overlayClassName={objektNeuOpen ? 'editor-sheet-overlay--recessed' : undefined}
-        headerEnd={
-          <MockBtn className="editor-sheet__confirm-text" type="button" disabled={saving} onClick={() => void saveEdit()}>
-            {saving ? '…' : 'Speichern'}
-          </MockBtn>
-        }
+        primary={{ label: 'Speichern', busy: saving, disabled: saving, onClick: () => void saveEdit() }}
       >
         <MelderLeistungsortFields
           draft={draft}

@@ -404,7 +404,8 @@ export function buildPhaseRows(
             },
             {
               k: 'Status',
-              v: angebotStatusKurz(angebot!.status, angebot!.status_einfach),
+              // An der Wirklichkeit: gibt es einen Auftrag, ist das Angebot angenommen
+              v: auftrag && !angebotNichtMehrVorhanden ? 'Angenommen' : angebotStatusKurz(angebot!.status, angebot!.status_einfach),
             },
             {
               k: 'Gültigkeit',

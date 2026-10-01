@@ -142,9 +142,7 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
         title="Stammdaten"
         icon="clipboard-list"
         actions={
-          <MockBtn className="qa-btn" type="button" title="Bearbeiten" aria-label="Stammdaten bearbeiten" onClick={openEdit}>
-            <MockIcon ctx="btn" n="pencil" size={16} />
-          </MockBtn>
+          <MockBtn sm kind="secondary" icon="pencil" title="Bearbeiten" aria-label="Stammdaten bearbeiten" onClick={openEdit} />
         }
       >
         <div className="mb-3">
