@@ -104,6 +104,9 @@ const posTableCollision: CollisionDetection = (args) => {
 
   const itemPointer = pointer.filter((c) => !String(c.id).startsWith('group:'))
   if (itemPointer.length) return itemPointer
+  // Zeiger über einem Gewerk-Kopf (auch leeres Gewerk): dorthin verschieben
+  const groupPointer = pointer.filter((c) => String(c.id).startsWith('group:'))
+  if (groupPointer.length) return groupPointer
   const itemCenter = center.filter((c) => !String(c.id).startsWith('group:'))
   if (itemCenter.length) return itemCenter
   return pointer.length ? pointer : center
@@ -171,7 +174,7 @@ function SortableGroupHeader({
             <SelectBox on={allSel} />
           </span>
         ) : null}
-        <span className="g">{g.gewerk || 'Ohne Gewerk'}</span>
+        <span className="g">{g.gewerk || 'Allgemein'}</span>
         {g.titel ? <span className="gt">· {g.titel}</span> : null}
         <div style={{ flex: 1 }} />
         {onAddKind && !unifiedAdd ? (
@@ -677,7 +680,7 @@ export function PosTable({
                   <SelectBox on={allSel} />
                 </span>
               ) : null}
-              <span className="g">{g.gewerk || 'Ohne Gewerk'}</span>
+              <span className="g">{g.gewerk || 'Allgemein'}</span>
               {g.titel ? <span className="gt">· {g.titel}</span> : null}
               <div style={{ flex: 1 }} />
               {onAddKind && !unifiedAdd ? (

@@ -451,11 +451,20 @@ export function PosBoard({
     onChange([...positionen, np])
   }
 
+  /** Gewerke, die im Dokument vorkommen (ohne den Block für Freitext/Nachlass). */
+  const dokGewerke = Array.from(
+    new Set([
+      ...positionen.filter((p) => p.kind !== 'freitext' && p.kind !== 'nachlass').map(gewerkOf),
+      ...pendingGewerke,
+    ])
+  ).filter((g) => g.trim())
+
   const onAddKind = (kind: PosAddKind, gewerk?: string) => {
-    // Ohne zweiten Arg = Dokument-Ebene (ohne Gewerk). Mit Arg = unter Gewerk-Gruppe.
+    // Mit Gewerk = „+“ am Gewerk. Ohne = Leiste unten: Freitext/Nachlass fürs ganze Dokument,
+    // Position ins zuletzt benutzte Gewerk (im Blatt sichtbar und änderbar).
     const target = gewerk !== undefined ? gewerk.trim() : ''
     if (kind === 'position' || kind === 'preisliste') {
-      openAddSheet(target, 'preisliste')
+      openAddSheet(target || dokGewerke[dokGewerke.length - 1] || '', 'preisliste')
     } else if (kind === 'freitext') addFreitext(target)
     else if (kind === 'nachlass') addNachlass(undefined, target)
   }
@@ -559,7 +568,8 @@ export function PosBoard({
     arr.forEach((p, i) => {
       if (gewerkOf(p) === gewerk) lastIdx = i
     })
-    arr.splice(lastIdx + 1, 0, moved)
+    // Leeres Ziel-Gewerk steht unten — Position dort ans Ende, damit die Gewerk-Reihenfolge bleibt
+    arr.splice(lastIdx < 0 ? arr.length : lastIdx + 1, 0, moved)
     onChange(arr)
   }
 
@@ -840,10 +850,10 @@ export function PosBoard({
         groups={groups}
         onAddKind={editable && !unifiedAdd ? onAddKind : undefined}
         onAddGroup={editable && !hideAddGewerk && !unifiedAdd ? addGewerk : undefined}
-        // Hinzufügen immer direkt im Gewerk („+“ am Gewerk): Position, Freitext, Nachlass.
-        // Auf Dokument-Ebene nur „Gewerk hinzufügen“ (und die Leiste, solange noch nichts da ist).
-        gewerkAddKinds={['position', 'freitext', 'nachlass']}
-        documentAddKinds={undefined}
+        // „+“ am Gewerk: Position genau in dieses Gewerk.
+        // Leiste unten (wie Lexware): Position · Freitext · Nachlass — Freitext und Nachlass gelten fürs ganze Dokument.
+        gewerkAddKinds={['position']}
+        documentAddKinds={['position', 'freitext', 'nachlass']}
         groupActions={groupActions}
         itemActions={itemActions}
         selectable={selectable}
@@ -1008,6 +1018,8 @@ export function PosBoard({
           open
           initialMode={addSheetMode}
           preferredGewerkName={preislisteTargetGewerk}
+          zielGewerke={dokGewerke}
+          onZielGewerkChange={(g) => setPreislisteTargetGewerk(g)}
           gewerke={gewerkOptions}
           showUst={showUst}
           allowGewerk={false}

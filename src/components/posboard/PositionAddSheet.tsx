@@ -84,6 +84,8 @@ export function PositionAddSheet({
   onClose,
   initialMode = 'preisliste',
   preferredGewerkName,
+  zielGewerke = [],
+  onZielGewerkChange,
   gewerke = [],
   showUst = true,
   allowGewerk = false,
@@ -101,6 +103,9 @@ export function PositionAddSheet({
   onClose: () => void
   initialMode?: PositionAddMode
   preferredGewerkName?: string | null
+  /** Gewerke im Dokument: ab zwei wird oben gewählt, wohin die Position kommt */
+  zielGewerke?: string[]
+  onZielGewerkChange?: (gewerk: string) => void
   gewerke?: string[]
   showUst?: boolean
   /** Gewerk-Chip (meist aus) — Gewerk läuft über „Gewerk hinzufügen“ */
@@ -477,10 +482,26 @@ export function PositionAddSheet({
           ))}
       </div>
 
-      {activeGewerk && mode !== 'gewerk' && mode !== 'nachlass' ? (
-        <p className="mb-2 text-[length:var(--fs-text)] text-bw-text-muted">
-          Gewerk: <span className="font-medium text-bw-text">{activeGewerk}</span>
-        </p>
+      {zielGewerke.length > 1 && (mode === 'preisliste' || mode === 'frei') ? (
+        <div className="field mb-3">
+          <div className="field-label">In Gewerk</div>
+          <MockSelect
+            className="sel"
+            value={activeGewerk}
+            onChange={(e) => {
+              setActiveGewerk(e.target.value)
+              setFrei((f) => ({ ...f, gewerk: e.target.value }))
+              onZielGewerkChange?.(e.target.value)
+            }}
+            aria-label="In Gewerk"
+          >
+            {zielGewerke.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </MockSelect>
+        </div>
       ) : null}
 
       {mode === 'preisliste' ? (
