@@ -863,6 +863,17 @@ export function AuftragDetailClient({
     openAngebotKorrektur,
   ])
 
+  // ?bearbeiten=1 (z. B. „Bearbeiten“ am angenommenen Angebot) öffnet direkt die Bearbeitung
+  useEffect(() => {
+    if (searchParams.get('bearbeiten') !== '1') return
+    const q = new URLSearchParams(searchParams.toString())
+    q.delete('bearbeiten')
+    const qs = q.toString()
+    router.replace(`/auftraege/${detail.id}${qs ? `?${qs}` : ''}`, { scroll: false })
+    if (kannLeistungenOhneAngebot) openLeistungenOhneAngebot()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- einmalig beim Öffnen
+  }, [searchParams, detail.id])
+
   const leistungInhalt = (
     <AuftragLeistungenTab
       detail={detail}

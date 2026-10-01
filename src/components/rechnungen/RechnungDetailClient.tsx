@@ -513,10 +513,19 @@ export function RechnungDetailClient({
         disabled: pending,
       }
     }
-    // Flow-Vereinfachung 30.09.2026: kein Korrektur-Modus mehr. Nach Versand: „Stornieren“ im „…“,
-    // danach schlägt der Auftrag die neue Rechnung als nächsten Schritt vor.
+    // „Bearbeiten“ versteht den Stand: nach Versand storniert es per Gutschrift und öffnet
+    // die neue Rechnung mit denselben Positionen (Abbrechen nimmt beides zurück).
+    if (belegTyp === 'rechnung' && rechnungKorrekturModus(detail.status) === 'storno_neu') {
+      return {
+        label: 'Rechnung bearbeiten',
+        shortLabel: 'Bearbeiten',
+        icon: 'pencil',
+        onClick: handleKorrigieren,
+        disabled: pending,
+      }
+    }
     return null
-  }, [detail.status, pending, isEingehend])
+  }, [detail.status, pending, isEingehend, belegTyp])
 
   const overflowMenuItems = useMemo((): ActionsMenuItem[] => {
     // Aktionsmodell: im „…“ nur, was gerade passt — PDF · Erinnerung · Stornieren/Verwerfen

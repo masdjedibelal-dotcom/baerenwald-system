@@ -285,11 +285,8 @@ export function AngebotDetailPageClient({
       router.push(`/angebote/neu?angebot_id=${detail.id}`)
       return
     }
-    /* Mehrere Angebote oder kein reiner Entwurf → Auswahl wie an der Anfrage */
-    if (angeboteAuswahlZeilen.length > 1 || statusEinfach !== 'entwurf') {
-      setAngebotAuswahlOpen(true)
-      return
-    }
+    // Direkt dieses Angebot öffnen. Liegt es beim Kunden, speichert der Server automatisch
+    // eine neue Fassung und die alte gilt als ersetzt — kein Zwischenschritt.
     startTransition(async () => {
       const res = await loadAngebotWizardBootstrap(detail.id, detail.lead_id!)
       if (!res.ok) {
@@ -620,9 +617,18 @@ export function AngebotDetailPageClient({
         disabled: pending,
       }
     }
-    // Kein ausgegrauter Knopf: gesperrt → „Als neues Angebot“ im „…“
+    // Angenommen: Änderungen gehören in den Auftrag — „Bearbeiten“ führt dorthin
+    if (auftragId) {
+      return {
+        label: 'Auftrag bearbeiten',
+        shortLabel: 'Bearbeiten',
+        icon: 'pencil',
+        onClick: () => router.push(`/auftraege/${auftragId}?bearbeiten=1`),
+        disabled: pending,
+      }
+    }
     return null
-  }, [kannBearbeiten, pending])
+  }, [kannBearbeiten, pending, auftragId, router])
 
   const stammdatenInhalt = (
     <>

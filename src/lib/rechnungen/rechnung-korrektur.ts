@@ -120,7 +120,7 @@ export async function linkRechnungKorrekturKette(
 export function rechnungKorrekturModus(status: RechnungStatus | string | null | undefined): RechnungKorrekturModus {
   const s = (status ?? '').toLowerCase()
   if (s === 'entwurf') return 'direkt'
-  if (s === 'gesendet' || s === 'bezahlt') return 'storno_neu'
+  if (s === 'gesendet' || s === 'ueberfaellig' || s === 'teilbezahlt' || s === 'bezahlt') return 'storno_neu'
   return 'gesperrt'
 }
 
