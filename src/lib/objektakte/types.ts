@@ -1,6 +1,6 @@
 import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
 
-export type ObjektKontaktRolle = 'hausmeister' | 'beirat' | 'dienstleister' | 'notfall' | 'sonstiges'
+export type ObjektKontaktRolle = 'hausmeister' | 'ansprechpartner' | 'beirat' | 'dienstleister' | 'notfall' | 'sonstiges'
 
 export type EinheitBewohnerRolle = 'mieter' | 'eigentuemer'
 

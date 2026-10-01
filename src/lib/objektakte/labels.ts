@@ -7,6 +7,7 @@ import type {
 
 export const OBJEKT_KONTAKT_ROLLEN: ObjektKontaktRolle[] = [
   'hausmeister',
+  'ansprechpartner',
   'beirat',
   'dienstleister',
   'notfall',
@@ -15,6 +16,7 @@ export const OBJEKT_KONTAKT_ROLLEN: ObjektKontaktRolle[] = [
 
 export const OBJEKT_KONTAKT_ROLLE_LABELS: Record<ObjektKontaktRolle, string> = {
   hausmeister: 'Hausmeister',
+  ansprechpartner: 'Ansprechpartner',
   beirat: 'Beirat',
   dienstleister: 'Dienstleister',
   notfall: 'Notfall',

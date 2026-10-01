@@ -56,7 +56,7 @@ export function ObjektKontakteSection({
   const [edit, setEdit] = useState<ObjektKontakt | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const [rolle, setRolle] = useState<ObjektKontaktRolle>('beirat')
+  const [rolle, setRolle] = useState<ObjektKontaktRolle>('ansprechpartner')
   const [name, setName] = useState('')
   const [telefon, setTelefon] = useState('')
   const [email, setEmail] = useState('')
@@ -116,7 +116,7 @@ export function ObjektKontakteSection({
 
   function openNeu() {
     setEdit(null)
-    setRolle('beirat')
+    setRolle('ansprechpartner')
     setName('')
     setTelefon('')
     setEmail('')
@@ -364,7 +364,7 @@ export function ObjektKontakteSection({
   return (
     <>
       <MockCard
-        title={liste.length ? `Kontakte vor Ort · ${liste.length}` : 'Kontakte vor Ort'}
+        title={liste.length ? `Personen · ${liste.length}` : 'Personen'}
         icon="user"
         actions={
           <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
@@ -399,7 +399,7 @@ export function ObjektKontakteSection({
             >
               <span aria-hidden />
               <span>Name</span>
-              <span>Rolle</span>
+              <span>Funktion</span>
               <span>Kontakt</span>
               <span aria-hidden />
             </div>
@@ -436,7 +436,7 @@ export function ObjektKontakteSection({
         onClose={() => {
           if (!deletePending) setDeleteTarget(null)
         }}
-        title="Kontakt löschen?"
+        title="Person löschen?"
         danger
         busy={deletePending}
         confirmLabel={deletePending ? 'Wird gelöscht…' : 'Löschen'}
@@ -455,14 +455,14 @@ export function ObjektKontakteSection({
       <EditorSheet
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Kontakt"
+        title="Person"
         context="detail"
         dirty={dirty}
         confirmBusy={pending}
         onConfirm={speichern}
       >
         <div className="space-y-3">
-          <Combobox label="Rolle" id="rolle" name="rolle" options={ROLLE_OPTIONS} value={rolle == null ? '' : String(rolle)} placeholder="Auswählen…" onChange={(next) => {
+          <Combobox label="Funktion" id="rolle" name="rolle" options={ROLLE_OPTIONS} value={rolle == null ? '' : String(rolle)} placeholder="Auswählen…" onChange={(next) => {
               setDirty(true)
               setRolle(next as ObjektKontaktRolle)
             }} />
