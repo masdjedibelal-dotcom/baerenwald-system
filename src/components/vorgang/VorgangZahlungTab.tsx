@@ -667,11 +667,16 @@ export function VorgangZahlungTab({
   /** Nur eine Rechnung (kein Abschlag) — dann überall „Rechnung“ statt Abschlag-Wörter */
   const nurEineRechnung = rows.length === 1 && Boolean(rows[0]?.istSchluss)
   /** P09: Abschlag/Schluss direkt stellen — der Plan entsteht im Hintergrund. */
+  /** Schlussrechnung schon gestellt oder alles bezahlt → kein weiterer Abschlag. */
+  const schlussGestellt = rows.some((r) => r.istSchluss && r.status !== 'geplant')
+  const abschlagMoeglich = !schlussGestellt && offen > 0.005
   const planAktionen = canEditPlan ? (
     <span style={{ display: 'inline-flex', gap: 8 }}>
-      <MockBtn sm kind="secondary" icon="plus" onClick={() => setAbschlagOpen(true)}>
-        Abschlag stellen
-      </MockBtn>
+      {abschlagMoeglich ? (
+        <MockBtn sm kind="secondary" icon="plus" onClick={() => setAbschlagOpen(true)}>
+          Abschlag stellen
+        </MockBtn>
+      ) : null}
       {!hatSchlusszeile ? (
         <MockBtn
           sm

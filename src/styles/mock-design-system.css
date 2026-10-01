@@ -22219,3 +22219,13 @@ display: flex;
 .card-b > .props > .prop:first-child {
   border-top: 0;
 }
+
+/* Abschlagsplan im Sheet: Raten als Abschnitte mit Trennlinie, keine Karte in der Karte */
+.editor-sheet__body .zahlplan-rate-card {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 0 16px;
+}
