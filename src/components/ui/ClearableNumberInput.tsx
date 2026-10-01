@@ -74,7 +74,9 @@ export function ClearableNumberInput({
         setFocused(true)
         setDraft(isEmptyDisplay ? '' : String(value))
         onFocus?.(e)
-        requestAnimationFrame(() => e.currentTarget.select())
+        // Element merken: React leert e.currentTarget nach dem Handler
+        const el = e.currentTarget
+        requestAnimationFrame(() => el?.select())
       }}
       onChange={(e) => {
         const next = e.target.value

@@ -28,13 +28,13 @@ function memberStatusLabel(
     return 'Wird ersetzt'
   }
   if (m.role === 'neu' && m.status.toLowerCase() === 'entwurf') {
-    return 'Korrektur Entwurf'
+    return 'Entwurf'
   }
   if (
     m.role === 'neu' &&
     (m.status.toLowerCase() === 'gesendet' || m.status.toLowerCase() === 'versendet')
   ) {
-    return 'Korrektur versendet'
+    return 'Offen'
   }
   return rechnungStatusDisplay(m.status, {
     korrektur_von: m.role === 'neu' ? 'x' : null,

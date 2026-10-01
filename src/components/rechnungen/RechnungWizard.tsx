@@ -579,7 +579,13 @@ export function RechnungWizard({
         : `${rechnungTitel || auftragLabel} — ${
             rechnungsart === 'abschlag' ? 'Abschlag' : 'Schlussrechnung'
           }`
-  const rBrutto = hasPlan && selBerechnet ? selBerechnet.brutto : brutto
+  // Eine Wahrheit: Schlussrechnung = Positionen dieser Rechnung minus Abschläge (wie beim Speichern),
+  // nicht der alte Planwert — sonst fehlen ergänzte Positionen im Prüfen-Blatt und in der Mail.
+  const rBrutto = schlussAbrechnung
+    ? schlussAbrechnung.rest_brutto
+    : hasPlan && selBerechnet
+      ? selBerechnet.brutto
+      : brutto
   const rFaellig =
     hasPlan && selRate?.faellig_am?.trim()
       ? selRate.faellig_am.trim().slice(0, 10)

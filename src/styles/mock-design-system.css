@@ -22141,3 +22141,23 @@ display: flex;
 .wizard-flow p:is(.text-bw-text-muted, .text-muted) {
   display: none;
 }
+
+/* „+ Neu“ öffnet am Desktop direkt unter dem „+“ in der Kopfleiste (nicht mehr unten rechts) */
+@media (min-width: 768px) {
+  .neu-pop { top: calc(var(--topbar-h, 44px) + 6px); right: 64px; bottom: auto; }
+}
+
+/* Ladeanzeige ohne Unschärfe, nur leicht abgedunkelt (wie die Blätter) */
+.action-busy { backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* Position frei: Preisfeld darf nicht von der USt-Auswahl zusammengedrückt werden */
+.pos-add-preis-ust__row > .pos-add-preis-ust__preis { flex: 1 1 auto; min-width: 120px; }
+.pos-add-preis-ust__row > select.pos-add-preis-ust__ust { flex: 0 0 88px; width: 88px; min-width: 0; }
+.pos-add-preis-ust__preis input.txt { flex: 1; min-width: 0; border: 0; background: transparent; }
+.editor-sheet__body .pos-add-preis-ust__row > *,
+.editor-sheet__body .field > div[style*='display: flex'] > :is(input, select) { height: 40px; min-height: 40px; }
+
+/* Keine Großbuchstaben-Beschriftungen auch dort, wo sie per Tailwind-Klasse gesetzt sind */
+.app .uppercase,
+.document-canvas .uppercase,
+.editor-sheet .uppercase { text-transform: none; letter-spacing: 0; }

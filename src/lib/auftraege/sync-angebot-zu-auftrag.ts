@@ -1,3 +1,4 @@
+import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import 'server-only'
 
 import { logDbError } from '@/lib/errors/log-db-error'
@@ -217,14 +218,26 @@ export async function syncAngebotPositionenZuAuftrag(input: {
   if (gewerkNamen.length) {
     const { data: auftrag, error } = await supabaseAdmin
       .from('auftraege')
-      .select('titel, kunden(name)')
+      .select('titel, angebot_id, kunden(name)')
       .eq('id', auftragId)
       .maybeSingle()
     if (error) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftraege', error)
     if (auftrag) {
       const kRaw = auftrag.kunden as { name?: string } | { name?: string }[] | null
       const kunde = Array.isArray(kRaw) ? kRaw[0] : kRaw
-      const titel = `${gewerkNamen.join(', ')} — ${kunde?.name ?? 'Kunde'}`.slice(0, 240)
+      // Eine Wahrheit: Auftragstitel = Angebots-Titel. Nur ohne Titel auf Gewerke ausweichen.
+      let angebotTitel = ''
+      const angebotId = String((auftrag as { angebot_id?: string | null }).angebot_id ?? '').trim()
+      if (angebotId) {
+        const { data: ang } = await supabaseAdmin
+          .from('angebote')
+          .select('leistungsumfang, notizen')
+          .eq('id', angebotId)
+          .maybeSingle()
+        const t = angebotTitelOderSituationBereich({ angebot: ang ?? null })
+        if (t && t !== 'Vorgang') angebotTitel = t
+      }
+      const titel = (angebotTitel || `${gewerkNamen.join(', ')} — ${kunde?.name ?? 'Kunde'}`).slice(0, 240)
       const { error: __dbErr1 } = await supabaseAdmin.from('auftraege').update({ titel }).eq('id', auftragId)
       if (__dbErr1) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftraege', __dbErr1)
     }

@@ -21,6 +21,7 @@ export type FabOverlayArt =
   | 'handwerker'
   | 'rechnung'
   | 'angebot'
+  | 'auftrag'
   | 'anfrage'
   | 'termin'
   | 'todo'
@@ -35,6 +36,7 @@ const FAB_ARTS = new Set<FabOverlayArt>([
   'anfrage',
   'termin',
   'todo',
+  'auftrag',
 ])
 
 /** Öffnet Create-Overlay auf der aktuellen Seite (ohne weiße `/neu`-Zwischenseite). */
@@ -89,7 +91,7 @@ export function FabCreateHost() {
   }, [art, gewerke.length, startTransition])
 
   const vorgangArt: FabVorgangArt | null =
-    art === 'rechnung' || art === 'angebot' ? art : null
+    art === 'rechnung' || art === 'angebot' || art === 'auftrag' ? art : null
 
   return (
     <>

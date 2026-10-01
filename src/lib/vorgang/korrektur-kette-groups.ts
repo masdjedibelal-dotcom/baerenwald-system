@@ -188,15 +188,15 @@ export function korrekturKetteListenStatus(group: KorrekturKetteGroup): {
   kind: 'neu' | 'warten' | 'aktiv' | 'fertig' | 'storniert' | 'plain'
 } | null {
   if (group.members.length < 2 && !group.pending) return null
-  if (group.pending) return { label: 'Korrektur Entwurf', kind: 'neu' }
+  if (group.pending) return { label: 'Entwurf', kind: 'neu' }
   const tip = group.members.filter((m) => m.role === 'neu').at(-1)?.row ?? group.head
   const st = String(tip.unterstatus).toLowerCase()
   if (st === 'bezahlt') return { label: 'Bezahlt', kind: 'fertig' }
   if (st === 'gesendet' || st === 'versendet') {
-    return { label: 'Korrektur versendet', kind: 'warten' }
+    return { label: 'Offen', kind: 'warten' }
   }
   if (String(tip.korrektur_von ?? '').trim()) {
-    return { label: 'Korrektur versendet', kind: 'warten' }
+    return { label: 'Offen', kind: 'warten' }
   }
   return null
 }

@@ -2065,8 +2065,9 @@ export async function sendAngebotToKunde(
         {
           name: kundenAnrede.name,
           positionen: posMail,
-          gesamt_min: summenMail.nettoMin,
-          gesamt_max: summenMail.nettoMax,
+          titel: leistungsumfang,
+          gesamt_min: mailReverseCharge ? summenMail.nettoMin : summenMail.bruttoMin,
+          gesamt_max: mailReverseCharge ? summenMail.nettoMax : summenMail.bruttoMax,
           lohn_gesamt: summenKostenaufstellungAusPositionen(posMail)?.lohn_netto ?? 0,
           gueltig_bis: gueltig,
           statusLink,
@@ -2275,8 +2276,9 @@ async function previewAngebotKundeMailInner(input: {
     {
       name: kundenAnrede.name,
       positionen: posMail,
-      gesamt_min: nettoAnzeige,
-      gesamt_max: nettoMaxAnzeige,
+      titel: leistungsumfang,
+      gesamt_min: mailReverseCharge ? nettoAnzeige : bruttoAnzeige,
+      gesamt_max: mailReverseCharge ? nettoMaxAnzeige : liveBrutto ?? summenMail.bruttoMax,
       lohn_gesamt: summenKostenaufstellungAusPositionen(posMail)?.lohn_netto ?? 0,
       gueltig_bis: gueltig,
       statusLink,

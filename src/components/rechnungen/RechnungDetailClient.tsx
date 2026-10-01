@@ -400,16 +400,14 @@ export function RechnungDetailClient({
     const nr = detail.rechnungsnummer?.trim()
     openActionConfirm({
       title: istKorrektur
-        ? 'Korrektur mit Storno wirklich versenden?'
-        : 'Rechnung wirklich versenden?',
+        ? 'Korrektur mit Storno senden?'
+        : 'Rechnung senden?',
       body: istKorrektur
         ? nr
           ? `${nr}: Storno-Gutschrift und neue Rechnung gehen als zwei PDFs an den Kunden.`
           : 'Storno-Gutschrift und neue Rechnung gehen als zwei PDFs an den Kunden.'
-        : nr
-          ? `${nr} wird per E-Mail an den Kunden gesendet.`
-          : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
-      confirmLabel: istKorrektur ? 'Korrektur jetzt versenden' : 'Jetzt versenden',
+        : `${nr ? `${nr} geht` : 'Die Rechnung geht'} per E-Mail an ${kundeEmail || 'den Kunden'}.`,
+      confirmLabel: istKorrektur ? 'Korrektur senden' : 'Senden',
       cancelLabel: 'Abbrechen',
       busyLabel: istKorrektur ? 'Korrektur wird gesendet…' : 'Wird gesendet…',
       onConfirm: async () => {
@@ -818,9 +816,9 @@ export function RechnungDetailClient({
             }
             label={
               korrekturUi.filterKey === 'korrektur_entwurf'
-                ? 'Korrektur Entwurf'
-                : korrekturUi.filterKey === 'korrektur_versendet'
-                  ? 'Korrektur versendet'
+                ? 'Entwurf'
+                : korrekturUi.filterKey === 'korrektur_versendet' && detail.status !== 'bezahlt' && detail.status !== 'storniert'
+                  ? 'Offen'
                   : rechnungStatus.label
             }
           />

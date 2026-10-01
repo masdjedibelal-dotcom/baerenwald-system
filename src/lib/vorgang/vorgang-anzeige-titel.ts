@@ -90,6 +90,22 @@ export function situationBereichTitel(
   return parts.length ? parts.join(' · ') : null
 }
 
+/** Eingetragenes Vorhaben einer Anfrage (Staff-Erfassung „Frei“/Formular, `funnel_daten.vorhaben`). */
+export function anfrageVorhaben(funnelDaten: unknown): string | null {
+  const rec = typeof funnelDaten === 'object' && funnelDaten !== null ? (funnelDaten as Record<string, unknown>) : {}
+  const v = typeof rec.vorhaben === 'string' ? rec.vorhaben.trim() : ''
+  return v && !isPlaceholderVorgangTitel(v) ? v : null
+}
+
+/** Eine Wahrheit für den Titel einer Anfrage: eingetragenes Vorhaben, sonst Situation · Bereich. */
+export function anfrageTitel(opts: {
+  funnel_daten?: unknown
+  situation?: string | null
+  bereiche?: string[] | null
+}): string | null {
+  return anfrageVorhaben(opts.funnel_daten) || situationBereichTitel(opts.situation, opts.bereiche)
+}
+
 /** Titel aus Angebot (Leistungsumfang / Wizard / Titel-Spalte), sonst Situation · Bereich. */
 export function angebotTitelOderSituationBereich(opts: {
   angebot?: VorgangAnzeigeTitelAngebot | null
@@ -119,6 +135,7 @@ export function resolveAkteVorgangTitel(opts: {
   rechnungTitel?: string | null
   situation?: string | null
   bereiche?: string[] | null
+  funnel_daten?: unknown
   fallback?: string | null
 }): string {
   const angebotTitel = angebotSprechenderTitel(opts.angebot)
@@ -130,7 +147,7 @@ export function resolveAkteVorgangTitel(opts: {
   const rechnungTitel = opts.rechnungTitel?.trim() || ''
   if (rechnungTitel && !isPlaceholderVorgangTitel(rechnungTitel)) return rechnungTitel
 
-  const anfrage = situationBereichTitel(opts.situation, opts.bereiche)
+  const anfrage = anfrageTitel({ funnel_daten: opts.funnel_daten, situation: opts.situation, bereiche: opts.bereiche })
   if (anfrage) return anfrage
 
   const fb = opts.fallback?.trim() || ''

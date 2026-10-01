@@ -1,5 +1,8 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
+import { CRM_REFRESH_EVENT } from '@/lib/crm-client-refresh'
+
 import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Sidebar } from '@/components/layout/Sidebar'
@@ -24,6 +27,21 @@ function ShellChrome({
   const [neuOpen, setNeuOpen] = useState(false)
   const [sbCollapsed, setSbCollapsed] = useState(false)
   useKeyboardOpen()
+
+  // Seite nach Aktionen an den echten Stand binden (siehe afterServerActionRefresh)
+  const router = useRouter()
+  useEffect(() => {
+    let t: number | undefined
+    const onRefresh = () => {
+      window.clearTimeout(t)
+      t = window.setTimeout(() => router.refresh(), 50)
+    }
+    window.addEventListener(CRM_REFRESH_EVENT, onRefresh)
+    return () => {
+      window.clearTimeout(t)
+      window.removeEventListener(CRM_REFRESH_EVENT, onRefresh)
+    }
+  }, [router])
 
   useEffect(() => {
     const openNeu = () => setNeuOpen(true)

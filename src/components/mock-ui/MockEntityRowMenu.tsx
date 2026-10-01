@@ -349,6 +349,7 @@ type NeuItem = { ic: string; label: string; overlay: FabOverlayArt }
 const VORGANG_ITEMS: NeuItem[] = [
   { ic: 'inbox', label: 'Anfrage', overlay: 'anfrage' },
   { ic: 'file-invoice', label: 'Angebot', overlay: 'angebot' },
+  { ic: 'briefcase', label: 'Auftrag', overlay: 'auftrag' },
   { ic: 'receipt', label: 'Rechnung', overlay: 'rechnung' },
 ]
 
@@ -361,6 +362,7 @@ const STAMM_ITEMS: NeuItem[] = [
 const BUSY_LABEL: Record<FabOverlayArt, string> = {
   anfrage: 'Anfrage wird geöffnet…',
   angebot: 'Angebot wird geöffnet…',
+  auftrag: 'Auftrag wird geöffnet…',
   rechnung: 'Rechnung wird geöffnet…',
   kunde: 'Kunde wird geöffnet…',
   handwerker: `${COPY_ROLE.partner} wird geöffnet…`,

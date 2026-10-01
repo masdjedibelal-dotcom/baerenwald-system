@@ -27,12 +27,15 @@ export function AngebotNeuFromKundeClient({
   preislisten,
   firm,
   handwerker = [],
+  direktAuftrag = false,
 }: {
   kunde: Kunde
   gewerke: Gewerk[]
   preislisten: Preisliste[]
   firm: FirmenEinstellungen
   handwerker?: Handwerker[]
+  /** „+ Auftrag“: am Ende „Auftrag anlegen“ statt senden */
+  direktAuftrag?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(true)
@@ -79,6 +82,7 @@ export function AngebotNeuFromKundeClient({
       firm={firm}
       handwerker={handwerker}
       deferredLeadCreate
+      direktAuftrag={direktAuftrag}
       onClose={() => leave()}
       onDone={(id) => leave(id)}
       onSaved={() => {

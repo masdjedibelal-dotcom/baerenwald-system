@@ -177,7 +177,7 @@ export function AngebotDetailPageClient({
   const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { refresh } = useCrmRefresh()
+  const { refresh, hardRefresh } = useCrmRefresh()
   const [pending, startTransition] = useLocalTransition()
   const [mainTab, setMainTab] = useState<AngebotDetailTab>(ANGEBOT_DETAIL_DEFAULT_TAB)
   const [acceptOpen, setAcceptOpen] = useState(false)
@@ -459,6 +459,13 @@ export function AngebotDetailPageClient({
       onClick: openNeuesAngebotAlsKopie,
     })
   }
+  if (statusEinfach === 'entwurf' && !auftragId) {
+    angebotMenuItems.push({
+      label: 'Angebot annehmen',
+      icon: <MockIcon ctx="btn" n="check" size={16} />,
+      onClick: openAcceptModal,
+    })
+  }
   if (dangerAction) {
     angebotMenuItems.push({
       label: 'Kunde hat abgelehnt',
@@ -629,6 +636,33 @@ export function AngebotDetailPageClient({
     }
     return null
   }, [kannBearbeiten, pending, auftragId, router])
+
+  function annehmenAusfuehren(mitMail: boolean) {
+    if (!aufStart.trim()) {
+      applyFieldErrors({ _form: TOAST.bitte_start_datum_angeben })
+      return
+    }
+    if (mitMail && !aufTo.length) {
+      applyFieldErrors({ _form: TOAST.bitte_mindestens_einen_empfaenger_angeben })
+      return
+    }
+    startTransition(async () => {
+      const res = await acceptAngebotAndCreateAuftrag(detail.id, {
+        start_datum: aufStart,
+        end_datum: aufEnde || null,
+        send_kunden_email: mitMail,
+        ...(mitMail ? { betreff: aufBetreff.trim(), to: aufTo, cc: aufCc } : {}),
+      })
+      if (!res.ok) {
+        toast.systemError(res)
+        return
+      }
+      setAcceptOpen(false)
+      toast.success(mitMail ? TOAST.auftrag_erstellt_bestaetigung_gesendet : TOAST.auftrag_erstellt)
+      router.push(`/auftraege/${res.auftragId}`)
+      refresh()
+    })
+  }
 
   const stammdatenInhalt = (
     <>
@@ -871,13 +905,14 @@ export function AngebotDetailPageClient({
       <AngebotVersandSection
         mode="kunde"
         detail={detail}
+        angebotTitel={projektTitel}
         bruttoMin={summenMail.bruttoMin}
         bruttoMax={summenMail.bruttoMax}
         positionen={detail.positionen ?? []}
         gueltigBis={gueltigBisYmd}
         kundeModalOpen={kundeVersandOpen}
         onKundeModalOpenChange={setKundeVersandOpen}
-        onKundeSent={() => refresh()}
+        onKundeSent={() => hardRefresh()}
       />
 
       {wizardOpen && lead ? (
@@ -921,7 +956,19 @@ export function AngebotDetailPageClient({
         />
       ) : null}
 
-      <EditorSheet open={acceptOpen} onClose={() => setAcceptOpen(false)} title="Angebot annehmen" size="lg">
+      <EditorSheet
+        open={acceptOpen}
+        onClose={() => setAcceptOpen(false)}
+        title="Angebot annehmen"
+        size="lg"
+        secondary={{ label: 'Ohne Mail annehmen', kind: 'ghost', disabled: pending, onClick: () => annehmenAusfuehren(false) }}
+        primary={{
+          label: 'Annehmen und bestätigen',
+          busy: pending,
+          disabled: pending || !kunde?.email?.trim() || !aufTo.length,
+          onClick: () => annehmenAusfuehren(true),
+        }}
+      >
       {fieldErrors._form ? <p className="field-error" role="alert">{fieldErrors._form}</p> : null}
                 <div className="space-y-4">
           <p className="text-[length:var(--fs-text)] text-bw-text-muted">
@@ -980,75 +1027,6 @@ export function AngebotDetailPageClient({
               </>
             )}
           </div>
-        </div>
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <MockBtn type="button" kind="secondary" onClick={() => setAcceptOpen(false)}>
-            Abbrechen
-          </MockBtn>
-          <MockBtn
-            type="button"
-            kind="secondary"
-            loading={pending}
-            onClick={() => {
-              if (!aufStart.trim()) {
-                applyFieldErrors({ _form: TOAST.bitte_start_datum_angeben })
-                return
-              }
-              startTransition(async () => {
-                const res = await acceptAngebotAndCreateAuftrag(detail.id, {
-                  start_datum: aufStart,
-                  end_datum: aufEnde || null,
-                  send_kunden_email: false,
-                })
-                if (!res.ok) {
-                  toast.systemError(res)
-                  return
-                }
-                setAcceptOpen(false)
-                toast.success(TOAST.auftrag_erstellt)
-                router.push(`/auftraege/${res.auftragId}`)
-                refresh()
-              })
-            }}
-          >
-            Nur Auftrag erstellen
-          </MockBtn>
-          <MockBtn
-            type="button"
-            kind="primary"
-            loading={pending}
-            disabled={!kunde?.email?.trim() || !aufTo.length}
-            onClick={() => {
-              if (!aufStart.trim()) {
-                applyFieldErrors({ _form: TOAST.bitte_start_datum_angeben })
-                return
-              }
-              if (!aufTo.length) {
-                applyFieldErrors({ _form: TOAST.bitte_mindestens_einen_empfaenger_angeben })
-                return
-              }
-              startTransition(async () => {
-                const res = await acceptAngebotAndCreateAuftrag(detail.id, {
-                  start_datum: aufStart,
-                  end_datum: aufEnde || null,
-                  send_kunden_email: true,
-                  betreff: aufBetreff.trim(),
-                  to: aufTo,
-                  cc: aufCc,
-                })
-                if (!res.ok) {
-                  toast.systemError(res)
-                  return
-                }
-                setAcceptOpen(false)
-                toast.success(TOAST.auftrag_erstellt_bestaetigung_gesendet)
-                router.push(`/auftraege/${res.auftragId}`)
-                refresh()
-              })
-            }}
-          >
-            Erstellen & Bestätigung senden
-          </MockBtn>
         </div>
       </EditorSheet>
 

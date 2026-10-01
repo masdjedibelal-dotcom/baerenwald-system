@@ -103,20 +103,20 @@ export function RechnungKorrekturWahlModal({
     <EditorSheet
       open={open}
       onClose={() => !pending && onClose()}
-      title="Rechnung korrigieren"
-      subtitle="Was möchten Sie tun?"
+      title="Rechnung ändern"
+      subtitle={nr}
       size="md"
       secondary={{ label: 'Abbrechen', onClick: onClose, disabled: pending, kind: 'ghost' }}
       primary={{
         label: pending
           ? mode === 'korrigieren'
-            ? 'Storno + Entwurf…'
+            ? 'Wird vorbereitet…'
             : 'Lädt…'
           : mode === 'korrigieren'
-            ? 'Korrektur anlegen'
+            ? 'Weiter'
             : mode === 'neu'
-              ? 'Neue Rechnung anlegen'
-              : 'Bitte wählen',
+              ? 'Weiter'
+              : 'Weiter',
         disabled: !interactReady || pending || !mode,
         busy: pending,
         onClick: () => {
@@ -125,15 +125,6 @@ export function RechnungKorrekturWahlModal({
         },
       }}
     >
-      <p
-        className="text-[length:var(--fs-meta)]"
-        style={{ color: 'var(--text-3)', margin: '0 0 0.875rem', lineHeight: 1.45 }}
-      >
-        <strong style={{ color: 'var(--text-2)', fontWeight: 600 }}>{nr}</strong> ist bereits
-        versendet. Eine Korrektur legt Storno-Gutschrift und neuen Entwurf an — das Original bleibt
-        bis zum Versand gültig. Es geht noch keine Mail raus, bis du im Wizard bewusst „Versenden“
-        bestätigst.
-      </p>
 
       <div
         className="doctype-row doctype-row--stack"
@@ -147,12 +138,9 @@ export function RechnungKorrekturWahlModal({
           <span className="dot" />
           <span className="doctype-radio-opt__copy">
             <span className="lbl" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-              Diese Rechnung korrigieren
+              Diese Rechnung ändern
             </span>
-            <span className="hint">
-              Nur wenn Betrag oder Positionen falsch sind: Storno-Gutschrift + neue Rechnung als
-              Entwurf. Versand erst nach Bestätigung im Wizard.
-            </span>
+            <span className="hint">Wird storniert und neu erstellt. Sie senden die neue danach.</span>
           </span>
         </MockBtn>
 
@@ -163,13 +151,9 @@ export function RechnungKorrekturWahlModal({
           <span className="dot" />
           <span className="doctype-radio-opt__copy">
             <span className="lbl" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-              Neue Rechnung anlegen
-              <MockBadge kind="aktiv">Zusatzleistung</MockBadge>
+              Zusätzliche Rechnung
             </span>
-            <span className="hint">
-              Separater Beleg — z. B. Regie oder weiterer Posten. Die bestehende Rechnung bleibt
-              unverändert.
-            </span>
+            <span className="hint">Für weitere Leistungen. Diese Rechnung bleibt.</span>
           </span>
         </MockBtn>
       </div>

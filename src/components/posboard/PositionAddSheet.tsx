@@ -172,6 +172,8 @@ export function PositionAddSheet({
       .then((list) => {
         if (cancelled) return
         setRows(list)
+        // Keine Preisliste angelegt → gleich „Frei“ statt „Keine Treffer“
+        if (list.length === 0) setMode('frei')
         const preferred = preferredGewerkName?.trim()
         if (preferred) {
           const hit = list.find(
@@ -447,6 +449,9 @@ export function PositionAddSheet({
       title="Position hinzufügen"
       context="canvas"
       size="lg"
+      // Fester Knopf unten statt kleinem Haken oben — der Haken rutschte beim Verlassen eines Feldes weg
+      secondary={{ label: 'Abbrechen', kind: 'ghost' }}
+      primary={{ label: 'Hinzufügen', onClick: onConfirm, disabled: headerConfirmDisabled }}
       headerEnd={
         <div className="pos-add-sheet__header-actions">
           {mode !== 'nachlass' && mode !== 'gewerk' ? (
@@ -466,9 +471,6 @@ export function PositionAddSheet({
               }}
             />
           ) : null}
-          <MockBtn className="editor-sheet__confirm" type="button" disabled={headerConfirmDisabled} onClick={onConfirm} aria-label="Speichern" title="Speichern">
-            <MockIcon n="check" ctx="row" className="h-5 w-5" aria-hidden />
-          </MockBtn>
         </div>
       }
     >

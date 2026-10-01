@@ -464,16 +464,19 @@ export function mailAngebot(
     kundeTyp?: string | null
     visualisierung_vorschau_url?: string | null
     reverseCharge?: boolean
+    /** Titel des Angebots (Leistungsumfang) — sonst erste Position */
+    titel?: string | null
   },
   b: MailBranding
 ): { betreff: string; html: string } {
   const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
   const anredeKey = anrede === 'sie' ? 'sie' : 'du'
   const begruessung = esc(mailBegruessungZeile(anrede, data.name))
+  // Beträge kommen brutto (bei §13b netto) — passend zum Hinweis „inkl. MwSt.“
   const istRange = data.gesamt_min !== data.gesamt_max
   const betragText = istRange
     ? `${formatEuroSpanne(data.gesamt_min, data.gesamt_max)}`
-    : `${formatEuro(data.gesamt_min, { decimals: 0 })}`
+    : `${formatEuro(data.gesamt_min)}`
   const steuer = Math.round(data.lohn_gesamt * 0.2)
   const body1 = mailText(
     anrede,
@@ -489,6 +492,7 @@ export function mailAngebot(
         )}</p>`
       : ''
   const titel =
+    data.titel?.trim() ||
     data.positionen[0]?.beschreibung?.trim() ||
     data.positionen[0]?.leistung?.trim() ||
     mailText(anrede, 'dein Projekt', 'Ihr Projekt')

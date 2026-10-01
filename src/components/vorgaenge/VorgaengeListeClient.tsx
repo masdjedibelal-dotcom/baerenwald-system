@@ -165,8 +165,8 @@ function statusLabel(row: VorgangListeRow): string {
     korrektur_von: row.korrektur_von,
     korrektur_art: row.korrektur_art,
   })
-  if (ui.filterKey === 'korrektur_entwurf') return 'Korrektur Entwurf'
-  if (ui.filterKey === 'korrektur_versendet') return 'Korrektur versendet'
+  if (ui.filterKey === 'korrektur_entwurf') return 'Entwurf'
+  if (ui.filterKey === 'korrektur_versendet') return 'Offen'
   return row.unterstatusLabel
 }
 

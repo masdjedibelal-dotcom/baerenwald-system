@@ -72,7 +72,7 @@ import {
 } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
 import { leadIstAkut, leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
-import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { anfrageTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 
 const AngebotWizard = dynamic(
@@ -183,8 +183,11 @@ function kundenName(lead: LeadDetail) {
 
 function leadVorhabenTitel(lead: LeadDetail): string {
   return (
-    situationBereichTitel(lead.situation, bereicheFuerAnzeige(lead.bereiche, lead.situation)) ||
-    'Anfrage'
+    anfrageTitel({
+      funnel_daten: lead.funnel_daten,
+      situation: lead.situation,
+      bereiche: bereicheFuerAnzeige(lead.bereiche, lead.situation),
+    }) || 'Anfrage'
   )
 }
 

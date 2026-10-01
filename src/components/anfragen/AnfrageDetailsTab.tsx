@@ -10,13 +10,16 @@ import { updateLeadBeschreibung } from '@/app/(dashboard)/anfragen/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { isEchterFreitext, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
-import { situationBereichTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { anfrageTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import type { LeadDetail } from '@/lib/types'
 
 function vorhabenTitel(lead: LeadDetail): string {
   return (
-    situationBereichTitel(lead.situation, bereicheFuerAnzeige(lead.bereiche, lead.situation)) ||
-    'Anfrage'
+    anfrageTitel({
+      funnel_daten: lead.funnel_daten,
+      situation: lead.situation,
+      bereiche: bereicheFuerAnzeige(lead.bereiche, lead.situation),
+    }) || 'Anfrage'
   )
 }
 

@@ -273,8 +273,16 @@ export function DocumentCanvas({
   useEffect(() => {
     if (!open || !mounted || !portal) return
 
+    const geoeffnetAm = Date.now()
     const onPop = (e: PopStateEvent) => {
       if (shouldIgnoreSuppressedEditorSheetPop()) return
+      // Zurück-Ereignis direkt nach dem Öffnen stammt vom Aufräumen eines vorherigen Durchlaufs
+      // (React-Entwicklungsmodus führt Effekte doppelt aus) — Canvas offen lassen.
+      if (Date.now() - geoeffnetAm < 500) {
+        window.history.pushState({ documentCanvas: true }, '')
+        historyPushed.current = true
+        return
+      }
       // Sheet geschlossen → wir landen wieder auf Canvas-State → offen lassen
       const st = e.state as { documentCanvas?: boolean; editorSheet?: string } | null
       if (st?.documentCanvas) {

@@ -40,6 +40,9 @@ import {
 import { DateInput } from '@/components/ui/DateInput'
 import { PosBoard } from '@/components/posboard/PosBoard'
 import { toast } from '@/components/ui/app-toast'
+import { acceptAngebotAndCreateAuftrag } from '@/app/(dashboard)/angebote/angebot-flow-actions'
+import { heuteYmd } from '@/lib/angebot-einfach'
+import { anfrageVorhaben } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { normalizeKundeNamen, splitDeutscherVollname } from '@/lib/kunde-namen'
@@ -178,6 +181,9 @@ function zuweisungenFromBootstrapPositionen(
 }
 
 function projektLabel(lead: LeadDetail) {
+  // Eingetragenes Vorhaben der Anfrage zuerst (eine Wahrheit mit der Anfrage-Seite)
+  const vorhaben = anfrageVorhaben(lead.funnel_daten)
+  if (vorhaben) return vorhaben
   const bereiche = bereicheFuerAnzeige(lead.bereiche, lead.situation)
   if (bereiche.length) return bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
   return leadSituationDisplay(lead.situation) || 'Projekt'
@@ -196,6 +202,7 @@ export function AngebotWizard({
   firm: firmProp,
   bootstrap = null,
   deferredLeadCreate = false,
+  direktAuftrag = false,
   initialStep,
   focusField,
   onClose,
@@ -216,6 +223,8 @@ export function AngebotWizard({
    * (oder bei Foto-Upload); Abbruch ohne Angebot soft-löscht den Träger.
    */
   deferredLeadCreate?: boolean
+  /** „+ Auftrag“: am Ende „Auftrag anlegen“ (ohne Mail sofort angenommen) statt senden */
+  direktAuftrag?: boolean
   /** Deep-Link vom Assistenten: 1–5 */
   initialStep?: number | null
   /** Deep-Link Fokus: titel | beschreibung | positionen */
@@ -400,7 +409,7 @@ export function AngebotWizard({
   const [zahlungsplan] = useState<Zahlungsplan | null>(() => bootstrap?.zahlungsplan ?? null)
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
   const auftragKorrekturId = bootstrap?.auftragKorrektur?.auftragId ?? null
-  const wizardTitel = istNachtrag ? 'Nachtrag' : 'Angebot'
+  const wizardTitel = istNachtrag ? 'Nachtrag' : direktAuftrag ? 'Auftrag' : 'Angebot'
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
@@ -1111,6 +1120,32 @@ export function AngebotWizard({
     onClose()
   }
 
+  /** „+ Auftrag“: Entwurf speichern, ohne Mail annehmen, direkt zum Auftrag. */
+  async function handleFinishDirektAuftrag() {
+    setSaving(true)
+    try {
+      const id = await persistDraft({ notify: false, manageBusy: false })
+      if (!id) return
+      const leadId = await ensureLeadId()
+      if (!leadId) return
+      const res = await acceptAngebotAndCreateAuftrag(id, {
+        start_datum: heuteYmd(),
+        end_datum: null,
+        send_kunden_email: false,
+        direktOhneHvFreigabe: true,
+      })
+      if (!res?.ok) {
+        toast.error(res && 'message' in res && res.message ? res.message : 'Auftrag konnte nicht angelegt werden.')
+        return
+      }
+      toast.success('Auftrag angelegt')
+      onClose()
+      window.location.assign(`/auftraege/${res.auftragId}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleFinishVersenden() {
     const recipients =
       mailTo.length > 0
@@ -1386,15 +1421,15 @@ export function AngebotWizard({
       <EditorSheet
         open={sheet === 'pruefen'}
         onClose={closeSheet}
-        title="Prüfen und senden"
+        title={direktAuftrag ? 'Prüfen und beauftragen' : 'Prüfen und senden'}
         context="canvas"
         size="lg"
         primary={{
-          label: COPY_BUTTON.angebotSenden,
+          label: direktAuftrag ? 'Auftrag anlegen' : COPY_BUTTON.angebotSenden,
           onClick: () => {
             if (saving) return
             setSheet(null)
-            void handleFinishVersenden()
+            void (direktAuftrag ? handleFinishDirektAuftrag() : handleFinishVersenden())
           },
           busy: saving,
         }}

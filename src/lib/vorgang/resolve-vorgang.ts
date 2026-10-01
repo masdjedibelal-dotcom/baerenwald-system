@@ -332,6 +332,7 @@ function buildTitel(
     auftragTitel,
     situation: input.lead.situation,
     bereiche: input.lead.bereiche,
+    funnel_daten: (input.lead as { funnel_daten?: unknown }).funnel_daten,
     // Nie Kundenname — nur expliziter Vorgangs-Titel falls gesetzt
     fallback: input.titel?.trim() || null,
   })

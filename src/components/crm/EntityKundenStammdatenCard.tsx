@@ -302,13 +302,7 @@ export function EntityKundenStammdatenCard({
                 hideLogin
               />
             </div>
-            <div className="stammdaten-footer__login">
-              <PortalLoginIconButton
-                kundeId={kundeId}
-                label="Kundenportal öffnen"
-                withLabel
-              />
-            </div>
+            {/* „Als Kunde einloggen“ entfällt (Entlastung 01.10.2026) */}
           </div>
           {showKundeLink ? (
             <div className="stammdaten-footer__secondary">

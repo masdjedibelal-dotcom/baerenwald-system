@@ -7,7 +7,7 @@ import { KundeModal } from '@/components/kunden/KundeModal'
 import { showRouteBusy, hideOverlayBusy } from '@/components/ui/action-busy'
 import type { Kunde } from '@/lib/types'
 
-export type FabVorgangArt = 'anfrage' | 'angebot' | 'rechnung'
+export type FabVorgangArt = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
 
 /**
  * FAB-Zwischenschritt auf der aktuellen Seite (kein weißer `/neu`-Host).
@@ -41,7 +41,7 @@ export function FabVorgangStartModal({
       startRechnung(kid)
       return
     }
-    if (art === 'angebot' && kid) {
+    if ((art === 'angebot' || art === 'auftrag') && kid) {
       startAngebot(kid)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei open/art/kunde
@@ -61,9 +61,10 @@ export function FabVorgangStartModal({
     setContinuing(true)
     setCreateOpen(false)
     hideOverlayBusy()
-    showRouteBusy('Angebot wird geöffnet…')
+    showRouteBusy(art === 'auftrag' ? 'Auftrag wird geöffnet…' : 'Angebot wird geöffnet…')
     onClose()
-    router.push(`/angebote/neu?kunde_id=${encodeURIComponent(kid)}`)
+    // Auftrag = Angebot, das am Ende ohne Mail sofort angenommen wird (ein Weg zum Auftrag)
+    router.push(`/angebote/neu?kunde_id=${encodeURIComponent(kid)}${art === 'auftrag' ? '&direkt=1' : ''}`)
   }
 
   function startRechnung(kid: string) {
@@ -77,14 +78,14 @@ export function FabVorgangStartModal({
   }
 
   function onKundePick(k: Kunde) {
-    if (art === 'angebot') {
+    if (art === 'angebot' || art === 'auftrag') {
       startAngebot(k.id)
       return
     }
     startRechnung(k.id)
   }
 
-  const pickerTitle = art === 'angebot' ? 'Angebot' : 'Rechnung'
+  const pickerTitle = art === 'angebot' ? 'Angebot' : art === 'auftrag' ? 'Auftrag' : 'Rechnung'
   const showPicker = open && !createOpen && !continuing && !initialKundeId?.trim()
 
   return (
@@ -116,7 +117,7 @@ export function FabVorgangStartModal({
             setCreateOpen(false)
             return
           }
-          if (art === 'angebot') startAngebot(id)
+          if (art === 'angebot' || art === 'auftrag') startAngebot(id)
           else startRechnung(id)
         }}
       />

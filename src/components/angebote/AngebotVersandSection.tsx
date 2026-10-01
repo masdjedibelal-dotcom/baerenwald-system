@@ -1,5 +1,7 @@
 'use client'
 
+import { angebotMailBetreff } from '@/lib/templates/angebot-mail'
+
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn, MockEmpty } from '@/components/mock-ui'
 import { MockField, MockInput } from '@/components/mock-ui/MockForm'
@@ -105,7 +107,10 @@ export function AngebotVersandSection({
     if (kundeModalControlled) onKundeModalOpenChange?.(open)
     else setKundeModalInternal(open)
   }
-  const [subject, setSubject] = useState('Vorgang – Angebot bereit')
+  // Betreff aus dem Angebots-Titel (eine Wahrheit mit der Seite), kein Platzhalter
+  const [subject, setSubject] = useState(() =>
+    angebotMailBetreff(angebotTitel?.trim() || null, detail.angebotsnr?.trim() || '')
+  )
 
   const [hwModal, setHwModal] = useState<{
     id: string
@@ -175,8 +180,9 @@ export function AngebotVersandSection({
       {
         name: vorname,
         positionen: posMail,
-        gesamt_min: summenMail.nettoMin,
-        gesamt_max: summenMail.nettoMax,
+        titel,
+        gesamt_min: summenMail.bruttoMin,
+        gesamt_max: summenMail.bruttoMax,
         lohn_gesamt: summenKostenaufstellungAusPositionen(posMail)?.lohn_netto ?? 0,
         gueltig_bis: gueltigBis,
         statusLink,
@@ -184,7 +190,7 @@ export function AngebotVersandSection({
       },
       b
     ).html
-  }, [vorname, positionen, gueltigBis, detail.lead_id, kundeTyp])
+  }, [vorname, positionen, gueltigBis, detail.lead_id, kundeTyp, titel])
 
   const allHandwerkerAngefragt = useMemo(() => {
     if (rows.length === 0) return false
@@ -555,7 +561,7 @@ export function AngebotVersandSection({
                   'zahlplan-preset-chip',
                   (!mailToOverride || mailToOverride === kunde.email.trim()) && 'is-on'
                 )} type="button" onClick={() => setMailToOverride(kunde.email!.trim())}>
-                Stamm · {kunde.email.trim()}
+                {kunde.email.trim()}
               </MockBtn>
             ) : null}
             {apRows.map((ap) => {

@@ -141,10 +141,10 @@ export function rechnungStatusDisplay(
       korrektur_art: opts.korrektur_art,
     })
     if (ui.filterKey === 'korrektur_entwurf') {
-      return { label: 'Korrektur Entwurf', variant: 'neutral' }
+      return { label: 'Entwurf', variant: 'neutral' }
     }
     if (ui.filterKey === 'korrektur_versendet') {
-      return { label: 'Korrektur versendet', variant: 'active' }
+      return { label: 'Offen', variant: 'active' }
     }
   }
   const key = String(status ?? '')

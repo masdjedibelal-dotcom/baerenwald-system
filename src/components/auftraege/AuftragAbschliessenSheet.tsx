@@ -294,8 +294,7 @@ export function AuftragAbschliessenSheet({
         }}
       >
         <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
-          Abnahme ist optional. Du kannst den Auftrag direkt abschließen oder ein
-          Abnahmeprotokoll mit Leistungen, Mängeln und Unterschriften erstellen.
+          Mit Abnahmeprotokoll oder direkt abschließen?
         </p>
       </EditorSheet>
     )

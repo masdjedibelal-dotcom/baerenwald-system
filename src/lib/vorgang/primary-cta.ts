@@ -112,9 +112,11 @@ export function primaryCta(
   }
 
   if (phase === 'angebot') {
+    // Alltag: Entwurf geht zuerst an den Kunden. Zusage am Telefon → „Angebot annehmen“ im „…“.
+    if (ui === 'entwurf' && !ctx.unterSchwelleDirektAuftrag) {
+      return { id: 'angebot_versenden', label: 'Angebot senden', icon: 'send' }
+    }
     if (ui === 'entwurf' || ui === 'gesendet_kunde') {
-      // Entwurf: Annehmen (Auftrag) ist Primary — E-Mail-Versand nur über Bearbeiten/Senden.
-      // Portal zeigt Angebote mit PDF sowieso; „Versenden“ = nur Mail.
       if (ctx.unterSchwelleDirektAuftrag) {
         return { id: 'direkt_auftrag', label: 'Direkt Auftrag', icon: 'briefcase' }
       }
@@ -139,7 +141,7 @@ export function primaryCta(
         return {
           id: 'rechnung_versenden',
           label: ctx.naechsterAbschlagSenden
-            ? 'Abschlag versenden'
+            ? 'Abschlag senden'
             : 'Rechnung versenden',
           icon: 'send',
         }
@@ -178,12 +180,12 @@ export function primaryCta(
   }
   if (ui === 'entwurf') {
     if (ctx.korrektur) {
-      return { id: 'rechnung_versenden', label: 'Korrektur versenden', icon: 'send' }
+      return { id: 'rechnung_versenden', label: 'Korrektur senden', icon: 'send' }
     }
     if (ctx.naechsterAbschlagSenden) {
       return { id: 'rechnung_versenden', label: 'Abschlag senden', icon: 'send' }
     }
-    return { id: 'rechnung_versenden', label: 'Rechnung versenden', icon: 'send' }
+    return { id: 'rechnung_versenden', label: 'Rechnung senden', icon: 'send' }
   }
   if (ui === 'versendet' || ui === 'ueberfaellig') {
     if (ctx.eingehend) {

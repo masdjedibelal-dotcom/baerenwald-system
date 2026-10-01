@@ -105,7 +105,7 @@ function rateBadgeMeta(
   }
   if (st === 'gestellt') {
     const ueber = faelligUeberfaellig(r?.faellig_am)
-    if (!ueber) return { label: 'Gestellt', tone: 'blau', status: 'gesendet' }
+    if (!ueber) return { label: 'Offen', tone: 'blau', status: 'gesendet' }
     const stufe = aktuelleMahnstufeNummer({
       status: String(r?.status ?? 'gesendet'),
       erinnerung_7_sent_at: r?.erinnerung_7_sent_at,
@@ -140,7 +140,7 @@ function belegStatusLabel(r: RechnungAuswahlZeile): string {
   if (st === 'storniert') return 'Storniert'
   if (st === 'entwurf') return 'Entwurf'
   if (faelligUeberfaellig(r.faellig_am)) return 'Überfällig'
-  if (st === 'gesendet' || st === 'versendet') return 'Gestellt'
+  if (st === 'gesendet' || st === 'versendet') return 'Offen'
   return st || '—'
 }
 
@@ -318,12 +318,12 @@ export function VorgangZahlungTab({
           istSchluss: Boolean(z.istSchluss),
           sub:
             [
-              pct != null ? `${pct} % der Auftragssumme` : z.istSchluss ? 'Restbetrag nach Abschlägen' : null,
+              pct != null ? `${pct} % der Auftragssumme` : z.istSchluss && plan.zeilen.length > 1 ? 'Restbetrag nach Abschlägen' : null,
               related.length === 1 ? r?.rechnungsnummer?.trim() || null : null,
               badge.hint ?? null,
             ]
               .filter(Boolean)
-              .join(' · ') || 'Abschlag',
+              .join(' · ') || (z.istSchluss ? (plan.zeilen.length > 1 ? 'Schlussrechnung' : '') : 'Abschlag'),
           badgeLabel: badge.label,
           badgeTone: badge.tone,
           badgeStatus: badge.status,
@@ -522,6 +522,17 @@ export function VorgangZahlungTab({
     })
   }
 
+  // „Rechnung stellen“: nach dem Anlegen den Entwurf gleich öffnen (kein zweiter Klick auf die Zeile)
+  const [oeffneSchlussNachSpeichern, setOeffneSchlussNachSpeichern] = useState(false)
+  useEffect(() => {
+    if (!oeffneSchlussNachSpeichern) return
+    const schluss = rows.find((r) => r.istSchluss && r.rechnungId)
+    if (!schluss?.rechnungId) return
+    setOeffneSchlussNachSpeichern(false)
+    openRechnungBearbeiten(schluss.rechnungId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur wenn die Zeile mit Rechnung erscheint
+  }, [oeffneSchlussNachSpeichern, rows])
+
   function openRechnungBearbeiten(rechnungId: string) {
     setOpenRateId(null)
     if (onEditInvoice) {
@@ -653,6 +664,8 @@ export function VorgangZahlungTab({
   const interactive = !readOnly && variant !== 'angebot'
   const canEditPlan = interactive && variant === 'auftrag' && Boolean(auftragId)
   const hatSchlusszeile = plan.zeilen.some((z) => z.typ === 'rest')
+  /** Nur eine Rechnung (kein Abschlag) — dann überall „Rechnung“ statt Abschlag-Wörter */
+  const nurEineRechnung = rows.length === 1 && Boolean(rows[0]?.istSchluss)
   /** P09: Abschlag/Schluss direkt stellen — der Plan entsteht im Hintergrund. */
   const planAktionen = canEditPlan ? (
     <span style={{ display: 'inline-flex', gap: 8 }}>
@@ -665,9 +678,13 @@ export function VorgangZahlungTab({
           kind="secondary"
           icon="file-invoice"
           disabled={pending}
-          onClick={() => speichern(planMitSchlussrechnung(hasPlan ? plan : null))}
+          onClick={() => {
+            setOeffneSchlussNachSpeichern(true)
+            speichern(planMitSchlussrechnung(hasPlan ? plan : null))
+          }}
         >
-          Schlussrechnung
+          {/* Ohne Abschläge ist es einfach „die Rechnung“ */}
+          {plan.zeilen.some((z) => z.typ !== 'rest') ? 'Schlussrechnung' : 'Rechnung stellen'}
         </MockBtn>
       ) : null}
     </span>
@@ -693,6 +710,12 @@ export function VorgangZahlungTab({
       belege.some((b) => b.id === aktuelleRechnungId)
 
     function onOpenDrawer() {
+      // Eine Wahrheit: gibt es die Rechnung schon, direkt die Rechnungsseite (dort Senden/Bezahlt/Bearbeiten).
+      // Das Zwischenblatt nur für geplante Raten ohne Rechnung.
+      if (row.rechnungId && row.rechnungId !== aktuelleRechnungId) {
+        router.push(`/rechnungen/${row.rechnungId}`)
+        return
+      }
       setOpenRateId(row.id)
     }
 
@@ -762,20 +785,7 @@ export function VorgangZahlungTab({
           <div className="zahlplan-empty">
             <MockIcon ctx="empty" n="calculator" size={26} />
             <div className="zahlplan-empty__title">
-              {variant === 'angebot' ? 'Kein Zahlungsvorschlag' : 'Noch keine Abschläge'}
-            </div>
-            <div className="zahlplan-empty__text">
-              {variant === 'angebot' ? (
-                <>
-                  Auftragssumme <b>{formatEurBetrag(totalBrutto || gesamtNetto)}</b> — Einzelrechnung
-                  oder Abschläge legst du bei der Rechnung fest.
-                </>
-              ) : (
-                <>
-                  Auftragssumme <b>{formatEurBetrag(totalBrutto || gesamtNetto)}</b>. Abschläge über
-                  „Abschlag stellen“. Die Schlussrechnung zieht sie automatisch ab.
-                </>
-              )}
+              {variant === 'angebot' ? 'Kein Zahlungsvorschlag' : 'Noch keine Rechnung'}
             </div>
           </div>
           {afterTable}
@@ -860,7 +870,9 @@ export function VorgangZahlungTab({
           {!isMobile ? (
             <div className="list-row head zahlplan-row zahlplan-row--simple zahlplan-row-head">
               <div>
-                {showGruppen
+                {nurEineRechnung
+                  ? 'Rechnung'
+                  : showGruppen
                   ? 'Rate'
                   : variant === 'rechnung' || nurEinzel || !hasPlan
                     ? 'Rechnung'
@@ -898,6 +910,8 @@ export function VorgangZahlungTab({
               ? rows.length === 1
                 ? 'Rate'
                 : 'Raten'
+              : nurEineRechnung
+                ? 'Rechnung'
               : variant !== 'rechnung' && hasPlan && rows.length !== 1
                 ? 'Abschläge'
                 : variant !== 'rechnung' && hasPlan

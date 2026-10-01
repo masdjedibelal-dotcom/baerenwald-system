@@ -21,6 +21,7 @@ export default async function AngebotNeuRedirectPage({
     kopie_von?: string
     vorlage_id?: string
     kunde_id?: string
+    direkt?: string
   }
 }) {
   const leadId = searchParams.lead_id?.trim()
@@ -70,6 +71,7 @@ export default async function AngebotNeuRedirectPage({
         preislisten={wizard.preislisten}
         firm={wizard.firm}
         handwerker={(handwerker ?? []) as Handwerker[]}
+        direktAuftrag={searchParams.direkt === '1'}
       />
     )
   }
