@@ -21991,3 +21991,118 @@ display: flex;
   .list-row > .lc-pills { display: flex; align-items: center; align-self: center; gap: 4px; }
   .list-row > .lc-pills > .meta-tag { line-height: 1.4; }
 }
+
+/* Phasenleiste als Pfeil-Schritte (01.10.2026): erledigt grün mit Haken, aktuell kräftiger, hier = gefüllt, fehlt = hell */
+.phase-steps { display: flex; align-items: center; margin: 4px 0 2px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.phase-steps::-webkit-scrollbar { display: none; }
+.phase-steps__step {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 20px 0 24px; margin-left: -6px;
+  border: 0; border-radius: 0;
+  font: inherit; font-size: var(--fs-meta); font-weight: 500;
+  background: var(--bg-soft); color: var(--text-3);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.phase-steps__step:first-child {
+  margin-left: 0; padding-left: 14px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  border-radius: var(--r-sm) 0 0 var(--r-sm);
+}
+.phase-steps__step--done { background: color-mix(in srgb, var(--green) 12%, var(--card)); color: var(--green); }
+.phase-steps__step--current { background: color-mix(in srgb, var(--green) 22%, var(--card)); color: var(--green); font-weight: 600; }
+.phase-steps__step--hier { background: var(--green); color: var(--card); font-weight: 600; }
+.phase-steps__step--open { cursor: default; }
+.phase-steps__step:not(:disabled):not(.phase-steps__step--hier):hover { background: color-mix(in srgb, var(--green) 28%, var(--card)); }
+.phase-steps__step:disabled { opacity: 1; }
+
+/* Blätter wie bei Apple (01.10.2026):
+   Desktop schwebt als Karte mit Abstand zum Rand, Handy öffnet immer gleich hoch,
+   Schließen-Knopf als ruhiger grauer Kreis ohne Rand. Hintergrund nur abgedunkelt (--overlay-blur: 0). */
+@media (min-width: 768px) {
+  .editor-sheet.editor-sheet--slide {
+    top: 12px;
+    bottom: 12px;
+    right: 12px;
+    height: auto;
+    max-height: calc(100% - 24px);
+    width: min(480px, calc(100% - 24px));
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--sh-3);
+  }
+  .editor-sheet.editor-sheet--slide.editor-sheet--lg { width: min(560px, calc(100% - 24px)); }
+}
+.editor-sheet.editor-sheet--bottom:not(.editor-sheet--stack-bottom) {
+  height: min(92dvh, calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - 4px));
+}
+.editor-sheet__header .editor-sheet__icon-btn {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: var(--bg-soft);
+  color: var(--text-2);
+}
+.editor-sheet__header { border-bottom-color: var(--border); }
+.editor-sheet__footer { border-top: 0.5px solid var(--border); background: var(--card); }
+.detail-phase-bar.phase-steps { background: none; border: 0; padding: 0; box-shadow: none; border-radius: 0; }
+
+/* Positionen hinzufügen: schlichte Knöpfe (Symbol + Wort) statt gestrichelter Kacheln */
+.pos-add-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.pos-add-row .pos-add-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 36px; padding: 0 14px;
+  border: 1px solid var(--border-strong); border-style: solid; border-radius: var(--r-pill);
+  background: var(--card); color: var(--text);
+  font: inherit; font-size: var(--fs-text); font-weight: 500;
+  cursor: pointer;
+}
+.pos-add-row .pos-add-btn:hover:not(:disabled) { background: var(--bg-soft); }
+.pos-add-row .pos-add-btn .icon-wrap { display: inline-flex; color: var(--green); }
+.pos-add-row .pos-add-btn .lbl-block { display: inline; }
+.pos-add-row .pos-add-btn .sub { display: none; }
+.pt2-gewerk-add-panel { padding: 10px 12px; }
+.pos-add-row .pos-add-btn .icon-wrap { background: none; width: auto; height: auto; padding: 0; border: 0; }
+.pos-add-row .pos-add-btn { height: 36px; min-height: 36px; }
+
+/* Mailadressen: das Eingabefeld im Adressen-Feld ohne eigenen Rahmen (keine Box in der Box) */
+.editor-sheet__body .email-pills-field input.input,
+.email-pills-field input.input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 4px;
+}
+/* gegen die allgemeine .modal-input-Regel (sehr spezifisch) */
+.modal .email-pills-field input.input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='image']):not([type='reset']),
+.editor-sheet .email-pills-field input.input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='image']):not([type='reset']) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Login: Innenabstand gegen die allgemeine input.input-Regel, damit das Brief-Symbol nicht über dem Text liegt */
+.crm-login__input-wrap input.crm-login__input { padding-left: 40px; }
+.crm-login__input-wrap input.crm-login__input.crm-login__input--plain { padding-left: 14px; padding-right: 42px; }
+
+/* Assistent: Titel direkt über den Positionen, sieht aus wie eine Überschrift, ist aber ein Feld */
+.posboard-sec-h input.wizard-titel-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  margin-left: -10px;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+}
+.posboard-sec-h input.wizard-titel-input:hover { background: var(--bg-soft); }
+.posboard-sec-h input.wizard-titel-input:focus { background: var(--card); border-color: var(--green); }
+.posboard-sec-h input.wizard-titel-input:placeholder-shown { background: var(--bg-soft); border-color: var(--border-strong); }

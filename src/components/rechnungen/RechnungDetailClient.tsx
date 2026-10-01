@@ -777,6 +777,9 @@ export function RechnungDetailClient({
     <EntityDetailLayout
       phase="rechnung"
       projektKontext={projektKontext}
+      phaseLead={lead ?? null}
+      phaseFrom={{ kind: 'rechnung', id: detail.id }}
+      phaseExtras={phasenExtras}
       crumbBackHref={
         isEingehend
           ? '/vorgaenge?tab=rechnung&richtung=eingehend'

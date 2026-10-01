@@ -768,6 +768,8 @@ export function AngebotDetailPageClient({
     <EntityDetailLayout
       phase="angebot"
       projektKontext={projektKontext}
+      phaseLead={lead ?? null}
+      phaseFrom={{ kind: 'angebot', id: detail.id }}
       crumbBackHref="/vorgaenge?tab=angebot&lifecycle=offen"
       crumbBackLabel="Zurück"
       crumbSectionLabel="Angebote"

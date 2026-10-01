@@ -3,6 +3,7 @@ import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 import { C } from '@/lib/tokens/colors'
 
 import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField, MockSelect } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -1307,6 +1308,23 @@ export function RechnungWizard({
             (istDirektrechnung ? 'Rechnung' : auftragLabel) ||
             'Rechnung'
           }
+          titleSlot={
+            /* Titel direkt vorne — wurde im Blatt „Dokument“ oft vergessen */
+            <MockInput
+              className="wizard-titel-input"
+              value={rechnungTitel}
+              onChange={(e) => {
+                setRechnungTitel(e.target.value)
+                setDraftDirty(true)
+              }}
+              placeholder={
+                (hasPlan && selRate?.titel?.trim()) ||
+                (istDirektrechnung ? 'Titel der Rechnung, z. B. Badsanierung' : auftragLabel) ||
+                'Titel der Rechnung'
+              }
+              aria-label="Titel der Rechnung"
+            />
+          }
           positionen={posBoardLines}
           onChange={abschlagNurVersand ? undefined : onPosBoardChange}
           showUst
@@ -1483,28 +1501,6 @@ export function RechnungWizard({
         manageHistory={false}
         draftDirty={draftDirty}
         lastSavedAt={lastSavedAt}
-        sections={[
-          {
-            id: 'kunde',
-            label: '1 Kunde',
-            complete: Boolean(kundeId?.trim()) && versandComplete,
-            onClick: () => setSheet('kunde'),
-          },
-          { id: 'positionen', label: '2 Positionen', complete: hatLeistungszeile },
-          {
-            id: 'pruefen',
-            label: '3 Prüfen und senden',
-            complete: false,
-            onClick: () => {
-              if (saving) return
-              if (getRechnungSendGaps().length > 0) {
-                toast.info('Bitte zuerst Kunde und Positionen ergänzen.')
-                return
-              }
-              openPruefenSheet()
-            },
-          },
-        ]}
         draftAction={{
           onClick: () => {
             if (saving || (hasPlan && !planOk)) return

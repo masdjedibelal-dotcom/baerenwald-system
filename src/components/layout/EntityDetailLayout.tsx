@@ -13,6 +13,9 @@ import {
 import { AkteRueckwegChip } from '@/components/vorgang/AkteRueckwegChip'
 import { DetailQuickBar, type QuickBarAction } from '@/components/vorgang/DetailQuickBar'
 import { PhaseStrip } from '@/components/vorgang/PhaseStrip'
+import type { VorgangPhasenExtras } from '@/components/vorgang/VorgangPhasenVerlauf'
+import type { AkteFromRef } from '@/lib/vorgang/akte-from'
+import type { LeadDetail } from '@/lib/types'
 import type { WiedervorlageEntity } from '@/app/(dashboard)/vorgaenge/wiedervorlage-actions'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import type { ResolvedVorgang } from '@/lib/vorgang/types'
@@ -282,8 +285,12 @@ export type EntityDetailLayoutProps = {
   resolvedVorgang?: ResolvedVorgang | null
   /** @deprecated Display-Phase — Prop bleibt für Aufrufer */
   phase?: VorgangPhase | null
-  /** @deprecated Phasen-Strip — nicht mehr im Header */
+  /** Phasenleiste oben (Pfeil-Schritte); Klick öffnet die Details der Phase im Blatt */
   projektKontext?: ProjektKontext | null
+  /** Für die Details im Phasen-Blatt (Anfrage-Angaben, Auftrag/Rechnung-Zusatz) */
+  phaseLead?: LeadDetail | null
+  phaseExtras?: VorgangPhasenExtras
+  phaseFrom?: AkteFromRef | null
   head: DetailHeadProps
   /**
    * @deprecated Next-Step-Card ist entfernt (Mobil + Desktop) und wird nicht wieder gerendert.
@@ -320,6 +327,9 @@ export type EntityDetailLayoutProps = {
 export function EntityDetailLayout({
   resolvedVorgang,
   projektKontext,
+  phaseLead,
+  phaseExtras,
+  phaseFrom,
   head,
   quickBar,
   crumbBackHref,
@@ -366,7 +376,7 @@ export function EntityDetailLayout({
           </div>
           {showResolver ? <VorgangResolverBanner resolved={resolvedVorgang!} /> : null}
           {/* P22: ein Vorgang — Phasenleiste Anfrage → Angebot → Auftrag → Rechnung */}
-          {projektKontext ? <PhaseStrip kontext={projektKontext} className="detail-phase-bar" /> : null}
+          {projektKontext ? <PhaseStrip kontext={projektKontext} lead={phaseLead} extras={phaseExtras} fromRef={phaseFrom} className="detail-phase-bar" /> : null}
           <DetailHead
             title={head.title}
             badges={head.badges}

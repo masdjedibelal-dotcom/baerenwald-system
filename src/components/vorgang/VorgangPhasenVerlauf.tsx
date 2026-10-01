@@ -22,10 +22,10 @@ import { buildAnfragePhaseSheetProps } from '@/lib/anfragen/funnel-bedarf-rows'
 import { formatDatum, kanalLabel, cn } from '@/lib/utils'
 import type { LeadDetail } from '@/lib/types'
 
-type PhaseKind = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
-type PhaseState = 'done' | 'current' | 'open'
+export type PhaseKind = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
+export type PhaseState = 'done' | 'current' | 'open'
 
-type PhaseRowModel = {
+export type PhaseRowModel = {
   kind: PhaseKind
   label: string
   state: PhaseState
@@ -246,7 +246,8 @@ export function VorgangPhasenVerlauf({
   )
 }
 
-function buildPhaseRows(
+/** Eine Quelle für Phasen-Zustände und Detail-Inhalte (Phasenleiste oben + Blatt). */
+export function buildPhaseRows(
   kontext: ProjektKontext | null | undefined,
   lead: LeadDetail | null,
   withFrom: (pathname: string, extra?: Record<string, string>) => string,

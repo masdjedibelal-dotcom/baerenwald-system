@@ -36,7 +36,7 @@
     /* Sheets / Modals: Hintergrund weich blurren, nicht grau zudecken */
     --overlay-scrim: rgba(20, 24, 31, 0.22);
     --overlay-scrim-strong: rgba(20, 24, 31, 0.32);
-    --overlay-blur: 18px;
+    --overlay-blur: 0px;
 
     --blue-bg: #e4ecf7;
     --blue-tx: #1f4fa8;
@@ -263,7 +263,7 @@
       /* Mobil: mehr Blur, leichter Scrim — Hintergrund bleibt sichtbar */
       --overlay-scrim: rgba(20, 24, 31, 0.26);
       --overlay-scrim-strong: rgba(20, 24, 31, 0.36);
-      --overlay-blur: 20px;
+      --overlay-blur: 0px;
 
       /* 4/5) Weichere Borders + ruhige Elevation */
       --border: rgba(22, 32, 27, 0.08);

@@ -988,6 +988,8 @@ export function AnfrageDetailClient({
     <EntityDetailLayout
       phase="anfrage"
       projektKontext={projektKontext}
+      phaseLead={lead ?? null}
+      phaseFrom={{ kind: 'anfrage', id: lead.id }}
       crumbBackHref="/vorgaenge?tab=anfrage"
       crumbBackLabel="Zurück"
       crumbSectionLabel="Anfragen"

@@ -51,6 +51,8 @@ export type PosBoardProps = {
   /** Summenfuß unter der Tabelle — default: wie showUst */
   showTotals?: boolean
   title?: string
+  /** Statt des Titeltexts ein eigenes Element (z. B. Titel-Eingabe im Assistenten) */
+  titleSlot?: ReactNode
   renderEditor?: (
     position: PosBoardLine,
     helpers: {
@@ -113,6 +115,7 @@ export function PosBoard({
   showUst = true,
   showTotals,
   title,
+  titleSlot,
   renderEditor,
   lineOf,
   preisLabelOf,
@@ -753,7 +756,7 @@ export function PosBoard({
 
   return (
     <div className={className}>
-      {title || headerAction ? (
+      {title || titleSlot || headerAction ? (
         <div
           className="section-h posboard-sec-h"
           style={{
@@ -770,7 +773,7 @@ export function PosBoard({
             color: 'var(--text)',
           }}
         >
-          <span className="posboard-sec-h__title">{title || null}</span>
+          {titleSlot ?? <span className="posboard-sec-h__title">{title || null}</span>}
           <div className="posboard-sec-h__actions">
             {headerAction}
             <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 'var(--fs-meta)' }}>
@@ -837,10 +840,10 @@ export function PosBoard({
         groups={groups}
         onAddKind={editable && !unifiedAdd ? onAddKind : undefined}
         onAddGroup={editable && !hideAddGewerk && !unifiedAdd ? addGewerk : undefined}
-        gewerkAddKinds={hideAddGewerk ? undefined : ['freitext', 'nachlass']}
-        documentAddKinds={
-          hideAddGewerk ? undefined : ['position', 'freitext', 'nachlass']
-        }
+        // Hinzufügen immer direkt im Gewerk („+“ am Gewerk): Position, Freitext, Nachlass.
+        // Auf Dokument-Ebene nur „Gewerk hinzufügen“ (und die Leiste, solange noch nichts da ist).
+        gewerkAddKinds={['position', 'freitext', 'nachlass']}
+        documentAddKinds={undefined}
         groupActions={groupActions}
         itemActions={itemActions}
         selectable={selectable}

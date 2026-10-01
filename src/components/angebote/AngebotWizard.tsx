@@ -1,6 +1,7 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { MockField, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
@@ -1264,13 +1265,23 @@ export function AngebotWizard({
       <div data-doc-section="positionen">
         <PosBoard
           title={angebotTitel || 'Angebot'}
+          titleSlot={
+            /* Titel direkt vorne — wurde im Blatt „Dokument“ oft vergessen */
+            <MockInput
+              className="wizard-titel-input"
+              value={meta.leistungsumfang}
+              onChange={(e) => patchProjektTitel(e.target.value)}
+              placeholder={projekt ? `Titel, z. B. ${projekt}` : 'Titel des Angebots, z. B. Badsanierung'}
+              aria-label="Titel des Angebots"
+              disabled={saving}
+            />
+          }
           positionen={posBoardLines}
           onChange={onPosBoardChange}
           showUst
           showTotals={false}
           gewerke={gewerkNamen}
           preislisten={preislisten}
-          hideAddGewerk={dokumentTyp === 'einfach'}
           suggestContext={istAuftragKorrektur ? null : posSuggestContext}
           badgeOf={(p) =>
             p.regieSchein
@@ -1354,28 +1365,6 @@ export function AngebotWizard({
         manageHistory={false}
         draftDirty={draftDirty}
         lastSavedAt={lastSavedAt}
-        sections={[
-          {
-            id: 'kunde',
-            label: '1 Kunde',
-            complete: Boolean(kundeId?.trim()) && versandComplete,
-            onClick: () => setSheet('kunde'),
-          },
-          { id: 'positionen', label: '2 Positionen', complete: hatLeistungszeile },
-          {
-            id: 'pruefen',
-            label: '3 Prüfen und senden',
-            complete: false,
-            onClick: () => {
-              if (saving) return
-              if (getAngebotSendGaps().length > 0) {
-                toast.info('Bitte zuerst Kunde und Positionen ergänzen.')
-                return
-              }
-              openPruefenSheet()
-            },
-          },
-        ]}
         draftAction={{
           onClick: () => {
             if (saving) return

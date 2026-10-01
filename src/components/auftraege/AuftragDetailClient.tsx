@@ -1224,6 +1224,9 @@ export function AuftragDetailClient({
     <EntityDetailLayout
       phase="auftrag"
       projektKontext={projektKontext}
+      phaseLead={_leadDetail ?? null}
+      phaseFrom={{ kind: 'auftrag', id: detail.id }}
+      phaseExtras={phasenExtras}
       crumbBackHref="/vorgaenge?tab=auftrag&lifecycle=offen"
       crumbBackLabel="Zurück"
       crumbSectionLabel="Aufträge"
