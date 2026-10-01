@@ -315,7 +315,7 @@ export function ObjektHausmeisterCard({
         disabled: pending,
       })
     }
-    if (showLogin) {
+    if (false && showLogin) {
       items.push({
         icon: 'log-in',
         label: 'Login',

@@ -1,7 +1,6 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-import { KalenderClient } from '@/components/kalender/KalenderClient'
-
-export default function KalenderPage() {
-  return <KalenderClient />
+/** Entlastung 01.10.2026: für den Start nicht nötig — alte Links führen aufs Dashboard. */
+export default function EntfallenPage() {
+  redirect('/')
 }

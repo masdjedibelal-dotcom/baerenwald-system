@@ -119,7 +119,8 @@ export function StammdatenPortalZeile({
         : 'd'
 
   const showInvite = !gesperrt && registered === false
-  const showLogin = !hideLogin && !gesperrt && registered === true && isCrmAdmin
+  // Entlastung 01.10.2026: „Als Kunde/Partner einloggen“ entfällt
+  const showLogin = false && !hideLogin && !gesperrt && registered === true && isCrmAdmin
 
   return (
     <>

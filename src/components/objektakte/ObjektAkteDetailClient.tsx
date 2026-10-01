@@ -151,14 +151,7 @@ export function ObjektAkteDetailClient({
 
   const overview = (
     <div className="space-y-4">
-      {kpis ? (
-        <ObjektUebersichtKpiCard
-          kpis={kpis}
-          jahr={jahr}
-          onHistorieClick={() => setTab('vorgaenge')}
-          onBerichtClick={() => setBerichtOpen(true)}
-        />
-      ) : null}
+      {/* Kennzahlen und Versammlungsbericht entfallen (Entlastung 01.10.2026) */}
       <MockCard
         title="Objektdaten"
         actions={
@@ -281,22 +274,7 @@ export function ObjektAkteDetailClient({
         />
       ),
     },
-    {
-      id: 'anlagen',
-      label: 'Anlagen & Teile',
-      icon: 'tool',
-      count: anlagenAnzahl || undefined,
-      render: () => (
-        <ObjektAnlagenSection
-          kundeId={kunde.id}
-          objektId={objektState.id}
-          anlagen={akte.anlagen}
-          einheiten={einheiten}
-          gewerke={gewerke}
-          onChanged={refresh}
-        />
-      ),
-    },
+    // Anlagen & Teile entfallen (Entlastung 01.10.2026).
     // Historie entfällt: zeigte dieselben Vorgänge wie der Tab „Vorgänge“ (eine Wahrheit, 01.10.2026).
     {
       id: 'vorgaenge',
@@ -343,11 +321,6 @@ export function ObjektAkteDetailClient({
               label: 'Objektdaten bearbeiten',
               icon: 'pencil',
               onClick: () => setObjektModalOpen(true),
-            }}
-            secondary={{
-              label: 'Versammlungsbericht',
-              icon: 'file-text',
-              onClick: () => setBerichtOpen(true),
             }}
             menuItems={[]}
           />
