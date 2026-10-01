@@ -280,7 +280,8 @@ export function createInitialStaffFunnelState(
     telefon: '',
     kanal: 'telefon',
     interneNotiz: '',
-    erfassungsModus: 'formular',
+    // Am Telefon zählt Tempo: Vorhaben, Beschreibung, Kunde — das ausführliche Formular bleibt wählbar
+    erfassungsModus: 'frei',
     anliegen: '',
     vorhaben: '',
     situation: '',
