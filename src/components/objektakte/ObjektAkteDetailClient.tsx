@@ -174,7 +174,7 @@ export function ObjektAkteDetailClient({
             </span>
             <span className="vgid-chip ghost">
               <MockIcon ctx="default" n="users" size={14} />
-              {personenAnzahl} Personen
+              {personenAnzahl} {personenAnzahl === 1 ? 'Person' : 'Personen'}
             </span>
             {flaecheGesamt > 0 ? (
               <span className="vgid-chip ghost">
