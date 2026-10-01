@@ -132,6 +132,12 @@ export type VorgangListeRow = ResolvedVorgang & {
   listenSummeEuro?: number | null
   /** false = Abschlags-Satellit — nicht separat in der Summe zählen. */
   listeSummeZaehlen?: boolean
+  /** Nächstes relevantes Datum: Angebot gültig bis · nächster Einsatz · Rechnung fällig. */
+  faelligAm?: string | null
+  /** Erstes Meldungsfoto (Vorschau in der Liste). */
+  fotoUrl?: string | null
+  /** Straße des Vorgangs (unter dem Titel). */
+  ortLabel?: string | null
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'

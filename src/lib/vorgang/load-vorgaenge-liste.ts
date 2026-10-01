@@ -49,6 +49,8 @@ const VORGAENGE_LEAD_SELECT = `
   situation,
   bereiche,
   plz,
+  strasse,
+  hausnummer,
   kontakt_name,
   kunde_id,
   auftraggeber_kunde_id,
@@ -71,6 +73,18 @@ const VORGAENGE_LEAD_SELECT = `
   ${leadKundeEmbed('id, name, vorname, nachname, typ')},
   ${leadAuftraggeberEmbed('id, name, vorname, nachname, typ, org_anzeigename')}
 `
+
+/** Erstes Foto einer Meldung (`funnel_daten.fotos`) für die Listen-Vorschau. */
+function ersteFotoUrl(funnelDaten: unknown): string | null {
+  const fd = funnelDaten && typeof funnelDaten === 'object' ? (funnelDaten as Record<string, unknown>) : null
+  const fotos = fd?.fotos
+  if (!Array.isArray(fotos)) return null
+  for (const f of fotos) {
+    if (typeof f === 'string' && /^https?:\/\//.test(f)) return f
+    if (f && typeof f === 'object' && typeof (f as { url?: unknown }).url === 'string') return (f as { url: string }).url
+  }
+  return null
+}
 
 export type LoadVorgaengeListeOpts = {
   /** Nur Vorgänge dieses Kunden (statt globale Liste). */
@@ -286,7 +300,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
         await (() => { const db = createClient(); return db
             .from('angebote')
             .select(
-              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, zahlungsplan, ist_partner_einholung'
+              'id, lead_id, status, status_einfach, gesendet_am, gesendet_kunde_at, leistungsumfang, notizen, gesamt_fix, gesamt_min, gesamt_max, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ersetzt_durch, zahlungsplan, ist_partner_einholung, gueltig_bis'
             )
             .in('lead_id', leadIds)
             .order('created_at', { ascending: false })
@@ -294,7 +308,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
         await (() => { const db = createClient(); return db
             .from('auftraege')
             .select(
-              'id, lead_id, angebot_id, status, titel, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ist_notfall'
+              'id, lead_id, angebot_id, status, titel, created_at, updated_at, ist_wiederkehrend, wiederkehr_turnus, ist_notfall, end_datum'
             )
             .in('lead_id', leadIds)
             .order('created_at', { ascending: false })
@@ -458,6 +472,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       ersetzt_durch?: string | null
       zahlungsplan?: unknown
       ist_partner_einholung?: boolean | null
+      gueltig_bis?: string | null
     }>
   )
   const auftraege = (auftraegeRes.data ?? []) as Array<{
@@ -471,6 +486,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     ist_wiederkehrend?: boolean | null
     wiederkehr_turnus?: string | null
     ist_notfall?: boolean | null
+    end_datum?: string | null
   }>
   const rechnungen = (rechnungenRes.data ?? []) as Array<{
     id: string
@@ -608,6 +624,23 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
     }>,
     (p) => p.auftrag_id
   )
+  // Nächster Einsatz-Termin je Auftrag (Spalte „Fällig“)
+  const einsatzTermineByAuftrag = new Map<string, string[]>()
+  if (auftragIds.length) {
+    const { data: einRows, error: einErr } = await createClient()
+      .from('einsaetze')
+      .select('auftrag_id, termin_von, status')
+      .in('auftrag_id', auftragIds)
+      .not('termin_von', 'is', null)
+    if (einErr) logDbError('lib/vorgang/load-vorgaenge-liste:einsaetze', einErr)
+    for (const e of (einRows ?? []) as Array<{ auftrag_id: string; termin_von: string; status?: string | null }>) {
+      const st = String(e.status ?? '').toLowerCase()
+      if (st === 'abgelehnt' || st === 'fertig' || st === 'erledigt') continue
+      const list = einsatzTermineByAuftrag.get(e.auftrag_id) ?? []
+      list.push(e.termin_von.slice(0, 10))
+      einsatzTermineByAuftrag.set(e.auftrag_id, list)
+    }
+  }
   const hwAktionByAuftrag = new Map<string, boolean>()
   for (const [auftragId, pos] of Array.from(positionenByAuftrag.entries())) {
     hwAktionByAuftrag.set(auftragId, auftragBrauchtHandwerkerAktion(pos))
@@ -796,9 +829,34 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       ? `/auftraege/${resolved.entityId}`
       : detailHrefForPhase(resolved.phase, resolved.entityId, lead.id)
 
+    const heute = new Date().toISOString().slice(0, 10)
+    const faelligFuerPhase = (): string | null => {
+      if (listPhase === 'anfrage') return null
+      if (listPhase === 'angebot') {
+        return (angeboteByLead.get(lead.id) ?? []).find((a) => a.id === resolved.entityId)?.gueltig_bis ?? null
+      }
+      if (listPhase === 'auftrag') {
+        // Nächster Einsatz (frühester offener Start ab heute), sonst geplantes Ende
+        const naechster = (einsatzTermineByAuftrag.get(resolved.entityId) ?? [])
+          .filter((t) => t >= heute)
+          .sort()[0]
+        if (naechster) return naechster
+        return (auftraegeByLead.get(lead.id) ?? []).find((a) => a.id === resolved.entityId)?.end_datum ?? null
+      }
+      if (listPhase === 'rechnung' && !rechnungAusstehend) {
+        return leadRechnungen.find((r) => r.id === resolved.entityId)?.faellig ?? null
+      }
+      return null
+    }
+    const adr = lead as { strasse?: string | null; hausnummer?: string | null }
+    const ortLabel = [adr.strasse?.trim(), adr.hausnummer?.trim()].filter(Boolean).join(' ') || null
+
     rows.push({
       ...resolved,
       phase: listPhase,
+      faelligAm: faelligFuerPhase(),
+      fotoUrl: ersteFotoUrl(lead.funnel_daten),
+      ortLabel,
       unterstatus: listUnterstatus,
       unterstatusLabel: listUnterstatusLabel,
       needsAction: rechnungAusstehend ? true : resolved.needsAction,
@@ -883,6 +941,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
           kundeId,
           kundeName,
           wertLabel: wertLabelForRechnung(r.id),
+          faelligAm: r.faellig ?? null,
           listenSummeEuro: leadListenSummeEuro,
           listeSummeZaehlen: false,
           detailHref: detailHrefForPhase('rechnung', r.id, lead.id),
@@ -941,6 +1000,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       kundeId: r.kunde_id,
       kundeName: r.kunde_name,
       wertLabel,
+      faelligAm: r.faellig ?? null,
       listenSummeEuro,
       // Stornierte nicht in der offenen Summe
       listeSummeZaehlen: r.status !== 'storniert',

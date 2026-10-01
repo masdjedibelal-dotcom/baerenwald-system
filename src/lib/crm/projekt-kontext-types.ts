@@ -59,6 +59,10 @@ export type ProjektKontext = {
     abschlussdokumentation_gesendet_at?: string | null
   } | null
   rechnungen: ProjektRechnungKurz[]
+  /** Vor-Ort-Adresse (Anfrage, sonst Kunde) — im Detailkopf mit Karten-Link. */
+  ort?: string | null
+  /** Zugewiesene Partner (Einsätze am Auftrag). */
+  partner?: string[]
   activeKind: ProjektKetteKind
   activeId: string
 }

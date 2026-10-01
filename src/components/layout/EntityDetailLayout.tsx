@@ -26,6 +26,7 @@ import {
   parseReturn,
 } from '@/lib/list-return-url'
 import type { MockIconName } from '@/lib/mock-icons'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
@@ -351,6 +352,29 @@ export function EntityDetailLayout({
     return parseReturn(searchParams, fallback)
   }, [searchParams, crumbBackHref, pathname])
 
+  const vorOrt = projektKontext?.ort || projektKontext?.partner?.length ? (
+            <div className="dh-vorort">
+              {projektKontext.ort ? (
+                <a
+                  className="dh-vorort__adresse"
+                  href={`https://maps.apple.com/?q=${encodeURIComponent(projektKontext.ort)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="In Karten öffnen"
+                >
+                  <MockIcon ctx="default" n="map-pin" size={14} />
+                  <span>{projektKontext.ort}</span>
+                </a>
+              ) : null}
+              {(projektKontext.partner ?? []).map((p) => (
+                <span key={p} className="dh-vorort__partner" title="Partner">
+                  <MockIcon ctx="default" n="tool" size={13} />
+                  {p}
+                </span>
+              ))}
+            </div>
+          ) : null
+
   const showResolver =
     resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
 
@@ -383,7 +407,7 @@ export function EntityDetailLayout({
             titleBadges={head.titleBadges}
             titleTrailing={isMobile ? undefined : head.titleTrailing}
             meta={undefined}
-            sub={undefined}
+            sub={vorOrt}
             actions={head.actions}
             amount={head.amount}
             variant={head.variant}

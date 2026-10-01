@@ -71,10 +71,10 @@ type DataColId = (typeof DATA_COL_IDS)[number]
 /** Daten-Spalten — fr-Gewichte (Hook), Kunde/Titel breiter; feste Spalten in px. */
 const VORGAENGE_DATA_COLS: ResizableColDef[] = [
   { id: 'kunde', defaultWidth: 22, minWidth: 10, maxWidth: 40 },
-  { id: 'titel', defaultWidth: 26, minWidth: 12, maxWidth: 48 },
+  { id: 'titel', defaultWidth: 45, minWidth: 16, maxWidth: 64 },
   { id: 'phase', defaultWidth: 9, minWidth: 6, maxWidth: 14 },
   { id: 'wert', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
-  { id: 'datum', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
+  { id: 'datum', defaultWidth: 12, minWidth: 8, maxWidth: 16 },
   { id: 'status', defaultWidth: 11, minWidth: 8, maxWidth: 16 },
 ]
 
@@ -181,6 +181,18 @@ function dateKey(row: VorgangListeRow): string {
 }
 
 
+function istErledigt(row: VorgangListeRow): boolean {
+  return ['bezahlt', 'storniert', 'abgeschlossen', 'abgelehnt', 'ersetzt', 'abgebrochen'].includes(row.unterstatus.toLowerCase())
+}
+
+/** Fälliges Datum überschritten und Vorgang noch nicht erledigt → rot. */
+function istUeberfaellig(row: VorgangListeRow): boolean {
+  if (!row.faelligAm) return false
+  const u = row.unterstatus.toLowerCase()
+  if (['bezahlt', 'storniert', 'abgeschlossen', 'angenommen', 'abgelehnt', 'ersetzt', 'abgebrochen', 'entwurf'].includes(u)) return false
+  return row.faelligAm.slice(0, 10) < new Date().toISOString().slice(0, 10)
+}
+
 /** Parse Anzeige „1.234 €“ / „207 – 813 €“ → Euro-Zahl für Wert-Filter/Sort. */
 function wertEuro(row: VorgangListeRow): number | null {
   return parseVorgangWertLabelEuro(row.wertLabel)
@@ -252,8 +264,9 @@ export function VorgaengeListeClient({
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   /** Aufgeklappte Korrektur-Ketten entfallen — eine Card pro Vorgang. */
   // Beim Kunden eingebettet ist die Kunden-Spalte doppelt.
+  // Wie Wowflow: Vorgangstitel vorne, Kunde · Adresse darunter — keine eigene Kunden-Spalte mehr
   const visibleCols: Record<DataColId, boolean> = {
-    kunde: !restrictKundeId,
+    kunde: false,
     titel: true,
     phase: true,
     wert: true,
@@ -261,14 +274,15 @@ export function VorgaengeListeClient({
     status: true,
   }
   const [flashKeys, setFlashKeys] = useState<Record<string, boolean>>({})
-  const [sortCol, setSortCol] = useState<SortCol | null>('datum')
+  // Standard: wie geladen (zuletzt bearbeitet zuerst); „Fällig“ sortiert auf Klick
+  const [sortCol, setSortCol] = useState<SortCol | null>(null)
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
   const colDefs = useMemo(() => {
     const data = VORGAENGE_DATA_COLS.filter((c) => visibleCols[c.id as DataColId])
     return [VORGAENGE_CHECK_COL, ...data, VORGAENGE_MENU_COL]
   }, [visibleCols])
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    `crm.cols.vorgaenge.v7.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
+    `crm.cols.vorgaenge.v9.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
     colDefs
   )
   const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
@@ -666,11 +680,19 @@ export function VorgaengeListeClient({
       titel: (v) => v.titel.toLowerCase(),
       phase: (v) => PHASE_META[v.phase].label.toLowerCase(),
       wert: (v) => wertEuro(v) ?? -1,
-      datum: (v) => dateKey(v),
+      // Ohne Datum immer ans Ende, egal welche Richtung
+      datum: (v) => v.faelligAm?.slice(0, 10) ?? (sortDir === 1 ? '9999' : '0000'),
       status: (v) => v.unterstatusLabel.toLowerCase(),
     }
 
-    if (!sortCol) return filteredBase
+    if (!sortCol) {
+      // Zuletzt bearbeitet zuerst (wie bisher)
+      return [...filteredBase].sort((a, b) => {
+        const av = dateKey(a)
+        const bv = dateKey(b)
+        return av < bv ? 1 : av > bv ? -1 : 0
+      })
+    }
     const fn = sortKeys[sortCol]
     const dir = sortDir
     return [...filteredBase].sort((a, b) => {
@@ -1040,6 +1062,17 @@ export function VorgaengeListeClient({
                 {phaseChipLabel(p)}
               </MockChip>
             ))}
+            {/* Handy: „Erledigt“ als letzter Chip statt eigener Zeile */}
+            {isMobile && showLifecycleToggle ? (
+              <MockChip
+                active={lifecycle === 'erledigt'}
+                count={effectiveLifecycleCounts.erledigt}
+                icon="check"
+                onClick={() => setLifecycleFilter(lifecycle === 'erledigt' ? 'offen' : 'erledigt')}
+              >
+                Erledigt
+              </MockChip>
+            ) : null}
             {filter === 'rechnung' ? (
               <>
                 <span className="listbar-chips-sep" aria-hidden />
@@ -1121,7 +1154,7 @@ export function VorgaengeListeClient({
             }
           />
         </div>
-        {showLifecycleToggle ? (
+        {showLifecycleToggle && !isMobile ? (
           <div className="listbar-lifecycle">{lifecycleToggle('stack')}</div>
         ) : null}
       </div>
@@ -1300,7 +1333,7 @@ export function VorgaengeListeClient({
             resizable
             onResizePointerDown={(e) => startColResize('datum', e)}
           >
-            Datum
+            Fällig
           </MockSortHead>
           ) : null}
           {visibleCols.status ? (
@@ -1366,7 +1399,7 @@ export function VorgaengeListeClient({
             ]
             const row = (
               <div
-                className={cn('vg-row', selected[key] && 'sel', flashKeys[key] && 'vg-row--flash')}
+                className={cn('vg-row vg-row--vorgang', selected[key] && 'sel', flashKeys[key] && 'vg-row--flash')}
                 onClick={() => openDetail(v)}
                 role="button"
                 tabIndex={0}
@@ -1390,8 +1423,26 @@ export function VorgaengeListeClient({
                 ) : null}
                 {visibleCols.titel ? (
                   <div className="vg-vorgang">
-                    <div className="t" title={v.titel}>
-                      {v.titel}
+                    {v.fotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        className="vg-foto"
+                        src={v.fotoUrl}
+                        alt=""
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    ) : null}
+                    <div className="vg-vorgang__txt">
+                      <div className="t" title={v.titel}>
+                        {v.titel}
+                      </div>
+                      {(() => {
+                        const sub = [restrictKundeId ? null : v.kundeName, v.ortLabel].filter(Boolean).join(' · ')
+                        return sub ? <div className="s">{sub}</div> : null
+                      })()}
                     </div>
                   </div>
                 ) : null}
@@ -1418,8 +1469,13 @@ export function VorgaengeListeClient({
                   </div>
                 ) : null}
                 {visibleCols.datum ? (
-                  <div className="vg-datum" style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
-                    {formatDatum(v.updatedAt)}
+                  <div className="vg-datum">
+                    {v.faelligAm && !istErledigt(v) ? (
+                      <span className={cn('vg-faellig', istUeberfaellig(v) && 'is-over')}>
+                        <MockIcon ctx="default" n="clock" size={12} />
+                        {formatDatum(v.faelligAm)}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
                 {visibleCols.status ? (

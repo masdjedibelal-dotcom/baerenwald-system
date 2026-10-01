@@ -156,7 +156,13 @@ export function rechnungStatusDisplay(
   }
   const known = statusMapEntry('rechnung', key)
   const label = known?.label ?? unknownStatusEntry(status).label
-  const variant = key in RECHNUNG_VARIANT ? RECHNUNG_VARIANT[key] : 'neutral'
+  // Teilbezahlt/Korrektur versendet heißen „Gesendet“ — dann auch dieselbe Farbe
+  const variant =
+    key in RECHNUNG_VARIANT
+      ? RECHNUNG_VARIANT[key]
+      : label === 'Gesendet'
+        ? RECHNUNG_VARIANT.gesendet
+        : 'neutral'
   return { label, variant }
 }
 

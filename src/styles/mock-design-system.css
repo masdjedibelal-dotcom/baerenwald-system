@@ -22229,3 +22229,98 @@ display: flex;
   box-shadow: none;
   padding: 4px 0 16px;
 }
+
+/* Vorgänge (Wowflow-Vorbild): Titel vorne, Kunde · Adresse darunter, Foto-Vorschau, „Fällig“ mit Uhr */
+.vg-row--vorgang .vg-vorgang { gap: 12px; }
+.vg-vorgang__txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vg-row--vorgang .vg-vorgang .t {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vg-vorgang .s {
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vg-foto {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: var(--r-sm, 8px);
+  object-fit: cover;
+  background: var(--bg-soft);
+}
+.vg-faellig {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vg-faellig.is-over { color: var(--danger, #b42318); font-weight: 600; }
+
+@media (max-width: 767px) {
+  .vg-row.vg-row--vorgang {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "title  status  actions"
+      "wert   datum   datum";
+  }
+  .vg-row.vg-row--vorgang > .vg-row-menu { grid-area: actions; }
+  .vg-row.vg-row--vorgang > .vg-row-menu:empty { display: none; }
+  /* Handy: keine Ankreuzkästchen auf jeder Karte */
+  .vg-row.vg-row--vorgang > .vg-check { display: none; }
+  .vg-row.vg-row--vorgang > .vg-vorgang { align-items: flex-start; }
+  .vg-row.vg-row--vorgang > .vg-vorgang .t {
+    font-size: var(--fs-title);
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .vg-row.vg-row--vorgang .vg-foto { width: 48px; height: 48px; flex-basis: 48px; }
+}
+
+/* Detailkopf: Vor-Ort-Zeile (Adresse → Karten, zugewiesene Partner) */
+.dh-vorort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 6px;
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  min-width: 0;
+}
+.dh-vorort__adresse {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+  text-decoration: none;
+  min-width: 0;
+}
+.dh-vorort__adresse span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dh-vorort__adresse:hover span { text-decoration: underline; }
+.dh-vorort__partner {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-2);
+  white-space: nowrap;
+}

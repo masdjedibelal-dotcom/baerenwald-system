@@ -114,14 +114,14 @@ export async function loadProjektKontext(
     kundeId
       ? supabase
           .from('kunden')
-          .select('id, name, vorname, nachname, typ')
+          .select('id, name, vorname, nachname, typ, strasse, hausnummer, plz, ort, adresse')
           .eq('id', kundeId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     leadId
       ? supabase
           .from('leads')
-          .select('id, status, situation, bereiche, org_freigabe_status, created_at')
+          .select('id, status, situation, bereiche, org_freigabe_status, created_at, strasse, hausnummer, plz')
           .eq('id', leadId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -231,9 +231,51 @@ export async function loadProjektKontext(
     rechnungen = (recRows ?? []) as ProjektRechnungKurz[]
   }
 
+  // Vor-Ort-Adresse: Adresse der Anfrage, sonst Kundenadresse
+  const lAdr = (leadRes.data ?? null) as { strasse?: string | null; hausnummer?: string | null; plz?: string | null } | null
+  const kAdr = (kundeRes.data ?? null) as {
+    strasse?: string | null
+    hausnummer?: string | null
+    plz?: string | null
+    ort?: string | null
+    adresse?: string | null
+  } | null
+  const zeile = (a: { strasse?: string | null; hausnummer?: string | null; plz?: string | null; ort?: string | null } | null) => {
+    if (!a?.strasse?.trim()) return null
+    const str = [a.strasse.trim(), a.hausnummer?.trim()].filter(Boolean).join(' ')
+    const ort = [a.plz?.trim(), a.ort?.trim()].filter(Boolean).join(' ')
+    return [str, ort].filter(Boolean).join(', ')
+  }
+  const leadMitOrt =
+    lAdr && kAdr?.ort?.trim() && (!lAdr.plz || lAdr.plz === kAdr.plz) ? { ...lAdr, ort: kAdr.ort } : lAdr
+  const ort = zeile(leadMitOrt) || zeile(kAdr) || kAdr?.adresse?.trim() || null
+
+  // Zugewiesene Partner (Einsätze am Auftrag)
+  let partner: string[] = []
+  if (auftragId) {
+    const { data: einRows, error } = await supabase
+      .from('einsaetze')
+      .select('status, handwerker(name, firma)')
+      .eq('auftrag_id', auftragId)
+    if (error) logDbError('lib/crm/load-projekt-kontext:partner', error)
+    const namen = new Set<string>()
+    for (const r of (einRows ?? []) as Array<{
+      status?: string | null
+      handwerker?: { name?: string | null; firma?: string | null } | Array<{ name?: string | null; firma?: string | null }> | null
+    }>) {
+      if (String(r.status ?? '').toLowerCase() === 'abgelehnt') continue
+      const hw = Array.isArray(r.handwerker) ? r.handwerker[0] : r.handwerker
+      const n = hw?.firma?.trim() || hw?.name?.trim()
+      if (n) namen.add(n)
+    }
+    partner = Array.from(namen)
+  }
+
   return {
     kunde,
     lead,
+    ort,
+    partner,
     angebote,
     auftrag,
     rechnungen,
