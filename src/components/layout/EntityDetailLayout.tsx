@@ -389,12 +389,6 @@ export function EntityDetailLayout({
             variant={head.variant}
             className={head.className}
           />
-          {head.nextStep ? (
-            <div className="detail-next-step" role="status">
-              <span className="detail-next-step__label">Nächster Schritt</span>
-              <span className="detail-next-step__text">{head.nextStep}</span>
-            </div>
-          ) : null}
           {banner ? <div className="detail-entity-banner">{banner}</div> : null}
           {isMobile && quickBar?.length ? <DetailQuickBar actions={quickBar} /> : null}
         </div>

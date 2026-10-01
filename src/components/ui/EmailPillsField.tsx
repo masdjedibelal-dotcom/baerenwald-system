@@ -80,7 +80,6 @@ export function EmailPillsField({
         ))}
         <MockInput ref={inputRef} type="email" autoComplete="off" className="min-w-0 flex-1 border-0 bg-transparent py-1 text-fs-text text-bw-text outline-none placeholder:text-fs-meta placeholder:font-normal placeholder:text-bw-text-muted" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} onBlur={commitInput} placeholder={emails.length === 0 ? placeholder : ''} disabled={disabled} />
       </div>
-      {hint ? <p className="mt-1 text-fs-caption leading-snug text-bw-text-muted">{hint}</p> : null}
     </div>
   )
 }

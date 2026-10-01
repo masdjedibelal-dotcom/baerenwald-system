@@ -22106,3 +22106,38 @@ display: flex;
 .posboard-sec-h input.wizard-titel-input:hover { background: var(--bg-soft); }
 .posboard-sec-h input.wizard-titel-input:focus { background: var(--card); border-color: var(--green); }
 .posboard-sec-h input.wizard-titel-input:placeholder-shown { background: var(--bg-soft); border-color: var(--border-strong); }
+
+/* Entlastung 01.10.2026: keine Erklär- und Hilfetexte mehr (zu viel Lesen). Fehler und Status bleiben. */
+.field-hint:not(.field-error),
+.form-field-hint,
+.wizard-field-hint,
+.wizard-projekt-field-hint,
+.wizard-inline-hint,
+.wizard-mobile-toolbar__hint,
+.wizard-zahlung-lz__hint,
+.sheet-editable-field__hint,
+.prop-form-hint,
+.inline-edit-hint,
+.lt-hint,
+.zahlung-tab-hint,
+.pt2-foot-hint,
+.mock-empty__hint,
+.empty-hint,
+.mkt-funnel-hint,
+.akt-card__hint,
+.hw-upd-hint,
+.freigabe-settings__hint,
+.formulare-sec__hint,
+.angebot-ki__hint,
+.abschluss-canvas-footer__hint,
+.lead-notiz-compose__hint,
+.crm-notif-detail__hint,
+.signature-pad-sheet__hint,
+.vgp-table-hint {
+  display: none;
+}
+/* Graue Erklär-Absätze in Blättern und im Assistenten */
+.editor-sheet__body p:is(.text-bw-text-muted, .text-muted),
+.wizard-flow p:is(.text-bw-text-muted, .text-muted) {
+  display: none;
+}

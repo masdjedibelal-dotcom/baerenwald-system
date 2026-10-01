@@ -222,9 +222,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         }
       >
         {einsaetze == null ? null : einsaetze.length === 0 ? (
-          <p style={{ margin: 0, color: 'var(--text-3)', fontSize: 'var(--fs-text)' }}>
-            Noch kein Partner eingesetzt. Über „Einsatz“ bekommt ein Partner die Anweisung mit EK.
-          </p>
+          <p style={{ margin: 0, color: 'var(--text-3)', fontSize: 'var(--fs-text)' }}>Noch kein Einsatz.</p>
         ) : (
           <div className="einsatz-liste">
             {einsaetze.map((e) => {
@@ -292,7 +290,6 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
             <div className="einsatz-gruppe">
               <div className="einsatz-gruppe__kopf">
                 <span className="einsatz-gruppe__titel">Verlauf</span>
-                <span className="einsatz-gruppe__hinweis">Nur intern, der Kunde sieht das nicht.</span>
               </div>
               <ol className="einsatz-verlauf">
                 {verlauf(detail).map((v) => (

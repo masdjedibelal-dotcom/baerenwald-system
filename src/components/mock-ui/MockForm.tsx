@@ -83,7 +83,7 @@ export function MockFormSection({
 export function MockField({
   label,
   required,
-  hint,
+  hint: _hint,
   error,
   children,
   full,
@@ -125,7 +125,7 @@ export function MockField({
         </label>
       ) : null}
       {kids}
-      {hint && !error ? <div className="field-hint">{hint}</div> : null}
+      {/* Entlastung 01.10.2026: keine Erklär-Hinweise unter Feldern, nur Fehler */}
       {error ? (
         <div id={errorId} className="field-hint field-error" role="alert">
           {error}

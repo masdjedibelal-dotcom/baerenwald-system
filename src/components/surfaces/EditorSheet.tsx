@@ -526,7 +526,8 @@ export function EditorSheet({
           <MockIcon n="x" ctx="default" className="h-5 w-5" aria-hidden />
         </MockBtn>
         <div className="editor-sheet__title-block">
-          {crumb ? <span className="editor-sheet__crumb">{crumb}</span> : null}
+          {/* Nur kurze Einordnung (Nummer, Name), keine Erklärsätze */}
+          {crumb && !(typeof crumb === 'string' && crumb.length > 48) ? <span className="editor-sheet__crumb">{crumb}</span> : null}
           <h2 id={titleId} className="editor-sheet__title">
             {title}
           </h2>
