@@ -1,3 +1,4 @@
+import { leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
@@ -39,6 +40,7 @@ export type { VorgangListeRow } from '@/lib/vorgang/types'
 
 export { computeVorgaengeKpis, countVorgaengeByPhase } from '@/lib/vorgang/vorgaenge-kpis'
 export type { VorgaengeKpis } from '@/lib/vorgang/vorgaenge-kpis'
+
 
 const VORGAENGE_LEAD_SELECT = `
   id,
@@ -614,6 +616,8 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
   const rows: VorgangListeRow[] = []
 
   for (const lead of leads) {
+    // Meldungen, die HV/Hausmeister noch nicht an uns weitergegeben haben, erst zeigen, wenn sie freigegeben sind
+    if (leadWartetAufHvStartFreigabe(lead)) continue
     const kundeName = leadKontaktAnzeigeName(lead, '') || null
     const kundeId = leadVertragsKundeId(lead)
 

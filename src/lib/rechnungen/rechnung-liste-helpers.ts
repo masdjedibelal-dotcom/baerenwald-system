@@ -76,7 +76,7 @@ export const RECHNUNG_STATUS_FILTER_LABELS: Record<RechnungListenStatusFilter, s
   offen: 'Offen',
   entwurf: 'Entwurf',
   gesendet: 'Offen',
-  ueberfaellig: 'Überfällig',
+  ueberfaellig: 'Fällig',
   bezahlt: 'Bezahlt',
   storniert: 'Storniert',
 }
@@ -98,7 +98,7 @@ export function countRechnungStatusFilters(
 
 export function rechnungDisplayStatusLabel(r: RechnungListeFilterRow): string {
   const mahn = mahnstufeListenLabel(r)
-  if (isRechnungUeberfaellig(r)) return mahn ? `Überfällig · ${mahn}` : 'Überfällig'
+  if (isRechnungUeberfaellig(r)) return mahn ? `Fällig · ${mahn}` : 'Fällig'
   const st = (r.status ?? '').toLowerCase() as RechnungStatus
   if (st === 'entwurf') return 'Entwurf'
   if (st === 'gesendet') return mahn ? `Offen · ${mahn}` : 'Offen'

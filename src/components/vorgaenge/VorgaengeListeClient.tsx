@@ -71,11 +71,11 @@ type DataColId = (typeof DATA_COL_IDS)[number]
 /** Daten-Spalten — fr-Gewichte (Hook), Kunde/Titel breiter; feste Spalten in px. */
 const VORGAENGE_DATA_COLS: ResizableColDef[] = [
   { id: 'kunde', defaultWidth: 22, minWidth: 10, maxWidth: 40 },
-  { id: 'titel', defaultWidth: 28, minWidth: 12, maxWidth: 48 },
+  { id: 'titel', defaultWidth: 26, minWidth: 12, maxWidth: 48 },
   { id: 'phase', defaultWidth: 9, minWidth: 6, maxWidth: 14 },
   { id: 'wert', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
   { id: 'datum', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
-  { id: 'status', defaultWidth: 9, minWidth: 6, maxWidth: 14 },
+  { id: 'status', defaultWidth: 11, minWidth: 8, maxWidth: 16 },
 ]
 
 function phaseChipLabel(p: (typeof VORGANG_FILTERS)[number]): string {
@@ -166,7 +166,7 @@ function statusLabel(row: VorgangListeRow): string {
     korrektur_art: row.korrektur_art,
   })
   if (ui.filterKey === 'korrektur_entwurf') return 'Entwurf'
-  if (ui.filterKey === 'korrektur_versendet') return 'Offen'
+  if (ui.filterKey === 'korrektur_versendet') return 'Gesendet'
   return row.unterstatusLabel
 }
 
@@ -268,7 +268,7 @@ export function VorgaengeListeClient({
     return [VORGAENGE_CHECK_COL, ...data, VORGAENGE_MENU_COL]
   }, [visibleCols])
   const { gridTemplateColumns, startResize } = useResizableColumns(
-    `crm.cols.vorgaenge.v6.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
+    `crm.cols.vorgaenge.v7.${DATA_COL_IDS.filter((id) => visibleCols[id]).join('-')}`,
     colDefs
   )
   const colIndex = useCallback((id: string) => colDefs.findIndex((c) => c.id === id), [colDefs])
@@ -1358,12 +1358,11 @@ export function VorgaengeListeClient({
               else toast.info(TOAST.kopieren_fuer_diesen_typ_noch_nicht_verfuegbar)
             }
             // Aktionsmodell: Kopieren nur beim Angebot, Löschen nur solange Entwurf bzw. neue Anfrage.
-            const kopierbar = v.phase === 'angebot'
+            const kopierbar = v.phase === 'angebot' && label === 'Abgelehnt'
             const loeschbar = label === 'Entwurf' || (v.phase === 'anfrage' && label === 'Neu')
             const rowMenu: EntityMenuItem[] = [
-              { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(v) },
               ...(kopierbar ? [{ icon: 'copy', label: 'Als neues Angebot', onClick: copy }] : []),
-              ...(loeschbar ? (['sep', { icon: 'trash', label: 'Löschen', danger: true, onClick: del }] as EntityMenuItem[]) : []),
+              ...(loeschbar ? ([{ icon: 'trash', label: 'Löschen', danger: true, onClick: del }] as EntityMenuItem[]) : []),
             ]
             const row = (
               <div
@@ -1462,7 +1461,7 @@ export function VorgaengeListeClient({
                   onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => e.stopPropagation()}
                 >
-                  <MockEntityRowMenu items={rowMenu} title="Aktionen" />
+                  {rowMenu.filter((i) => i !== 'sep').length >= 2 ? <MockEntityRowMenu items={rowMenu} title="Aktionen" /> : null}
                 </div>
               </div>
             )

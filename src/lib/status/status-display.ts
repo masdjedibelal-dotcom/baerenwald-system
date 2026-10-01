@@ -31,8 +31,9 @@ const ANGEBOT_VARIANT: Record<AngebotStatusEinfach, StatusDisplayVariant> = {
 
 const ANFRAGE_VARIANT: Record<LeadStatus, StatusDisplayVariant> = {
   neu: 'active',
-  kontaktiert: 'warning',
-  termin: 'warning',
+  // Eine Wahrheit: alles vor dem Angebot ist „Neu“ — gleiche Farbe
+  kontaktiert: 'active',
+  termin: 'active',
   angebot: 'active',
   auftrag: 'success',
   abgeschlossen: 'success',
@@ -42,7 +43,7 @@ const ANFRAGE_VARIANT: Record<LeadStatus, StatusDisplayVariant> = {
 const AUFTRAG_VARIANT: Record<AuftragStatus, StatusDisplayVariant> = {
   offen: 'neutral',
   in_arbeit: 'active',
-  abnahme: 'warning',
+  abnahme: 'active',
   abgeschlossen: 'success',
   storniert: 'danger',
 }
@@ -143,8 +144,8 @@ export function rechnungStatusDisplay(
     if (ui.filterKey === 'korrektur_entwurf') {
       return { label: 'Entwurf', variant: 'neutral' }
     }
-    if (ui.filterKey === 'korrektur_versendet') {
-      return { label: 'Offen', variant: 'active' }
+    if (ui.filterKey === 'korrektur_versendet' && status !== 'bezahlt' && status !== 'storniert') {
+      return { label: 'Gesendet', variant: 'active' }
     }
   }
   const key = String(status ?? '')

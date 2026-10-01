@@ -452,7 +452,8 @@ export function AngebotDetailPageClient({
 
   // Aktionsmodell: „…“ = Als neues Angebot · Ablehnen · PDF · Löschen (nur Entwurf)
   const angebotMenuItems: ActionsMenuItem[] = []
-  if (detail.lead_id) {
+  // Kopieren nur noch für abgelehnte Angebote — sonst legt „Bearbeiten“ automatisch eine neue Fassung an
+  if (detail.lead_id && statusEinfach === 'abgelehnt') {
     angebotMenuItems.push({
       label: 'Als neues Angebot',
       icon: <MockIcon ctx="btn" n="copy" size={16} />,
@@ -469,7 +470,8 @@ export function AngebotDetailPageClient({
   if (dangerAction) {
     angebotMenuItems.push({
       label: 'Kunde hat abgelehnt',
-      icon: <MockIcon ctx="btn" n="x" size={16} />,
+      danger: true,
+      icon: <MockIcon ctx="btn" n="circle-x" size={16} />,
       onClick: () => dangerAction.onClick?.(),
     })
   }

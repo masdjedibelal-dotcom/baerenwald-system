@@ -31,61 +31,60 @@ export type VorgangPhaseKey = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
 
 /** Anfrage / Lead */
 export const ANFRAGE_STATUS_MAP = {
-  // Aktionsmodell 30.09.2026: Neu · In Arbeit · Abgesagt (+ Erledigt, wenn beauftragt)
+  // 01.10.2026: Anfrage ist nur „Neu“ oder „Abgesagt“ (keine Zwischenstufen; Akut = roter Punkt)
   neu: { label: 'Neu' },
-  kontaktiert: { label: 'In Arbeit' },
-  termin: { label: 'In Arbeit' },
-  in_bearbeitung: { label: 'In Arbeit' },
-  angebot: { label: 'In Arbeit' },
+  kontaktiert: { label: 'Neu' },
+  termin: { label: 'Neu' },
+  in_bearbeitung: { label: 'Neu' },
+  angebot: { label: 'Neu' },
   auftrag: { label: 'Beauftragt' },
   abgeschlossen: { label: 'Beauftragt' },
-  hm_erledigt: { label: 'Vom Hausmeister erledigt' },
+  hm_erledigt: { label: 'Erledigt' },
   abgebrochen: { label: 'Abgesagt' },
   storniert: { label: 'Abgesagt' },
 } as const satisfies Record<string, StatusMapEntry>
 
 /** Angebot — Fein- + Einfach-Status */
 export const ANGEBOT_STATUS_MAP = {
-  // Aktionsmodell: Entwurf · Beim Kunden · Angenommen · Abgelehnt (+ Abgelaufen, Ersetzt)
+  // 01.10.2026: Entwurf · Gesendet · Angenommen · Abgelehnt (Abgelaufen = rotes „Gesendet“)
   entwurf: { label: 'Entwurf' },
   gesendet_handwerker: { label: 'Entwurf' },
   handwerker_akzeptiert: { label: 'Entwurf' },
-  gesendet_kunde: { label: 'Beim Kunden' },
-  gesendet: { label: 'Beim Kunden' },
-  versendet: { label: 'Beim Kunden' },
+  gesendet_kunde: { label: 'Gesendet' },
+  gesendet: { label: 'Gesendet' },
+  versendet: { label: 'Gesendet' },
   angenommen: { label: 'Angenommen' },
   kunde_akzeptiert: { label: 'Angenommen' },
   abgelehnt: { label: 'Abgelehnt' },
-  // Abgelaufen ist kein eigener Stand, sondern ein roter Hinweis auf „Beim Kunden“ (Ton kommt aus status-tone)
-  abgelaufen: { label: 'Beim Kunden' },
+  abgelaufen: { label: 'Gesendet' },
   ersetzt: { label: 'Ersetzt' },
   storniert: { label: 'Abgelehnt' },
 } as const satisfies Record<string, StatusMapEntry>
 
 /** Auftrag */
 export const AUFTRAG_STATUS_MAP = {
-  // Aktionsmodell: Läuft · Fertig · Storniert (Abnahme ist ein Schritt, kein Status)
-  offen: { label: 'Läuft' },
-  in_arbeit: { label: 'Läuft' },
-  wartend: { label: 'Läuft' },
-  abnahme: { label: 'Läuft' },
+  // 01.10.2026: Offen · In Bearbeitung · Fertig (Abnahme ist ein Schritt, kein Status)
+  offen: { label: 'Offen' },
+  in_arbeit: { label: 'In Bearbeitung' },
+  wartend: { label: 'In Bearbeitung' },
+  abnahme: { label: 'In Bearbeitung' },
   abgeschlossen: { label: 'Fertig' },
   storniert: { label: 'Storniert' },
 } as const satisfies Record<string, StatusMapEntry>
 
 /** Rechnung */
 export const RECHNUNG_STATUS_MAP = {
-  // Aktionsmodell: Entwurf · Offen · Bezahlt · Storniert (Überfällig = rot markiertes Offen)
+  // 01.10.2026: Entwurf · Gesendet · Fällig (rot) · Bezahlt · Storniert
   ausstehend: { label: 'Rechnung fehlt' },
   entwurf: { label: 'Entwurf' },
-  gesendet: { label: 'Offen' },
-  teilbezahlt: { label: 'Offen' },
+  gesendet: { label: 'Gesendet' },
+  teilbezahlt: { label: 'Gesendet' },
   bezahlt: { label: 'Bezahlt' },
   storniert: { label: 'Storniert' },
   korrektur_entwurf: { label: 'Entwurf' },
   korrektur_gespeichert: { label: 'Entwurf' },
-  korrektur_versendet: { label: 'Offen' },
-  ueberfaellig: { label: 'Überfällig' },
+  korrektur_versendet: { label: 'Gesendet' },
+  ueberfaellig: { label: 'Fällig' },
   ueberwiesen: { label: 'Bezahlt' },
 } as const satisfies Record<string, StatusMapEntry>
 

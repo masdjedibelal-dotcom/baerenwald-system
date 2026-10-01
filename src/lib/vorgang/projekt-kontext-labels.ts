@@ -46,7 +46,7 @@ export function auftragStatusKurz(status: string): string {
 
 export function rechnungStatusKurz(status: string): string {
   const key = status.trim().toLowerCase()
-  if (key === 'ueberfaellig' || key === 'überfällig') return 'Überfällig'
+  if (key === 'ueberfaellig' || key === 'überfällig') return 'Fällig'
   // Legacy-Alias aus Listen
   if (key === 'versendet') return rechnungStatusDisplay('gesendet').label
   return rechnungStatusDisplay(status).label

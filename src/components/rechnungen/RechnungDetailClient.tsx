@@ -456,9 +456,7 @@ export function RechnungDetailClient({
     const istEntwurf = String(detail.status ?? '').toLowerCase() === 'entwurf'
     openActionConfirm({
       title: istEntwurf ? 'Entwurf verwerfen?' : 'Rechnung stornieren?',
-      body: istEntwurf
-        ? 'Der Entwurf wird verworfen. Er ging noch nicht an den Kunden.'
-        : `${nr} wird storniert. Dazu entsteht eine Storno-Gutschrift als Entwurf, die Sie danach an den Kunden senden. Eine neue Rechnung entsteht nicht.`,
+      body: istEntwurf ? nr : nr,
       confirmLabel: istEntwurf ? 'Verwerfen' : 'Stornieren',
       cancelLabel: 'Abbrechen',
       danger: true,
@@ -547,9 +545,9 @@ export function RechnungDetailClient({
     if (rechnungDarfOhneErsatzStorniertWerden(detail.status)) {
       items.push({
         label: 'Stornieren',
-        icon: <MockIcon ctx="btn" n="x" size={16} />,
+        danger: true,
+        icon: <MockIcon ctx="btn" n="circle-x" size={16} />,
         onClick: handleStornoOhneErsatz,
-        hint: 'Mit Storno-Gutschrift, ohne neue Rechnung',
       })
     } else if (st === 'entwurf') {
       items.push({
@@ -818,7 +816,7 @@ export function RechnungDetailClient({
               korrekturUi.filterKey === 'korrektur_entwurf'
                 ? 'Entwurf'
                 : korrekturUi.filterKey === 'korrektur_versendet' && detail.status !== 'bezahlt' && detail.status !== 'storniert'
-                  ? 'Offen'
+                  ? 'Gesendet'
                   : rechnungStatus.label
             }
           />

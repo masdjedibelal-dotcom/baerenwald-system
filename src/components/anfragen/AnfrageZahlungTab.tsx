@@ -123,7 +123,7 @@ export function AnfrageZahlungTab({
 function badgeForStatus(st: string): { status: string; label: string } {
   if (st === 'bezahlt' || st === 'teilbezahlt') return { status: 'bezahlt', label: 'Bezahlt' }
   if (st === 'gesendet' || st === 'gestellt') return { status: 'gesendet', label: 'Gestellt' }
-  if (st === 'ueberfaellig') return { status: 'ueberfaellig', label: 'Überfällig' }
+  if (st === 'ueberfaellig') return { status: 'ueberfaellig', label: 'Fällig' }
   if (st === 'entwurf') return { status: 'entwurf', label: 'Entwurf' }
   if (st === 'storniert') return { status: 'storniert', label: 'Storniert' }
   return { status: st || 'entwurf', label: st || '—' }

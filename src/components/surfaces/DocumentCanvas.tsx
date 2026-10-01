@@ -119,7 +119,8 @@ export function DocumentCanvas({
   busyLabel,
 }: DocumentCanvasProps) {
   // Client sofort mounten — sonst ein Frame Flash der darunterliegenden Seite (z. B. Vorgänge)
-  const [mounted, setMounted] = useState(() => typeof document !== 'undefined')
+  // Erst nach dem Laden — sonst rendert der Browser beim ersten Mal anders als der Server (Hydration-Fehler)
+  const [mounted, setMounted] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const [saveFlash, setSaveFlash] = useState(false)

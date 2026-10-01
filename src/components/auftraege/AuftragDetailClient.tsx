@@ -45,7 +45,6 @@ import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
 import {
   AuftragComplianceTab,
 } from '@/components/auftraege/AuftragComplianceTab'
-import { AuftragFachdokuCard } from '@/components/auftraege/AuftragFachdokuCard'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
 import { formatAuftragsNr, auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -748,7 +747,7 @@ export function AuftragDetailClient({
             if (s === 'bezahlt') return 'Bezahlt'
             if (s === 'gesendet' || s === 'versendet') return 'Versendet'
             if (s === 'entwurf') return 'Entwurf'
-            if (s === 'ueberfaellig' || s === 'überfällig') return 'Überfällig'
+            if (s === 'ueberfaellig' || s === 'überfällig') return 'Fällig'
             return null
           })
           .filter(Boolean)
@@ -1162,10 +1161,6 @@ export function AuftragDetailClient({
             leadId={detail.lead_id ?? _leadDetail?.id ?? null}
             onChanged={() => refresh()}
           />
-          <AuftragFachdokuCard
-            auftragId={detail.id}
-            onChanged={() => refresh()}
-          />
           {istBauprojekt ? (
             <AuftragComplianceTab
               detail={detail}
@@ -1397,21 +1392,8 @@ export function AuftragDetailClient({
               }
               return null
             })()}
-            menuItems={
-              // Aktionsmodell: „…“ = Abnahme (optional, solange er läuft)
-              !istStorniert &&
-              (detail.status === 'offen' ||
-                detail.status === 'in_arbeit' ||
-                detail.status === 'abnahme') &&
-              detail.status !== 'abnahme'
-                ? [
-                    {
-                      label: 'Abnahme mit Protokoll',
-                      onClick: () => router.push(`/auftraege/${detail.id}/abnahme/erstellen`),
-                    },
-                  ]
-                : []
-            }
+            // Abnahme läuft über „Auftrag abschließen“ — kein zweiter Weg im „…“
+            menuItems={[]}
           />
         ),
       }}

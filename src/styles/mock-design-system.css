@@ -16349,9 +16349,9 @@ border-color: #d97706;
   background: #fff8eb;
 }
 
+/* Abgenommen = grüner Haken; Titel bleibt lesbar (nicht durchgestrichen wie gelöscht) */
 .abnahme-inline__item.is-done .abnahme-inline__item-title {
-text-decoration: line-through;
-  color: var(--text-3);
+  color: var(--text);
 }
 
 .abnahme-inline__item.is-done .abnahme-inline__item-sub {
@@ -22189,3 +22189,33 @@ display: flex;
 .lt-karte > .card-b { padding: 0; }
 .lt-karte .lt, .lt-karte .lt-wrap { border: 0; border-radius: 0; box-shadow: none; margin: 0; }
 .lt-karte .lt-grouphead { text-transform: none; letter-spacing: 0; }
+
+/* Abnahme: alles abgenommen → grün statt gelb */
+.abnahme-inline__progress.is-complete {
+  background: var(--grn-bg, #e9f6ee);
+  color: var(--grn-tx, #1f7a45);
+}
+
+/* Notiz schreiben: nur ein Rahmen (Textfeld ohne eigene Box) */
+.note-composer textarea.input,
+.note-composer textarea.input:focus,
+.note-composer textarea.input:hover {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 4px 0 !important;
+  min-height: calc(1.5em * 2 + 8px);
+}
+
+/* Portal als normale Stammdaten-Zeile */
+.prop-v.vgid-portal {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  font-size: inherit;
+}
+
+/* Erste Zeile einer Karte ohne Trennlinie oben (sonst leere Zeile unter dem Kopf) */
+.card-b > .props > .prop:first-child {
+  border-top: 0;
+}

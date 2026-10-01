@@ -193,10 +193,10 @@ export function korrekturKetteListenStatus(group: KorrekturKetteGroup): {
   const st = String(tip.unterstatus).toLowerCase()
   if (st === 'bezahlt') return { label: 'Bezahlt', kind: 'fertig' }
   if (st === 'gesendet' || st === 'versendet') {
-    return { label: 'Offen', kind: 'warten' }
+    return { label: 'Gesendet', kind: 'warten' }
   }
   if (String(tip.korrektur_von ?? '').trim()) {
-    return { label: 'Offen', kind: 'warten' }
+    return { label: 'Gesendet', kind: 'warten' }
   }
   return null
 }

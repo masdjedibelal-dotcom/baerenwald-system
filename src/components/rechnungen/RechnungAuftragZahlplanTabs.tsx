@@ -15,7 +15,6 @@ import type {
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { AuftragDetail, LeadDetail, Rechnung } from '@/lib/types'
 import type { RechnungErstellenOpts } from '@/components/vorgang/VorgangZahlungTab'
-import { RechnungZahlungszielCard } from '@/components/rechnungen/RechnungZahlungszielCard'
 
 /** Read-only Auftragskontext auf der Rechnung. */
 export function RechnungAuftragdetailsTab({
@@ -88,7 +87,6 @@ export function RechnungZahlplanTab({
   onOpenWizard,
   onCreateInvoice,
   onRefresh,
-  zahlungszielFallback = 14,
 }: {
   detail: Rechnung
   auftragDetail: AuftragDetail | null
@@ -149,13 +147,6 @@ export function RechnungZahlplanTab({
       onCreateInvoice={onCreateInvoice}
       onRefresh={onRefresh}
       readOnly={false}
-      afterTable={
-        <RechnungZahlungszielCard
-          detail={detail}
-          zahlungszielFallback={zahlungszielFallback}
-          onSaved={onRefresh}
-        />
-      }
     />
   )
 }

@@ -44,7 +44,7 @@ export const STATUSES: Record<string, StatusEntry> = {
   // Auftrag — kanonisch (status-map / Leitfaden §3)
   offen: { label: 'Offen', tone: 'grau' },
   geplant: { label: 'Offen', tone: 'grau' },
-  in_arbeit: { label: 'In Arbeit', tone: 'blau' },
+  in_arbeit: { label: 'In Bearbeitung', tone: 'blau' },
   aktiv: { label: 'In Arbeit', tone: 'blau' },
   abnahme: { label: 'Abnahme', tone: 'blau' },
   fertig: { label: 'Abgeschlossen', tone: 'gruen' },
@@ -55,7 +55,7 @@ export const STATUSES: Record<string, StatusEntry> = {
   // Rechnung
   versendet: { label: 'Gesendet', tone: 'blau' },
   bezahlt: { label: 'Bezahlt', tone: 'gruen' },
-  ueberfaellig: { label: 'Überfällig', tone: 'rot' },
+  ueberfaellig: { label: 'Fällig', tone: 'rot' },
   reklamiert: { label: 'Reklamiert', tone: 'rot' },
   gutschrift: { label: 'Gutschrift', tone: 'grau' },
 

@@ -288,32 +288,21 @@ export function EntityKundenStammdatenCard({
           {draft.quelleLabel?.trim() ? (
             <PropRow label="Quelle" value={draft.quelleLabel.trim()} />
           ) : null}
-        </div>
-      </div>
-
-      {kundeId?.trim() ? (
-        <div className="stammdaten-footer">
-          <div className="stammdaten-footer__row">
-            <div className="stammdaten-footer__status">
-              <StammdatenPortalZeile
-                kundeId={kundeId}
-                fallbackEmail={draft.email}
-                variant="vgid"
-                hideLogin
-              />
-            </div>
-            {/* „Als Kunde einloggen“ entfällt (Entlastung 01.10.2026) */}
-          </div>
+          {kundeId?.trim() ? (
+            <StammdatenPortalZeile kundeId={kundeId} fallbackEmail={draft.email} hideLogin />
+          ) : null}
           {showKundeLink ? (
-            <div className="stammdaten-footer__secondary">
-              <Link className="vgid-chip ghost vgid-chip--secondary" href={`/kunden/${kundeId.trim()}`}>
-                <MockIcon ctx="default" n="user" size={14} />
-                Kundenakte
-              </Link>
-            </div>
+            <PropRow
+              label="Kundenakte"
+              value={
+                <Link className="link" href={`/kunden/${kundeId!.trim()}`}>
+                  Öffnen
+                </Link>
+              }
+            />
           ) : null}
         </div>
-      ) : null}
+      </div>
       {footerBanner ? (
         <div className="stammdaten-footer-banner">{footerBanner}</div>
       ) : null}

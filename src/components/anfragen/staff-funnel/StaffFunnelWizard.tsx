@@ -385,7 +385,7 @@ export function StaffFunnelWizard({
   onSuccess?: (id: string) => void
 }) {
   const router = useRouter()
-  const [mounted, setMounted] = useState(() => typeof document !== 'undefined')
+  const [mounted, setMounted] = useState(false)
   const [state, setState] = useState<StaffFunnelState>(() =>
     createInitialStaffFunnelState({ kundeId: defaultKundeId ?? null })
   )

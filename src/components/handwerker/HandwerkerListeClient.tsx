@@ -589,9 +589,6 @@ export function HandwerkerListeClient({
               void runDeleteHandwerker(h.id, router, handwerkerDisplayName(h))
             }
             const rowMenu: EntityMenuItem[] = [
-              { icon: 'external-link', label: 'Öffnen', onClick: () => openDetail(h.id) },
-              { icon: 'pencil', label: 'Bearbeiten', onClick: edit },
-              'sep',
               { icon: 'trash', label: 'Löschen', danger: true, onClick: del },
             ]
             const menuCell = (
@@ -600,7 +597,8 @@ export function HandwerkerListeClient({
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <MockEntityRowMenu items={rowMenu} title="Aktionen" />
+                {/* Zeile öffnet schon; ein Menü nur für Löschen lohnt nicht (Löschen über Auswahl) */}
+                {rowMenu.filter((i) => i !== 'sep').length >= 2 ? <MockEntityRowMenu items={rowMenu} title="Aktionen" /> : null}
               </div>
             )
             const row = isMobile ? (

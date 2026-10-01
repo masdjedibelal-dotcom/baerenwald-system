@@ -61,7 +61,7 @@ export function resolveVorgangDisplay(resolved: ResolvedVorgang, role: PortalRol
 
   const metaParts: string[] = []
   if (resolved.kanalMeta) metaParts.push(resolved.kanalMeta)
-  if (resolved.ueberfaellig) metaParts.push('Überfällig')
+  if (resolved.ueberfaellig) metaParts.push('Fällig')
   if (resolved.badges.notfall) metaParts.push('Notfall')
 
   return {

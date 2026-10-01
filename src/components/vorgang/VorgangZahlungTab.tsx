@@ -105,7 +105,7 @@ function rateBadgeMeta(
   }
   if (st === 'gestellt') {
     const ueber = faelligUeberfaellig(r?.faellig_am)
-    if (!ueber) return { label: 'Offen', tone: 'blau', status: 'gesendet' }
+    if (!ueber) return { label: 'Gesendet', tone: 'blau', status: 'gesendet' }
     const stufe = aktuelleMahnstufeNummer({
       status: String(r?.status ?? 'gesendet'),
       erinnerung_7_sent_at: r?.erinnerung_7_sent_at,
@@ -116,7 +116,7 @@ function rateBadgeMeta(
     if (stufe > 0) {
       return { label: `Mahnstufe ${stufe}`, tone: 'rot', status: 'ueberfaellig' }
     }
-    return { label: 'Überfällig', tone: 'rot', status: 'ueberfaellig' }
+    return { label: 'Fällig', tone: 'rot', status: 'ueberfaellig' }
   }
   if (r && String(r.status) === 'entwurf') {
     return { label: 'Entwurf', tone: 'grau', status: 'entwurf' }
@@ -139,8 +139,8 @@ function belegStatusLabel(r: RechnungAuswahlZeile): string {
   if (st === 'bezahlt') return 'Bezahlt'
   if (st === 'storniert') return 'Storniert'
   if (st === 'entwurf') return 'Entwurf'
-  if (faelligUeberfaellig(r.faellig_am)) return 'Überfällig'
-  if (st === 'gesendet' || st === 'versendet') return 'Offen'
+  if (faelligUeberfaellig(r.faellig_am)) return 'Fällig'
+  if (st === 'gesendet' || st === 'versendet') return 'Gesendet'
   return st || '—'
 }
 
@@ -662,7 +662,7 @@ export function VorgangZahlungTab({
   }
 
   const interactive = !readOnly && variant !== 'angebot'
-  const canEditPlan = interactive && variant === 'auftrag' && Boolean(auftragId)
+  const canEditPlan = interactive && (variant === 'auftrag' || variant === 'rechnung') && Boolean(auftragId)
   const hatSchlusszeile = plan.zeilen.some((z) => z.typ === 'rest')
   /** Nur eine Rechnung (kein Abschlag) — dann überall „Rechnung“ statt Abschlag-Wörter */
   const nurEineRechnung = rows.length === 1 && Boolean(rows[0]?.istSchluss)

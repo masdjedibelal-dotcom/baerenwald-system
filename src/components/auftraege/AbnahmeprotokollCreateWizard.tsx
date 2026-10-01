@@ -595,15 +595,13 @@ export function AbnahmeprotokollCreateWizard({
         </p>
       </fieldset>
       <SheetEditableField
-        label="Hinweis (z. B. nicht Vertragsgegenstand)"
+        label="Hinweis"
         value={meta.hinweis_sonstiges}
         onSave={(hinweis_sonstiges) => patchMeta({ hinweis_sonstiges })}
         multiline
-        rows={14}
-        kiExtraHint="Abnahmeprotokoll-Hinweis für den Kunden (PDF)."
-        placeholder="Optional…"
+        rows={3}
       />
-      <MockField label="Mängelbeseitigung (global, PDF)">
+      <MockField label="Mängel beseitigen bis">
         <MockInput
         value={meta.maengel_beseitigung_spaetestens}
         onChange={(e) => patchMeta({ maengel_beseitigung_spaetestens: e.target.value })}
@@ -611,12 +609,11 @@ export function AbnahmeprotokollCreateWizard({
       />
       </MockField>
       <SheetEditableField
-        label="Interne / weitere Anmerkungen"
+        label="Interne Notiz"
         value={notizen}
         onSave={setNotizen}
         multiline
-        rows={14}
-        placeholder="Interne Anmerkungen…"
+        rows={3}
       />
     </div>
   )
@@ -628,7 +625,7 @@ export function AbnahmeprotokollCreateWizard({
       className="document-canvas-sec space-y-5"
     >
       <p className="section-h" style={{ marginBottom: 4 }}>
-        Leistungen begehen &amp; abnehmen
+        Leistungen
       </p>
       <AbnahmeBegehListe
         punkte={punkte}
@@ -636,8 +633,8 @@ export function AbnahmeprotokollCreateWizard({
         katalogPositionen={positionen}
       />
 
-      <FieldCard title="Mängel (optional)">
-        <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} />
+      <FieldCard title="Mängel">
+        <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} auftragId={auftragId} />
       </FieldCard>
 
       {maengelListe.length > 0 ? (
@@ -830,13 +827,12 @@ export function AbnahmeprotokollCreateWizard({
       />
       </MockField>
             <SheetEditableField
-              label="Leistungsumfang (Kurz)"
+              label="Leistungsumfang"
               value={meta.leistungsumfang_kurz}
               onSave={(leistungsumfang_kurz) => patchMeta({ leistungsumfang_kurz })}
               multiline
-              rows={14}
+              rows={3}
               sheetContext="canvas"
-              placeholder="Leistungsumfang…"
             />
           </div>
         </MobileEditableBlock>
@@ -1333,26 +1329,7 @@ export function AbnahmeprotokollCreateWizard({
           </ul>
         </div>
       ) : null}
-      {undokumentiert.n > 0 && undokumentiert.m > 0 ? (
-        <div className="abnahme-canvas-warn" role="status">
-          <MockIcon ctx="default" n="alert-triangle" size={16} />
-          <p>
-            {undokumentiert.n} von {undokumentiert.m} Leistungen nicht dokumentiert. Die Doku ist die
-            Grundlage der Abnahme — ohne sie fehlt der Nachweis. Abnahme trotzdem möglich, dann als{' '}
-            <strong>Abnahme unter Vorbehalt</strong> vermerken.
-            {meta.abnahme_ergebnis === 'mit_vorbehalt' ? ' (aktuell unter Vorbehalt.)' : null}
-          </p>
-          {meta.abnahme_ergebnis !== 'mit_vorbehalt' ? (
-            <button
-              type="button"
-              className="abnahme-canvas-warn__action"
-              onClick={() => patchMeta({ abnahme_ergebnis: 'mit_vorbehalt' })}
-            >
-              Als Abnahme unter Vorbehalt setzen
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      {/* Kein Warnkasten mehr: Ergebnis „mit Vorbehalt“ wählt man selbst, wenn nötig */}
 
       <div className="abnahme-canvas">
         <div className="abnahme-canvas__head">

@@ -138,17 +138,13 @@ export function EntityHandwerkerStammdatenCard({
                 )
               }
             />
+            <StammdatenPortalZeile
+              handwerkerId={handwerkerId}
+              fallbackEmail={draft.email}
+              gesperrt={portalGesperrt}
+              onInvite={onInvite}
+            />
           </div>
-        </div>
-
-        <div className="stammdaten-footer">
-          <StammdatenPortalZeile
-            handwerkerId={handwerkerId}
-            fallbackEmail={draft.email}
-            gesperrt={portalGesperrt}
-            onInvite={onInvite}
-            variant="vgid"
-          />
         </div>
       </MockCard>
 

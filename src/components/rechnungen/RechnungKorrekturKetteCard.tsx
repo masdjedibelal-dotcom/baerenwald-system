@@ -34,7 +34,7 @@ function memberStatusLabel(
     m.role === 'neu' &&
     (m.status.toLowerCase() === 'gesendet' || m.status.toLowerCase() === 'versendet')
   ) {
-    return 'Offen'
+    return 'Gesendet'
   }
   return rechnungStatusDisplay(m.status, {
     korrektur_von: m.role === 'neu' ? 'x' : null,

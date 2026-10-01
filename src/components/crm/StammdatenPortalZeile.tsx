@@ -103,11 +103,11 @@ export function StammdatenPortalZeile({
   }
 
   const statusLabel = gesperrt
-    ? 'Portal gesperrt'
+    ? 'Gesperrt'
     : registered === true
-      ? 'Portal aktiv'
+      ? 'Aktiv'
       : registered === false
-        ? 'Noch nicht registriert'
+        ? 'Nicht registriert'
         : '…'
 
   const dotClass = gesperrt
@@ -124,7 +124,9 @@ export function StammdatenPortalZeile({
 
   return (
     <>
-      <div className="vgid-portal">
+      <div className="prop">
+      <div className="prop-l">Portal</div>
+      <div className="prop-v vgid-portal">
         <span className={cn(dotClass)} aria-hidden />
         <span className="t">{statusLabel}</span>
         {showInvite ? (
@@ -143,6 +145,7 @@ export function StammdatenPortalZeile({
             </MockBtn>
           </span>
         ) : null}
+      </div>
       </div>
       {kid ? (
         <KundenportalLinkVersendenModal

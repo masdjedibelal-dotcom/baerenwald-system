@@ -2,21 +2,14 @@
 import { EMPTY } from '@/lib/crm-labels'
 
 import { MockBtn, MockEmpty } from '@/components/mock-ui'
-import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField, MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useMemo, useState } from 'react'
-import { Combobox } from '@/components/ui/Combobox'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { toast } from '@/components/ui/app-toast'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
-import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
-import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
-import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import {
-  abnahmePunktAusAuftragPosition,
   abnahmePunktErbrachteLeistung,
   bereinigeAbnahmeLeistungName,
   gruppiereAbnahmePunkte,
@@ -30,45 +23,11 @@ import {
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import { optimizeImageForAbnahmePdf } from '@/lib/media/optimize-image-for-upload'
 import type { AuftragPosition } from '@/lib/types'
-import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import { cn } from '@/lib/utils'
-import type { KiAssistDraft } from '@/lib/copilot/ki-assist-scopes'
 import { TOAST } from '@/lib/copy'
 
 const MAX_MANGEL_FOTOS = 4
-
-function applyTextDraftToTitelNotiz(
-  d: Extract<KiAssistDraft, { type: 'text' }>,
-  setTitel: (v: string) => void,
-  setNotiz: (v: string) => void
-) {
-  const titel = d.titel?.trim() || ''
-  const text = d.text?.trim() || ''
-  if (titel) {
-    setTitel(titel)
-    setNotiz(text)
-    return
-  }
-  if (!text) return
-  const lines = text
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-  if (lines.length >= 2) {
-    setTitel(lines[0]!)
-    setNotiz(lines.slice(1).join('\n'))
-  } else {
-    setTitel(text)
-  }
-}
-
-function maengelLinesFromDraft(text: string): string[] {
-  return text
-    .split(/\n+/)
-    .map((l) => l.replace(/^[-•*\d.)\s]+/, '').trim())
-    .filter(Boolean)
-}
 
 function leistungKey(p: AbnahmePunkt): string {
   return p.leistung_id?.trim() || p.id
@@ -178,7 +137,6 @@ function BegehItem({
 export function AbnahmeBegehListe({
   punkte,
   onChange,
-  katalogPositionen = [],
 }: {
   punkte: AbnahmePunkt[]
   onChange: (next: AbnahmePunkt[]) => void
@@ -191,30 +149,7 @@ export function AbnahmeBegehListe({
     [blocks]
   )
 
-  const usedPosIds = useMemo(() => {
-    const s = new Set<string>()
-    for (const p of punkte) {
-      const lid = p.leistung_id?.trim()
-      if (lid) s.add(lid)
-    }
-    return s
-  }, [punkte])
-
-  const katalogOpts = useMemo(
-    () =>
-      katalogPositionen
-        .filter((p) => p.id && !usedPosIds.has(p.id))
-        .map((p) => ({
-          value: p.id,
-          label: (p.leistung_name ?? '').trim() || 'Leistung',
-          sub: (p.gewerk_name ?? '').trim() || undefined,
-        })),
-    [katalogPositionen, usedPosIds]
-  )
-
   const [addOpen, setAddOpen] = useState(false)
-  const [addMode, setAddMode] = useState<'katalog' | 'frei'>('katalog')
-  const [pickId, setPickId] = useState('')
   const [draftTitel, setDraftTitel] = useState('')
   const [draftNotiz, setDraftNotiz] = useState('')
 
@@ -223,28 +158,14 @@ export function AbnahmeBegehListe({
   const [editNotiz, setEditNotiz] = useState('')
 
   function openAdd() {
-    const hasKatalog = katalogOpts.length > 0
-    setAddMode(hasKatalog ? 'katalog' : 'frei')
-    setPickId(katalogOpts[0]?.value ?? '')
     setDraftTitel('')
     setDraftNotiz('')
     setAddOpen(true)
   }
 
   function confirmAdd() {
-    if (addMode === 'katalog' && pickId) {
-      const pos = katalogPositionen.find((p) => p.id === pickId)
-      if (!pos) return
-      const neu = abnahmePunktAusAuftragPosition(pos)
-      if (draftNotiz.trim()) neu.notizen = [draftNotiz.trim()]
-      if (draftTitel.trim()) {
-        neu.leistung_name = draftTitel.trim()
-        neu.beschreibung = draftTitel.trim()
-      }
-      onChange([...punkte, neu])
-    } else {
-      onChange([...punkte, abnahmePunktErbrachteLeistung(draftTitel, draftNotiz)])
-    }
+    if (!draftTitel.trim()) return
+    onChange([...punkte, abnahmePunktErbrachteLeistung(draftTitel, draftNotiz)])
     setAddOpen(false)
   }
 
@@ -260,31 +181,10 @@ export function AbnahmeBegehListe({
     setEditId(null)
   }
 
-  useKiAssistDraftConsumer(addOpen, 'text', (d) => {
-    if (d.type !== 'text') return
-    // Nur strukturierte Übernahme (Titel gesetzt) — reine Feld-KI läuft über KiAssistFieldLabel
-    if (!d.titel?.trim()) return
-    setAddMode('frei')
-    applyTextDraftToTitelNotiz(d, setDraftTitel, setDraftNotiz)
-  })
-
-  useKiAssistDraftConsumer(Boolean(editId), 'text', (d) => {
-    if (d.type !== 'text') return
-    if (!d.titel?.trim()) return
-    applyTextDraftToTitelNotiz(d, setEditTitel, setEditNotiz)
-  })
-
-  const leistungKiHint =
-    'Abnahmeprotokoll: erbrachte Leistung für den Kunden (Titel + optionale Notiz). Keine Preise.'
-
   return (
     <div className="abnahme-begeh">
       {flatLeistungen.length === 0 ? (
-        <MockEmpty
-          icon="clipboard-list"
-          title="Noch keine Leistungen"
-          hint="Per Dropdown aus dem Auftrag wählen oder frei als erbrachte Leistung erfassen."
-        />
+        <MockEmpty icon="clipboard-list" title="Noch keine Leistungen" />
       ) : (
         <ul className="abnahme-inline__items">
           {flatLeistungen.map(({ gewerk, leistung }) => (
@@ -308,72 +208,20 @@ export function AbnahmeBegehListe({
       </MockBtn>
 
       <EditorSheet
-        primary={{ label: 'Speichern', onClick: confirmAdd, disabled: Boolean(addMode === 'katalog' ? !pickId : !draftTitel.trim() && !draftNotiz.trim()) }}
+        primary={{ label: 'Hinzufügen', onClick: confirmAdd, disabled: !draftTitel.trim() }}
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="Leistung hinzufügen"
         context="canvas"
         size="md"
-        headerEnd={
-          <div className="flex items-center gap-1">
-            <KiAssistIconButton
-              overSheet
-              scope="abnahme_leistung"
-              title="Leistung mit KI formulieren"
-              extraHint={leistungKiHint}
-              draftInput={[draftTitel.trim(), draftNotiz.trim()].filter(Boolean).join('\n') || null}
-              onBeforeOpen={() => setAddMode('frei')}
-            />
-          </div>
-        }
       >
         <div className="form-grid form-grid--sheet">
-          {katalogOpts.length > 0 ? (
-            <div className="abnahme-begeh__seg" role="group" aria-label="Art">
-              <MockBtn className={cn('abnahme-begeh__seg-btn', addMode === 'katalog' && 'is-active')} type="button" onClick={() => setAddMode('katalog')}>
-                Aus Auftrag
-              </MockBtn>
-              <MockBtn className={cn('abnahme-begeh__seg-btn', addMode === 'frei' && 'is-active')} type="button" onClick={() => setAddMode('frei')}>
-                Freitext
-              </MockBtn>
-            </div>
-          ) : null}
-
-          {addMode === 'katalog' && katalogOpts.length > 0 ? (
-            <MockField label="Leistung">
-              <MockSelect value={pickId} onChange={(e) => {
-                  setPickId(e.target.value)
-                  const pos = katalogPositionen.find((p) => p.id === e.target.value)
-                  if (pos && !draftTitel.trim()) {
-                    setDraftTitel((pos.leistung_name ?? '').trim())
-                  }
-                }}>
-                <option value="">Leistung wählen…</option>
-                {katalogOpts.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </MockSelect>
-            </MockField>
-          ) : null}
-
-          <KiAssistFieldLabel
-            label={addMode === 'katalog' ? 'Titel (optional anpassen)' : 'Titel'}
-            value={draftTitel}
-            onApply={setDraftTitel}
-            extraHint="Kurztitel der erbrachten Leistung im Abnahmeprotokoll."
-          >
-            <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder={addMode === 'katalog' ? 'Wie im Auftrag — oder umbenennen' : 'z. B. Heizkörper getauscht'} />
-          </KiAssistFieldLabel>
-          <KiAssistFieldLabel
-            label="Notiz (optional)"
-            value={draftNotiz}
-            onApply={setDraftNotiz}
-            extraHint="Kurzbeschreibung unter dem Titel im PDF."
-          >
-            <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} placeholder="Kurzbeschreibung fürs Protokoll…" rows={14} className="resize-y py-2 ta--long" />
-          </KiAssistFieldLabel>
+          <MockField label="Leistung" required>
+            <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder="z. B. Heizkörper getauscht" autoFocus />
+          </MockField>
+          <MockField label="Beschreibung">
+            <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} rows={4} className="resize-y py-2" />
+          </MockField>
         </div>
       </EditorSheet>
 
@@ -384,36 +232,14 @@ export function AbnahmeBegehListe({
         title="Leistung bearbeiten"
         context="canvas"
         size="md"
-        headerEnd={
-          <div className="flex items-center gap-1">
-            <KiAssistIconButton
-              overSheet
-              scope="abnahme_leistung"
-              title="Leistung mit KI formulieren"
-              extraHint={leistungKiHint}
-              draftInput={[editTitel.trim(), editNotiz.trim()].filter(Boolean).join('\n') || null}
-            />
-          </div>
-        }
       >
         <div className="form-grid form-grid--sheet">
-          <KiAssistFieldLabel
-            label="Titel"
-            value={editTitel}
-            onApply={setEditTitel}
-            required
-            extraHint="Kurztitel der erbrachten Leistung im Abnahmeprotokoll."
-          >
-            <MockField required><MockInput value={editTitel} onChange={(e) => setEditTitel(e.target.value)} required /></MockField>
-          </KiAssistFieldLabel>
-          <KiAssistFieldLabel
-            label="Notiz (optional)"
-            value={editNotiz}
-            onApply={setEditNotiz}
-            extraHint="Beschreibung unter dem Titel im PDF."
-          >
-            <MockTextarea value={editNotiz} onChange={(e) => setEditNotiz(e.target.value)} placeholder="Beschreibung unter dem Titel im PDF…" rows={14} className="resize-y py-2 ta--long" />
-          </KiAssistFieldLabel>
+          <MockField label="Leistung" required>
+            <MockInput value={editTitel} onChange={(e) => setEditTitel(e.target.value)} required />
+          </MockField>
+          <MockField label="Beschreibung">
+            <MockTextarea value={editNotiz} onChange={(e) => setEditNotiz(e.target.value)} rows={4} className="resize-y py-2" />
+          </MockField>
         </div>
       </EditorSheet>
     </div>
@@ -428,8 +254,8 @@ export function AbnahmeProgressBar({
   total: number
 }) {
   return (
-    <div className="abnahme-inline__progress" role="status">
-      <MockIcon ctx="default" n="clock" size={16} />
+    <div className={cn('abnahme-inline__progress', total > 0 && done >= total && 'is-complete')} role="status">
+      <MockIcon ctx="default" n={total > 0 && done >= total ? 'check' : 'clock'} size={16} />
       <span>
         {total === 0
           ? EMPTY.leistungenErfasst
@@ -554,32 +380,10 @@ export function AbnahmeMaengelCheckliste({
     }
   }
 
-  useKiAssistDraftConsumer(editIdx != null, ['maengel', 'text'], (d) => {
-    if (d.type === 'maengel') {
-      const lines = maengelLinesFromDraft(d.text)
-      if (!lines.length) return
-      if (lines.length > 1 && (isNew || editIdx === -1)) {
-        onChange([...items, ...lines.map((l) => neuerMangelCheckItem(l, ''))])
-        setEditIdx(null)
-        return
-      }
-      setDraftTitel(lines[0]!)
-      if (lines.length > 1) setDraftNotiz(lines.slice(1).join('\n'))
-      return
-    }
-    if (d.type === 'text') {
-      applyTextDraftToTitelNotiz(d, setDraftTitel, setDraftNotiz)
-    }
-  })
-
   return (
     <div className="abnahme-begeh">
       {items.length === 0 ? (
-        <MockEmpty
-          icon="alert-triangle"
-          title="Keine Mängel"
-          hint="Optional Punkte hinzufügen."
-        />
+        null
       ) : (
         <ul className="abnahme-inline__items">
           {items.map((item, i) => {
@@ -609,36 +413,22 @@ export function AbnahmeMaengelCheckliste({
                   ) : null}
                 </div>
                 <div className="abnahme-inline__item-actions">
-                  <MockEntityRowMenu
-                    title="Mangel"
-                    items={
-                      [
-                        {
-                          icon: 'pencil',
-                          label: 'Bearbeiten',
-                          onClick: () => openEdit(i),
-                        },
-                        'sep',
-                        {
-                          icon: 'trash',
-                          label: 'Löschen',
-                          danger: true,
-                          onClick: () => {
-                            const preview =
-                              [item.titel.trim() || 'Mangel', item.notiz.trim()]
-                                .filter(Boolean)
-                                .join('\n')
-                                .slice(0, 240) || 'Mangel'
-                            openDeleteConfirm(
-                              'Mangel löschen?',
-                              () => onChange(items.filter((_, j) => j !== i)),
-                              { body: preview }
-                            )
-                          },
-                        },
-                      ] satisfies EntityMenuItem[]
+                  <MockBtn className="abnahme-inline__icon-btn" type="button" title="Bearbeiten" aria-label="Mangel bearbeiten" onClick={() => openEdit(i)}>
+                    <MockIcon ctx="btn" n="pencil" size={15} />
+                  </MockBtn>
+                  <MockBtn
+                    className="abnahme-inline__icon-btn"
+                    type="button"
+                    title="Löschen"
+                    aria-label="Mangel löschen"
+                    onClick={() =>
+                      openDeleteConfirm('Mangel löschen?', () => onChange(items.filter((_, j) => j !== i)), {
+                        body: item.titel.trim() || 'Mangel',
+                      })
                     }
-                  />
+                  >
+                    <MockIcon ctx="btn" n="trash" size={15} />
+                  </MockBtn>
                 </div>
               </li>
             )
@@ -652,43 +442,24 @@ export function AbnahmeMaengelCheckliste({
       </MockBtn>
 
       <EditorSheet
-        primary={{ label: 'Speichern', onClick: confirm, disabled: Boolean(uploading || (!draftTitel.trim() && !draftNotiz.trim() && !draftFotos.length)) }}
+        primary={{ label: isNew || editIdx === -1 ? 'Hinzufügen' : 'Speichern', onClick: confirm, disabled: Boolean(uploading || !draftTitel.trim()) }}
         open={editIdx != null}
         onClose={() => setEditIdx(null)}
         title={isNew || editIdx === -1 ? 'Mangel hinzufügen' : 'Mangel bearbeiten'}
         context="canvas"
         size="md"
-        headerEnd={
-          <div className="flex items-center gap-1">
-            <KiAssistIconButton
-              overSheet
-              scope="mangel"
-              title="Mangel mit KI formulieren"
-              extraHint="Abnahmeprotokoll: Mängel klar und prüfbar (Ort + Mangel). Ein Punkt oder Liste."
-              draftInput={[draftTitel.trim(), draftNotiz.trim()].filter(Boolean).join('\n') || null}
-            />
-          </div>
-        }
       >
         <div className="form-grid form-grid--sheet">
-          <KiAssistFieldLabel
-            label="Titel"
-            value={draftTitel}
-            onApply={setDraftTitel}
-            extraHint="Kurzer Mangel-Titel fürs Abnahmeprotokoll."
-          >
-            <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder="z. B. Dichtung nachziehen" />
-          </KiAssistFieldLabel>
-          <KiAssistFieldLabel
-            label="Notiz (optional)"
-            value={draftNotiz}
-            onApply={setDraftNotiz}
-            extraHint="Details zur Nacharbeit im Protokoll."
-          >
-            <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} placeholder="Details zur Nacharbeit…" rows={14} className="resize-y py-2 ta--long" />
-          </KiAssistFieldLabel>
+          <MockField label="Mangel" required>
+            <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder="z. B. Silikonfuge an der Wanne nacharbeiten" autoFocus />
+          </MockField>
+          {draftNotiz.trim() ? (
+            <MockField label="Beschreibung">
+              <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} rows={3} className="resize-y py-2" />
+            </MockField>
+          ) : null}
           <div>
-            <span className="lt-field-lbl">Fotos (optional)</span>
+            <span className="lt-field-lbl">Fotos</span>
             {draftFotos.length < MAX_MANGEL_FOTOS ? (
               <FotoDropZone
                 disabled={uploading || !auftragId}
@@ -724,9 +495,6 @@ export function AbnahmeMaengelCheckliste({
                 ))}
               </div>
             ) : null}
-            <p className="mt-1.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-              Max. {MAX_MANGEL_FOTOS} Fotos · werden fürs Protokoll optimiert
-            </p>
           </div>
         </div>
       </EditorSheet>

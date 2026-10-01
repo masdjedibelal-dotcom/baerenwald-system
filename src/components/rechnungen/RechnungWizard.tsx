@@ -842,7 +842,6 @@ export function RechnungWizard({
         } else if (opts?.notify) {
           toast.autoSaved({ label: 'Entwurf' })
         }
-        if (korrekturSession) korrekturSessionKeptRef.current = true
         setMeta(nextMeta)
         savedSnapshotRef.current = draftSnapshot
         setDraftDirty(false)
@@ -946,7 +945,6 @@ export function RechnungWizard({
       setDraftDirty(false)
       setLastSavedAt(Date.now())
       if (opts?.notify) toast.autoSaved({ label: 'Entwurf' })
-      if (korrekturSession) korrekturSessionKeptRef.current = true
       return res.versandRechnungId
     } catch (e) {
       if (!silent) {
@@ -1495,9 +1493,14 @@ export function RechnungWizard({
         onClose={() => {
           void closeWizardClean()
         }}
-        onSaveDraftClose={() => {
-          void handleSaveDraftAndClose()
-        }}
+        // Rechnung ändern (Storno + neu): nur ganz oder gar nicht — kein Zwischen-Entwurf
+        onSaveDraftClose={
+          korrekturSession
+            ? undefined
+            : () => {
+                void handleSaveDraftAndClose()
+              }
+        }
         headerEnd={headerEnd}
         busy={saving}
         busyLabel="Bitte warten…"
@@ -1507,14 +1510,18 @@ export function RechnungWizard({
         manageHistory={false}
         draftDirty={draftDirty}
         lastSavedAt={lastSavedAt}
-        draftAction={{
-          onClick: () => {
-            if (saving || (hasPlan && !planOk)) return
-            void handleFinish(false)
-          },
-          busy: saving,
-          disabled: hasPlan && !planOk,
-        }}
+        draftAction={
+          korrekturSession
+            ? undefined
+            : {
+                onClick: () => {
+                  if (saving || (hasPlan && !planOk)) return
+                  void handleFinish(false)
+                },
+                busy: saving,
+                disabled: hasPlan && !planOk,
+              }
+        }
         primaryAction={{
           label: 'Weiter: Prüfen',
           onClick: () => {

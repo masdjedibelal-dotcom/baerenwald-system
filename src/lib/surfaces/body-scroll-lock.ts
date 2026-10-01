@@ -8,6 +8,7 @@
 
 let depth = 0
 let savedScrollY = 0
+let savedWindowY = 0
 let savedHtmlOverflow = ''
 let savedBody = {
   overflow: '',
@@ -102,7 +103,9 @@ export function acquireBodyScrollLock(): () => void {
     const body = document.body
     const page = document.querySelector<HTMLElement>('main.page')
 
-    savedScrollY = readScrollY()
+    const windowY = readScrollY()
+    savedScrollY = windowY
+    savedWindowY = windowY
     if (page && pageIsScrollContainer(page) && page.scrollTop > savedScrollY) {
       savedScrollY = page.scrollTop
     }
@@ -122,7 +125,9 @@ export function acquireBodyScrollLock(): () => void {
     html.style.overflow = 'hidden'
     body.style.overflow = 'hidden'
     body.style.position = 'fixed'
-    body.style.top = `-${savedScrollY}px`
+    // Nur um den Fenster-Scroll verschieben — scrollt `main.page` selbst, bleibt der Body stehen
+    // (sonst springt die Seite hoch und unten erscheint ein leerer grauer Balken).
+    body.style.top = `-${windowY}px`
     body.style.left = '0'
     body.style.right = '0'
     body.style.width = '100%'
@@ -156,15 +161,16 @@ export function acquireBodyScrollLock(): () => void {
 
     const y = savedScrollY
     // Nach position:fixed: Scroll + Chrome (Nav/CTA/Safe-Area) im nächsten Frame syncen
+    const wy = savedWindowY
     window.requestAnimationFrame(() => {
-      window.scrollTo(0, y)
+      window.scrollTo(0, wy)
       if (page && pageWasScrollContainer) {
         page.scrollTop = y
       }
       syncScrollChrome()
       // iOS: zweiter Pass nach Layout/Safe-Area
       window.requestAnimationFrame(() => {
-        window.scrollTo(0, y)
+        window.scrollTo(0, wy)
         syncScrollChrome()
       })
     })

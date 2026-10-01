@@ -25,7 +25,7 @@ import { toast } from '@/components/ui/app-toast'
 
 const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
   gesendet: { label: 'Gesendet', kind: 'warten' },
-  angenommen: { label: 'Läuft', kind: 'aktiv' },
+  angenommen: { label: 'In Bearbeitung', kind: 'aktiv' },
   abgelehnt: { label: 'Abgelehnt', kind: 'storniert' },
   fertig: { label: 'Fertig', kind: 'fertig' },
 }

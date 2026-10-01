@@ -1,10 +1,7 @@
 'use client'
-import { MockBtn } from '@/components/mock-ui'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
 import {
@@ -12,23 +9,18 @@ import {
   loadRechnungWizardBootstrapStandalone,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
-import { cn } from '@/lib/utils'
-import { TOAST } from '@/lib/copy'
 
 /**
- * Mobil: Bottom-Sheet öffnet genau unter dem Sticky-CTA.
- * Ohne Guard trifft der gleiche Touch die erste Option → versehentliche Korrektur.
+ * „Rechnung bearbeiten“ bei gesendeter Rechnung: ohne Rückfrage Storno + Ersatz-Entwurf
+ * vorbereiten und direkt in den Wizard. Bricht man dort ab, verwirft der Wizard alles
+ * (Original wieder wie vorher). Keine Auswahl „zusätzliche Rechnung“ mehr.
  */
-const INTERACT_DELAY_MS = 450
-
 export function RechnungKorrekturWahlModal({
   open,
   onClose,
   rechnungId,
   auftragId,
-  rechnungsnummer,
   onKorrigieren,
-  onNeueRechnung,
 }: {
   open: boolean
   onClose: () => void
@@ -36,127 +28,45 @@ export function RechnungKorrekturWahlModal({
   auftragId?: string | null
   rechnungsnummer?: string | null
   onKorrigieren: (bootstrap: RechnungWizardBootstrap) => void
-  onNeueRechnung: () => void
+  /** Veraltet — keine Auswahl mehr. */
+  onNeueRechnung?: () => void
 }) {
-  const [pending, startTransition] = useTransition()
-  const [mode, setMode] = useState<'korrigieren' | 'neu' | null>(null)
-  const [interactReady, setInteractReady] = useState(false)
-  const nr = rechnungsnummer?.trim() || 'diese Rechnung'
+  const [, startTransition] = useTransition()
+  const runningRef = useRef(false)
 
   useEffect(() => {
-    if (!open) {
-      setMode(null)
-      setInteractReady(false)
-      return
-    }
-    setInteractReady(false)
-    const t = window.setTimeout(() => setInteractReady(true), INTERACT_DELAY_MS)
-    return () => window.clearTimeout(t)
-  }, [open])
-
-  function starteKorrigieren() {
-    if (!interactReady || pending) return
-    setMode('korrigieren')
+    if (!open || runningRef.current) return
+    runningRef.current = true
     startTransition(async () => {
-      // Gesendet/Bezahlt: Storno-Gutschrift + Ersatz-Entwurf, dann Wizard auf dem Entwurf
-      const korr = await korrigiereRechnung(rechnungId)
-      if (!korr.ok) {
-        setMode(null)
-        toast.systemError(korr)
-        return
-      }
-
-      const targetId = korr.mode === 'storno_neu' ? korr.neuId : rechnungId
-      const res = auftragId?.trim()
-        ? await loadRechnungWizardBootstrap(targetId, auftragId.trim())
-        : await loadRechnungWizardBootstrapStandalone(targetId)
-      setMode(null)
-      if (!res.ok) {
-        toast.systemError(res)
-        return
-      }
-      if (korr.mode === 'storno_neu') {
-        res.bootstrap.korrekturSession = {
-          originalId: rechnungId,
-          gutschriftId: korr.stornoId,
-          neuId: korr.neuId,
-          originalStatus: korr.originalStatus,
+      try {
+        const korr = await korrigiereRechnung(rechnungId)
+        if (!korr.ok) {
+          toast.systemError(korr)
+          return
         }
-        if (!korr.resumed) {
-          toast.success(TOAST.korrektur_entwurf_angelegt_bitte_pruefen_und_ers)
+        const targetId = korr.mode === 'storno_neu' ? korr.neuId : rechnungId
+        const res = auftragId?.trim()
+          ? await loadRechnungWizardBootstrap(targetId, auftragId.trim())
+          : await loadRechnungWizardBootstrapStandalone(targetId)
+        if (!res.ok) {
+          toast.systemError(res)
+          return
         }
+        if (korr.mode === 'storno_neu') {
+          res.bootstrap.korrekturSession = {
+            originalId: rechnungId,
+            gutschriftId: korr.stornoId,
+            neuId: korr.neuId,
+            originalStatus: korr.originalStatus,
+          }
+        }
+        onKorrigieren(res.bootstrap)
+      } finally {
+        runningRef.current = false
+        onClose()
       }
-      onClose()
-      onKorrigieren(res.bootstrap)
     })
-  }
+  }, [open, rechnungId, auftragId, onKorrigieren, onClose, startTransition])
 
-  function starteNeu() {
-    if (!interactReady || pending) return
-    setMode('neu')
-    onClose()
-    onNeueRechnung()
-    setMode(null)
-  }
-
-  return (
-    <EditorSheet
-      open={open}
-      onClose={() => !pending && onClose()}
-      title="Rechnung ändern"
-      subtitle={nr}
-      size="md"
-      secondary={{ label: 'Abbrechen', onClick: onClose, disabled: pending, kind: 'ghost' }}
-      primary={{
-        label: pending
-          ? mode === 'korrigieren'
-            ? 'Wird vorbereitet…'
-            : 'Lädt…'
-          : mode === 'korrigieren'
-            ? 'Weiter'
-            : mode === 'neu'
-              ? 'Weiter'
-              : 'Weiter',
-        disabled: !interactReady || pending || !mode,
-        busy: pending,
-        onClick: () => {
-          if (mode === 'korrigieren') starteKorrigieren()
-          else if (mode === 'neu') starteNeu()
-        },
-      }}
-    >
-
-      <div
-        className="doctype-row doctype-row--stack"
-        style={!interactReady ? { pointerEvents: 'none', opacity: 0.72 } : undefined}
-        aria-busy={!interactReady || undefined}
-      >
-        <MockBtn className={cn(
-            'doctype-radio-opt doctype-radio-opt--block',
-            mode === 'korrigieren' && 'on'
-          )} type="button" disabled={pending || !interactReady} onClick={() => setMode('korrigieren')}>
-          <span className="dot" />
-          <span className="doctype-radio-opt__copy">
-            <span className="lbl" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-              Diese Rechnung ändern
-            </span>
-            <span className="hint">Wird storniert und neu erstellt. Sie senden die neue danach.</span>
-          </span>
-        </MockBtn>
-
-        <MockBtn className={cn(
-            'doctype-radio-opt doctype-radio-opt--block',
-            mode === 'neu' && 'on'
-          )} type="button" disabled={pending || !interactReady} onClick={() => setMode('neu')}>
-          <span className="dot" />
-          <span className="doctype-radio-opt__copy">
-            <span className="lbl" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-              Zusätzliche Rechnung
-            </span>
-            <span className="hint">Für weitere Leistungen. Diese Rechnung bleibt.</span>
-          </span>
-        </MockBtn>
-      </div>
-    </EditorSheet>
-  )
+  return null
 }
