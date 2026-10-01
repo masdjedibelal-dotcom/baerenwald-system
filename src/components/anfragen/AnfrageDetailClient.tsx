@@ -783,6 +783,8 @@ export function AnfrageDetailClient({
       orgFreigabeStatus: lead.org_freigabe_status,
       hvMeldungStatus: lead.hv_meldung_status,
     })
+    // „Beauftragt“ entfällt — dass es weitergeht, zeigt die Phasenleiste
+    if (s.label === 'Beauftragt') return null
     return (
       <span className="inline-flex flex-wrap items-center gap-1.5">
         <StatusBadge status={lead.status} label={s.label} />

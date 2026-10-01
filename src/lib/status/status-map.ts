@@ -56,7 +56,8 @@ export const ANGEBOT_STATUS_MAP = {
   angenommen: { label: 'Angenommen' },
   kunde_akzeptiert: { label: 'Angenommen' },
   abgelehnt: { label: 'Abgelehnt' },
-  abgelaufen: { label: 'Abgelaufen' },
+  // Abgelaufen ist kein eigener Stand, sondern ein roter Hinweis auf „Beim Kunden“ (Ton kommt aus status-tone)
+  abgelaufen: { label: 'Beim Kunden' },
   ersetzt: { label: 'Ersetzt' },
   storniert: { label: 'Abgelehnt' },
 } as const satisfies Record<string, StatusMapEntry>

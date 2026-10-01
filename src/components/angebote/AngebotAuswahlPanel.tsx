@@ -57,7 +57,8 @@ export function AngebotAuswahlPanel({
 
   const rows = useMemo(
     () =>
-      [...angebote].sort((a, b) => {
+      // Ersetzte Fassungen nicht anzeigen — sie liegen nur noch in der Akte
+      angebote.filter((x) => String(x.status_einfach ?? '').toLowerCase() !== 'ersetzt').sort((a, b) => {
         const aBearbeitbar = angebotDarfImWizardBearbeitetWerden(a.status) ? 0 : 1
         const bBearbeitbar = angebotDarfImWizardBearbeitetWerden(b.status) ? 0 : 1
         if (aBearbeitbar !== bBearbeitbar) return aBearbeitbar - bBearbeitbar
