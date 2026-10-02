@@ -268,7 +268,8 @@ export function RechnungWizard({
   const hatAuftrag = Boolean(bootstrap.auftragId?.trim())
   const istDirektrechnung = !hatAuftrag || Boolean(bootstrap.standalone)
   /** Neu: Art der Leistung vor dem Wizard (nicht im Dokument-Sheet). */
-  const needsArtGate = !bootstrap.rechnungId
+  // Aus einem Auftrag ist die Art schon bekannt — nur Direktrechnung fragt nach
+  const needsArtGate = !bootstrap.rechnungId && istDirektrechnung
   const [artGateOpen, setArtGateOpen] = useState(needsArtGate)
   const auftragLabel =
     bootstrap.auftragsReferenz?.trim() ||

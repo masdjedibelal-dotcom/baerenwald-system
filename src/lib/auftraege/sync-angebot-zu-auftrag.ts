@@ -1,4 +1,4 @@
-import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
+import { anfrageTitel, angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import 'server-only'
 
 import { logDbError } from '@/lib/errors/log-db-error'
@@ -218,7 +218,7 @@ export async function syncAngebotPositionenZuAuftrag(input: {
   if (gewerkNamen.length) {
     const { data: auftrag, error } = await supabaseAdmin
       .from('auftraege')
-      .select('titel, angebot_id, kunden(name)')
+      .select('titel, angebot_id, lead_id, kunden(name)')
       .eq('id', auftragId)
       .maybeSingle()
     if (error) logDbError('lib/auftraege/sync-angebot-zu-auftrag:auftraege', error)
@@ -236,6 +236,18 @@ export async function syncAngebotPositionenZuAuftrag(input: {
           .maybeSingle()
         const t = angebotTitelOderSituationBereich({ angebot: ang ?? null })
         if (t && t !== 'Vorgang') angebotTitel = t
+      }
+      // Ohne Angebotstitel: Titel der Anfrage (Vorhaben bzw. Situation · Bereich), erst dann Gewerke
+      if (!angebotTitel) {
+        const leadId = String((auftrag as { lead_id?: string | null }).lead_id ?? '').trim()
+        if (leadId) {
+          const { data: lead } = await supabaseAdmin
+            .from('leads')
+            .select('funnel_daten, situation, bereiche')
+            .eq('id', leadId)
+            .maybeSingle()
+          angebotTitel = (lead ? anfrageTitel(lead) : null) ?? ''
+        }
       }
       const titel = (angebotTitel || `${gewerkNamen.join(', ')} — ${kunde?.name ?? 'Kunde'}`).slice(0, 240)
       const { error: __dbErr1 } = await supabaseAdmin.from('auftraege').update({ titel }).eq('id', auftragId)

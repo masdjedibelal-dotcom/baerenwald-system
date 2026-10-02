@@ -596,10 +596,33 @@ export function AuftragDetailClient({
         return
       }
 
-      // Zwischenschritt: Bottom Card (Liste oder Leer + Neu)
+      // Noch keine (gültige) Rechnung → direkt in die Rechnung, ohne leere Auswahl
+      const vorhandene = rechnungenListe.filter(
+        (r) => String((r as { status?: string | null }).status ?? '') !== 'storniert'
+      )
+      if (!vorhandene.length) {
+        startTransition(() => {
+          void (async () => {
+            const res = await loadRechnungWizardBootstrapFromAuftrag(detail.id, { naechsterAbschlag: true })
+            if (res.ok) {
+              openRechnungWizard(res.bootstrap)
+              return
+            }
+            const fallback = await loadRechnungWizardBootstrapFromAuftrag(detail.id)
+            if (!fallback.ok) {
+              toast.systemError(fallback)
+              return
+            }
+            openRechnungWizard(fallback.bootstrap)
+          })()
+        })
+        return
+      }
+
+      // Zwischenschritt: vorhandene Rechnungen weiterbearbeiten oder neue
       setRechnungAuswahlOpen(true)
     },
-    [detail.id, openRechnungWizard]
+    [detail.id, openRechnungWizard, rechnungenListe]
   )
 
   useEffect(() => {
