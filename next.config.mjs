@@ -23,6 +23,8 @@ const nextConfig = {
     return config
   },
   experimental: {
+    /** Fotos/PDFs aus „Für den Partner eintragen“ (Einsätze) — wie im Portal */
+    serverActions: { bodySizeLimit: '10mb' },
     serverComponentsExternalPackages: ['puppeteer-core', '@puppeteer/browsers', '@sparticuz/chromium', 'archiver'],
     /** Sparticuz-Binaries für Angebot-PDF auf Netlify/Lambda mit deployen */
     outputFileTracingIncludes: {

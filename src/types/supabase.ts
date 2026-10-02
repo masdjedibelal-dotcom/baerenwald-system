@@ -2886,6 +2886,9 @@ export type Database = {
           abgelehnt_at: string | null
           ablehnung_grund: string | null
           angenommen_at: string | null
+          angenommen_von: string | null
+          fertig_von: string | null
+          rechnung_von: string | null
           anweisung: string | null
           auftrag_id: string
           created_at: string
@@ -2914,6 +2917,9 @@ export type Database = {
           abgelehnt_at?: string | null
           ablehnung_grund?: string | null
           angenommen_at?: string | null
+          angenommen_von?: string | null
+          fertig_von?: string | null
+          rechnung_von?: string | null
           anweisung?: string | null
           auftrag_id: string
           created_at?: string
@@ -2942,6 +2948,9 @@ export type Database = {
           abgelehnt_at?: string | null
           ablehnung_grund?: string | null
           angenommen_at?: string | null
+          angenommen_von?: string | null
+          fertig_von?: string | null
+          rechnung_von?: string | null
           anweisung?: string | null
           auftrag_id?: string
           created_at?: string

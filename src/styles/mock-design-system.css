@@ -22324,3 +22324,11 @@ display: flex;
   color: var(--text-2);
   white-space: nowrap;
 }
+
+/* Einsatz: für den Partner eintragen (Telefon/WhatsApp) */
+.einsatz-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}

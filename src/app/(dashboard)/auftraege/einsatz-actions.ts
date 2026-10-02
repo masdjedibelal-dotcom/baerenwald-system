@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { logDbError } from '@/lib/errors/log-db-error'
@@ -12,6 +13,8 @@ import {
   markEinsatzUpdatesGesehen,
   writeEinsatzMitteilungStatus,
 } from '@/lib/status/write-einsatz-mitteilung-status'
+import { planAuftragStatusWrite } from '@/lib/status/write-auftrag-status'
+import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
 
 /** Bucket der Partner-Uploads (Portal `PARTNER_UPLOAD_BUCKET`). */
 const PARTNER_UPLOAD_BUCKET = 'handwerker-uploads'
@@ -38,6 +41,11 @@ export type EinsatzZeile = {
   ek_art: 'netto' | 'brutto'
   status: EinsatzStatus
   gesendet_at: string
+  angenommen_at: string | null
+  /** Wer welchen Schritt erfasst hat: Partner (null/'partner') oder Bärenwald ('bw'). */
+  angenommen_von: 'partner' | 'bw' | null
+  fertig_von: 'partner' | 'bw' | null
+  rechnung_von: 'partner' | 'bw' | null
   ablehnung_grund: string | null
   fertig_at: string | null
   fertig_text: string | null
@@ -62,6 +70,7 @@ export type EinsatzMitteilung = {
   status: 'offen' | 'uebernommen' | 'erledigt'
   dateien: { name: string; url: string }[]
   created_at: string
+  erfasst_von: 'partner' | 'bw' | null
 }
 
 export type EinsatzPartnerOption = { id: string; label: string; email: string | null }
@@ -75,7 +84,7 @@ export type EinsatzVorbelegung = {
 }
 
 const SELECT =
-  'id, auftrag_id, handwerker_id, titel, anweisung, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, gesendet_at, ablehnung_grund, fertig_at, fertig_text, fertig_dateien, rechnung_pdf_url, rechnung_betrag, rechnung_eingereicht_at, handwerker(name, firma)'
+  'id, auftrag_id, handwerker_id, titel, anweisung, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, gesendet_at, angenommen_at, angenommen_von, fertig_von, rechnung_von, ablehnung_grund, fertig_at, fertig_text, fertig_dateien, rechnung_pdf_url, rechnung_betrag, rechnung_eingereicht_at, handwerker(name, firma)'
 
 function partnerLabel(hw: { name?: string | null; firma?: string | null } | null | undefined): string {
   return hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
@@ -102,6 +111,10 @@ function mapZeile(r: Record<string, unknown>): EinsatzZeile {
     ek_art: r.ek_art === 'brutto' ? 'brutto' : 'netto',
     status: (String(r.status ?? 'gesendet') as EinsatzStatus) ?? 'gesendet',
     gesendet_at: String(r.gesendet_at ?? ''),
+    angenommen_at: (r.angenommen_at as string | null) ?? null,
+    angenommen_von: r.angenommen_von === 'bw' ? 'bw' : r.angenommen_von === 'partner' ? 'partner' : null,
+    fertig_von: r.fertig_von === 'bw' ? 'bw' : r.fertig_von === 'partner' ? 'partner' : null,
+    rechnung_von: r.rechnung_von === 'bw' ? 'bw' : r.rechnung_von === 'partner' ? 'partner' : null,
     ablehnung_grund: (r.ablehnung_grund as string | null) ?? null,
     fertig_at: (r.fertig_at as string | null) ?? null,
     fertig_text: (r.fertig_text as string | null) ?? null,
@@ -156,7 +169,7 @@ export async function listEinsaetze(
   if (einsaetze.length) {
     const { data: mitt, error: mErr } = await gate.db
       .from('einsatz_mitteilungen')
-      .select('id, einsatz_id, typ, text, stunden, status, dateien, created_at')
+      .select('id, einsatz_id, typ, text, stunden, status, dateien, created_at, erfasst_von')
       .eq('auftrag_id', auftragId)
       .order('created_at', { ascending: true })
     if (mErr) logDbError('app/auftraege/einsatz-actions:mitteilungen', mErr)
@@ -171,6 +184,7 @@ export async function listEinsaetze(
         status: (String(m.status) as EinsatzMitteilung['status']) || 'offen',
         dateien: await signiereDateien(m.dateien),
         created_at: String(m.created_at ?? ''),
+        erfasst_von: m.erfasst_von === 'bw' ? 'bw' : null,
       })
     }
   }
@@ -282,6 +296,8 @@ export async function createEinsatz(input: {
   kontaktVorOrt?: string | null
   ekBetrag?: number | null
   ekArt: 'netto' | 'brutto'
+  /** Telefonisch vergeben: keine Mail, Einsatz gilt als angenommen (von Bärenwald eingetragen). */
+  ohneMail?: boolean
 }): Promise<{ ok: true; einsatz: EinsatzZeile; mailGesendet: boolean } | { ok: false; message: string }> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
@@ -302,7 +318,8 @@ export async function createEinsatz(input: {
       kontakt_vor_ort: input.kontaktVorOrt?.trim() || null,
       ek_betrag: input.ekBetrag != null && input.ekBetrag > 0 ? Math.round(input.ekBetrag * 100) / 100 : null,
       ek_art: input.ekArt === 'brutto' ? 'brutto' : 'netto',
-      status: 'gesendet',
+      status: input.ohneMail ? 'angenommen' : 'gesendet',
+      ...(input.ohneMail ? { angenommen_at: new Date().toISOString(), angenommen_von: 'bw' } : {}),
       erstellt_von: gate.user.id,
     })
     .select(SELECT)
@@ -312,6 +329,17 @@ export async function createEinsatz(input: {
     return { ok: false, message: 'Einsatz konnte nicht angelegt werden.' }
   }
   const einsatz = mapZeile(data as Record<string, unknown>)
+
+  if (input.ohneMail) {
+    // Wie „Partner hat angenommen“: Auftrag läuft
+    await gate.db
+      .from('auftraege')
+      .update(planAuftragStatusWrite('in_arbeit'))
+      .eq('id', input.auftragId)
+      .eq('status', 'offen')
+    revalidatePath(`/auftraege/${input.auftragId}`)
+    return { ok: true, einsatz, mailGesendet: false }
+  }
 
   // Mail an den Partner — Einsatz ist angelegt, auch wenn die Mail scheitert (Hinweis im CRM).
   let mailGesendet = false
@@ -376,5 +404,197 @@ export async function zurueckziehenEinsatz(
     return { ok: false, message: 'Einsatz konnte nicht zurückgezogen werden.' }
   }
   revalidatePath(`/auftraege/${String(row.auftrag_id)}`)
+  return { ok: true }
+}
+
+/* ── Für den Partner eintragen (nach Telefon/WhatsApp) ──────────────────────────
+ * Schreibt dasselbe wie das Partner-Portal, markiert aber „von Bärenwald“ (…_von = 'bw').
+ */
+
+type ErfassenResult = { ok: true } | { ok: false; message: string }
+
+async function ladeEinsatzKurz(db: SupabaseClient, einsatzId: string) {
+  const { data, error } = await db
+    .from('einsaetze')
+    .select('id, auftrag_id, handwerker_id, status, rechnung_eingereicht_at')
+    .eq('id', einsatzId)
+    .maybeSingle()
+  if (error) logDbError('app/auftraege/einsatz-actions:kurz', error)
+  return data as
+    | { id: string; auftrag_id: string; handwerker_id: string; status: string; rechnung_eingereicht_at: string | null }
+    | null
+}
+
+/** Dateien wie im Partner-Portal ablegen (gleicher Bucket/Pfad), damit beide Seiten sie gleich zeigen. */
+async function ladeDateienHoch(
+  db: SupabaseClient,
+  handwerkerId: string,
+  einsatzId: string,
+  files: File[],
+  ordner: 'mitteilung' | 'fertig' | 'rechnung'
+): Promise<{ ok: true; dateien: { name: string; path: string }[] } | { ok: false; message: string }> {
+  const out: { name: string; path: string }[] = []
+  for (const file of files) {
+    const mime = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg')
+    const ext = mime === 'application/pdf' ? 'pdf' : mime.split('/')[1] || 'jpg'
+    const path = `${handwerkerId}/einsatz/${einsatzId}/${ordner}/${crypto.randomUUID()}.${ext}`
+    const { error } = await db.storage
+      .from(PARTNER_UPLOAD_BUCKET)
+      .upload(path, Buffer.from(await file.arrayBuffer()), { contentType: mime, upsert: false })
+    if (error) {
+      logDbError('app/auftraege/einsatz-actions:upload', error)
+      return { ok: false, message: 'Datei konnte nicht hochgeladen werden.' }
+    }
+    out.push({ name: file.name || 'Datei', path })
+  }
+  return { ok: true, dateien: out }
+}
+
+function dateienAus(formData: FormData, feld: string): File[] {
+  return formData.getAll(feld).filter((f): f is File => f instanceof File && f.size > 0)
+}
+
+function betragAus(formData: FormData): number | null {
+  const n = Number(String(formData.get('rechnungBetrag') ?? '').replace(',', '.'))
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null
+}
+
+/** Partner hat zugesagt bzw. abgesagt (z. B. am Telefon). */
+export async function einsatzRueckmeldungErfassen(
+  einsatzId: string,
+  antwort: 'angenommen' | 'abgelehnt',
+  grund?: string
+): Promise<ErfassenResult> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const e = await ladeEinsatzKurz(gate.db, einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  const now = new Date().toISOString()
+  if (antwort === 'abgelehnt' && !grund?.trim()) return { ok: false, message: 'Bitte kurz den Grund angeben.' }
+  const w = await writeEinsatzStatus(gate.db, {
+    einsatzId,
+    von: 'gesendet',
+    nach: antwort,
+    extra:
+      antwort === 'angenommen'
+        ? { angenommen_at: now, angenommen_von: 'bw' }
+        : { abgelehnt_at: now, ablehnung_grund: grund!.trim() },
+  })
+  if (!w.ok) return { ok: false, message: w.error }
+  revalidatePath(`/auftraege/${e.auftrag_id}`)
+  return { ok: true }
+}
+
+/** Update des Partners eintragen (Text und/oder Fotos, z. B. aus WhatsApp). */
+export async function einsatzUpdateErfassen(formData: FormData): Promise<ErfassenResult> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const einsatzId = String(formData.get('einsatzId') ?? '').trim()
+  const text = String(formData.get('text') ?? '').trim()
+  const files = dateienAus(formData, 'dateien')
+  const e = await ladeEinsatzKurz(gate.db, einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  if (e.status !== 'angenommen') return { ok: false, message: 'Updates sind möglich, solange der Einsatz läuft.' }
+  if (!text && !files.length) return { ok: false, message: 'Bitte einen Text oder ein Foto hinzufügen.' }
+  const up = await ladeDateienHoch(gate.db, e.handwerker_id, einsatzId, files, 'mitteilung')
+  if (!up.ok) return up
+  const { error } = await gate.db.from('einsatz_mitteilungen').insert({
+    einsatz_id: einsatzId,
+    auftrag_id: e.auftrag_id,
+    handwerker_id: e.handwerker_id,
+    typ: 'update',
+    text,
+    dateien: up.dateien,
+    // Von Bärenwald eingetragen = schon gelesen
+    status: 'erledigt',
+    erledigt_at: new Date().toISOString(),
+    erfasst_von: 'bw',
+  })
+  if (error) {
+    logDbError('app/auftraege/einsatz-actions:update-erfassen', error)
+    return { ok: false, message: 'Update konnte nicht gespeichert werden.' }
+  }
+  revalidatePath(`/auftraege/${e.auftrag_id}`)
+  return { ok: true }
+}
+
+/** Rechnungsfelder aus Formular (PDF oder Betrag) — gemeinsam für „Fertig“ und „Rechnung nachreichen“. */
+async function rechnungPatch(
+  db: SupabaseClient,
+  e: { id: string; handwerker_id: string },
+  formData: FormData
+): Promise<{ ok: true; patch: Record<string, unknown> | null } | { ok: false; message: string }> {
+  const pdf = dateienAus(formData, 'rechnungPdf')[0]
+  const betrag = betragAus(formData)
+  if (!pdf && !betrag) return { ok: true, patch: null }
+  let pfad: string | null = null
+  if (pdf) {
+    const up = await ladeDateienHoch(db, e.handwerker_id, e.id, [pdf], 'rechnung')
+    if (!up.ok) return up
+    pfad = up.dateien[0]?.path ?? null
+  }
+  return {
+    ok: true,
+    patch: {
+      rechnung_pdf_url: pfad,
+      rechnung_betrag: betrag,
+      rechnung_positionen: betrag ? [{ text: 'Rechnung', betrag }] : null,
+      rechnung_eingereicht_at: new Date().toISOString(),
+      rechnung_von: 'bw',
+    },
+  }
+}
+
+/** Partner ist fertig — optional gleich mit Rechnung (PDF oder Betrag). */
+export async function einsatzFertigErfassen(formData: FormData): Promise<ErfassenResult> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const einsatzId = String(formData.get('einsatzId') ?? '').trim()
+  const text = String(formData.get('text') ?? '').trim() || null
+  const e = await ladeEinsatzKurz(gate.db, einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  if (e.status !== 'angenommen') return { ok: false, message: 'Der Einsatz muss zuerst angenommen sein.' }
+  const up = await ladeDateienHoch(gate.db, e.handwerker_id, einsatzId, dateienAus(formData, 'dateien'), 'fertig')
+  if (!up.ok) return up
+  const re = await rechnungPatch(gate.db, e, formData)
+  if (!re.ok) return re
+  const w = await writeEinsatzStatus(gate.db, {
+    einsatzId,
+    von: 'angenommen',
+    nach: 'fertig',
+    extra: {
+      fertig_at: new Date().toISOString(),
+      fertig_text: text,
+      fertig_dateien: up.dateien,
+      fertig_von: 'bw',
+      ...(re.patch ?? {}),
+    },
+  })
+  if (!w.ok) return { ok: false, message: w.error }
+  revalidatePath(`/auftraege/${e.auftrag_id}`)
+  return { ok: true }
+}
+
+/** Rechnung des Partners nachreichen (PDF oder Betrag). */
+export async function einsatzRechnungErfassen(formData: FormData): Promise<ErfassenResult> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const einsatzId = String(formData.get('einsatzId') ?? '').trim()
+  const e = await ladeEinsatzKurz(gate.db, einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  if (e.status !== 'fertig') return { ok: false, message: 'Die Rechnung ist nach der Fertigmeldung möglich.' }
+  if (e.rechnung_eingereicht_at) return { ok: false, message: 'Die Rechnung ist bereits erfasst.' }
+  const re = await rechnungPatch(gate.db, e, formData)
+  if (!re.ok) return re
+  if (!re.patch) return { ok: false, message: 'Bitte ein PDF hochladen oder den Betrag angeben.' }
+  const { error } = await gate.db
+    .from('einsaetze')
+    .update({ ...re.patch, updated_at: new Date().toISOString() })
+    .eq('id', einsatzId)
+  if (error) {
+    logDbError('app/auftraege/einsatz-actions:rechnung-erfassen', error)
+    return { ok: false, message: 'Rechnung konnte nicht gespeichert werden.' }
+  }
+  revalidatePath(`/auftraege/${e.auftrag_id}`)
   return { ok: true }
 }

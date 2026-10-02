@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from 'react'
 
 import {
   createEinsatz,
+  einsatzFertigErfassen,
+  einsatzRechnungErfassen,
+  einsatzRueckmeldungErfassen,
+  einsatzUpdateErfassen,
   einsatzUpdatesGesehen,
   listEinsaetze,
   loadEinsatzFormular,
@@ -19,6 +23,7 @@ import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/moc
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { DateInput } from '@/components/ui/DateInput'
+import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { safeAction } from '@/lib/actions/safe-action'
 import { formatDatum, formatEuro } from '@/lib/format/geld-datum'
 import { toast } from '@/components/ui/app-toast'
@@ -58,9 +63,25 @@ type VerlaufEintrag = {
 
 /** Alles, was zu einem Einsatz passiert ist, neueste Meldung oben. */
 function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
+  const vonBw = (v: 'partner' | 'bw' | null | undefined) => (v === 'bw' ? ' · von Bärenwald eingetragen' : '')
+  // Telefonisch vergeben: angelegt und im selben Moment als angenommen eingetragen
+  const telefonisch =
+    e.angenommen_von === 'bw' &&
+    Boolean(e.angenommen_at) &&
+    Math.abs(Date.parse(e.angenommen_at ?? '') - Date.parse(e.gesendet_at)) < 60_000
   const liste: VerlaufEintrag[] = [
-    { key: 'gesendet', at: e.gesendet_at, art: 'An Partner gesendet', text: '', dateien: [], neu: false },
+    {
+      key: 'gesendet',
+      at: e.gesendet_at,
+      art: telefonisch ? 'Vergeben und angenommen · von Bärenwald eingetragen' : 'An Partner gesendet',
+      text: '',
+      dateien: [],
+      neu: false,
+    },
   ]
+  if (e.angenommen_at && !telefonisch) {
+    liste.push({ key: 'angenommen', at: e.angenommen_at, art: `Angenommen${vonBw(e.angenommen_von)}`, text: '', dateien: [], neu: false })
+  }
   if (e.status === 'abgelehnt') {
     liste.push({ key: 'abgelehnt', at: e.gesendet_at, art: 'Abgelehnt', text: e.ablehnung_grund ?? '', dateien: [], neu: false })
   }
@@ -69,16 +90,16 @@ function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
       m.typ === 'regie'
         ? `Regie${m.stunden ? `, ${String(m.stunden).replace('.', ',')} Std` : ''}${REGIE_STAND[m.status]}`
         : MELDUNG_LABEL[m.typ]
-    liste.push({ key: m.id, at: m.created_at, art, text: m.text, dateien: m.dateien, neu: m.status === 'offen', m })
+    liste.push({ key: m.id, at: m.created_at, art: `${art}${vonBw(m.erfasst_von)}`, text: m.text, dateien: m.dateien, neu: m.status === 'offen', m })
   }
   if (e.fertig_at) {
-    liste.push({ key: 'fertig', at: e.fertig_at, art: 'Erledigt gemeldet', text: e.fertig_text ?? '', dateien: e.fertig_dateien, neu: false })
+    liste.push({ key: 'fertig', at: e.fertig_at, art: `Erledigt gemeldet${vonBw(e.fertig_von)}`, text: e.fertig_text ?? '', dateien: e.fertig_dateien, neu: false })
   }
   if (e.rechnung_eingereicht_at) {
     liste.push({
       key: 'rechnung',
       at: e.rechnung_eingereicht_at,
-      art: `Rechnung${e.rechnung_betrag != null ? ` ${formatEuro(e.rechnung_betrag)}` : ''}`,
+      art: `Rechnung${e.rechnung_betrag != null ? ` ${formatEuro(e.rechnung_betrag)}` : ''}${vonBw(e.rechnung_von)}`,
       text: '',
       dateien: e.rechnung_pdf_url ? [{ name: 'PDF öffnen', url: e.rechnung_pdf_url }] : [],
       neu: false,
@@ -112,6 +133,12 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const [detailId, setDetailId] = useState<string | null>(null)
   // Updates, die in dieser Sitzung geöffnet wurden: zählen in der Zeile nicht mehr als neu.
   const [gesehen, setGesehen] = useState<Set<string>>(new Set())
+  /** „Für den Partner eintragen“: welches Formular gerade offen ist */
+  const [erfassen, setErfassen] = useState<null | 'abgelehnt' | 'update' | 'fertig' | 'rechnung'>(null)
+  const [eText, setEText] = useState('')
+  const [eFotos, setEFotos] = useState<File[]>([])
+  const [ePdf, setEPdf] = useState<File | null>(null)
+  const [eBetrag, setEBetrag] = useState(0)
   const detail = einsaetze?.find((e) => e.id === detailId) ?? null
   const setDetail = (e: EinsatzZeile | null) => setDetailId(e?.id ?? null)
 
@@ -156,7 +183,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
     })
   }
 
-  async function senden() {
+  async function senden(ohneMail = false) {
     if (!form) return
     setSaving(true)
     const res = await safeAction(
@@ -171,6 +198,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         kontaktVorOrt: form.kontaktVorOrt,
         ekBetrag: form.ekBetrag || null,
         ekArt: form.ekArt,
+        ohneMail,
       })
     )
     setSaving(false)
@@ -178,7 +206,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       toast.error(res.message)
       return
     }
-    if (!res.mailGesendet) {
+    if (!ohneMail && !res.mailGesendet) {
       toast.error('Einsatz angelegt, aber die Mail an den Partner ging nicht raus. Bitte Partner-E-Mail prüfen.')
     }
     setOpen(false)
@@ -206,6 +234,62 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
     }
     await laden()
   }
+
+  function erfassenOeffnen(art: NonNullable<typeof erfassen>) {
+    setEText('')
+    setEFotos([])
+    setEPdf(null)
+    setEBetrag(0)
+    setErfassen(art)
+  }
+
+  async function angenommenEintragen(id: string) {
+    const res = await safeAction(einsatzRueckmeldungErfassen(id, 'angenommen'))
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    await laden()
+  }
+
+  async function erfassenSpeichern() {
+    if (!detail || !erfassen) return
+    setSaving(true)
+    let res: { ok: true } | { ok: false; message: string }
+    if (erfassen === 'abgelehnt') {
+      res = await safeAction(einsatzRueckmeldungErfassen(detail.id, 'abgelehnt', eText))
+    } else {
+      const fd = new FormData()
+      fd.set('einsatzId', detail.id)
+      fd.set('text', eText)
+      for (const f of eFotos) fd.append('dateien', f)
+      if (ePdf) fd.set('rechnungPdf', ePdf)
+      if (eBetrag > 0) fd.set('rechnungBetrag', String(eBetrag))
+      res = await safeAction(
+        erfassen === 'update'
+          ? einsatzUpdateErfassen(fd)
+          : erfassen === 'fertig'
+            ? einsatzFertigErfassen(fd)
+            : einsatzRechnungErfassen(fd)
+      )
+    }
+    setSaving(false)
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    setErfassen(null)
+    await laden()
+  }
+
+  const erfassenOk =
+    erfassen === 'abgelehnt'
+      ? Boolean(eText.trim())
+      : erfassen === 'update'
+        ? Boolean(eText.trim() || eFotos.length)
+        : erfassen === 'rechnung'
+          ? Boolean(ePdf || eBetrag > 0)
+          : true
 
   const setF = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f))
   const ok = Boolean(form?.handwerkerId && form.titel.trim())
@@ -286,6 +370,32 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 </span>
               </div>
               {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
+              {/* Für den Partner eintragen (Telefon/WhatsApp) — gleiche Schritte wie im Portal */}
+              {detail.status === 'gesendet' ? (
+                <div className="einsatz-aktionen">
+                  <MockBtn sm kind="primary" icon="check" onClick={() => { angenommenEintragen(detail.id) }}>
+                    Hat angenommen
+                  </MockBtn>
+                  <MockBtn sm kind="secondary" onClick={() => erfassenOeffnen('abgelehnt')}>
+                    Hat abgelehnt
+                  </MockBtn>
+                </div>
+              ) : detail.status === 'angenommen' ? (
+                <div className="einsatz-aktionen">
+                  <MockBtn sm kind="primary" icon="check" onClick={() => erfassenOeffnen('fertig')}>
+                    Fertig gemeldet
+                  </MockBtn>
+                  <MockBtn sm kind="secondary" icon="plus" onClick={() => erfassenOeffnen('update')}>
+                    Update erfassen
+                  </MockBtn>
+                </div>
+              ) : detail.status === 'fertig' && !detail.rechnung_eingereicht_at ? (
+                <div className="einsatz-aktionen">
+                  <MockBtn sm kind="primary" icon="file-invoice" onClick={() => erfassenOeffnen('rechnung')}>
+                    Rechnung erfassen
+                  </MockBtn>
+                </div>
+              ) : null}
             </div>
             <div className="einsatz-gruppe">
               <div className="einsatz-gruppe__kopf">
@@ -327,11 +437,76 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       </EditorSheet>
 
       <EditorSheet
+        open={Boolean(erfassen && detail)}
+        onClose={() => setErfassen(null)}
+        title={
+          erfassen === 'abgelehnt'
+            ? 'Hat abgelehnt'
+            : erfassen === 'update'
+              ? 'Update erfassen'
+              : erfassen === 'fertig'
+                ? 'Fertig gemeldet'
+                : 'Rechnung erfassen'
+        }
+        crumb={detail?.partner_name}
+        primary={{
+          label: 'Speichern',
+          disabled: !erfassenOk || saving,
+          busy: saving,
+          onClick: () => { erfassenSpeichern() },
+        }}
+      >
+        {erfassen === 'abgelehnt' ? (
+          <MockField label="Grund" required>
+            <MockTextarea rows={3} value={eText} onChange={(ev) => setEText(ev.target.value)} />
+          </MockField>
+        ) : null}
+        {erfassen === 'update' || erfassen === 'fertig' ? (
+          <>
+            <MockField label={erfassen === 'fertig' ? 'Was wurde gemacht?' : 'Text'}>
+              <MockTextarea rows={3} value={eText} onChange={(ev) => setEText(ev.target.value)} />
+            </MockField>
+            <MockField label="Fotos">
+              <FotoDropZone
+                multiple
+                label={eFotos.length ? `${eFotos.length} Foto(s) ausgewählt` : 'Fotos hinzufügen'}
+                onFiles={(files) => setEFotos((prev) => [...prev, ...files].slice(0, 10))}
+              />
+            </MockField>
+          </>
+        ) : null}
+        {erfassen === 'fertig' || erfassen === 'rechnung' ? (
+          <>
+            <MockField label={erfassen === 'fertig' ? 'Rechnung (PDF, optional)' : 'Rechnung (PDF)'}>
+              <FotoDropZone
+                accept="application/pdf"
+                label={ePdf ? ePdf.name : 'PDF hinzufügen'}
+                onFiles={(files) => setEPdf(files[0] ?? null)}
+              />
+            </MockField>
+            <MockField label="oder Betrag (€)">
+              <ClearableNumberInput
+                className="txt"
+                min={0}
+                value={eBetrag}
+                onValueChange={(v) => setEBetrag(Number(v) || 0)}
+                style={{ textAlign: 'right' }}
+              />
+            </MockField>
+          </>
+        ) : null}
+      </EditorSheet>
+
+      <EditorSheet
         open={open}
         onClose={() => setOpen(false)}
         title="Einsatz anlegen"
-        crumb="Der Partner sieht nur diese Anweisung und den EK, keine Positionen und keine Verkaufspreise."
-        secondary={{ label: 'Abbrechen', disabled: saving, kind: 'ghost' }}
+        secondary={{
+          // Telefonisch vergeben: ohne Mail, gilt als angenommen
+          label: 'Nur eintragen',
+          disabled: !ok || saving,
+          onClick: () => { senden(true) },
+        }}
         primary={{
           label: 'Senden',
           icon: 'send',

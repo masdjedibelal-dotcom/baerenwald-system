@@ -78,6 +78,14 @@
       "portal": "src/types/supabase.ts",
       "rewrite": false,
       "note": "Generierte DB-Typen — keine Import-Rewrite; Portal-Guard check-db-spalten."
+    },
+    {
+      "crm": "src/lib/status/write-helpers.ts",
+      "portal": "src/lib/status/write-helpers.ts"
+    },
+    {
+      "crm": "src/lib/status/write-einsatz-status.ts",
+      "portal": "src/lib/status/write-einsatz-status.ts"
     }
   ],
   "planned": [
