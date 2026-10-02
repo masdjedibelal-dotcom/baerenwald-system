@@ -30,7 +30,6 @@ import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
-import { DirektauftragUnterSchwelleBanner } from '@/components/anfragen/DirektauftragUnterSchwelleBanner'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -859,7 +858,7 @@ export function AngebotDetailPageClient({
         </p>
       ) : null}
 
-      {inhaltGeaendertNachVersand || direktAuftragUnterSchwelleHinweis ? (
+      {inhaltGeaendertNachVersand ? (
         <div className="detail-info-banners">
           {inhaltGeaendertNachVersand ? (
             <div className="detail-info-banner detail-info-banner--warn flex flex-wrap items-center justify-between gap-3">
@@ -876,12 +875,6 @@ export function AngebotDetailPageClient({
                 Korrigierte Fassung senden
               </MockBtn>
             </div>
-          ) : null}
-          {direktAuftragUnterSchwelleHinweis ? (
-            <DirektauftragUnterSchwelleBanner
-              betragEur={direktAuftragUnterSchwelleHinweis.betragEur}
-              schwelleEur={direktAuftragUnterSchwelleHinweis.schwelleEur}
-            />
           ) : null}
         </div>
       ) : null}

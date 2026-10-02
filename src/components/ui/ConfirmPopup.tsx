@@ -33,6 +33,8 @@ export function ConfirmPopup({
   saveDraftLabel = 'Als Entwurf speichern',
   onSaveDraft,
   discardLabel,
+  secondaryLabel,
+  onSecondary,
   busy = false,
   confirmDisabled = false,
 }: {
@@ -49,6 +51,9 @@ export function ConfirmPopup({
   onSaveDraft?: () => void
   /** Label für den Verwerfen-/Schließen-Button (Default = confirmLabel). */
   discardLabel?: string
+  /** Zweite gleichwertige Wahl (z. B. „Ohne Abnahme“) — Schließen bleibt „Abbrechen“. */
+  secondaryLabel?: string
+  onSecondary?: () => void
   /** Speichern läuft — Buttons sperren, Dialog bleibt deckend sichtbar. */
   busy?: boolean
   /** Confirm-Button sperren (z. B. Namens-Confirm noch falsch). */
@@ -105,11 +110,48 @@ export function ConfirmPopup({
         <div
           className={cn(
             'confirm-popup__footer',
-            unsavedClose && 'confirm-popup__footer--stack',
+            (unsavedClose || Boolean(onSecondary && secondaryLabel)) && 'confirm-popup__footer--stack',
             danger && 'confirm-popup__footer--danger'
           )}
         >
-          {unsavedClose ? (
+          {onSecondary && secondaryLabel ? (
+            <>
+              <MockBtn
+                type="button"
+                kind="primary"
+                disabled={confirmBlocked}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (confirmBlocked) return
+                  onConfirm()
+                }}
+              >
+                {confirmLabel}
+              </MockBtn>
+              <MockBtn
+                type="button"
+                kind="secondary"
+                disabled={busy}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSecondary()
+                }}
+              >
+                {secondaryLabel}
+              </MockBtn>
+              <MockBtn
+                type="button"
+                kind="ghost"
+                disabled={busy}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClose()
+                }}
+              >
+                {cancelLabel}
+              </MockBtn>
+            </>
+          ) : unsavedClose ? (
             <>
               <MockBtn
                 type="button"

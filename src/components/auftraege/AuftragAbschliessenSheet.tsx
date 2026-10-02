@@ -4,6 +4,7 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockField, MockTextarea } from '@/components/mock-ui/MockForm'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
   AbnahmeBegehListe,
@@ -275,28 +276,20 @@ export function AuftragAbschliessenSheet({
   }
 
   if (step === 'frage') {
+    // Eine Frage → kleiner Dialog statt Seitenleiste
     return (
-      <EditorSheet
+      <ConfirmPopup
         open={open}
         onClose={onClose}
         title="Auftrag abschließen"
-        size="md"
-        manageHistory={false}
-        secondary={{
-          label: 'Ohne Abnahme',
-          disabled: pending,
-          onClick: abschliessenOhneAbnahme,
-        }}
-        primary={{
-          label: 'Abnahme erstellen',
-          disabled: pending,
-          onClick: openAbnahmeWizard,
-        }}
+        confirmLabel="Abnahme erstellen"
+        onConfirm={openAbnahmeWizard}
+        secondaryLabel="Ohne Abnahme"
+        onSecondary={abschliessenOhneAbnahme}
+        busy={pending}
       >
-        <p className="text-[length:var(--fs-text)] text-[var(--text-2)] leading-relaxed m-0">
-          Mit Abnahmeprotokoll oder direkt abschließen?
-        </p>
-      </EditorSheet>
+        Mit Abnahmeprotokoll oder direkt abschließen?
+      </ConfirmPopup>
     )
   }
 

@@ -352,7 +352,8 @@ export function defaultWizardMeta(
   const leistungsumfang = leistungsumfangAusLead.trim() || projektLabel
   const recht = defaultAngebotRechtshinweise(kundeTyp, firm ?? defaultFirmenEinstellungen())
   return {
-    titel: [projektLabel, kundenName].filter(Boolean).join(' — ') || 'Projekt',
+    // Titel = Vorhaben (Kunde steht ohnehin im Kopf) — eine Wahrheit mit Anfrage und Auftrag
+    titel: projektLabel?.trim() || 'Projekt',
     // Eine Quelle: Firmen-Einstellung „Angebot gültig (Tage)“ — wie im PDF
     gueltig_bis: plusDaysYmd(
       Math.max(1, parseInt(String((firm ?? defaultFirmenEinstellungen()).angebot_gueltig_tage ?? '30'), 10) || 30)

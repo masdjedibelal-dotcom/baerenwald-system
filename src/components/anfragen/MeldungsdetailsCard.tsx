@@ -27,7 +27,8 @@ function bereichAnzeige(lead: LeadDetail): string | null {
   if (!bereiche.length) return null
   const labels = bereiche.map((b) => {
     const key = b.trim().toLowerCase()
-    return meldeBereichLabel(key) || BEREICH_LABELS[key] || b
+    // Bereichs-Label zuerst — der Melde-Helfer gibt unbekannte Werte roh zurück („sanitaer“)
+    return BEREICH_LABELS[key] || meldeBereichLabel(key) || b
   })
   return labels.join(', ')
 }
