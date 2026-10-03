@@ -1415,8 +1415,18 @@ export function AuftragDetailClient({
               }
               return null
             })()}
-            // Abnahme läuft über „Auftrag abschließen“ — kein zweiter Weg im „…“
-            menuItems={[]}
+            // Abnahme läuft über „Auftrag abschließen“. Weiteres Angebot (z. B. nach Akut-Einsatz) erweitert diesen Auftrag.
+            menuItems={
+              detail.lead_id
+                ? [
+                    {
+                      label: 'Angebot erstellen',
+                      icon: <MockIcon ctx="btn" n="file-text" size={16} />,
+                      onClick: () => router.push(`/angebote/neu?lead_id=${encodeURIComponent(String(detail.lead_id))}`),
+                    },
+                  ]
+                : []
+            }
           />
         ),
       }}

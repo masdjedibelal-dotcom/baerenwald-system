@@ -125,9 +125,10 @@ async function appendOrUpdateAuftragPositionen(
         .from('auftrag_positionen')
         .update({
           menge: row.menge,
-          preis_fix: row.preis_fix,
-          lohn_fix: row.lohn_fix,
-          material_fix: row.material_fix,
+          // Nie einen vorhandenen Preis durch „leer“ ersetzen (Rechnungszeile ohne Preisfelder)
+          preis_fix: row.preis_fix ?? match.preis_fix ?? null,
+          lohn_fix: row.lohn_fix ?? match.lohn_fix ?? null,
+          material_fix: row.material_fix ?? match.material_fix ?? null,
           beschreibung: row.beschreibung,
           einheit: row.einheit,
           aenderung_typ: null,

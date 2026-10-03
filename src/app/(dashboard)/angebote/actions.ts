@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { writeAuftragStatus } from '@/lib/status/write-auftrag-status'
 import { ensureAngebotsnummerFuerVersand } from '@/lib/angebot-utils'
 import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
@@ -2762,11 +2763,8 @@ export async function createAuftragFromAngebot(
       (a) => String(a.angebot_id ?? '') !== angebotId
     )
     if (anderer?.id) {
-      return {
-        ok: false,
-        message:
-          'Zu dieser Anfrage existiert bereits ein Auftrag. Für Änderungen bitte Nachtrag-Angebot am bestehenden Auftrag nutzen — nicht ein zweites Angebot annehmen.',
-      }
+      // Ein Vorgang = ein Auftrag: weiteres Angebot (z. B. nach Akut-Einsatz) erweitert den bestehenden Auftrag
+      return erweitereBestehendenAuftrag(String(anderer.id), angebotId, String(anderer.status ?? ''), !anderer.angebot_id)
     }
   }
 
@@ -3611,4 +3609,47 @@ export async function duplicateAngebotVorlage(
   if (error2) return { ok: false, message: error2.message }
   revalidateEinstellungenPath('/einstellungen/vorlagen')
   return { ok: true }
+}
+
+
+/**
+ * Weiteres Angebot zu einem Vorgang mit bestehendem Auftrag: Positionen anhängen (wie Nachtrag),
+ * Auftrag ohne Angebot (Akut) bekommt dieses als Grundlage, ein abgeschlossener Auftrag läuft wieder.
+ */
+async function erweitereBestehendenAuftrag(
+  auftragId: string,
+  angebotId: string,
+  auftragStatus: string,
+  ohneAngebot: boolean
+): Promise<{ ok: true; auftragId: string } | { ok: false; message: string }> {
+  const { data: ang, error: angErr } = await supabaseAdmin
+    .from('angebote')
+    .select('id, positionen')
+    .eq('id', angebotId)
+    .maybeSingle()
+  if (angErr) logDbError('app/angebote/actions:erweitern-angebot', angErr)
+  if (!ang) return { ok: false, message: 'Angebot nicht gefunden.' }
+  const { syncAngebotPositionenZuAuftrag } = await import('@/lib/auftraege/sync-angebot-zu-auftrag')
+  const { data: hwRows, error: hwErr } = await supabaseAdmin
+    .from('angebot_handwerker')
+    .select('id, handwerker_id, gewerk_id, status')
+    .eq('angebot_id', angebotId)
+  if (hwErr) logDbError('app/angebote/actions:erweitern-hw', hwErr)
+  const sync = await syncAngebotPositionenZuAuftrag({
+    auftragId,
+    angebotPositionen: (ang.positionen as AngebotPosition[]) ?? [],
+    angebotHandwerker: (hwRows ?? []) as never,
+    appendOnly: true,
+  })
+  if (!sync.ok) return sync
+  const patch: Record<string, unknown> = {}
+  if (ohneAngebot) patch.angebot_id = angebotId
+  if (Object.keys(patch).length) {
+    const { error } = await supabaseAdmin.from('auftraege').update(patch).eq('id', auftragId)
+    if (error) logDbError('app/angebote/actions:erweitern-link', error)
+  }
+  if (auftragStatus === 'abgeschlossen' || auftragStatus === 'abnahme') {
+    await writeAuftragStatus(supabaseAdmin, auftragId, 'in_arbeit')
+  }
+  return { ok: true, auftragId }
 }

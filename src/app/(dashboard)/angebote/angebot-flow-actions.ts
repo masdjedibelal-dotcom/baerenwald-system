@@ -290,8 +290,15 @@ export async function acceptAngebotAndCreateAuftrag(
 
   const leadId = (ang.lead_id as string | null) ?? null
   if (leadId) {
-    // Nachtrag: Stamm-Angebot am Auftrag nicht als „ersetzt“ markieren
-    if (!nachtragLink) {
+    // Nachtrag oder Erweiterung eines bestehenden Auftrags: frühere (angenommene) Angebote bleiben stehen
+    const { data: bestehend } = await supabaseAdmin
+      .from('auftraege')
+      .select('id, angebot_id')
+      .eq('lead_id', leadId)
+      .neq('status', 'storniert')
+      .limit(5)
+    const erweitertAuftrag = (bestehend ?? []).some((a) => String(a.angebot_id ?? '') !== id)
+    if (!nachtragLink && !erweitertAuftrag) {
       await markLeadAngeboteAbgelehnt(supabaseAdmin, leadId, id)
     }
     if (direktOhneHv) {
