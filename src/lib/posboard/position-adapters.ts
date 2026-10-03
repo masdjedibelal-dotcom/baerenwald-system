@@ -39,15 +39,17 @@ export function auftragPositionenToPosBoardLines(
           ? Number(p.geschaetzt_std)
           : Number(p.menge) || 1
         : Number(p.menge) || 1
-      const lohn = Number(p.lohn_fix ?? 0)
-      const mat = Number(p.material_fix ?? 0)
-      let unit = lohn + mat
+      // preis_fix / lohn_fix / material_fix sind Zeilensummen (wie aus dem Angebot übernommen) —
+      // Einzelpreis daher immer durch die Menge teilen, sonst verdoppelt Speichern den Preis.
+      const zeile =
+        p.preis_fix != null
+          ? Number(p.preis_fix)
+          : Number(p.lohn_fix ?? 0) + Number(p.material_fix ?? 0)
+      let unit = zeile / Math.max(menge, 0.0001)
       const kundenSatz = Number(p.stundensatz_kunde ?? 0)
       const partnerSatz = Number(p.stundensatz ?? 0)
       if (isRegie && (kundenSatz > 0 || partnerSatz > 0)) {
         unit = kundenSatz > 0 ? kundenSatz : partnerSatz
-      } else if (!unit && p.preis_fix != null) {
-        unit = Number(p.preis_fix) / Math.max(menge, 0.0001)
       }
       return {
         id: p.id,

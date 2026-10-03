@@ -39,11 +39,8 @@ export function auftragOrt(a: AuftragListeEintrag): string {
 export function auftragWertNum(a: AuftragListeEintrag, mwstSatz = DEFAULT_MWST_SATZ): number {
   const pos = (a as AuftragDetail).auftrag_positionen
   if (Array.isArray(pos) && pos.length) {
-    const netto = auftragPositionenFuerSumme(pos).reduce((s, p) => {
-      const menge = Number(p.menge) > 0 ? Number(p.menge) : 1
-      const unit = Number(p.preis_fix) || 0
-      return s + unit * menge
-    }, 0)
+    // preis_fix ist bereits die Zeilensumme (Menge × Einzelpreis)
+    const netto = auftragPositionenFuerSumme(pos).reduce((s, p) => s + (Number(p.preis_fix) || 0), 0)
     if (netto > 0) return nettoZuBrutto(netto, mwstSatz)
   }
   if (!a.angebote) return 0

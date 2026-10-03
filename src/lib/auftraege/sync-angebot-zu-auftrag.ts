@@ -281,5 +281,11 @@ export async function syncAngebotPositionenZuAuftrag(input: {
 
   provisionProjektvertragFireAndForget(auftragId)
 
+  // Schlussrechnung = immer der aktuelle Rest (offene Plan-Entwürfe nachziehen)
+  const { aktualisierePlanEntwuerfeNachLeistungsaenderung } = await import(
+    '@/lib/rechnungen/ensure-abschlag-entwuerfe'
+  )
+  await aktualisierePlanEntwuerfeNachLeistungsaenderung(auftragId)
+
   return { ok: true, neu, aktualisiert, entfernt }
 }

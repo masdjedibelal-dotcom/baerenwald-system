@@ -804,14 +804,14 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
 
     // Abgeschlossener Auftrag ohne Voll-/Schlussrechnung → Rechnung/Offen
     // („Offen“). Reine Abschläge gewinnen die Phase nicht (isPhaseWinningRechnung).
-    // Bei aktivem Abschlagsplan: keinen synthetischen Gesamt-Vorgang — nur gestellte Abschläge.
     const leadAngRaw = angeboteByLead.get(lead.id) ?? []
     const hatAbschlagsplan = leadAngRaw.some((a) =>
       hatAktivenAbschlagsplan(parseZahlungsplan(a.zahlungsplan))
     )
 
+    // Auch mit Abschlagsplan: ohne gestellte Schlussrechnung bleibt der Vorgang offen
+    // (Abschläge/Schluss nicht vergessen).
     const rechnungAusstehend =
-      !hatAbschlagsplan &&
       resolved.phase === 'auftrag' &&
       resolved.unterstatus === 'abgeschlossen' &&
       !leadRechnungenStamm.some(hatGestellteEndabrechnung)

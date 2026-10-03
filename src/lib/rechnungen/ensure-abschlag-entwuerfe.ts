@@ -5,6 +5,8 @@ import {
   berechneBereitsGestellt,
   berechneSchlussAbrechnung,
   berechneZahlungsplan,
+  hatAktivenAbschlagsplan,
+  parseZahlungsplan,
   positionenFuerAbschlagRechnung,
   rechnungArtFuerZeile,
   rechnungBerechnungFuerAbschlagZeile,
@@ -229,9 +231,27 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
     }
 
     if (existing?.id) {
+      // Beträge/Positionen neu rechnen, aber eingegebene Texte und Daten des Entwurfs behalten
+      const { data: alt, error: altErr } = await supabase
+        .from('rechnungen')
+        .select(
+          'einleitung, hinweise, mail_einleitung, mail_betreff, zahlungsbedingungen, hinweis_35a, rechnungsdatum, leistungszeitraum_von, leistungszeitraum_bis'
+        )
+        .eq('id', existing.id)
+        .maybeSingle()
+      if (altErr) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:rechnungen', altErr)
       const upd = await updateRechnungEntwurf(existing.id, {
         kunde_id: kundeId,
         ...payload,
+        einleitung: alt?.einleitung ?? null,
+        hinweise: alt?.hinweise ?? null,
+        mail_einleitung: alt?.mail_einleitung ?? null,
+        mail_betreff: alt?.mail_betreff ?? null,
+        zahlungsbedingungen: alt?.zahlungsbedingungen ?? null,
+        hinweis_35a: alt?.hinweis_35a ?? null,
+        rechnungsdatum: alt?.rechnungsdatum ?? payload.rechnungsdatum,
+        leistungszeitraum_von: alt?.leistungszeitraum_von ?? payload.leistungszeitraum_von,
+        leistungszeitraum_bis: alt?.leistungszeitraum_bis ?? payload.leistungszeitraum_bis,
       })
       if (!upd.ok) return upd
       await persistPdfForRechnung(existing.id).catch((err) => {
@@ -311,4 +331,43 @@ export async function storniereAbschlagEntwuerfeForAuftrag(
     }
   }
   return { ok: true, count }
+}
+
+/**
+ * Nach jeder Leistungsänderung am Auftrag (bearbeiten, weiteres Angebot, Regie):
+ * offene Abschlags-/Schluss-Entwürfe neu rechnen — die Schlussrechnung ist immer der aktuelle Rest.
+ * Gestellte Rechnungen bleiben unverändert.
+ */
+export async function aktualisierePlanEntwuerfeNachLeistungsaenderung(
+  auftragId: string
+): Promise<void> {
+  const supabase = createClient()
+  // Nur nachziehen, wenn es schon offene Plan-Entwürfe gibt (kein neues Anlegen beim ersten Sync)
+  const { data: entwuerfe, error: entErr } = await supabase
+    .from('rechnungen')
+    .select('id')
+    .eq('auftrag_id', auftragId)
+    .eq('status', 'entwurf')
+    .not('zahlungsplan_abschlag_id', 'is', null)
+    .limit(1)
+  if (entErr) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:rechnungen', entErr)
+  if (!entwuerfe?.length) return
+  const { data: auf, error } = await supabase
+    .from('auftraege')
+    .select('angebot_id')
+    .eq('id', auftragId)
+    .maybeSingle()
+  if (error) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:auftraege', error)
+  const angebotId = auf?.angebot_id ? String(auf.angebot_id) : ''
+  if (!angebotId) return
+  const { data: ang, error: angErr } = await supabase
+    .from('angebote')
+    .select('zahlungsplan')
+    .eq('id', angebotId)
+    .maybeSingle()
+  if (angErr) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:angebote', angErr)
+  const plan = parseZahlungsplan(ang?.zahlungsplan)
+  if (!plan || !hatAktivenAbschlagsplan(plan)) return
+  const r = await ensureAbschlagEntwuerfeForAuftrag(auftragId, plan)
+  if (!r.ok) console.warn('[aktualisierePlanEntwuerfe]', r.message)
 }

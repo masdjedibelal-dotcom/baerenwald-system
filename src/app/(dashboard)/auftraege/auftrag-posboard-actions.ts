@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { aktualisierePlanEntwuerfeNachLeistungsaenderung } from '@/lib/rechnungen/ensure-abschlag-entwuerfe'
 import { COPY_ERROR } from '@/lib/copy/errors'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
@@ -63,7 +64,8 @@ function lineToRow(
     gewerk_name: gewerk,
     gewerk_slug: base?.gewerk_slug?.trim() || slugFromGewerk(gewerk),
     gewerk_block_key: base?.gewerk_block_key ?? null,
-    lohn_fix: unit,
+    // Zeilensumme wie bei der Übernahme aus dem Angebot (nicht Einzelpreis)
+    lohn_fix: lineTotal,
     material_fix: 0,
     preis_fix: lineTotal,
     sort_order: sortOrder,
@@ -151,6 +153,8 @@ export async function replaceAuftragPositionenFromPosBoard(
 
   await syncAuftragIstBauprojekt(auftragId)
   await syncAuftragFortschrittFromPositionen(auftragId)
+  // Schlussrechnung = immer der aktuelle Rest
+  await aktualisierePlanEntwuerfeNachLeistungsaenderung(auftragId)
 
   revalidateAuftragDetail(auftragId)
   return { ok: true }
