@@ -18,7 +18,8 @@ export type EinsatzErfasstVon = 'partner' | 'bw'
 
 const UEBERGAENGE: Record<EinsatzStatus, EinsatzStatus[]> = {
   gesendet: ['angenommen', 'abgelehnt'],
-  angenommen: ['fertig'],
+  // angenommen → abgelehnt: Bärenwald entzieht den Einsatz (Partner sieht ihn danach nicht mehr)
+  angenommen: ['fertig', 'abgelehnt'],
   abgelehnt: [],
   fertig: [],
 }

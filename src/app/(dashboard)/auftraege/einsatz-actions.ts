@@ -382,7 +382,11 @@ export async function createEinsatz(input: {
   return { ok: true, einsatz, mailGesendet }
 }
 
-/** Nur solange der Partner noch nicht angenommen hat (gesendet/abgelehnt). */
+/**
+ * Gesendet/abgelehnt: Einsatz wird gelöscht. Angenommen: Bärenwald entzieht ihn — Status „abgelehnt“
+ * mit Grund, damit Updates/Fotos im CRM bleiben; im Partner-Portal ist er danach weg.
+ * Fertige Einsätze bleiben (Erledigt).
+ */
 export async function zurueckziehenEinsatz(
   einsatzId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -395,8 +399,19 @@ export async function zurueckziehenEinsatz(
     .maybeSingle()
   if (error) logDbError('app/auftraege/einsatz-actions:load', error)
   if (!row) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  if (row.status === 'angenommen') {
+    const w = await writeEinsatzStatus(gate.db, {
+      einsatzId,
+      von: 'angenommen',
+      nach: 'abgelehnt',
+      extra: { abgelehnt_at: new Date().toISOString(), ablehnung_grund: 'Von Bärenwald entzogen' },
+    })
+    if (!w.ok) return { ok: false, message: w.error }
+    revalidatePath(`/auftraege/${String(row.auftrag_id)}`)
+    return { ok: true }
+  }
   if (row.status !== 'gesendet' && row.status !== 'abgelehnt') {
-    return { ok: false, message: 'Angenommene Einsätze können nicht zurückgezogen werden.' }
+    return { ok: false, message: 'Fertige Einsätze können nicht zurückgezogen werden.' }
   }
   const { error: delErr } = await gate.db.from('einsaetze').delete().eq('id', einsatzId)
   if (delErr) {

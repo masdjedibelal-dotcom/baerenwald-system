@@ -22,6 +22,7 @@ import { MockBadge, MockBtn, MockCard, MockSegment } from '@/components/mock-ui'
 import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
+import { openConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { DateInput } from '@/components/ui/DateInput'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { safeAction } from '@/lib/actions/safe-action'
@@ -33,6 +34,16 @@ const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
   angenommen: { label: 'In Bearbeitung', kind: 'aktiv' },
   abgelehnt: { label: 'Abgelehnt', kind: 'storniert' },
   fertig: { label: 'Fertig', kind: 'fertig' },
+}
+
+/** Grund, den „Partner entziehen“ setzt — Anzeige „Entzogen“ statt „Abgelehnt“. */
+const ENTZOGEN_GRUND = 'Von Bärenwald entzogen'
+
+function statusAnzeige(e: { status: EinsatzStatus; ablehnung_grund: string | null }) {
+  if (e.status === 'abgelehnt' && e.ablehnung_grund === ENTZOGEN_GRUND) {
+    return { label: 'Entzogen', kind: 'storniert' }
+  }
+  return STATUS[e.status] ?? STATUS.gesendet
 }
 
 const MELDUNG_LABEL: Record<EinsatzMitteilung['typ'], string> = {
@@ -83,7 +94,11 @@ function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
     liste.push({ key: 'angenommen', at: e.angenommen_at, art: `Angenommen${vonBw(e.angenommen_von)}`, text: '', dateien: [], neu: false })
   }
   if (e.status === 'abgelehnt') {
-    liste.push({ key: 'abgelehnt', at: e.gesendet_at, art: 'Abgelehnt', text: e.ablehnung_grund ?? '', dateien: [], neu: false })
+    liste.push(
+      e.ablehnung_grund === ENTZOGEN_GRUND
+        ? { key: 'abgelehnt', at: e.gesendet_at, art: 'Von Bärenwald entzogen', text: '', dateien: [], neu: false }
+        : { key: 'abgelehnt', at: e.gesendet_at, art: 'Abgelehnt', text: e.ablehnung_grund ?? '', dateien: [], neu: false }
+    )
   }
   for (const m of e.mitteilungen) {
     const art =
@@ -310,7 +325,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         ) : (
           <div className="einsatz-liste">
             {einsaetze.map((e) => {
-              const st = STATUS[e.status] ?? STATUS.gesendet
+              const st = statusAnzeige(e)
               const neu = e.mitteilungen.filter(
                 (m) => m.status === 'offen' && !(m.typ !== 'regie' && gesehen.has(e.id))
               ).length
@@ -349,15 +364,29 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         secondary={
           detail && (detail.status === 'gesendet' || detail.status === 'abgelehnt')
             ? { label: 'Zurückziehen', kind: 'ghost', onClick: () => { zurueckziehen(detail.id) } }
-            : null
+            : detail && detail.status === 'angenommen'
+              ? {
+                  label: 'Partner entziehen',
+                  kind: 'ghost',
+                  onClick: () =>
+                    openConfirmPopup({
+                      title: 'Einsatz entziehen?',
+                      sub: detail.partner_name,
+                      body: 'Der Partner sieht den Einsatz danach nicht mehr in seinem Portal. Seine Updates bleiben hier im Verlauf.',
+                      confirmLabel: 'Entziehen',
+                      danger: true,
+                      onConfirm: () => zurueckziehen(detail.id),
+                    }),
+                }
+              : null
         }
       >
         {detail ? (
           <div className="einsatz-blatt">
             <div className="einsatz-karte">
               <div className="einsatz-kopf">
-                <MockBadge kind={(STATUS[detail.status] ?? STATUS.gesendet).kind}>
-                  {(STATUS[detail.status] ?? STATUS.gesendet).label}
+                <MockBadge kind={statusAnzeige(detail).kind}>
+                  {statusAnzeige(detail).label}
                 </MockBadge>
                 <span className="einsatz-kopf__meta">
                   {[
