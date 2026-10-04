@@ -444,9 +444,10 @@ export function PosBoard({
       preis: Number(r.variante.preis) || 0,
       ust: 19,
       kind: 'position',
-      preisliste_id: r.variante.id,
-      variante_id: r.variante.id,
-      position_quelle: 'katalog',
+      // „Bisher verwendet“ ist kein Katalogeintrag → freie Position mit übernommenem Preis
+      ...(r.variante.id.startsWith('verlauf:')
+        ? { preisliste_id: null, variante_id: null, position_quelle: 'frei' as const }
+        : { preisliste_id: r.variante.id, variante_id: r.variante.id, position_quelle: 'katalog' as const }),
     })
     onChange([...positionen, np])
   }

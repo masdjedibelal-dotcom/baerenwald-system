@@ -19,6 +19,100 @@ function mapVariante(r: Record<string, unknown>): KatalogVariante {
   }
 }
 
+/** Präfix für Einträge aus „Bisher verwendet“ — keine echte Katalog-ID, wird als freie Position übernommen. */
+const VERLAUF_ID_PREFIX = 'verlauf:'
+
+/**
+ * Alle bisher in Angeboten und Aufträgen verwendeten Positionen (04.10.2026), je Name die zuletzt
+ * benutzte Variante mit Einzelpreis — erscheinen in der Auswahl unter „Bisher verwendet“.
+ * Schreibt nichts in Katalog/Preisliste (kein Wildwuchs).
+ */
+export async function listVerwendetePositionen(): Promise<KatalogPosition[]> {
+  const supabase = createClient()
+  const [aufRes, angRes, katRes] = await Promise.all([
+    supabase
+      .from('auftrag_positionen')
+      .select('leistung_name, einheit, menge, preis_fix, gewerk_name, typ, created_at')
+      .order('created_at', { ascending: false })
+      .limit(3000),
+    supabase
+      .from('angebote')
+      .select('positionen, created_at')
+      .order('created_at', { ascending: false })
+      .limit(400),
+    supabase.from('katalog_positionen').select('titel').eq('aktiv', true),
+  ])
+  if (aufRes.error) logDbError('app/katalog/actions:verlauf-auftrag', aufRes.error)
+  if (angRes.error) logDbError('app/katalog/actions:verlauf-angebote', angRes.error)
+
+  type Treffer = { name: string; einheit: string; preis: number; gewerk: string; at: string }
+  const kandidaten: Treffer[] = []
+  for (const r of aufRes.data ?? []) {
+    const name = String(r.leistung_name ?? '').trim()
+    const menge = Number(r.menge) > 0 ? Number(r.menge) : 1
+    if (!name || r.typ === 'regie') continue
+    kandidaten.push({
+      name,
+      einheit: String(r.einheit ?? '').trim() || 'Stück',
+      preis: Math.round(((Number(r.preis_fix) || 0) / menge) * 100) / 100,
+      gewerk: String(r.gewerk_name ?? '').trim() || 'Allgemein',
+      at: String(r.created_at ?? ''),
+    })
+  }
+  for (const a of angRes.data ?? []) {
+    const list = Array.isArray(a.positionen) ? (a.positionen as Record<string, unknown>[]) : []
+    for (const p of list) {
+      const name = String(p.leistung ?? '').trim()
+      const kind = String(p.kind ?? p.typ ?? '')
+      if (!name || kind === 'freitext' || kind === 'nachlass') continue
+      kandidaten.push({
+        name,
+        einheit: String(p.einheit ?? '').trim() || 'Stück',
+        preis: Math.round((Number(p.vk_netto) || 0) * 100) / 100,
+        gewerk: String(p.gewerk_name ?? '').trim() || 'Allgemein',
+        at: String(a.created_at ?? ''),
+      })
+    }
+  }
+  const imKatalog = new Set((katRes.data ?? []).map((k) => String(k.titel ?? '').trim().toLowerCase()))
+  const neueste = new Map<string, Treffer>()
+  for (const k of kandidaten) {
+    const key = k.name.toLowerCase()
+    if (imKatalog.has(key) || /^__|^abschlag\b|^gesamtrabatt|^nachlass/i.test(k.name)) continue
+    const alt = neueste.get(key)
+    if (!alt || k.at > alt.at) neueste.set(key, k)
+  }
+  return Array.from(neueste.values())
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    .map((t, i) => {
+      const id = `${VERLAUF_ID_PREFIX}${i}`
+      return {
+        id,
+        gewerk_id: `${VERLAUF_ID_PREFIX}${t.gewerk.toLowerCase()}`,
+        titel: t.name,
+        kategorie: 'Bisher verwendet',
+        beschreibung_standard: '',
+        aktiv: true,
+        sortierung: 9999,
+        gewerk_name: t.gewerk,
+        gewerk_slug: null,
+        varianten: [
+          {
+            id,
+            position_id: id,
+            variante: '',
+            beschreibung: '',
+            einheit: t.einheit,
+            preis_typ: 'fix',
+            preis: t.preis,
+            aktiv: true,
+            sortierung: 0,
+          },
+        ],
+      }
+    })
+}
+
 /** Lädt aktiven Katalog. Leer-Array wenn Tabellen noch fehlen (vor Import). */
 export async function listKatalogPositionen(opts?: {
   nurAktiv?: boolean

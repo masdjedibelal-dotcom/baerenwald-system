@@ -9,7 +9,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { listKatalogPositionen } from '@/app/(dashboard)/katalog/actions'
+import { listKatalogPositionen, listVerwendetePositionen } from '@/app/(dashboard)/katalog/actions'
 import {
   katalogPreisLabel,
   katalogVarianteLabel,
@@ -168,7 +168,12 @@ export function PositionAddSheet({
     if (mode !== 'preisliste' && initialMode !== 'preisliste') return
     let cancelled = false
     setKatalogLoading(true)
-    void listKatalogPositionen({ nurAktiv: true })
+    // Katalog + alle bisher verwendeten Positionen (Gruppe „Bisher verwendet“)
+    void Promise.all([
+      listKatalogPositionen({ nurAktiv: true }),
+      listVerwendetePositionen().catch(() => []),
+    ])
+      .then(([katalog, verlauf]) => [...katalog, ...verlauf])
       .then((list) => {
         if (cancelled) return
         setRows(list)
