@@ -23,7 +23,7 @@ type LoadProjektKontextInput = {
 }
 
 const ANGEBOT_KURZ_SELECT =
-  'id, angebotsnr, status, status_einfach, gueltig_bis, created_at, gesamt_fix, gesamt_min, gesamt_max, pdf_url, ist_partner_einholung'
+  'id, angebotsnr, status, status_einfach, gueltig_bis, created_at, gesamt_fix, gesamt_min, gesamt_max, pdf_url, ist_partner_einholung, leistungsumfang'
 
 const RECHNUNG_KURZ_SELECT =
   'id, rechnungsnummer, status, brutto, rechnungsdatum, auftrag_id, rechnung_art, abschlag_index, beleg_typ, pdf_url, gesendet_at, created_at'

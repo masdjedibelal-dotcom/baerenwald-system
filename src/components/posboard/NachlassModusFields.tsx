@@ -6,7 +6,9 @@ import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import {
   formatEurBetrag,
   gesamtrabattAbzugFromModus,
-  isGesamtrabattZielModus,
+  gesamtrabattArt,
+  gesamtrabattIstBrutto,
+  gesamtrabattModusAus,
   type GesamtrabattModus,
 } from '@/lib/dokument-zeilen'
 
@@ -31,8 +33,7 @@ function Field({
 }
 
 export function nachlassSelectValue(modus: GesamtrabattModus): 'prozent' | 'betrag' | 'ziel' {
-  if (isGesamtrabattZielModus(modus)) return 'ziel'
-  return modus === 'betrag' ? 'betrag' : 'prozent'
+  return gesamtrabattArt(modus)
 }
 
 export function NachlassModusFields({
@@ -54,90 +55,84 @@ export function NachlassModusFields({
   inputClassName?: string
   selectClassName?: string
 }) {
-  const selectVal = nachlassSelectValue(modus)
-  const isZiel = isGesamtrabattZielModus(modus)
+  const art = gesamtrabattArt(modus)
+  const brutto = gesamtrabattIstBrutto(modus)
   const abzug = gesamtrabattAbzugFromModus(modus, wert, artikelNetto, artikelBrutto)
-  const zielBasis = modus === 'ziel_brutto' ? artikelBrutto : artikelNetto
+  const basis = brutto ? artikelBrutto : artikelNetto
 
   function setArt(next: 'prozent' | 'betrag' | 'ziel') {
-    if (next === 'prozent') {
-      onChange({ nachlassModus: 'prozent' })
+    const nextModus = gesamtrabattModusAus(next, brutto)
+    if (next !== 'ziel') {
+      onChange({ nachlassModus: nextModus })
       return
     }
-    if (next === 'betrag') {
-      onChange({ nachlassModus: 'betrag' })
-      return
-    }
-    const zielModus: GesamtrabattModus = modus === 'ziel_brutto' ? 'ziel_brutto' : 'ziel_netto'
-    const basis = zielModus === 'ziel_brutto' ? artikelBrutto : artikelNetto
+    // Beim Wechsel auf Zielbetrag: aktuelle Summe als Startwert
     onChange({
-      nachlassModus: zielModus,
-      // Beim Wechsel von %/Betrag immer aktuelle Summe als Startwert
-      preis: isZiel
-        ? wert > 0
-          ? wert
-          : Math.round(Math.max(0, basis) * 100) / 100
-        : Math.round(Math.max(0, basis) * 100) / 100,
+      nachlassModus: nextModus,
+      preis:
+        art === 'ziel' && wert > 0 ? wert : Math.round(Math.max(0, basis) * 100) / 100,
     })
   }
 
-  function setZielBasis(next: 'netto' | 'brutto') {
-    const zielModus: GesamtrabattModus = next === 'brutto' ? 'ziel_brutto' : 'ziel_netto'
-    const basis = next === 'brutto' ? artikelBrutto : artikelNetto
+  function setBasis(next: 'netto' | 'brutto') {
+    const nextModus = gesamtrabattModusAus(art, next === 'brutto')
+    if (art !== 'ziel') {
+      onChange({ nachlassModus: nextModus })
+      return
+    }
+    const b = next === 'brutto' ? artikelBrutto : artikelNetto
     onChange({
-      nachlassModus: zielModus,
-      preis: wert > 0 ? wert : Math.round(Math.max(0, basis) * 100) / 100,
+      nachlassModus: nextModus,
+      preis: wert > 0 ? wert : Math.round(Math.max(0, b) * 100) / 100,
     })
   }
 
   const wertLabel =
-    selectVal === 'prozent'
+    art === 'prozent'
       ? 'Prozent'
-      : selectVal === 'betrag'
-        ? 'Betrag netto'
-        : modus === 'ziel_brutto'
+      : art === 'betrag'
+        ? brutto
+          ? 'Betrag brutto'
+          : 'Betrag netto'
+        : brutto
           ? 'Neuer Brutto-Gesamtbetrag'
           : 'Neuer Netto-Gesamtbetrag'
 
   return (
     <>
       <Field label="Art des Nachlasses">
-        <MockSelect className={selectClassName} value={selectVal} onChange={(e) => setArt(e.target.value as 'prozent' | 'betrag' | 'ziel')}>
-          <option value="prozent">Prozent vom Netto</option>
-          <option value="betrag">Fester Betrag (netto)</option>
+        <MockSelect className={selectClassName} value={art} onChange={(e) => setArt(e.target.value as 'prozent' | 'betrag' | 'ziel')}>
+          <option value="prozent">Prozent</option>
+          <option value="betrag">Fester Betrag</option>
           <option value="ziel">Neuer Gesamtbetrag</option>
         </MockSelect>
       </Field>
 
-      {isZiel ? (
-        <Field label="Basis" hint="Rabatt = Summe vorher − neuer Gesamtbetrag">
-          <div className="seg" role="group" aria-label="Netto oder Brutto">
-            <MockBtn className={modus === 'ziel_netto' ? 'on' : undefined} type="button" onClick={() => setZielBasis('netto')}>
-              Netto
-            </MockBtn>
-            <MockBtn className={modus === 'ziel_brutto' ? 'on' : undefined} type="button" onClick={() => setZielBasis('brutto')}>
-              Brutto
-            </MockBtn>
-          </div>
-        </Field>
-      ) : (
-        <div />
-      )}
+      <Field label="Basis">
+        <div className="seg" role="group" aria-label="Netto oder Brutto">
+          <MockBtn className={!brutto ? 'on' : undefined} type="button" onClick={() => setBasis('netto')}>
+            Netto
+          </MockBtn>
+          <MockBtn className={brutto ? 'on' : undefined} type="button" onClick={() => setBasis('brutto')}>
+            Brutto
+          </MockBtn>
+        </div>
+      </Field>
 
       <Field
         label={wertLabel}
         hint={
-          isZiel && zielBasis > 0
-            ? `Aktuell ${formatEurBetrag(zielBasis)}${
-                abzug > 0 ? ` · Nachlass −${formatEurBetrag(abzug)}` : ''
+          art === 'ziel' && basis > 0
+            ? `Aktuell ${formatEurBetrag(basis)}${
+                abzug > 0 ? ` · Nachlass −${formatEurBetrag(abzug)} netto` : ''
               }`
-            : abzug > 0 && selectVal !== 'prozent'
-              ? `Nachlass −${formatEurBetrag(abzug)}`
+            : abzug > 0
+              ? `Nachlass −${formatEurBetrag(abzug)} netto`
               : undefined
         }
       >
         <div className="txt-prefix">
-          <span className="prefix">{selectVal === 'prozent' ? '%' : '€'}</span>
+          <span className="prefix">{art === 'prozent' ? '%' : '€'}</span>
           <ClearableNumberInput
             className={inputClassName}
             min={0}

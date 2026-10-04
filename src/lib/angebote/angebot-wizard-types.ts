@@ -18,24 +18,16 @@ import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
 import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition,AngebotStatus } from '@/lib/types'
 import { neuePositionsId } from '@/lib/angebot-positionen'
-import {
-  bereicheFuerAnzeige,
-} from '@/lib/lead-gewerbe-storage'
 import { formatEuroSpanne } from '@/lib/format/geld-datum'
 
 export type AngebotDokumentTyp = 'einfach' | 'projekt'
 
-/** Bereiche, für die standardmäßig das Projekt-Layout empfohlen wird. */
-export const IMMER_PROJEKT_BEREICHE = ['bad', 'dach', 'trockenbau', 'fassade'] as const
 
+/** Ein Layout für alle neuen Angebote (04.10.2026) — Gewerke gehen auch im einfachen Layout. */
 export function initialDokumentTypFromLead(
-  bereicheRaw: unknown,
-  situation: string | null | undefined
+  _bereicheRaw?: unknown,
+  _situation?: string | null
 ): AngebotDokumentTyp {
-  const bereiche = bereicheFuerAnzeige(bereicheRaw, situation)
-  if (bereiche.length >= 2) return 'projekt'
-  const immer = IMMER_PROJEKT_BEREICHE as readonly string[]
-  if (bereiche.some((b) => immer.includes(b))) return 'projekt'
   return 'einfach'
 }
 

@@ -27,7 +27,7 @@ export function AngebotAuswahlModal({
   onKopie?: (bootstrap: AngebotWizardBootstrap) => void
 }) {
   return (
-    <EditorSheet open={open} onClose={onClose} title="Angebote" context="detail" size="md">
+    <EditorSheet open={open} onClose={onClose} title="Alle Angebote" context="detail" size="md">
       <AngebotAuswahlPanel
         leadId={leadId}
         angebote={angebote}

@@ -12,6 +12,8 @@ export type ProjektAngebotKurz = {
   gesamt_max: number | null
   /** Für konsolidierte Vorgangs-Akte */
   pdf_url?: string | null
+  /** Projekttitel des Angebots */
+  leistungsumfang?: string | null
 }
 
 export type ProjektRechnungKurz = {

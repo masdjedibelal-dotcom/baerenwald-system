@@ -53,6 +53,9 @@ export function resolveBlockTitelFromGroup(
 }
 
 /** Reihenfolge wie im Wizard; Freitexte bleiben beim Abschnitt, in dem sie eingefügt wurden. */
+/** Sammel-Block für Freitexte (kein Gewerk). */
+const HINWEISE_BLOCK_KEY = '__hinweise'
+
 export function groupAngebotPositionenByBlock(
   positionen: AngebotPosition[],
   gewerke: Gewerk[]
@@ -94,8 +97,8 @@ export function groupAngebotPositionenByBlock(
     }
 
     if (istFreitextPosition(p)) {
-      const key = p.gewerk_block_key?.trim() || lastKey
-      lastKey = key
+      // Freitexte stehen gesammelt unter „Hinweise“ am Ende (wie im Wizard)
+      const key = HINWEISE_BLOCK_KEY
       ensure(key, lastSample)
       ensure(key, lastSample).entries.push({
         kind: 'freitext',
@@ -117,11 +120,12 @@ export function groupAngebotPositionenByBlock(
     ensure(key, p).entries.push({ kind: 'position', position: p })
   }
 
-  return order.map((k) => {
+  const sortiert = [...order.filter((k) => k !== HINWEISE_BLOCK_KEY), ...order.filter((k) => k === HINWEISE_BLOCK_KEY)]
+  return sortiert.map((k) => {
     const group = map.get(k)!
     return {
       ...group,
-      titel: resolveBlockTitelFromGroup(group, gewerke),
+      titel: k === HINWEISE_BLOCK_KEY ? 'Hinweise' : resolveBlockTitelFromGroup(group, gewerke),
     }
   })
 }

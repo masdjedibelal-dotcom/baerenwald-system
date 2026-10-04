@@ -8,7 +8,7 @@ import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { Toggle } from '@/components/ui/Toggle'
 import { NachlassModusFields } from '@/components/posboard/NachlassModusFields'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
-import { formatEurBetrag, type GesamtrabattModus } from '@/lib/dokument-zeilen'
+import { formatEurBetrag, gesamtrabattArt, type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
@@ -54,10 +54,13 @@ export function PositionModal({
   gewerke = [],
   artikelNetto = 0,
   artikelBrutto = 0,
+  onRemove,
 }: {
   position: PosBoardLine
   onChange: (patch: Partial<PosBoardLine>) => void
   onClose: () => void
+  /** Nachlass: im Blatt entfernen (steht nicht mehr als Zeile in der Liste) */
+  onRemove?: () => void
   showUst?: boolean
   gewerke?: string[]
   /** Summe der Positionen vor Nachlass (für Zielbetrag) */
@@ -79,7 +82,19 @@ export function PositionModal({
         : p.name || 'Position'
 
   return (
-    <EditorSheet open onClose={onClose} title={title} context="canvas" size="lg" onConfirm={onClose} confirmLabel="Speichern">
+    <EditorSheet
+      open
+      onClose={onClose}
+      title={title}
+      context="canvas"
+      size="lg"
+      {...(kind === 'nachlass' && onRemove
+        ? {
+            primary: { label: 'Speichern', onClick: onClose },
+            danger: { label: 'Entfernen', icon: 'trash', onClick: onRemove },
+          }
+        : { onConfirm: onClose, confirmLabel: 'Speichern' })}
+    >
       {kind === 'nachlass' ? (
         <div className="form-grid">
           <Field label="Bezeichnung" full required>
@@ -95,24 +110,14 @@ export function PositionModal({
               onChange({
                 ...next,
                 nachlassModus: modus,
-                einheit: modus === 'prozent' ? '%' : '€',
+                einheit: gesamtrabattArt(modus) === 'prozent' ? '%' : '€',
               })
             }}
           />
         </div>
       ) : isFreitext ? (
         <div className="form-grid">
-          <Field label="Gewerk">
-            <MockSelect className="sel" value={p.gewerk || ''} onChange={(e) => onChange({ gewerk: e.target.value })}>
-              <option value="">Gewerk wählen…</option>
-              {gewerkOptions.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </MockSelect>
-          </Field>
-          <div />
+          {/* Freitext ohne Gewerk — steht immer unter „Hinweise“ */}
           <Field label="Überschrift" full>
             <MockInput className="txt" value={p.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="z. B. Wichtiger Hinweis" autoFocus={!p.name} />
           </Field>

@@ -319,11 +319,8 @@ export function AngebotWizard({
    * Neu: zuerst Art (Einmalig/Wiederkehrend), bei Einmalig dann Layout (Einfach/Komplex).
    * Wiederkehrend (Wartung/Winterdienst) → immer Einfach, ohne Komplex-Schritt.
    */
-  const needsTypGate = !bootstrap?.angebotId && !istAuftragKorrektur && !istNachtrag
-  // Nur noch einmalige Leistungen (30.09.2026) — die Frage „Wiederkehrend?“ entfällt.
-  const [typGateStep, setTypGateStep] = useState<'art' | 'layout' | null>(
-    () => (needsTypGate ? 'layout' : null)
-  )
+  // Keine Abfrage mehr (04.10.2026): ein Angebotslayout für alles — Gewerke kann man immer anlegen.
+  const [typGateStep, setTypGateStep] = useState<'art' | 'layout' | null>(null)
   const typConfirmed = typGateStep === null
   const [sheet, setSheet] = useState<WizardSheetId>(() => {
     const s = Number(initialStep)
@@ -1228,10 +1225,7 @@ export function AngebotWizard({
       ? 'MwSt 0%'
       : `MwSt ${effektiverMwstSatz}%`
 
-  const dokumentCrowValue = [
-    meta.leistungsumfang.trim() || meta.titel.trim() || 'Titel offen',
-    dokumentTyp === 'projekt' ? 'Komplex' : 'Einfach',
-  ].join(' · ')
+  const dokumentCrowValue = meta.leistungsumfang.trim() || meta.titel.trim() || 'Titel offen'
 
   const zahlungCrowValue = [
     meta.gueltig_bis ? `bis ${formatDatum(meta.gueltig_bis)}` : 'Gültig offen',
@@ -1263,7 +1257,7 @@ export function AngebotWizard({
       aria-label="Vorschau"
       title="Vorschau"
     >
-      <MockIcon n="file-text" ctx="row" className="h-5 w-5" aria-hidden />
+      <MockIcon n="eye" ctx="row" className="h-5 w-5" aria-hidden />
     </MockBtn>
   )
 

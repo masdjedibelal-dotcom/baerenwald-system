@@ -187,16 +187,13 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-const FACHBETRIEB_POS_ZEILE =
-  `<span style="display:block;font-size:8pt;color:${TEXT_PRIMARY};margin-top:3pt;font-weight:400;">Ausführung durch zugelassenen Fachbetrieb</span>`
-
 const FACHBETRIEB_GLOBAL_BLOCK = `
   <div class="avoid-fuss-overlap" style="margin:20px 0 0;padding:10pt 12pt;border:1pt solid ${C.blue3};border-radius:4pt;background:${C.blueBg2};font-size:9pt;color:${TEXT_PRIMARY};line-height:1.55;font-weight:400;page-break-inside:avoid;">
     <strong style="font-weight:700;">Hinweis zur Leistungserbringung:</strong>
-    Gekennzeichnete Leistungen werden durch zugelassene und geprüfte Fachbetriebe
-    unter der Projektverantwortung von Bärenwald München ausgeführt.
-    Bärenwald München übernimmt als Generalunternehmer die vollständige Koordination,
-    Qualitätskontrolle und Haftung gegenüber dem Auftraggeber.
+    Bärenwald München führt das Vorhaben als Generalunternehmer aus. Einzelne Leistungen
+    können durch zugelassene und geprüfte Fachbetriebe ausgeführt werden.
+    Koordination, Qualitätskontrolle und Haftung gegenüber dem Auftraggeber
+    liegen vollständig bei Bärenwald München.
   </div>`
 
 function positionRowHtml(p: AngebotTemplatePosition): string {
@@ -210,7 +207,7 @@ function positionRowHtml(p: AngebotTemplatePosition): string {
   <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};">
     <strong>${esc(p.bezeichnung)}</strong>
     ${besch ? `<div style="font-size:10pt;color:${TEXT_PRIMARY};margin-top:3pt;font-weight:400;">${richTextToSafePdfHtml(besch)}</div>` : ''}
-    ${p.ist_fachbetrieb ? FACHBETRIEB_POS_ZEILE : ''}
+
   </td>
   <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};text-align:right;">${esc(String(p.menge))}</td>
   <td style="padding:7px 6px;border-bottom:1px solid ${C.gray300};">${esc(p.einheit)}</td>
@@ -320,7 +317,10 @@ export function positionenMitFreitextFlatHtml(
           )
         : g.entries
 
-      const showNummer = groups.length > 1
+      // „Hinweise“ (Freitexte) ist kein Gewerk — ohne Nummer
+      const istHinweise = g.key === '__hinweise'
+      const gewerkGruppen = groups.filter((x) => x.key !== '__hinweise').length
+      const showNummer = gewerkGruppen > 1 && !istHinweise
       const gewerkTitel = showNummer
         ? `GEWERK ${i + 1} – ${g.titel.toUpperCase()}`
         : g.titel.toUpperCase()

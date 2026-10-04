@@ -13,6 +13,7 @@ import {
   type DokumentFreitextZeile,
   type DokumentGesamtrabattZeile,
   type DokumentZeile,
+  type GesamtrabattModus,
   type MwstSatzOption,
 } from '@/lib/dokument-zeilen'
 import { withResolvedGewerkMeta, resolveGewerkFromHints } from '@/lib/angebote/resolve-position-gewerk'
@@ -38,7 +39,7 @@ export type PosBoardLine = {
   /** Zeilentyp — Standard Position */
   kind?: PosBoardLineKind
   /** Nur kind=nachlass */
-  nachlassModus?: 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
+  nachlassModus?: GesamtrabattModus
   /** Legacy Preisliste-ID (= oft Katalog-Varianten-ID nach Import) */
   preisliste_id?: string | null
   /** Katalog-Variante (Herkunft) */

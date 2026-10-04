@@ -22,7 +22,7 @@ import {
 } from '@/components/posboard/PosBoardKiSuggestions'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { preislisteEinheitspreisNetto } from '@/lib/angebote/angebot-positionen-from-lead'
-import { formatEurBetrag } from '@/lib/dokument-zeilen'
+import { formatEurBetrag, gesamtrabattArt, type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import {
   neuePosBoardLine,
   posBoardLineNetto,
@@ -31,6 +31,7 @@ import {
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { richTextToPlain } from '@/lib/rich-text'
 import type { Preisliste } from '@/lib/types'
+import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { toast } from '@/components/ui/app-toast'
 import { deleteWithUndo } from '@/lib/ui/delete-with-undo'
@@ -82,6 +83,9 @@ export type PosBoardProps = {
   className?: string
 }
 
+/** Anzeige-Gruppe für Freitexte — kein Gewerk, nur Darstellung. */
+const HINWEISE_GRUPPE = 'Hinweise'
+
 function gewerkOf(p: PosBoardLine): string {
   return (p.gewerk ?? '').trim()
 }
@@ -94,10 +98,9 @@ function defaultMengeLabel(p: PosBoardLine): string {
 function defaultPreisLabel(p: PosBoardLine, lineNetto: number): string {
   if (p.kind === 'freitext') return '—'
   if (p.kind === 'nachlass') {
-    if (p.nachlassModus === 'ziel_netto' || p.nachlassModus === 'ziel_brutto') {
-      return `→ ${formatEurBetrag(p.preis || 0)}`
-    }
-    if (p.nachlassModus === 'betrag') return `−${formatEurBetrag(p.preis || 0)}`
+    const art = gesamtrabattArt(p.nachlassModus)
+    if (art === 'ziel') return `→ ${formatEurBetrag(p.preis || 0)}`
+    if (art === 'betrag') return `−${formatEurBetrag(p.preis || 0)}`
     return `−${p.preis || 0} %`
   }
   return formatEurBetrag(lineNetto)
@@ -224,6 +227,7 @@ export function PosBoard({
     preis: number
     ust: number
     regieSchein?: boolean
+    kostenverteilung?: KostenVerteilung
   }) => {
     if (!onChange) return
     claimPendingGewerk(gewerk)
@@ -246,6 +250,7 @@ export function PosBoard({
                 ust: draft.ust,
                 regieSchein: draft.regieSchein,
                 notizExtern: draft.regieSchein ? 'nach Aufwand' : undefined,
+                ...(draft.kostenverteilung ? { kostenverteilung: draft.kostenverteilung } : {}),
               }
             : {}),
         }
@@ -264,6 +269,7 @@ export function PosBoard({
           preisliste_id: null,
           regieSchein: draft?.regieSchein,
           notizExtern: draft?.regieSchein ? 'nach Aufwand' : undefined,
+          ...(draft?.kostenverteilung ? { kostenverteilung: draft.kostenverteilung } : {}),
         })
     onChange([...positionen, np])
     setEditId(draft?.name?.trim() ? null : id)
@@ -317,17 +323,13 @@ export function PosBoard({
     setAddSheetOpen(true)
   }
 
-  const addFreitext = (
-    gewerk?: string,
-    draft?: { name?: string; beschreibung?: string }
-) => {
+  const addFreitext = (draft?: { name?: string; beschreibung?: string }) => {
     if (!onChange) return
-    const g = (gewerk ?? '').trim()
-    claimPendingGewerk(g)
     const id = neuePosBoardLine().id
     const np = neuePosBoardLine({
       id,
-      gewerk: g,
+      // Freitext hat kein Gewerk — steht immer unter „Hinweise“
+      gewerk: '',
       name: draft?.name?.trim() || '',
       beschreibung: draft?.beschreibung?.trim() || '',
       menge: 0,
@@ -343,7 +345,7 @@ export function PosBoard({
   const addNachlass = (
     draft?: {
       name?: string
-      nachlassModus?: 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
+      nachlassModus?: GesamtrabattModus
       preis?: number
     },
     gewerk?: string
@@ -359,7 +361,7 @@ export function PosBoard({
           name: draft.name?.trim() || existing.name,
           nachlassModus: modus,
           preis: draft.preis ?? existing.preis,
-          einheit: modus === 'prozent' ? '%' : '€',
+          einheit: gesamtrabattArt(modus) === 'prozent' ? '%' : '€',
           gewerk: gewerk !== undefined ? gewerk.trim() : existing.gewerk,
         })
       }
@@ -373,7 +375,7 @@ export function PosBoard({
       gewerk: g,
       name: draft?.name?.trim() || 'Nachlass',
       menge: 1,
-      einheit: modus === 'prozent' ? '%' : '€',
+      einheit: gesamtrabattArt(modus) === 'prozent' ? '%' : '€',
       preis: draft?.preis ?? 0,
       ust: 0,
       kind: 'nachlass',
@@ -466,7 +468,7 @@ export function PosBoard({
     const target = gewerk !== undefined ? gewerk.trim() : ''
     if (kind === 'position' || kind === 'preisliste') {
       openAddSheet(target || dokGewerke[dokGewerke.length - 1] || '', 'preisliste')
-    } else if (kind === 'freitext') addFreitext(target)
+    } else if (kind === 'freitext') addFreitext()
     else if (kind === 'nachlass') addNachlass(undefined, target)
   }
 
@@ -534,6 +536,15 @@ export function PosBoard({
     const targetPos = positionen.find((p) => p.id === targetId)
     if (from < 0 || !targetPos) return
     const src = positionen[from]
+    // Freitexte bleiben unter „Hinweise“, Positionen in ihren Gewerken
+    if ((src.kind === 'freitext') !== (targetPos.kind === 'freitext')) return
+    if (src.kind === 'freitext') {
+      const arr = positionen.filter((p) => p.id !== draggedId)
+      const to = arr.findIndex((p) => p.id === targetId)
+      arr.splice(to < 0 ? arr.length : to, 0, src)
+      onChange(arr)
+      return
+    }
     // Nachlass bleibt dokumentweit — kein Gewerk-Wechsel
     if (src.kind === 'nachlass') {
       const arr = positionen.filter((p) => p.id !== draggedId)
@@ -558,7 +569,7 @@ export function PosBoard({
     const from = positionen.findIndex((p) => p.id === draggedId)
     if (from < 0) return
     const src = positionen[from]
-    if (src.kind === 'nachlass') return
+    if (src.kind === 'nachlass' || src.kind === 'freitext' || gewerk === HINWEISE_GRUPPE) return
     claimPendingGewerk(gewerk)
     const moved =
       gewerkOf(src) === gewerk
@@ -577,6 +588,7 @@ export function PosBoard({
   /** Gewerk-Abschnitte als Blöcke umsortieren (Flat-Array-Reihenfolge). */
   const reorderGroups = (draggedGewerk: string, targetGewerk: string) => {
     if ((!onChange && pendingGewerke.length === 0) || draggedGewerk === targetGewerk) return
+    if (draggedGewerk === HINWEISE_GRUPPE || targetGewerk === HINWEISE_GRUPPE) return
     const map = new Map<string, PosBoardLine[]>()
     const order: string[] = []
     for (const p of positionen) {
@@ -626,13 +638,44 @@ export function PosBoard({
     ) / 100
 
   const groups = useMemo((): PosTableGroup[] => {
+    // Nachlass steht nur in der Summen-Box; Freitexte immer unter „Hinweise“ (am Ende)
     const map = new Map<string, PosBoardLine[]>()
+    const hinweise: PosBoardLine[] = []
     positionen.forEach((p) => {
+      if (p.kind === 'nachlass') return
+      if (p.kind === 'freitext') {
+        hinweise.push(p)
+        return
+      }
       const g = gewerkOf(p)
       const arr = map.get(g) ?? []
       arr.push(p)
       map.set(g, arr)
     })
+    const toItem = (p: PosBoardLine) => {
+        const namePlain = richTextToPlain(p.name)
+        const beschPlain = richTextToPlain(p.beschreibung)
+        const lineNetto = _line(p)
+        return {
+          id: p.id,
+          name: namePlain || beschPlain || '(ohne Bezeichnung)',
+          beschreibung: namePlain ? beschPlain : '',
+          mengeLabel: mengeLabelOf ? mengeLabelOf(p) : defaultMengeLabel(p),
+          menge:
+            p.kind === 'nachlass' || p.kind === 'freitext'
+              ? undefined
+              : typeof p.menge === 'number'
+                ? p.menge
+                : Number(p.menge) || undefined,
+          einheit: p.kind === 'nachlass' || p.kind === 'freitext' ? undefined : p.einheit || undefined,
+          mengeEditable: p.kind !== 'nachlass' && p.kind !== 'freitext',
+          preisLabel: preisLabelOf ? preisLabelOf(p) : defaultPreisLabel(p, lineNetto),
+          badge: badgeOf ? badgeOf(p) : defaultBadge(p),
+        }
+    }
+    const hinweisGruppe: PosTableGroup[] = hinweise.length
+      ? [{ id: 'hinweise', gewerk: HINWEISE_GRUPPE, items: hinweise.map(toItem), fest: true }]
+      : []
     const fromLines = Array.from(map.entries()).map(([gewerk, arr], gi) => ({
       id: `g${gi}`,
       gewerk,
@@ -666,7 +709,7 @@ export function PosBoard({
         gewerk,
         items: [] as PosTableGroup['items'],
       }))
-    return [...fromLines, ...pending]
+    return [...fromLines, ...pending, ...hinweisGruppe]
   }, [positionen, pendingGewerke, mengeLabelOf, preisLabelOf, badgeOf, _line])
 
   const itemActions = editable
@@ -939,6 +982,14 @@ export function PosBoard({
                 gewerke={gewerkOptions}
                 artikelNetto={artikelNettoVorNachlass}
                 artikelBrutto={artikelBruttoVorNachlass}
+                onRemove={
+                  editP.kind === 'nachlass'
+                    ? () => {
+                        remove(editP.id)
+                        setEditId(null)
+                      }
+                    : undefined
+                }
               />
             )
         : null}
@@ -1044,6 +1095,7 @@ export function PosBoard({
               preis: draft.preis,
               ust: draft.ust,
               regieSchein: Boolean(draft.regie),
+              kostenverteilung: draft.kostenverteilung,
             })
             setAddSheetOpen(false)
             setPreislisteTargetGewerk(null)

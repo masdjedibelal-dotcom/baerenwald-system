@@ -17,6 +17,7 @@ import {
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag,type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import { REGIE_BADGE_LABEL } from '@/lib/auftraege/regie-display'
+import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import { Toggle } from '@/components/ui/Toggle'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
@@ -36,7 +37,15 @@ export type FreiePositionDraft = {
   gewerk: string
   /** Regie / nach Aufwand */
   regie?: boolean
+  /** Lohn / Material / Allgemein */
+  kostenverteilung?: KostenVerteilung
 }
+
+const KOSTENART_OPTIONS: { value: KostenVerteilung; label: string }[] = [
+  { value: 'allgemein', label: 'Allgemein' },
+  { value: 'lohn', label: 'Lohn' },
+  { value: 'material', label: 'Material' },
+]
 
 export type FreitextDraft = {
   name: string
@@ -46,7 +55,7 @@ export type FreitextDraft = {
 
 export type NachlassDraft = {
   name: string
-  nachlassModus: 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
+  nachlassModus: GesamtrabattModus
   preis: number
 }
 
@@ -59,6 +68,7 @@ const emptyFrei = (gewerk: string): FreiePositionDraft => ({
   ust: 19,
   gewerk: gewerk.trim(),
   regie: false,
+  kostenverteilung: 'allgemein',
 })
 
 const emptyFreitext = (gewerk: string): FreitextDraft => ({
@@ -530,7 +540,7 @@ export function PositionAddSheet({
           ) : !katalogLoading && !filtered.length ? (
             <MockEmpty title="Keine Treffer." />
           ) : (
-            <div className="max-h-[280px] overflow-y-auto rounded-field border border-bw-border">
+            <div className="max-h-[280px] overflow-y-auto rounded-field border border-bw-border md:max-h-[calc(100dvh-340px)]">
               {grouped.map(([gewerkName, items]) => (
                 <div key={gewerkName}>
                   <div className="sticky top-0 bg-bw-surface-2 px-3 py-1.5 text-[length:var(--fs-meta)] font-semibold uppercase tracking-wide text-bw-text-muted">
@@ -542,9 +552,9 @@ export function PositionAddSheet({
                       const selectedHere = picked?.position.id === p.id
                       return (
                         <li key={p.id} className="border-t border-bw-border/60">
-                          <MockBtn fullWidth className="flex items-center gap-2 px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-bw-surface-2" type="button" onClick={() => tryPickPosition(p)}>
-                            <span className="min-w-0 flex-1 font-medium">{p.titel}</span>
-                            <MockBadge kind="fertig">{p.kategorie}</MockBadge>
+                          <MockBtn fullWidth className="flex min-w-0 items-center gap-2 overflow-hidden px-3 py-2 text-left text-[length:var(--fs-text)] hover:bg-bw-surface-2" type="button" onClick={() => tryPickPosition(p)} title={p.titel}>
+                            <span className="min-w-0 flex-1 truncate font-medium">{p.titel}</span>
+                            <span className="shrink-0"><MockBadge kind="fertig">{p.kategorie}</MockBadge></span>
                             <span className="shrink-0 text-[length:var(--fs-meta)] text-bw-text-muted">
                               {p.varianten.length} Var.
                             </span>
@@ -631,6 +641,21 @@ export function PositionAddSheet({
             placeholder="Details zur Leistung…"
             sheetContext="canvas"
           />
+          <div className="field" style={{ gridColumn: '1 / -1' }}>
+            <div className="field-label">Kostenart</div>
+            <div className="seg" role="group" aria-label="Kostenart">
+              {KOSTENART_OPTIONS.map((opt) => (
+                <MockBtn
+                  key={opt.value}
+                  className={(frei.kostenverteilung ?? 'allgemein') === opt.value ? 'on' : undefined}
+                  type="button"
+                  onClick={() => setFrei((f) => ({ ...f, kostenverteilung: opt.value }))}
+                >
+                  {opt.label}
+                </MockBtn>
+              ))}
+            </div>
+          </div>
           <div className="field" style={{ gridColumn: '1 / -1' }}>
             <Toggle
               checked={Boolean(frei.regie)}

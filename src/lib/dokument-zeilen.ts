@@ -79,7 +79,33 @@ export type DokumentFreitextZeile = {
 }
 
 /** Nachlass-Art: Prozent / fester Abzug / Ziel-Gesamtbetrag (Netto oder Brutto). */
-export type GesamtrabattModus = 'prozent' | 'betrag' | 'ziel_netto' | 'ziel_brutto'
+export type GesamtrabattModus =
+  | 'prozent'
+  | 'prozent_brutto'
+  | 'betrag'
+  | 'betrag_brutto'
+  | 'ziel_netto'
+  | 'ziel_brutto'
+
+/** Prozent / fester Betrag / neuer Gesamtbetrag — unabhängig von Netto/Brutto. */
+export function gesamtrabattArt(modus: string | null | undefined): 'prozent' | 'betrag' | 'ziel' {
+  if (modus === 'ziel_netto' || modus === 'ziel_brutto') return 'ziel'
+  if (modus === 'betrag' || modus === 'betrag_brutto') return 'betrag'
+  return 'prozent'
+}
+
+export function gesamtrabattIstBrutto(modus: string | null | undefined): boolean {
+  return modus === 'prozent_brutto' || modus === 'betrag_brutto' || modus === 'ziel_brutto'
+}
+
+export function gesamtrabattModusAus(
+  art: 'prozent' | 'betrag' | 'ziel',
+  brutto: boolean
+): GesamtrabattModus {
+  if (art === 'ziel') return brutto ? 'ziel_brutto' : 'ziel_netto'
+  if (art === 'betrag') return brutto ? 'betrag_brutto' : 'betrag'
+  return brutto ? 'prozent_brutto' : 'prozent'
+}
 
 export type DokumentGesamtrabattZeile = {
   id: string
@@ -96,6 +122,8 @@ export function parseGesamtrabattModus(raw: string | null | undefined): Gesamtra
     .trim()
     .toLowerCase()
   if (m === 'betrag') return 'betrag'
+  if (m === 'betrag_brutto') return 'betrag_brutto'
+  if (m === 'prozent_brutto') return 'prozent_brutto'
   if (m === 'ziel_netto' || m === 'zielnetto') return 'ziel_netto'
   if (m === 'ziel_brutto' || m === 'zielbrutto') return 'ziel_brutto'
   return 'prozent'
@@ -115,7 +143,8 @@ export function gesamtrabattAbzugFromModus(
   artikelBrutto?: number
 ): number {
   const netto = Math.max(0, artikelNetto)
-  if (modus === 'prozent') {
+  // Prozent vom Brutto = gleicher Anteil vom Netto
+  if (modus === 'prozent' || modus === 'prozent_brutto') {
     const p = Math.max(0, Math.min(100, wert))
     if (p <= 0 || netto <= 0) return 0
     return Math.round(netto * (p / 100) * 100) / 100
@@ -123,6 +152,16 @@ export function gesamtrabattAbzugFromModus(
   if (modus === 'betrag') {
     if (wert <= 0 || netto <= 0) return 0
     return Math.round(Math.min(netto, Math.max(0, wert)) * 100) / 100
+  }
+  if (modus === 'betrag_brutto') {
+    // fester Brutto-Betrag → proportionaler Netto-Abzug (auch bei gemischter USt)
+    const bruttoSumme =
+      artikelBrutto != null && Number.isFinite(artikelBrutto) && artikelBrutto > 0
+        ? artikelBrutto
+        : Math.round(netto * 1.19 * 100) / 100
+    if (wert <= 0 || netto <= 0 || bruttoSumme <= 0) return 0
+    const anteil = Math.min(1, Math.max(0, wert) / bruttoSumme)
+    return Math.round(netto * anteil * 100) / 100
   }
   if (modus === 'ziel_netto') {
     const ziel = Math.max(0, wert)
@@ -291,7 +330,7 @@ export function gesamtrabattAbzugAusAngebotPositionen(
   if (!r) return 0
   const { modus, wert } = parseGesamtrabattMetaFromPosition(r)
   const artikelBrutto =
-    modus === 'ziel_brutto'
+    modus === 'ziel_brutto' || modus === 'betrag_brutto'
       ? summeArtikelBruttoAusAngebotPositionen(positionen, mwstSatz)
       : undefined
   return gesamtrabattAbzugFromModus(modus, wert, artikelNetto, artikelBrutto)
@@ -328,7 +367,8 @@ export function summeArtikelBrutto(zeilen: DokumentZeile[]): number {
 export function gesamtrabattBetrag(zeilen: DokumentZeile[], artikelNetto: number): number {
   const r = zeilen.find((z): z is DokumentGesamtrabattZeile => z.typ === 'gesamtrabatt')
   if (!r) return 0
-  const artikelBrutto = r.modus === 'ziel_brutto' ? summeArtikelBrutto(zeilen) : undefined
+  const artikelBrutto =
+    r.modus === 'ziel_brutto' || r.modus === 'betrag_brutto' ? summeArtikelBrutto(zeilen) : undefined
   return gesamtrabattAbzugFromModus(r.modus, r.wert, artikelNetto, artikelBrutto)
 }
 

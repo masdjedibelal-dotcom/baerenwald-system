@@ -54,6 +54,8 @@ export type PosTableGroup = {
   gewerk: string
   titel?: string
   items: PosTableItem[]
+  /** Feste Anzeige-Gruppe (z. B. „Hinweise“): nicht verschiebbar, kein +, kein Menü */
+  fest?: boolean
 }
 
 function SelectBox({ on }: { on: boolean }) {
@@ -137,7 +139,7 @@ function SortableGroupHeader({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: groupSortId(g.gewerk),
-    disabled: !dnd,
+    disabled: !dnd || Boolean(g.fest),
   })
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -148,8 +150,8 @@ function SortableGroupHeader({
 
   return (
     <div ref={setNodeRef} style={style}>
-      <div className="pt2-sub" style={{ cursor: dnd ? 'grab' : undefined }}>
-        {dnd ? (
+      <div className="pt2-sub" style={{ cursor: dnd && !g.fest ? 'grab' : undefined }}>
+        {dnd && !g.fest ? (
           <span
             className="drag touch-none"
             title="Gewerk ziehen zum Sortieren"
@@ -175,12 +177,12 @@ function SortableGroupHeader({
         <span className="g">{g.gewerk || 'Allgemein'}</span>
         {g.titel ? <span className="gt">· {g.titel}</span> : null}
         <div style={{ flex: 1 }} />
-        {onAddKind && !unifiedAdd ? (
+        {onAddKind && !unifiedAdd && !g.fest ? (
           <MockBtn className={cn('pt2-gewerk-add', addOpen && 'is-open')} type="button" title="Position hinzufügen" aria-label="Position hinzufügen" aria-expanded={addOpen} onClick={() => setAddOpenFor(addOpen ? null : g.id)}>
             <MockIcon ctx="default" n="plus" size={14} />
           </MockBtn>
         ) : null}
-        {groupActions ? <MockEntityRowMenu items={groupActions(g)} title="Position" /> : null}
+        {groupActions && !g.fest ? <MockEntityRowMenu items={groupActions(g)} title="Position" /> : null}
       </div>
       {children}
     </div>
@@ -681,12 +683,12 @@ export function PosTable({
               <span className="g">{g.gewerk || 'Allgemein'}</span>
               {g.titel ? <span className="gt">· {g.titel}</span> : null}
               <div style={{ flex: 1 }} />
-              {onAddKind && !unifiedAdd ? (
+              {onAddKind && !unifiedAdd && !g.fest ? (
                 <MockBtn className={cn('pt2-gewerk-add', addOpen && 'is-open')} type="button" title="Position hinzufügen" aria-label="Position hinzufügen" aria-expanded={addOpen} onClick={() => setAddOpenFor(addOpen ? null : g.id)}>
                   <MockIcon ctx="default" n="plus" size={14} />
                 </MockBtn>
               ) : null}
-              {groupActions ? <MockEntityRowMenu items={groupActions(g)} title="Position" /> : null}
+              {groupActions && !g.fest ? <MockEntityRowMenu items={groupActions(g)} title="Position" /> : null}
             </div>
             {itemList}
           </div>

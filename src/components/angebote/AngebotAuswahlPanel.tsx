@@ -16,10 +16,9 @@ import {
 } from '@/app/(dashboard)/angebote/wizard-actions'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { angebotDarfImWizardBearbeitetWerden } from '@/lib/angebote/angebot-wizard-types'
-import type { AngebotStatus } from '@/lib/types'
 import { formatAngebotEurKurzBrutto } from '@/lib/vorgang/projekt-kontext-labels'
 import { findeNeuestenEntwurf } from '@/lib/angebote/angebot-lebenszyklus'
-import { ANGEBOT_STATUS_LABELS, formatRelativeDate } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
 import { TOAST } from '@/lib/copy'
 export type AngebotAuswahlZeile = {
@@ -31,6 +30,7 @@ export type AngebotAuswahlZeile = {
   gesamt_max: number | null
   created_at: string
   angebotsnr?: string | null
+  titel?: string | null
 }
 
 /**
@@ -189,23 +189,25 @@ export function AngebotAuswahlPanel({
         <ul className="m-0 list-none divide-y divide-bw-border overflow-hidden rounded-[10px] border border-bw-border p-0">
           {rows.map((a) => {
             const loading = pending && loadingId === a.id
-            const label = ANGEBOT_STATUS_LABELS[a.status as AngebotStatus] ?? a.status
             const nr = a.angebotsnr?.trim() || `AN-${a.id.slice(0, 8).toUpperCase()}`
 
             return (
               <li key={a.id} className="flex items-center gap-2 px-3 py-2.5">
                 <MockBtn className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left shadow-none" type="button" disabled={pending} onClick={() => openRow(a)}>
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[length:var(--fs-meta)] font-medium text-bw-text-muted">
-                      {nr}
+                  <span className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate font-semibold text-[length:var(--fs-text)]">
+                      {a.titel?.trim() || nr}
                     </span>
                     <StatusBadge phase="angebot" status={a.status} />
                   </span>
-                  <span className="mt-0.5 block text-[length:var(--fs-meta)] text-bw-text-muted">
-                    {a.created_at ? formatRelativeDate(a.created_at) : '—'}
-                    {label ? ` · ${label}` : ''}
-                    {' · '}
-                    {formatAngebotEurKurzBrutto(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                  <span className="mt-0.5 flex items-center gap-2 text-[length:var(--fs-meta)] text-bw-text-muted">
+                    <span className="flex-1">
+                      {a.created_at ? `Erstellt ${formatDatum(a.created_at)}` : '—'}
+                      {a.titel?.trim() ? ` · ${nr}` : ''}
+                    </span>
+                    <span className="tabular-nums font-medium text-bw-text">
+                      {formatAngebotEurKurzBrutto(a.gesamt_fix ?? null, a.gesamt_min, a.gesamt_max)}
+                    </span>
                   </span>
                 </MockBtn>
                 <div className="shrink-0">
@@ -230,7 +232,7 @@ export function AngebotAuswahlPanel({
         disabled={pending}
         className="w-full"
       >
-        Neu
+        Neues Angebot
       </MockBtn>
     </div>
   )

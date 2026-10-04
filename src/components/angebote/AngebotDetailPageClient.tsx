@@ -235,6 +235,7 @@ export function AngebotDetailPageClient({
       gesamt_max: a.gesamt_max,
       created_at: a.created_at,
       angebotsnr: a.angebotsnr,
+      titel: a.leistungsumfang ?? null,
     }))
     if (!fromCtx.some((a) => a.id === detail.id)) {
       fromCtx.unshift({
@@ -246,6 +247,7 @@ export function AngebotDetailPageClient({
         gesamt_max: detail.gesamt_max ?? null,
         created_at: detail.created_at ?? new Date().toISOString(),
         angebotsnr: detail.angebotsnr ?? null,
+        titel: detail.leistungsumfang ?? null,
       })
     }
     return fromCtx
@@ -448,8 +450,15 @@ export function AngebotDetailPageClient({
     }
   }, [statusEinfach, auftragId, clearFieldErrors])
 
-  // Aktionsmodell: „…“ = Als neues Angebot · Ablehnen · PDF · Löschen (nur Entwurf)
+  // Aktionsmodell: „…“ = Alle Angebote · Als neues Angebot · Ablehnen · PDF · Löschen (nur Entwurf)
   const angebotMenuItems: ActionsMenuItem[] = []
+  if (detail.lead_id) {
+    angebotMenuItems.push({
+      label: 'Alle Angebote',
+      icon: <MockIcon ctx="btn" n="files" size={16} />,
+      onClick: () => setAngebotAuswahlOpen(true),
+    })
+  }
   // Kopieren nur noch für abgelehnte Angebote — sonst legt „Bearbeiten“ automatisch eine neue Fassung an
   if (detail.lead_id && statusEinfach === 'abgelehnt') {
     angebotMenuItems.push({
