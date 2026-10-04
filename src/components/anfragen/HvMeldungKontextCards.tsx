@@ -181,7 +181,7 @@ export function HvMeldungKontextCards({
               sm
               kind="secondary"
               icon="pencil"
-              title="Melder & Leistungsort bearbeiten"
+              title="Kontakt vor Ort & Leistungsort bearbeiten"
               onClick={() => setEditOpen(true)}
             />
           </div>
@@ -250,7 +250,7 @@ export function HvMeldungKontextCards({
       <EditorSheet
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Melder & Leistungsort"
+        title="Kontakt vor Ort & Leistungsort"
         overlayClassName={objektNeuOpen ? 'editor-sheet-overlay--recessed' : undefined}
         primary={{ label: 'Speichern', busy: saving, disabled: saving, onClick: () => void saveEdit() }}
       >

@@ -17,8 +17,6 @@ import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
-import { ObjektEinheitenSection } from '@/components/objektakte/ObjektEinheitenSection'
-import { ObjektHausmeisterCard } from '@/components/objektakte/ObjektHausmeisterCard'
 import { ObjektAnlagenSection } from '@/components/objektakte/ObjektAnlagenSection'
 import { ObjektHistorieSection } from '@/components/objektakte/ObjektHistorieSection'
 import { ObjektUebersichtKpiCard } from '@/components/objektakte/ObjektUebersichtKpiCard'
@@ -233,14 +231,6 @@ export function ObjektAkteDetailClient({
         />
       ) : null}
 
-      <ObjektHausmeisterCard
-        kundeId={kunde.id}
-        objektId={objektState.id}
-        liste={akte.orgHausmeisterListe}
-        amObjekt={akte.hausmeisterAmObjekt}
-        onChanged={refresh}
-      />
-
       <ObjektKontakteSection
         kundeId={kunde.id}
         objektId={objektState.id}
@@ -257,23 +247,7 @@ export function ObjektAkteDetailClient({
       icon: 'layout-dashboard',
       render: () => overview,
     },
-    {
-      id: 'einheiten',
-      label: 'Einheiten',
-      icon: 'building',
-      count: einheitenAnzahl || undefined,
-      render: () => (
-        <ObjektEinheitenSection
-          kundeId={kunde.id}
-          objektId={objektState.id}
-          einheiten={akte.einheiten}
-          bewohner={akte.bewohner}
-          verwaltungName={kunde.name}
-          objektLabel={objektState.titel}
-          onChanged={refresh}
-        />
-      ),
-    },
+    // Einheiten/Mieter und Hausmeister entfallen (04.10.2026) — Mieterdaten nur in der Meldung
     // Anlagen & Teile entfallen (Entlastung 01.10.2026).
     // Historie entfällt: zeigte dieselben Vorgänge wie der Tab „Vorgänge“ (eine Wahrheit, 01.10.2026).
     {

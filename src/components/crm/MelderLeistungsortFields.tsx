@@ -80,7 +80,7 @@ export function MelderLeistungsortFields({
       </MockFormSection>
 
       {hideMelder ? null : (
-      <MockFormSection title="Melder" icon="user">
+      <MockFormSection title="Kontakt vor Ort" icon="user">
         <MockField label="Name" full>
           <MockInput className="txt" value={draft.melder_name} disabled={disabled} placeholder="Vor- und Nachname" onChange={(e) => onChange({ melder_name: e.target.value })} />
         </MockField>
@@ -90,7 +90,7 @@ export function MelderLeistungsortFields({
         <MockField label="E-Mail">
           <MockInput className="txt" type="email" value={draft.melder_email} disabled={disabled} onChange={(e) => onChange({ melder_email: e.target.value })} />
         </MockField>
-        <MockField label="Einheit" hint="Wohnung / Stockwerk / Tür">
+        <MockField label="Wohnung / Lage" hint="Wohnung, Stockwerk oder Tür">
           <MockInput className="txt" value={draft.melder_einheit} disabled={disabled} placeholder="z. B. EG links" onChange={(e) => onChange({ melder_einheit: e.target.value })} />
         </MockField>
       </MockFormSection>

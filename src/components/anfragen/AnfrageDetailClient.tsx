@@ -909,7 +909,7 @@ export function AnfrageDetailClient({
             ? () =>
                 toast.message('Wartet auf Zustimmung', {
                   description:
-                    'Die Hausverwaltung muss freigeben oder die Hausmeister-Prüfung abschließen. Danach können Sie disponieren.',
+                    'Die Hausverwaltung muss die Meldung zuerst freigeben. Danach können Sie disponieren.',
                 })
             : undefined // Partner-LV einholen entfällt (30.09.2026) — Partner kommen über Einsätze
       }
