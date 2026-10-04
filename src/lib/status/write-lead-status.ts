@@ -1,7 +1,6 @@
 /**
  * Einziger erlaubter Schreibpfad für leads.status (P2-5).
  */
-import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   assertKnownStatus,

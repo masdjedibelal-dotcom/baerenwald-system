@@ -1,4 +1,3 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import {
   buildRechnungHtmlInput,
   loadVorherigeAbschlaegeFuerSchluss,

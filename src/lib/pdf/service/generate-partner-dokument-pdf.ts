@@ -1,6 +1,6 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument,StandardFonts,rgb,type PDFFont,type PDFPage } from "pdf-lib";
 
-import { formatDatum, formatEuro } from "@/lib/format/geld-datum";
+import { formatDatum,formatEuro } from "@/lib/format/geld-datum";
 
 export type PartnerDocEmpfaenger = {
   firma: string;
@@ -467,18 +467,4 @@ export async function generatePartnerDokumentPdf(
   }
 
   return pdf.save();
-}
-
-export function sumPartnerDocNetto(positionen: PartnerDocPosition[]): number {
-  return positionen.reduce((s, p) => s + (Number.isFinite(p.netto) ? p.netto : 0), 0);
-}
-
-export function formatPartnerRechnungsNr(year: number, seq: number): string {
-  return `${year}-${String(seq).padStart(4, "0")}`;
-}
-
-export function formatPartnerAngebotsNr(prefix: string, isoDate: string): string {
-  const d = isoDate.slice(0, 10).replace(/-/g, "");
-  const short = prefix.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase() || "HW";
-  return `A-${short}-${d}`;
 }

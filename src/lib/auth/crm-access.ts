@@ -37,10 +37,6 @@ export function crmRoleFromUser(user: User | null | undefined): 'admin' | 'manag
   return null
 }
 
-export function isLikelyPortalOnlyUser(user: User): boolean {
-  return !crmRoleFromUser(user)
-}
-
 export const CRM_LOGIN_PORTAL_ONLY_MESSAGE =
   `Diese E-Mail ist für MeinBärenwald / das ${COPY_ROLE.partnerPortal} registriert, nicht für das CRM. ` +
   'Für das CRM nutze die Einladungs-E-Mail (z. B. info@baerenwald-muenchen.de mit Bindestrich) oder bitte einen Admin um CRM-Zugang.'

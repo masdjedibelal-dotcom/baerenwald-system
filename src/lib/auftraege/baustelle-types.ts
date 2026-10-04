@@ -52,13 +52,6 @@ export type AuftragBaustellenDokument = {
   created_at: string
 }
 
-export const BAUSTELLEN_DOKUMENT_TYP_LABELS: Record<BaustellenDokumentTyp, string> = {
-  tagesbericht: 'Tagesbericht',
-  wochenbericht: 'Wochenbericht',
-  regiebericht: 'Regiebericht',
-  sonstiges: 'Sonstiges',
-}
-
 export function parseStringListJson(raw: unknown): string[] {
   if (!Array.isArray(raw)) return []
   return raw.map((x) => String(x ?? '').trim()).filter(Boolean)

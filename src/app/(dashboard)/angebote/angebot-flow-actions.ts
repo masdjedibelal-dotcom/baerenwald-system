@@ -1,22 +1,20 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAuftragDetail,revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
-import { sendAngebotToKunde, createAuftragFromAngebot, sendAngebotNachfassManuell, markLeadAngeboteAbgelehnt } from '@/app/(dashboard)/angebote/actions'
+import { createAuftragFromAngebot,sendAngebotNachfassManuell,markLeadAngeboteAbgelehnt } from '@/app/(dashboard)/angebote/actions'
 import { erledigeInterneNachfassTodos } from '@/lib/kalender-auto-termine'
-import { addDaysYmd, heuteYmd } from '@/lib/angebot-einfach'
-import { isKundeAblehnungGrund, KUNDE_ABLEHNUNG_GRUND_LABELS } from '@/lib/angebote/ablehnung-labels'
+import { isKundeAblehnungGrund,KUNDE_ABLEHNUNG_GRUND_LABELS } from '@/lib/angebote/ablehnung-labels'
 import {
   angebotDarfDirektAuftragOhneHvFreigabe,
   resolveAnfrageFreigabeRegeln,
 } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { writeLeadStatus } from '@/lib/status/write-lead-status'
 import {
-  writeAngebotStatus,
-  writeAngebotStatusEinfach,
+  writeAngebotStatus
 } from '@/lib/status/write-angebot-status'
 
 async function insertAngebotTimeline(
@@ -41,70 +39,10 @@ async function insertAngebotTimeline(
   if (__dbErr1) logDbError('app/angebote/angebot-flow-actions:lead_timeline', __dbErr1)
 }
 
-export async function sendAngebotEinfach(
-  angebotId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const sent = await sendAngebotToKunde(angebotId)
-  if (!sent.ok) return sent
-
-  const now = new Date().toISOString()
-  const gueltig = addDaysYmd(heuteYmd(), 30)
-  const supabase = createClient()
-  const { data: row, error } = await supabase
-    .from('angebote')
-    .select('lead_id, kunden(email, name)')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (error) logDbError('app/angebote/angebot-flow-actions:angebote', error)
-
-  const { error: error2 } = await writeAngebotStatus(supabase, angebotId, 'gesendet_kunde', {
-    status_einfach: 'gesendet',
-    gesendet_am: now,
-    gesendet_kunde_at: now,
-    gueltig_bis: gueltig,
-  })
-  if (error2) logDbError('app/angebote/angebot-flow-actions:angebote', error2)
-  if (error2) return { ok: false, message: error2.message }
-
-  revalidateAngebotDetail(angebotId)
-  if (row?.lead_id) revalidateLeadDetail(row.lead_id)
-  return { ok: true }
-}
-
 export async function sendAngebotNachfassManuellAction(
   angebotId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   return sendAngebotNachfassManuell(angebotId)
-}
-
-export async function resendAngebotEinfach(
-  angebotId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const sent = await sendAngebotToKunde(angebotId)
-  if (!sent.ok) return sent
-
-  const now = new Date().toISOString()
-  const gueltig = addDaysYmd(heuteYmd(), 30)
-  const supabase = createClient()
-  const { data: row, error } = await supabase
-    .from('angebote')
-    .select('lead_id, kunden(email)')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (error) logDbError('app/angebote/angebot-flow-actions:angebote', error)
-
-  const { error: error2 } = await writeAngebotStatusEinfach(supabase, angebotId, 'gesendet', {
-    gesendet_am: now,
-    gesendet_kunde_at: now,
-    gueltig_bis: gueltig,
-    nachgefasst_am: null,
-  })
-  if (error2) logDbError('app/angebote/angebot-flow-actions:angebote', error2)
-  if (error2) return { ok: false, message: error2.message }
-
-  revalidateAngebotDetail(angebotId)
-  if (row?.lead_id) revalidateLeadDetail(row.lead_id)
-  return { ok: true }
 }
 
 export async function markAngebotAbgelehntEinfach(input: {

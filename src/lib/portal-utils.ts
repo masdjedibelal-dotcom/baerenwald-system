@@ -1,5 +1,5 @@
 import { mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
-import { isStagingSupabase, STAGING_WEBSITE_ORIGIN } from '@/lib/auth/staging-admin'
+import { isStagingSupabase,STAGING_WEBSITE_ORIGIN } from '@/lib/auth/staging-admin'
 
 /** Kundenportal vs. Auftraggeber-Portal — steuert Button- und P.S.-Text in Mails. */
 export type PortalMailAudience = 'privat' | 'organisation'
@@ -108,10 +108,6 @@ export function buildPartnerLoginLink(): string {
   return buildPartnerDashboardLink()
 }
 
-export function buildPartnerRegisterUrl(): string {
-  return `${publicWebsiteBaseUrl()}/partner/registrieren`
-}
-
 /** Deep-Link zum Vorgang im Partner-Portal (Tab „Vorgänge“). */
 export function buildPartnerVorgangPortalUrl(auftragId: string): string {
   const id = auftragId.trim()
@@ -124,38 +120,10 @@ export function partnerVorgangRelativeLink(auftragId: string): string {
   return `/partner?section=vorgaenge&id=${encodeURIComponent(id)}`
 }
 
-/** @deprecated Nutze buildPartnerVorgangPortalUrl — alter Aufträge-Tab */
-export function buildPartnerAuftragPortalUrl(auftragId: string): string {
-  const id = auftragId.trim()
-  return `${publicWebsiteBaseUrl()}/partner?section=auftraege&auftrag=${encodeURIComponent(id)}`
-}
-
-/** Auftrags-Zuweisung — Annehmen/Ablehnen unter Anfragen (Listen-ID: auftrag:{id}). */
-export function buildPartnerAuftragAnfragePortalUrl(auftragId: string): string {
-  const id = auftragId.trim()
-  return `${publicWebsiteBaseUrl()}/partner?section=anfragen&id=${encodeURIComponent(`auftrag:${id}`)}`
-}
-
-/** Deep-Link zum Auftrag im Partner-Portal (für E-Mails). */
-export function buildPartnerLoginForAuftragUrl(auftragId: string): string {
-  return buildPartnerAuftragPortalUrl(auftragId)
-}
-
 /** Deep-Link zur Anfrage im Partner-Portal (Tab „Vorgänge“). */
 export function buildPartnerAnfragePortalUrl(anfrageId: string): string {
   const id = anfrageId.trim()
   return `${publicWebsiteBaseUrl()}/partner?section=vorgaenge&id=${encodeURIComponent(id)}`
-}
-
-/** Angebote-Tab im Partner-Portal (Vertrag + Checkliste nach Übernahme). */
-export function buildPartnerAngebotPortalUrl(anfrageId: string): string {
-  const id = anfrageId.trim()
-  return `${publicWebsiteBaseUrl()}/partner?section=angebote&id=${encodeURIComponent(id)}`
-}
-
-/** Deep-Link zum Angebote-Tab (für E-Mails). */
-export function buildPartnerLoginForAngebotUrl(anfrageId: string): string {
-  return buildPartnerAngebotPortalUrl(anfrageId)
 }
 
 export function buildPartnerPortalButton(portalLink: string): string {
@@ -170,23 +138,4 @@ export function buildPartnerPortalButton(portalLink: string): string {
   font-family:Arial,Helvetica,sans-serif;">
   Melde dich mit deiner bei Bärenwald hinterlegten Partner-E-Mail an — danach siehst du Auftrag und Leistungen.
 </p>`
-}
-
-/** Einzelner Portal-Button (ohne Zusatzabsatz — Text steht im P.S.-Block der Mail-Hülle). */
-export function buildPortalButton(
-  portalLink: string,
-  anrede: 'du' | 'sie' = 'sie',
-  audience: PortalMailAudience = 'privat'
-): string {
-  void anrede
-  return `
-<div style="margin:20px 0 8px;">
-  ${mailSecondaryButtonHtml(portalMailButtonLabel(audience), portalLink, { margin: '0' })}
-</div>`
-}
-
-/** @deprecated Token-Links entfallen — nutze buildPortalLoginLink() */
-export function buildPortalLink(_token?: string | null): string | null {
-  void _token
-  return buildPortalLoginLink()
 }

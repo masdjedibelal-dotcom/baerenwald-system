@@ -16,12 +16,6 @@ export function revalidateLeadList(): void {
   revalidatePath('/anfragen')
 }
 
-export function revalidateLead(leadId: string, opts?: { list?: boolean; vorgaenge?: boolean }): void {
-  revalidateLeadDetail(leadId)
-  if (opts?.list) revalidateLeadList()
-  if (opts?.vorgaenge) revalidateVorgaengeListe()
-}
-
 export function revalidateAngebotDetail(angebotId: string): void {
   const id = angebotId?.trim()
   if (!id) return
@@ -34,16 +28,6 @@ export function revalidateAngebotList(): void {
 
 export function revalidateAngebotNeu(): void {
   revalidatePath('/angebote/neu')
-}
-
-export function revalidateAngebot(
-  angebotId: string,
-  opts?: { list?: boolean; leadId?: string | null; vorgaenge?: boolean }
-): void {
-  revalidateAngebotDetail(angebotId)
-  if (opts?.list) revalidateAngebotList()
-  if (opts?.leadId) revalidateLeadDetail(opts.leadId)
-  if (opts?.vorgaenge) revalidateVorgaengeListe()
 }
 
 export function revalidateAuftragDetail(auftragId: string): void {
@@ -75,30 +59,10 @@ export function revalidateRechnungList(): void {
   revalidatePath('/rechnungen')
 }
 
-export function revalidateRechnung(
-  rechnungId: string,
-  opts?: { list?: boolean; vorgaenge?: boolean; auftragId?: string | null }
-): void {
-  revalidateRechnungDetail(rechnungId)
-  if (opts?.list) revalidateRechnungList()
-  if (opts?.auftragId) revalidateAuftragDetail(opts.auftragId)
-  if (opts?.vorgaenge) revalidateVorgaengeListe()
-}
-
 export function revalidateKundeDetail(kundeId: string): void {
   const id = kundeId?.trim()
   if (!id) return
   revalidatePath(`/kunden/${id}`)
-}
-
-export function revalidateKundeList(): void {
-  revalidatePath('/kunden')
-}
-
-export function revalidateKunde(kundeId: string, opts?: { list?: boolean; vorgaenge?: boolean }): void {
-  revalidateKundeDetail(kundeId)
-  if (opts?.list) revalidateKundeList()
-  if (opts?.vorgaenge) revalidateVorgaengeListe()
 }
 
 export function revalidateHandwerkerDetail(handwerkerId: string): void {
@@ -109,15 +73,6 @@ export function revalidateHandwerkerDetail(handwerkerId: string): void {
 
 export function revalidateHandwerkerList(): void {
   revalidatePath('/handwerker')
-}
-
-export function revalidateHandwerker(handwerkerId: string, opts?: { list?: boolean }): void {
-  revalidateHandwerkerDetail(handwerkerId)
-  if (opts?.list) revalidateHandwerkerList()
-}
-
-export function revalidatePartnerList(): void {
-  revalidatePath('/partner')
 }
 
 export function revalidatePreislistenList(): void {
@@ -164,10 +119,4 @@ export function revalidateFormularBearbeiten(templateId: string): void {
   const id = templateId?.trim()
   if (!id) return
   revalidatePath(`/formulare/${id}/bearbeiten`)
-}
-
-export function revalidatePartnerDetail(partnerId: string): void {
-  const id = partnerId?.trim()
-  if (!id) return
-  revalidatePath(`/partner/${id}`)
 }

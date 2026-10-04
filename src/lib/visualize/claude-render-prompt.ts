@@ -6,7 +6,7 @@ import {
   getClaudeModel,
 } from '@/lib/copilot/claude-api-key'
 import { formatAnthropicError } from '@/lib/copilot/format-anthropic-error'
-import type { VizBrief, VizRaumAnalyse } from '@/lib/visualize/types'
+import type { VizBrief,VizRaumAnalyse } from '@/lib/visualize/types'
 
 const SYSTEM = `Du übersetzt deutsche Renovierungswünsche in einen englischen Stable-Diffusion-Prompt
 für ein Interior-Design-Modell (bestehender Raum, gleiche Kameraposition).
@@ -74,6 +74,3 @@ export async function buildRenderPrompt(input: {
     throw new Error(formatAnthropicError(e))
   }
 }
-
-/** @deprecated Alias für Abwärtskompatibilität */
-export const buildEnglishRenderPrompt = buildRenderPrompt

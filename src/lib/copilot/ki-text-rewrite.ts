@@ -3,21 +3,6 @@
 /** Töne für Inline-Text-Rewrite (Mail, Dokument, …). */
 export type KiRewriteTone = 'standard' | 'foermlicher' | 'einfacher' | 'kuerzer'
 
-export const KI_REWRITE_TONES: {
-  id: KiRewriteTone
-  label: string
-  hint: string
-}[] = [
-  { id: 'standard', label: 'Standard', hint: 'Klar umschreiben, Ton behalten' },
-  { id: 'foermlicher', label: 'Förmlicher', hint: 'Höflicher, distanzierter' },
-  { id: 'einfacher', label: 'Einfacher', hint: 'Kürzere Sätze, verständlicher' },
-  { id: 'kuerzer', label: 'Kürzer', hint: 'Inhalt verdichten' },
-]
-
-export function kiRewriteToneLabel(tone: KiRewriteTone): string {
-  return KI_REWRITE_TONES.find((t) => t.id === tone)?.label ?? 'Standard'
-}
-
 export function buildKiRewriteUserPrompt(opts: {
   tone: KiRewriteTone
   sourceText: string

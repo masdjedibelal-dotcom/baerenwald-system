@@ -29,13 +29,6 @@ export function hrefWithAkteFrom(pathname: string, ref: AkteFromRef, extra?: Rec
   return qs ? `${pathname}?${qs}` : pathname
 }
 
-export function hrefClearingAkteFrom(pathname: string, searchParams: URLSearchParams): string {
-  const q = new URLSearchParams(searchParams.toString())
-  q.delete('from')
-  const qs = q.toString()
-  return qs ? `${pathname}?${qs}` : pathname
-}
-
 export function akteFromHref(ref: AkteFromRef): string {
   switch (ref.kind) {
     case 'rechnung':

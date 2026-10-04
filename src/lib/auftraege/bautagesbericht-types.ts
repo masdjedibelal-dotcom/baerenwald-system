@@ -33,14 +33,6 @@ export type AuftragBautagesbericht = {
   updated_at: string
 }
 
-export const DEFAULT_BAUTAGESBERICHT_RISIKEN = [
-  'Ordnung und Sauberkeit täglich kontrollieren.',
-  'Materiallagerung sichern.',
-  'Gerüstbereiche freihalten.',
-  'Öffnungen gegen Beschädigungen schützen.',
-  'Dokumentation täglich fortführen.',
-]
-
 export function parseStringList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return []
   return raw.map((x) => String(x ?? '').trim()).filter(Boolean)

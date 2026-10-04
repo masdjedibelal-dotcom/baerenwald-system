@@ -2,22 +2,21 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { MockField, MockFormSection, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField,MockFormSection,MockInput,MockSelect,MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect,useMemo,useState,type KeyboardEvent } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { EuroNettoInput } from '@/components/ui/EuroNettoInput'
 import { toast } from '@/components/ui/app-toast'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
 import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
-import type { Gewerk, Preisliste } from '@/lib/types'
-import { createPreisliste, updatePreisliste, softDeletePreisliste } from '@/app/(dashboard)/preislisten/actions'
+import type { Gewerk,Preisliste } from '@/lib/types'
+import { createPreisliste,updatePreisliste,softDeletePreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { sortPreislistenRows } from '@/lib/preislisten-sort'
 import {
   EINHEIT_CUSTOM,
@@ -68,7 +67,6 @@ export function PreislistenClient({
   initialRows: Preisliste[]
   gewerkeAlle: Gewerk[]
 }) {
-  const router = useRouter()
   const isMobile = useIsMobile()
   const [rows, setRows] = useState<Preisliste[]>(() => sortPreislistenRows(initialRows))
   const gewAll = gewerkeAlle

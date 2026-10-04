@@ -1,12 +1,9 @@
-import type { AuftragPosition, AngebotPosition } from '@/lib/types'
+import type { AuftragPosition } from '@/lib/types'
 import { istRegiePosition } from '@/lib/auftraege/regie-display'
 import {
   dokumentZeilenToPosBoardLines,
-  posBoardLineFromAngebotPosition,
-  posBoardLinesFromAngebotPositionen,
-  posBoardLinesToAngebotPositionen,
-  posBoardLinesToDokumentZeilen,
-  type PosBoardLine,
+  posBoardLineFromAngebotPosition,posBoardLinesToDokumentZeilen,
+  type PosBoardLine
 } from '@/lib/posboard/pos-board-line'
 
 export type { PosBoardLine } from '@/lib/posboard/pos-board-line'
@@ -63,28 +60,6 @@ export function auftragPositionenToPosBoardLines(
         regieSchein: isRegie || undefined,
       }
     })
-}
-
-/** @deprecated Nutze auftragPositionenToPosBoardLines — bleibt für Alt-Importe. */
-export function auftragPositionenToPosBoard(items: AuftragPosition[]): AngebotPosition[] {
-  return posBoardLinesToAngebotPositionen(auftragPositionenToPosBoardLines(items))
-}
-
-/** AngebotPositionen → PosBoard-Zeilen. */
-export function angebotPositionenToPosBoardLines(
-  items: AngebotPosition[] | null | undefined
-): PosBoardLine[] {
-  return posBoardLinesFromAngebotPositionen(items)
-}
-
-/** PosBoard-Zeilen → AngebotPositionen (mit optionaler Basis-Map für Metadaten). */
-export function posBoardLinesToAngebotPositionenWithBase(
-  lines: PosBoardLine[],
-  baseItems: AngebotPosition[] | null | undefined
-): AngebotPosition[] {
-  const base = Array.isArray(baseItems) ? baseItems : []
-  const baseById = new Map(base.map((p) => [p.id, p]))
-  return posBoardLinesToAngebotPositionen(lines, baseById)
 }
 
 /** DokumentZeilen → PosBoard; Re-Export für Wizard-Integration. */

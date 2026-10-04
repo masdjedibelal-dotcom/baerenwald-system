@@ -1,16 +1,16 @@
 'use client'
-import { MockField, MockFormSection, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockFormSection,MockInput } from '@/components/mock-ui/MockForm'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 import { z } from 'zod'
-import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
+import { EditorSheet,type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
-import { createKundenObjekt, updateKundenObjekt } from '@/app/actions/kunden-objekte'
+import { createKundenObjekt,updateKundenObjekt } from '@/app/actions/kunden-objekte'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenObjekt } from '@/lib/types'
 import { TOAST } from '@/lib/copy'
-import { parseForm, useFieldErrors } from '@/lib/validation/form-schema'
+import { parseForm,useFieldErrors } from '@/lib/validation/form-schema'
 
 /* FORM_VALIDATION: kunden-objekt */
 const kundenObjektSchema = z.object({
@@ -23,7 +23,6 @@ const kundenObjektSchema = z.object({
 
 /**
  * Objekt anlegen/bearbeiten — nur Objektdaten.
- * Einheiten sowie Mieter/Eigentümer danach in der Objektakte (wie HV-Portal).
  */
 export function KundenObjektModal({
   open,
@@ -257,19 +256,6 @@ export function KundenObjektModal({
           ) : null}
         </MockFormSection>
 
-        {!isEdit ? (
-          <p
-            style={{
-              fontSize: 'var(--fs-meta)',
-              color: 'var(--text-3)',
-              margin: 'var(--sp-row) 0 0',
-              lineHeight: 1.45,
-            }}
-          >
-            Nach dem Anlegen: Einheit anlegen, danach Eigentümer und Mieter zuordnen
-            (wie im HV-Portal).
-          </p>
-        ) : null}
       </div>
     </EditorSheet>
 

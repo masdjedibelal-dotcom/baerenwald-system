@@ -1,8 +1,7 @@
 /** Wann eine Rechnung wie korrigiert wird. */
 
-import { logDbError } from '@/lib/errors/log-db-error'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import type { AngebotPosition, RechnungStatus } from '@/lib/types'
+import type { AngebotPosition,RechnungStatus } from '@/lib/types'
 
 export type RechnungKorrekturModus = 'direkt' | 'storno_neu' | 'gesperrt'
 
@@ -11,18 +10,6 @@ export type RechnungKorrekturFilterKey =
   | 'korrektur_entwurf'
   | 'korrektur_gespeichert'
   | 'korrektur_versendet'
-
-export const RECHNUNG_KORREKTUR_FILTER_LABELS: Record<RechnungKorrekturFilterKey, string> = {
-  korrektur_entwurf: 'Korrektur Entwurf',
-  korrektur_gespeichert: 'Korrektur Gespeichert',
-  korrektur_versendet: 'Korrektur Versendet',
-}
-
-export const RECHNUNG_KORREKTUR_FILTER_KEYS: RechnungKorrekturFilterKey[] = [
-  'korrektur_entwurf',
-  'korrektur_gespeichert',
-  'korrektur_versendet',
-]
 
 export type RechnungKorrekturUiInput = {
   status?: string | null
@@ -52,26 +39,6 @@ export function resolveRechnungKorrekturUi(r: RechnungKorrekturUiInput): Rechnun
     filterKey: 'korrektur_entwurf',
     dualBadges: null,
   }
-}
-
-/** Status-Filter-Keys einer Listen-Zeile (Korrektur kann zwei Keys matchen). */
-export function rechnungStatusFilterKeys(r: RechnungKorrekturUiInput & { unterstatus?: string }): string[] {
-  const ui = resolveRechnungKorrekturUi(r)
-  if (ui.filterKey === 'korrektur_entwurf' || ui.filterKey === 'korrektur_gespeichert') {
-    return [ui.filterKey]
-  }
-  if (ui.filterKey === 'korrektur_versendet') {
-    return ['gesendet', 'korrektur_versendet']
-  }
-  const u = String(r.unterstatus ?? r.status ?? '').trim().toLowerCase()
-  return u ? [u] : []
-}
-
-export function matchesRechnungStatusFilterKey(
-  r: RechnungKorrekturUiInput & { unterstatus?: string },
-  filter: string
-): boolean {
-  return rechnungStatusFilterKeys(r).includes(filter)
 }
 
 /** Nach Storno + neuer RE: Kette setzen (korrektur_von / ersetzt_durch / Art). */
@@ -203,10 +170,6 @@ export function rechnungBrauchtStornoBeiAenderung(
   return rechnungMaterialGeaendert(vorher, nachher)
 }
 
-export function rechnungDarfHardGeloeschtWerden(status: RechnungStatus | string | null | undefined): boolean {
-  return (status ?? '').toLowerCase() === 'entwurf'
-}
-
 /** Storno ohne neue Rechnung (mit Storno-Gutschrift) — nach Versand. */
 export function rechnungDarfOhneErsatzStorniertWerden(
   status: RechnungStatus | string | null | undefined
@@ -229,18 +192,6 @@ export type RechnungKorrekturSibling = {
   ersetzt_durch?: string | null
   rechnungsnummer?: string | null
   brutto?: number | null
-}
-
-/** Ob zur Rechnung bereits eine Storno-Gutschrift (mit Bezug) existiert. */
-export function hatStornoGutschriftZuRechnung(
-  rechnungId: string,
-  siblings: RechnungKorrekturSibling[]
-): boolean {
-  return siblings.some(
-    (s) =>
-      String(s.beleg_typ ?? '') === 'gutschrift' &&
-      String(s.bezug_rechnung_id ?? '') === rechnungId
-  )
 }
 
 /** Gutschrift-ID zur Original-RE (neueste Entwurf/gesendet). */

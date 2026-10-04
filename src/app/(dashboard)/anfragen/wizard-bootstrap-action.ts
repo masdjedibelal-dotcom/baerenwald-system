@@ -1,6 +1,5 @@
 'use server'
 
-import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { loadWizardContext } from '@/lib/wizard-context'
 import type { Handwerker } from '@/lib/types'

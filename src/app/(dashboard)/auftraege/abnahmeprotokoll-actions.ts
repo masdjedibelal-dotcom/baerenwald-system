@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { planAbnahmeWrite } from '@/lib/status/write-auftrag-status'
 import { loadAuftragDetail } from '@/app/(dashboard)/auftraege/auftraege-data'
-import type { AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
+import type { AbnahmeMangel,AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import {
   normalizeAbnahmeProtokollMeta,
   type AbnahmeProtokollMeta,
@@ -14,22 +14,19 @@ import {
 import { resolveAbnahmeProtokollMetaForSave } from '@/lib/auftraege/abnahme-protokoll-html-payload'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
-import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { getMailBranding } from '@/lib/get-mail-branding'
-import { mailText, type MailAnrede } from '@/lib/mail/anrede'
+import { mailText,type MailAnrede } from '@/lib/mail/anrede'
 import { buildSubject } from '@/lib/mail/build-subject'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import { renderAbnahmeProtokollPdfBuffer } from '@/lib/auftraege/render-abnahme-protokoll-pdf'
 import {
-  abnahmePunkteStatistik,
-  type AbnahmeMangelStatus,
+  abnahmePunkteStatistik
 } from '@/lib/auftraege/abnahme-protokoll-types'
 import {
-  appendMangelVerlauf,
   applyPunktStatusFromMaengel,
   countOffeneMaengel,
   mergeMaengelFromPunkte,
-  normalizeMaengel,
+  normalizeMaengel
 } from '@/lib/auftraege/abnahme-maengel-helpers'
 import { syncPunchListFromAbnahmeMaengel } from '@/lib/auftraege/sync-abnahme-punch-list'
 import {
@@ -429,17 +426,6 @@ export async function getAbnahmeprotokollMailDefaults(
     }),
     kundeName,
   }
-}
-
-export async function previewAbnahmeprotokollMail(input: {
-  auftragId: string
-  betreff: string
-  nachricht: string
-  anrede: 'du' | 'sie'
-}): Promise<{ ok: true; html: string } | { ok: false; message: string }> {
-  const built = await buildAbnahmeMail(input)
-  if (!built.ok) return built
-  return { ok: true, html: built.html }
 }
 
 async function buildAbnahmeMail(input: {
@@ -1084,33 +1070,6 @@ export async function loadAbnahmeprotokolleListe(
   })
 }
 
-export async function deleteAbnahmeprotokoll(
-  protokollId: string,
-  auftragId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { error } = await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .delete()
-    .eq('id', protokollId)
-    .eq('auftrag_id', auftragId)
-  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
-
-  if (error) return { ok: false, message: error.message }
-
-  await syncAuftragAbnahmeDenorm(auftragId)
-  revalidateAuftragDetail(auftragId)
-  return { ok: true }
-}
-
-export async function loadLetztesAbnahmeprotokoll(auftragId: string): Promise<{
-  punkte: AbnahmePunkt[]
-  maengel: AbnahmeMangel[]
-} | null> {
-  const summary = await loadAbnahmeprotokollSummary(auftragId)
-  if (!summary) return null
-  return { punkte: summary.punkte, maengel: summary.maengel }
-}
-
 export async function loadAbnahmeprotokollSummary(
   auftragId: string,
   protokollId?: string | null
@@ -1366,127 +1325,6 @@ export async function loadOffenenAbnahmeEntwurf(
   return loadAbnahmeprotokollSummary(auftragId, preferred.id)
 }
 
-export async function updateAbnahmeMaengel(input: {
-  auftragId: string
-  punktId: string
-  status: AbnahmeMangelStatus
-  beschreibung?: string
-  frist?: string | null
-  foto_nachher_urls?: string[]
-  notiz?: string | null
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const summary = await loadAbnahmeprotokollSummary(input.auftragId)
-  if (!summary) return { ok: false, message: 'Kein Abnahmeprotokoll vorhanden.' }
-
-  const uid = await getAuthUserId()
-  const now = new Date().toISOString()
-  const idx = summary.maengel.findIndex((m) => m.punkt_id === input.punktId)
-  if (idx < 0) return { ok: false, message: 'Mangel nicht gefunden.' }
-
-  let m = normalizeMaengel([summary.maengel[idx]!])[0]!
-  if (input.beschreibung !== undefined) m = { ...m, beschreibung: input.beschreibung.trim() }
-  if (input.frist !== undefined) m = { ...m, frist: input.frist }
-  if (input.foto_nachher_urls !== undefined) m = { ...m, foto_nachher_urls: input.foto_nachher_urls }
-
-  const prevStatus = m.status ?? 'offen'
-  m = { ...m, status: input.status }
-
-  if (input.status === 'in_bearbeitung' && prevStatus === 'offen') {
-    m = appendMangelVerlauf(m, 'in_bearbeitung', input.notiz)
-  }
-  if (input.status === 'behoben') {
-    m = {
-      ...appendMangelVerlauf(m, 'behoben', input.notiz, now),
-      behoben_at: now,
-      behoben_von: uid,
-    }
-  }
-  if (input.status === 'abgenommen') {
-    m = {
-      ...appendMangelVerlauf(m, 'abgenommen', input.notiz, now),
-      abgenommen_at: now,
-      behoben_at: m.behoben_at ?? now,
-      behoben_von: m.behoben_von ?? uid,
-    }
-  }
-
-  const maengel = [...summary.maengel]
-  maengel[idx] = m
-  const punkte = applyPunktStatusFromMaengel(summary.punkte, maengel)
-
-  const { error } = await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .update({
-      punkte,
-      maengel: normalizeMaengel(maengel),
-      updated_at: now,
-    })
-    .eq('id', summary.id)
-  if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error)
-
-  if (error) return { ok: false, message: error.message }
-
-  await afterAbnahmePersist({
-    auftragId: input.auftragId,
-    protokollId: summary.id,
-    punkte,
-    maengel: normalizeMaengel(maengel),
-    prevOffeneMaengel: countOffeneMaengel(summary.maengel),
-  })
-
-  if (input.status === 'behoben' || input.status === 'abgenommen') {
-    await insertAuftragTimelineEvent({
-      auftrag_id: input.auftragId,
-      typ: 'mangel_behoben',
-      titel: input.status === 'abgenommen' ? 'Mangel abgenommen' : 'Mangel behoben',
-      beschreibung: m.beschreibung,
-      erstellt_von: uid,
-      foto_urls: m.foto_nachher_urls ?? [],
-      sichtbar_fuer_kunde: input.status === 'abgenommen',
-      fuer_kunde_freigegeben: input.status === 'abgenommen',
-      freigegeben_at: input.status === 'abgenommen' ? now : null,
-    })
-  }
-
-  const pdf = await persistProtokollPdfForRow(input.auftragId, summary.id, {
-    abnahmeDatum: summary.abnahme_datum,
-    punkte,
-    maengel: normalizeMaengel(maengel),
-    notizen: summary.notizen,
-    meta: summary.meta,
-    protokollTyp: countOffeneMaengel(maengel) === 0 ? 'schlussabnahme' : 'nachabnahme',
-  })
-  if (!pdf.ok) return pdf
-
-  revalidateAuftragDetail(input.auftragId)
-  return { ok: true }
-}
-
-export async function regenerateAbnahmeprotokollPdf(
-  auftragId: string
-): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
-  const summary = await loadAbnahmeprotokollSummary(auftragId)
-  if (!summary) return { ok: false, message: 'Kein Abnahmeprotokoll vorhanden.' }
-
-  const prepared = prepareAbnahmePayload({
-    punkte: summary.punkte,
-    maengel: summary.maengel,
-  })
-
-  const pdf = await persistProtokollPdfForRow(auftragId, summary.id, {
-    abnahmeDatum: summary.abnahme_datum,
-    punkte: prepared.punkte,
-    maengel: prepared.maengel,
-    notizen: summary.notizen,
-    meta: summary.meta,
-    protokollTyp: countOffeneMaengel(prepared.maengel) === 0 ? 'schlussabnahme' : 'nachabnahme',
-  })
-  if (!pdf.ok) return pdf
-
-  revalidateAuftragDetail(auftragId)
-  return { ok: true, publicUrl: pdf.publicUrl }
-}
-
 /** Zugewiesene Partner + aktueller Freigabe-Stand ihrer Teilabnahme. */
 export async function loadAbnahmeHwFreigabeZeilen(
   auftragId: string
@@ -1576,148 +1414,6 @@ export async function loadAbnahmeHwFreigabeZeilen(
       ort: meta.uebergabe_ort?.trim() || null,
     }
   })
-}
-
-export async function freigebenAbnahmeprotokoll(
-  protokollId: string,
-  auftragId: string
-): Promise<
-  | { ok: true; bereitZumAbschliessen?: boolean }
-  | { ok: false; message: string }
-> {
-  const uid = await getAuthUserId()
-  const now = new Date().toISOString()
-
-  const { data: row, error: loadErr } = await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .select('id, freigabe_status, ebene, handwerker_id')
-    .eq('id', protokollId)
-    .eq('auftrag_id', auftragId)
-    .maybeSingle()
-  if (loadErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', loadErr)
-  if (loadErr || !row) return { ok: false, message: 'Protokoll nicht gefunden.' }
-
-  const status = normalizeAbnahmeFreigabeStatus(row.freigabe_status)
-  if (status === 'freigegeben') {
-    const gate = await getGesamtabnahmeGate(auftragId)
-    return {
-      ok: true,
-      bereitZumAbschliessen: hatHwAbnahmeZurAbschlussVorschau(gate.zeilen),
-    }
-  }
-  if (status !== 'zur_freigabe' && status !== 'abgelehnt' && status !== 'entwurf') {
-    return { ok: false, message: 'Protokoll kann nicht freigegeben werden.' }
-  }
-
-  const { error: error2 } = await supabaseAdmin
-    .from('auftrag_abnahmeprotokolle')
-    .update({
-      freigabe_status: 'freigegeben',
-      freigegeben_at: now,
-      freigegeben_von: uid,
-      abgelehnt_at: null,
-      abgelehnt_von: null,
-      ablehnung_notiz: null,
-      updated_at: now,
-    })
-    .eq('id', protokollId)
-  if (error2) logDbError('app/auftraege/abnahmeprotokoll-actions:auftrag_abnahmeprotokolle', error2)
-  if (error2) return { ok: false, message: error2.message }
-
-  await insertAuftragTimelineEvent({
-    auftrag_id: auftragId,
-    typ: 'notiz',
-    titel:
-      normalizeAbnahmeEbene(row.ebene) === 'handwerker'
-        ? 'Teilabnahme freigegeben'
-        : 'Abnahmeprotokoll freigegeben',
-    beschreibung: 'CRM-Freigabe — Versand an Kunde optional danach.',
-    erstellt_von: uid,
-    sichtbar_fuer_kunde: false,
-  })
-
-  const hwId = String(row.handwerker_id ?? '').trim()
-  const gate = await getGesamtabnahmeGate(auftragId)
-
-  if (hwId) {
-    const { data: auftrag, error } = await supabaseAdmin
-      .from('auftraege')
-      .select('titel, lead_id')
-      .eq('id', auftragId)
-      .maybeSingle()
-    if (error) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', error)
-    const projekt =
-      String(auftrag?.titel ?? '').trim() || 'Auftrag'
-    await notifyPartnerUnified({
-      handwerkerId: hwId,
-      typ: 'erinnerung',
-      projektName: projekt,
-      link: partnerVorgangLink(auftragId),
-      leistungName: 'Abnahme freigegeben',
-      auftragId,
-      sendMail: true,
-    })
-
-    const [{ data: hw }, { data: protoFull }, { data: protokolle }] = await Promise.all([
-        supabaseAdmin.from('handwerker').select('name').eq('id', hwId).maybeSingle(),
-        supabaseAdmin
-          .from('auftrag_abnahmeprotokolle')
-          .select('punkte')
-          .eq('id', protokollId)
-          .maybeSingle(),
-        supabaseAdmin
-          .from('auftrag_abnahmeprotokolle')
-          .select('id, freigabe_status')
-          .eq('auftrag_id', auftragId)
-          .eq('handwerker_id', hwId),
-      ])
-    const punkteRaw = Array.isArray(protoFull?.punkte) ? protoFull.punkte : []
-    const leistungen = punkteRaw
-      .map((p: unknown) => {
-        if (!p || typeof p !== 'object') return ''
-        return String((p as { leistung_name?: string }).leistung_name ?? '').trim()
-      })
-      .filter(Boolean)
-    const andereOffen = (protokolle ?? []).some((p) => {
-      if (String(p.id) === protokollId) return false
-      const st = normalizeAbnahmeFreigabeStatus(p.freigabe_status)
-      return st === 'zur_freigabe' || st === 'entwurf' || st === 'abgelehnt'
-    })
-    const { notifyPortalPartnerErledigtFromCrm } = await import(
-      '@/lib/portal/notify-portal-partner-erledigt'
-    )
-    await notifyPortalPartnerErledigtFromCrm({
-      auftragId,
-      leadId: (auftrag as { lead_id?: string | null } | null)?.lead_id,
-      handwerkerName: String(hw?.name ?? 'Partner').trim() || 'Partner',
-      leistungen: leistungen.length ? leistungen : [projekt],
-      vollstaendig: !andereOffen && gate.ok,
-    })
-  }
-
-  const bereitZumAbschliessen = hatHwAbnahmeZurAbschlussVorschau(gate.zeilen)
-  if (gate.ok) {
-    /* Status „abnahme“ → Primary-CTA bleibt grün „Auftrag abschließen“ */
-    const abnahmePatch = planAbnahmeWrite()
-    const { error: stErr } = await supabaseAdmin
-      .from('auftraege')
-      .update(abnahmePatch)
-      .eq('id', auftragId)
-      .in('status', ['in_arbeit', 'offen', 'geplant', 'aktiv', 'abnahme'])
-    if (stErr) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', stErr)
-    if (stErr && /updated_at/i.test(stErr.message)) {
-      const { updated_at: _ua, ...abnahmeOhneTs } = abnahmePatch
-      const { error: __dbErr8 } = await supabaseAdmin
-        .from('auftraege')
-        .update(abnahmeOhneTs)
-        .eq('id', auftragId)
-        .in('status', ['in_arbeit', 'offen', 'geplant', 'aktiv', 'abnahme'])
-      if (__dbErr8) logDbError('app/auftraege/abnahmeprotokoll-actions:auftraege', __dbErr8)
-    }
-  }
-
-  revalidateAuftragDetail(auftragId)
-  return { ok: true, bereitZumAbschliessen }
 }
 
 export async function ablehnenAbnahmeprotokoll(input: {

@@ -1,9 +1,8 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAuftragList, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAuftragList,revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { writeAngebotStatus } from '@/lib/status/write-angebot-status'
 import { logDbError } from '@/lib/errors/log-db-error'
-import { ensureAngebotsnummerFuerVersand } from '@/lib/angebot-utils'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AngebotPosition } from '@/lib/types'
@@ -34,7 +33,7 @@ import {
   auftragKorrekturSperrgrund,
   type AuftragKorrekturKontext,
 } from '@/lib/angebote/auftrag-korrektur'
-import { parseZahlungsplan, zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
+import { parseZahlungsplan,zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import {
   mergeHandwerkerQueuesIntoPositionen,
@@ -125,45 +124,6 @@ async function persistAngebotPdfNachEntwurfSpeichern(
     return { ok: false, message: pdf.message }
   }
   return { ok: true }
-}
-
-/** PDF erzeugen und speichern — ohne E-Mail (wie Rechnung „Erstellen“). */
-export async function finalizeAngebotWizardWithoutMail(
-  angebotId: string
-): Promise<{ ok: true; angebotsnr: string | null } | { ok: false; message: string }> {
-  const { data: before, error } = await supabaseAdmin
-    .from('angebote')
-    .select('angebotsnr')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (error) logDbError('app/angebote/wizard-actions:angebote', error)
-
-  const nrRes = await ensureAngebotsnummerFuerVersand(
-    angebotId,
-    (before as { angebotsnr?: string | null } | null)?.angebotsnr
-  )
-  if (!nrRes.ok) return nrRes
-
-  const pdf = await persistPdfForAngebot(angebotId)
-  if (!pdf.ok) return pdf
-
-  const { data: row, error: error2 } = await supabaseAdmin
-    .from('angebote')
-    .select('angebotsnr, lead_id')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (error2) logDbError('app/angebote/wizard-actions:angebote', error2)
-
-  revalidateAngebotDetail(angebotId)
-  const leadId = (row as { lead_id?: string | null } | null)?.lead_id
-  if (leadId) {
-    revalidateLeadDetail(leadId)
-  }
-
-  return {
-    ok: true,
-    angebotsnr: (row as { angebotsnr?: string | null } | null)?.angebotsnr ?? null,
-  }
 }
 
 export async function saveAngebotWizardDraft(

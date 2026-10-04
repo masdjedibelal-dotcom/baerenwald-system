@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAngebotList, revalidateAngebotNeu, revalidateAuftragDetail, revalidateEinstellungenPath, revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAngebotList,revalidateAngebotNeu,revalidateAuftragDetail,revalidateEinstellungenPath,revalidateKalender,revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { randomBytes } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -15,9 +15,7 @@ import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for
 import { sendMail } from '@/lib/mail-service'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
-  mailAngebot,
-  mailAngebotAnnahmeBestaetigung,
-  mailHandwerkerAnfrage,
+  mailAngebot,mailHandwerkerAnfrage
 } from '@/lib/mail-templates'
 import {
   angebotMailBetreff,
@@ -25,7 +23,7 @@ import {
   parseWizardMetaFromNotizen,
   parseAngebotAnrede,
 } from '@/lib/templates/angebot-mail'
-import { formatDatumDeFromIso, projektOderStatusLink } from '@/lib/mail/versand-helpers'
+import { formatDatumDeFromIso,projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import {
   angebotDarfImWizardBearbeitetWerden,
@@ -39,7 +37,7 @@ import {
   auftragKorrekturSperrgrund,
   type AuftragKorrekturKontext,
 } from '@/lib/angebote/auftrag-korrektur'
-import { formatDatum, getPublicAppUrl } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
@@ -53,7 +51,7 @@ import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { syncAngebotLeistungenToLead } from '@/lib/angebote/sync-angebot-leistungen-to-lead'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
-import { buildPartnerLoginLink, buildPortalLoginLink, portalAudienceFromKunde } from '@/lib/portal-utils'
+import { buildPartnerLoginLink,buildPortalLoginLink,portalAudienceFromKunde } from '@/lib/portal-utils'
 import {
   buildGewerkEkMap,
   ekNettoFromHwEinreichung,
@@ -76,7 +74,7 @@ import {
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { notifyPartnerHandwerkerAngebotBestaetigt } from '@/lib/partner/notify-partner-angebot-bestaetigt'
 import { notifyPartnerHandwerkerAngebotAntwort } from '@/lib/partner/notify-partner-angebot-antwort'
-import { parseZahlungsplan, zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
+import { parseZahlungsplan,zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { loadHandwerkerAcceptWizardBootstrap } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { loadKiVizMailPreviewUrl } from '@/lib/visualize/pdf-data'
 import {
@@ -84,11 +82,10 @@ import {
   uploadHwAngebotPdfFromCrm,
 } from '@/lib/partner/upload-hw-angebot-pdf'
 import {
-  kundeAnredeKontextFromEmpfaenger,
-  kundeRechnungsempfaengerAusStammdaten,
+  kundeRechnungsempfaengerAusStammdaten
 } from '@/lib/kunde-rechnungsempfaenger'
 import { resolveAngebotDokumentEmpfaenger } from '@/lib/angebote/angebot-html-payload'
-import { LEAD_STATUS_VOR_ANGEBOT, leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
+import { LEAD_STATUS_VOR_ANGEBOT,leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
 import { syncAngebotMitOrgFreigabe } from '@/lib/org/hv-lead-actions'
 import { supersedeLeadAngebote } from '@/lib/angebote/supersede-lead-angebote'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
@@ -116,12 +113,12 @@ import { insertKalenderAutoTermine } from '@/lib/kalender-auto-termine'
 import { sendAngebotNachfassMailById } from '@/lib/angebote/send-angebot-nachfass-mail'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import type { AngebotVariantenPersistJson } from '@/lib/angebote/angebot-wizard-types'
-import { provisionProjektVertraegeFuerAuftrag, provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
+import { provisionProjektVertraegeFuerAuftrag,provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
 import { parseRechtshinweiseFromWizardMeta } from '@/lib/angebote/angebot-rechtshinweise'
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { planHvFreigabeWrite, writeLeadStatus } from '@/lib/status/write-lead-status'
+import { planHvFreigabeWrite,writeLeadStatus } from '@/lib/status/write-lead-status'
 import {
   planAngebotStatusWrite,
   writeAngebotStatus,
@@ -907,21 +904,6 @@ export async function updateAngebot(
     revalidateAngebotDetail(angebotId)
     if (leadId) revalidateLeadDetail(leadId)
   }
-  return { ok: true }
-}
-
-export async function updateAngebotNotizen(
-  angebotId: string,
-  notizen: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('angebote')
-    .update({ notizen, updated_at: new Date().toISOString() })
-    .eq('id', angebotId)
-  if (error) logDbError('app/angebote/actions:angebote', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAngebotDetail(angebotId)
   return { ok: true }
 }
 
@@ -1825,10 +1807,6 @@ export async function ablehneHandwerkerEinreichung(input: {
   }
 }
 
-export async function acceptPartner(angebotId: string) {
-  return setAngebotStatus(angebotId, 'handwerker_akzeptiert')
-}
-
 export async function sendAngebotToKunde(
   angebotId: string,
   options?: {
@@ -2377,10 +2355,6 @@ export async function previewAngebotWizardMailLive(input: {
   }
 }
 
-export async function markKundeAbgelehnt(angebotId: string) {
-  return setAngebotStatus(angebotId, 'abgelehnt')
-}
-
 export async function recordKundeAbgelehntMitDetails(
   angebotId: string,
   input: {
@@ -2490,15 +2464,6 @@ export async function sendAngebotNachfassManuell(
   revalidateKalender()
   if (detail.lead_id) revalidateLeadDetail(detail.lead_id)
   return { ok: true }
-}
-
-/** @deprecated Nutze sendAngebotNachfassManuell — kein Kalender-Termin mehr. */
-export async function planNachfassenTerminFuerAngebot(input: {
-  angebotId: string
-  datum: string
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  void input.datum
-  return sendAngebotNachfassManuell(input.angebotId)
 }
 
 export type HandwerkerGewerkListeEintrag = {
@@ -3255,65 +3220,6 @@ export async function markKundeAkzeptiert(
   return { ok: true }
 }
 
-async function buildAngebotAnnahmeMail(
-  angebotId: string,
-  betreffOverride?: string
-): Promise<
-  | {
-      ok: true
-      html: string
-      betreff: string
-      defaultTo: string[]
-      defaultCc: string[]
-      kundeName: string
-      detail: AngebotDetail
-    }
-  | { ok: false; message: string }
-> {
-  const supabase = createClient()
-  const detail = await loadAngebotDetail(angebotId)
-  if (!detail) return { ok: false, message: 'Angebot nicht gefunden' }
-
-  const pos = normalizeAngebotPositionen(detail.positionen)
-  if (!pos.length) return { ok: false, message: 'Keine Positionen im Angebot' }
-
-  const branding = await getMailBranding(supabaseAdmin)
-  const wizardMeta = parseWizardMetaFromNotizen(detail.notizen)
-  const kundeTyp = resolveAngebotKundeTyp(detail.kunden?.typ, detail.leads?.kundentyp)
-  const anrede = wizardMeta?.anrede ?? parseAngebotAnrede(detail.notizen, kundeTyp)
-  const kundeName = detail.kunden?.name?.trim() || 'Kunde'
-  const zeitraum = detail.leads?.zeitraum?.trim() || 'gemäß Vereinbarung'
-  const to = detail.kunden?.email?.trim() ? [detail.kunden.email.trim()] : []
-  const cc: string[] = []
-  const zeilen = pos.map((p) => {
-    const lineNetto = (p.lohn_netto + p.material_netto) * (p.menge || 1)
-    const brutto = lineNetto * 1.19
-    return {
-      gewerk: p.gewerk_name || '—',
-      leistung: (p.leistung_name || p.leistung || p.beschreibung || 'Leistung').trim(),
-      preis: `${formatEuro(brutto)}`,
-    }
-  })
-  const tpl = mailAngebotAnnahmeBestaetigung(
-    {
-      name: kundeName,
-      anrede,
-      zeilen,
-      zeitraum,
-    },
-    branding
-  )
-  return {
-    ok: true,
-    html: tpl.html,
-    betreff: betreffOverride?.trim() || tpl.betreff,
-    defaultTo: to,
-    defaultCc: cc,
-    kundeName,
-    detail,
-  }
-}
-
 export async function previewAuftragsbestaetigungMail(input: {
   angebotId: string
   start_datum: string
@@ -3323,7 +3229,6 @@ export async function previewAuftragsbestaetigungMail(input: {
   | { ok: true; html: string; betreff: string; defaultTo: string[]; defaultCc: string[] }
   | { ok: false; message: string }
 > {
-  const supabase = createClient()
   const detail = await loadAngebotDetail(input.angebotId)
   if (!detail?.kunden) return { ok: false, message: 'Angebot nicht gefunden' }
 
@@ -3366,55 +3271,6 @@ export async function previewAuftragsbestaetigungMail(input: {
     defaultTo: detail.kunden.email?.trim() ? [detail.kunden.email.trim()] : [],
     defaultCc: [],
   }
-}
-
-export async function previewAngebotAnnahmeMail(input: {
-  angebotId: string
-  betreff?: string
-}): Promise<
-  | { ok: true; html: string; betreff: string; defaultTo: string[]; defaultCc: string[] }
-  | { ok: false; message: string }
-> {
-  const built = await buildAngebotAnnahmeMail(input.angebotId, input.betreff)
-  if (!built.ok) return built
-  return {
-    ok: true,
-    html: built.html,
-    betreff: built.betreff,
-    defaultTo: built.defaultTo,
-    defaultCc: built.defaultCc,
-  }
-}
-
-export async function markKundeAkzeptiertMitOptionen(input: {
-  angebotId: string
-  sendMail: boolean
-  betreff?: string
-  to?: string[]
-  cc?: string[]
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (input.sendMail) {
-    const built = await buildAngebotAnnahmeMail(input.angebotId, input.betreff)
-    if (!built.ok) return built
-    const to = input.to?.map((v) => v.trim()).filter(Boolean) ?? built.defaultTo
-    if (!to.length) return { ok: false, message: 'Bitte mindestens eine Empfänger-Adresse in An angeben.' }
-    const cc = input.cc?.map((v) => v.trim()).filter(Boolean) ?? built.defaultCc
-
-    const mail = await sendMail({
-      typ: 'auftragsbestaetigung',
-      an: to.length === 1 ? to[0]! : to,
-      anName: built.kundeName,
-      cc,
-      betreff: built.betreff,
-      html: built.html,
-      kundeId: built.detail.kunde_id,
-      leadId: built.detail.lead_id,
-      angebotId: input.angebotId,
-    })
-    if (!mail.success) return { ok: false, message: mail.error ?? 'Versand fehlgeschlagen' }
-  }
-
-  return markKundeAkzeptiert(input.angebotId)
 }
 
 export async function listAngebotVorlagen(): Promise<AngebotVorlage[]> {
@@ -3565,52 +3421,6 @@ export async function deleteAngebot(
   if (leadId) revalidateLeadDetail(leadId)
   return { success: true }
 }
-
-export async function deleteAngebotVorlage(
-  id: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase.from('angebot_vorlagen').delete().eq('id', id)
-  if (error) logDbError('app/angebote/actions:angebot_vorlagen', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateEinstellungenPath('/einstellungen/vorlagen')
-  revalidateAngebotNeu()
-  return { ok: true }
-}
-
-export async function duplicateAngebotVorlage(
-  id: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  const { data: row, error: loadErr } = await supabase
-    .from('angebot_vorlagen')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
-  if (loadErr) logDbError('app/angebote/actions:angebot_vorlagen', loadErr)
-  if (loadErr || !row) return { ok: false, message: loadErr?.message ?? 'Vorlage nicht gefunden' }
-
-  const r = row as Record<string, unknown>
-  const { error: error2 } = await supabase.from('angebot_vorlagen').insert({
-    name: `Kopie: ${String(r.name ?? 'Vorlage')}`,
-    beschreibung: (r.beschreibung as string | null) ?? null,
-    positionen: r.positionen,
-    gesamt_min: r.gesamt_min,
-    gesamt_max: r.gesamt_max,
-    gesamt_fix: r.gesamt_fix,
-    aktiv: r.aktiv ?? true,
-    erstellt_von: user?.id ?? null,
-    updated_at: new Date().toISOString(),
-  })
-  if (error2) logDbError('app/angebote/actions:angebot_vorlagen', error2)
-  if (error2) return { ok: false, message: error2.message }
-  revalidateEinstellungenPath('/einstellungen/vorlagen')
-  return { ok: true }
-}
-
 
 /**
  * Weiteres Angebot zu einem Vorgang mit bestehendem Auftrag: Positionen anhängen (wie Nachtrag),

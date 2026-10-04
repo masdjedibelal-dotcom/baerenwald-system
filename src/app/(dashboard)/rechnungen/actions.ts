@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAuftragDetail, revalidateRechnungDetail, revalidateRechnungList } from '@/lib/crm-revalidate'
+import { revalidateAuftragDetail,revalidateRechnungDetail,revalidateRechnungList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
@@ -8,7 +8,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { updateGesamtUmsatz } from '@/app/actions/kunden'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { formatDatumDeFromIso } from '@/lib/mail/versand-helpers'
-import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import {
   kundeAngebotBegruessung,
@@ -32,7 +31,7 @@ import { buildZahlungsbestaetigungMail } from '@/lib/mail/zahlungsbestaetigung-m
 import { sendMail } from '@/lib/mail-service'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
-import { linkRechnungKorrekturKette, resolveRechnungKorrekturKette } from '@/lib/rechnungen/rechnung-korrektur'
+import { linkRechnungKorrekturKette,resolveRechnungKorrekturKette } from '@/lib/rechnungen/rechnung-korrektur'
 import {
   planRechnungStatusWrite,
   planRechnungStornoWrite,
@@ -47,15 +46,9 @@ import {
   rechnungUpdateMitSchemaFallback,
 } from '@/lib/rechnungen/rechnung-speichern'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
-import {
-  berechneRechnungZahlungszielUpdate,
-  mahnungFelderBeiFaelligkeitAenderung,
-  rechnungZahlungszielIstBearbeitbar,
-} from '@/lib/rechnungen/rechnung-zahlungsziel-patch'
-import type { ZahlfristSeg } from '@/lib/zahlfrist'
 import { validateRechnungPflichtangaben } from '@/lib/rechnung-validierung'
 import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
-import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
+import type { AngebotPosition,Kunde,RechnungStatus } from '@/lib/types'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
@@ -272,66 +265,6 @@ export async function updateRechnungEntwurf(
 
   revalidateRechnungDetail(id)
   return { ok: true }
-}
-
-/** Fälligkeit / Zahlungsziel nachträglich — ohne Storno (Entwurf + versendet). */
-export async function updateRechnungZahlungsziel(input: {
-  rechnungId: string
-  zahlfrist: ZahlfristSeg
-  zahlfristDatum?: string
-}): Promise<{ ok: true; faellig_am: string } | { ok: false; message: string }> {
-  const rechnungId = input.rechnungId?.trim()
-  if (!rechnungId) return { ok: false, message: 'Rechnung fehlt.' }
-
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return { ok: false, message: gate.message }
-  const supabase = gate.db
-  const { data: rec, error: loadErr } = await supabase
-    .from('rechnungen')
-    .select('id, status, beleg_typ, richtung, faellig_am, rechnungsdatum, created_at, zahlungsbedingungen')
-    .eq('id', rechnungId)
-    .maybeSingle()
-  if (loadErr) logDbError('app/rechnungen/actions:rechnungen', loadErr)
-
-  if (loadErr || !rec) return { ok: false, message: loadErr?.message ?? 'Rechnung nicht gefunden.' }
-
-  if (
-    !rechnungZahlungszielIstBearbeitbar({
-      status: rec.status as string,
-      beleg_typ: rec.beleg_typ as string,
-      richtung: rec.richtung as string,
-    })
-  ) {
-    return { ok: false, message: 'Zahlungsziel kann für diese Rechnung nicht mehr geändert werden.' }
-  }
-
-  const rechnungsdatum =
-    String(rec.rechnungsdatum ?? '').trim().slice(0, 10) ||
-    String(rec.created_at ?? '').trim().slice(0, 10) ||
-    new Date().toISOString().slice(0, 10)
-
-  const { faellig_am, zahlungsbedingungen } = berechneRechnungZahlungszielUpdate({
-    zahlfrist: input.zahlfrist,
-    zahlfristDatum: input.zahlfristDatum?.trim()?.slice(0, 10) ?? '',
-    rechnungsdatum,
-    bisherigeZahlungsbedingungen: rec.zahlungsbedingungen as string | null,
-  })
-
-  const { error: error2 } = await supabase
-    .from('rechnungen')
-    .update({
-      faellig_am,
-      zahlungsbedingungen,
-      ...mahnungFelderBeiFaelligkeitAenderung(faellig_am, rec.faellig_am as string | null),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', rechnungId)
-  if (error2) logDbError('app/rechnungen/actions:rechnungen', error2)
-
-  if (error2) return { ok: false, message: error2.message }
-
-  revalidateRechnungDetail(rechnungId)
-  return { ok: true, faellig_am }
 }
 
 /** Gutschrift zur Originalrechnung (negative Beträge, neue Nummer GS-BW-…). */
@@ -750,19 +683,6 @@ export async function storniereRechnungOhneErsatz(
   return { ok: false, message: 'Diese Rechnung kann nicht storniert werden.' }
 }
 
-/**
- * Soft-Storno zurücknehmen (nur wenn keine Storno-Gutschrift mit Bezug existiert).
- */
-export async function nehmeRechnungStornoZurueck(
-  _rechnungId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  // Ein Storno ist endgültig (P08). Fehler? Neue Rechnung erstellen.
-  return {
-    ok: false,
-    message: 'Ein Storno ist endgültig. Bitte bei Bedarf eine neue Rechnung erstellen.',
-  }
-}
-
 export type UpdateRechnungStatusResult =
   | {
       ok: true
@@ -782,19 +702,6 @@ async function sendZahlungsbestaetigungForRechnung(
   rechnungId: string
 ): Promise<{ ok: true } | { ok: false; message: string } | { ok: true; skipped: true }> {
   const supabase = createClient()
-
-  type RechnungBezahltRow = {
-    rechnungsnummer: string | null
-    status: string | null
-    beleg_typ: string | null
-    auftrag_id: string | null
-    kunde_id: string | null
-    brutto: number | null
-    reverse_charge_13b?: boolean | null
-    kunden: Kunde | Kunde[] | null
-    angebote: unknown
-    auftraege: unknown
-  }
 
   const { data: rec, error: loadErr } = await (() => { const db = createClient(); return db
       .from('rechnungen')
@@ -1010,29 +917,6 @@ export async function updateRechnungStatus(
   return { ok: true, zahlungsbestaetigungGesendet, partnerUeberwiesenNotified }
 }
 
-/** Zahlungsbestätigung nachträglich senden (Rechnung muss bereits bezahlt sein). */
-export async function sendZahlungsbestaetigung(
-  rechnungId: string
-): Promise<{ ok: true; skipped?: boolean } | { ok: false; message: string }> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return { ok: false, message: gate.message }
-  const { data: rec, error } = await gate.db
-    .from('rechnungen')
-    .select('status')
-    .eq('id', rechnungId)
-    .maybeSingle()
-  if (error) logDbError('app/rechnungen/actions:rechnungen', error)
-  if (!rec) return { ok: false, message: 'Rechnung nicht gefunden' }
-  if (rec.status !== 'bezahlt') {
-    return { ok: false, message: 'Nur bei Status „Bezahlt“ möglich.' }
-  }
-  const mailRes = await sendZahlungsbestaetigungForRechnung(rechnungId)
-  if (!mailRes.ok) return mailRes
-  if ('skipped' in mailRes && mailRes.skipped) return { ok: true, skipped: true }
-  revalidateRechnungDetail(rechnungId)
-  return { ok: true }
-}
-
 /** Rechnung per Mail (PDF + mail-templates + email_log). */
 export async function sendRechnung(
   rechnungId: string,
@@ -1041,26 +925,6 @@ export async function sendRechnung(
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
   const supabase = gate.db
-
-  type RechnungVersandRow = {
-    rechnungsnummer: string | null
-    status: string | null
-    beleg_typ: string | null
-    auftrag_id: string | null
-    kunde_id: string | null
-    faellig_am: string | null
-    brutto: number | null
-    mail_einleitung?: string | null
-    mail_betreff?: string | null
-    rechnung_art?: string | null
-    reverse_charge_13b?: boolean | null
-    ansprechpartner_id?: string | null
-    korrektur_von?: string | null
-    korrektur_art?: string | null
-    kunden: Kunde | Kunde[] | null
-    angebote: unknown
-    auftraege: unknown
-  }
 
   const { data: rec, error: loadErr } = await (() => { const db = createClient(); return db
       .from('rechnungen')
@@ -1734,21 +1598,6 @@ export async function previewRechnungKundeMail(input: {
   let stornoGutschriftNummer: string | null = null
 
   if (rechnungId) {
-    type RechnungPreviewRow = {
-      rechnungsnummer: string | null
-      status: string | null
-      beleg_typ: string | null
-      faellig_am: string | null
-      brutto: number | null
-      mail_einleitung?: string | null
-      mail_betreff?: string | null
-      reverse_charge_13b?: boolean | null
-      ansprechpartner_id?: string | null
-      korrektur_von?: string | null
-      kunden: Kunde | Kunde[] | null
-      angebote: unknown
-      auftraege: unknown
-    }
 
     const { data: rec, error: loadErr } = await (() => { const db = createClient(); return db
         .from('rechnungen')

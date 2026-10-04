@@ -1,13 +1,13 @@
 'use client'
 
-import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockBtn,MockEmpty } from '@/components/mock-ui'
 import { MockField } from '@/components/mock-ui/MockForm'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback,useEffect,useState } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { toast } from '@/components/ui/app-toast'
 import { Card } from '@/components/ui/Card'
-import { TokenLinkInvalid, PublicTokenLegalFooter } from '@/components/public/TokenLinkInvalid'
+import { TokenLinkInvalid,PublicTokenLegalFooter } from '@/components/public/TokenLinkInvalid'
 import {
   HANDWERKER_ABLEHNUNG_GRUND_LABELS,
   HANDWERKER_ABLEHNUNG_GRUND_VALUES,
@@ -25,7 +25,7 @@ export function HandwerkerAnfrageClient({ token }: { token: string }) {
   const [fehler, setFehler] = useState<string | null>(null)
   const [flow, setFlow] = useState<Flow>('laden')
   const [wahl, setWahl] = useState<'akzeptiert' | 'abgelehnt' | null>(null)
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { applyFieldErrors } = useFieldErrors()
   const [notiz, setNotiz] = useState('')
   const [ablehnungGrund, setAblehnungGrund] = useState<HandwerkerAblehnungGrund | ''>('')
   const [busy, setBusy] = useState(false)

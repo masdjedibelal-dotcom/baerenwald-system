@@ -14,18 +14,6 @@ export function istRegiePosition(p: {
   )
 }
 
-/** Angebot/PosBoard: Regie-Flag aus Persistenz oder Heuristik. */
-export function istAngebotRegiePosition(p: {
-  verguetung?: string | null
-  notiz_extern?: string | null
-  regieSchein?: boolean | null
-}): boolean {
-  if (p.regieSchein === true) return true
-  if (String(p.verguetung ?? '').toLowerCase() === 'aufwand') return true
-  const n = p.notiz_extern?.trim() || ''
-  return /regieschein/i.test(n) || /nach aufwand/i.test(n)
-}
-
 /** z. B. „geschätzt 4 h × 69 €/h“ */
 export function formatRegieSchaetzung(opts: {
   geschaetztStd?: number | null

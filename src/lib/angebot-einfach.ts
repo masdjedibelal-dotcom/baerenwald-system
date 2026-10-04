@@ -1,7 +1,5 @@
-import type { Angebot, AngebotPosition, AngebotStatus } from '@/lib/types'
-import { summenAusPositionen } from '@/lib/angebot-positionen'
-import { kundeDisplayName, type KundeListenNamePick } from '@/lib/kunde-stammdaten'
-import { BEREICH_LABELS } from '@/lib/utils'
+import type { Angebot,AngebotStatus } from '@/lib/types'
+import { kundeDisplayName,type KundeListenNamePick } from '@/lib/kunde-stammdaten'
 import { formatEuro } from '@/lib/format/geld-datum'
 
 export type AngebotStatusEinfach =
@@ -11,16 +9,6 @@ export type AngebotStatusEinfach =
   | 'abgelehnt'
   | 'abgelaufen'
   | 'ersetzt'
-
-/** @deprecated Wörter kommen aus status-map (statusLabel('angebot', …)). Nur noch Alias. */
-export const ANGEBOT_EINFACH_LABELS: Record<AngebotStatusEinfach, string> = {
-  entwurf: 'Entwurf',
-  gesendet: 'Gesendet',
-  angenommen: 'Angenommen',
-  abgelehnt: 'Abgelehnt',
-  abgelaufen: 'Abgelaufen',
-  ersetzt: 'Ersetzt',
-}
 
 export function heuteYmd(): string {
   return new Date().toISOString().slice(0, 10)
@@ -77,51 +65,11 @@ export function resolveStatusEinfach(row: AngebotStatusEinfachRow): AngebotStatu
 }
 
 /**
- * Beim Anlegen eines weiteren Angebots am gleichen Lead:
- * Geschwister bleiben bestehen (mehrere Angebote pro Anfrage sind erlaubt).
- * Entwertung passiert erst bei Annahme eines Angebots.
- */
-export function angebotSollBeiNeuerVersionErsetztWerden(
-  _st: AngebotStatusEinfach
-): boolean {
-  return false
-}
-
-/**
  * Bei Annahme: konkurrierende Angebote entwerten — nur eines darf „angenommen“ sein.
  * Mehrere gesendete/Entwürfe vorher sind ok; nach Annahme werden sie ersetzt.
  */
 export function angebotSollBeiAnnahmeErsetztWerden(st: AngebotStatusEinfach): boolean {
   return st !== 'ersetzt' && st !== 'abgelehnt'
-}
-
-export function matchesEinfachFilter(
-  row: AngebotStatusEinfachRow,
-  filter: '' | AngebotStatusEinfach
-): boolean {
-  if (!filter) return true
-  const eff = resolveStatusEinfach(row)
-  if (filter === 'abgelaufen') return eff === 'abgelaufen'
-  if (filter === 'ersetzt') return eff === 'ersetzt'
-  if (filter === 'gesendet') return eff === 'gesendet'
-  return eff === filter
-}
-
-export type GueltigBisTone = 'normal' | 'warn' | 'danger'
-
-export function gueltigBisTone(gueltigBis: string | null | undefined): GueltigBisTone {
-  const d = daysUntil(gueltigBis)
-  if (d == null) return 'normal'
-  if (d < 0) return 'danger'
-  if (d < 7) return 'danger'
-  if (d < 14) return 'warn'
-  return 'normal'
-}
-
-export function gueltigBisClass(tone: GueltigBisTone): string {
-  if (tone === 'danger') return 'text-bw-danger font-medium'
-  if (tone === 'warn') return 'text-status-contact-text font-medium'
-  return 'text-bw-text'
 }
 
 export function kundeNameAusAngebot(a: {
@@ -133,19 +81,6 @@ export function kundeNameAusAngebot(a: {
     if (display !== '—') return display
   }
   return a.leads?.kontakt_name?.trim() || 'Ohne Kunde'
-}
-
-export function leistungAnzeige(a: {
-  leistungsumfang?: string | null
-  leads?: { bereiche?: string[] | null } | null
-}): string {
-  const lf = a.leistungsumfang?.trim()
-  if (lf) return lf
-  const bereiche = a.leads?.bereiche ?? []
-  if (bereiche.length) {
-    return bereiche.map((b) => BEREICH_LABELS[b] ?? b).join(', ')
-  }
-  return '—'
 }
 
 /** Ein Gesamtbetrag aus DB-Feldern (kein Von-bis). */
@@ -191,15 +126,6 @@ export function betragAnzeigeBrutto(
   return `${formatEuro(brutto)}`
 }
 
-export function angebotSummenBrutto(positionen: AngebotPosition[], mwstSatz = 19) {
-  const s = summenAusPositionen(positionen, mwstSatz)
-  const netto =
-    s.nettoMax > 0 ? s.nettoMax : s.nettoMin > 0 ? s.nettoMin : (s.nettoMin + s.nettoMax) / 2
-  const mwst = Math.round(netto * (mwstSatz / 100) * 100) / 100
-  const brutto = Math.round((netto + mwst) * 100) / 100
-  return { netto, mwst, brutto, mwstSatz }
-}
-
 export function gesendetAmWert(a: Pick<Angebot, 'gesendet_am' | 'gesendet_kunde_at'>): string | null {
   return a.gesendet_am ?? a.gesendet_kunde_at ?? null
 }
@@ -214,17 +140,4 @@ export function erinnerungReferenzAm(
     return new Date(verl).getTime() >= new Date(gesendet).getTime() ? verl : gesendet
   }
   return verl ?? gesendet
-}
-
-export function erinnerungGeplantAm(refIso: string | null | undefined): string | null {
-  if (!refIso?.trim()) return null
-  const d = new Date(refIso)
-  if (Number.isNaN(d.getTime())) return null
-  d.setDate(d.getDate() + 7)
-  return d.toISOString()
-}
-
-/** @deprecated Nutze erinnerungGeplantAm(erinnerungReferenzAm(...)) */
-export function nachfassGeplantAm(gesendetAm: string | null): string | null {
-  return erinnerungGeplantAm(gesendetAm)
 }

@@ -1,6 +1,5 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { normalizeAngebotPositionen, repairAngebotPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen,repairAngebotPositionen } from '@/lib/angebot-positionen'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import {
   berechneRechnung,
@@ -8,7 +7,7 @@ import {
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import type { RechnungBerechnung } from '@/lib/rechnung-berechnung'
-import type { AngebotPosition, RechnungBelegTyp } from '@/lib/types'
+import type { AngebotPosition,RechnungBelegTyp } from '@/lib/types'
 
 export type RechnungSpeichernInput = {
   positionen: AngebotPosition[]

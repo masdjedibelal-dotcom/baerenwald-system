@@ -1,6 +1,5 @@
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
-import type { AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
-import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
+import type { AngebotPosition } from '@/lib/types'
 
 export const HW_KONDITION_MWST_DEFAULT = 19
 
@@ -193,34 +192,6 @@ export function hwKonditionForAuftragPosition(
 
   if (konditionen.positionen.length === 1) return konditionen.positionen[0]!
   return null
-}
-
-/** Partnerpreis pro Angebotsposition (aus übernommenen / eingereichten Konditionen). */
-export function buildPartnerPreisByAngebotPositionId(
-  rows: AngebotHandwerkerRow[]
-): Map<string, number> {
-  const map = new Map<string, number>()
-  for (const r of rows) {
-    if (!hasHwEinreichung(r)) continue
-    const k = parseHwKonditionen(r.hw_konditionen)
-    if (!k) continue
-    for (const p of k.positionen) {
-      if (p.position_id && p.hw_netto > 0) map.set(p.position_id, p.hw_netto)
-    }
-  }
-  return map
-}
-
-export function partnerPreisMapFromZuweisung(
-  row: Pick<AngebotHandwerkerRow, 'hw_konditionen'>
-): Map<string, number> {
-  const k = parseHwKonditionen(row.hw_konditionen)
-  const map = new Map<string, number>()
-  if (!k) return map
-  for (const p of k.positionen) {
-    if (p.position_id && p.hw_netto > 0) map.set(p.position_id, p.hw_netto)
-  }
-  return map
 }
 
 export function angebotPositionenFromRaw(raw: unknown): AngebotPosition[] {

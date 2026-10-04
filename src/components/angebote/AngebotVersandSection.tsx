@@ -3,21 +3,20 @@
 import { angebotMailBetreff } from '@/lib/templates/angebot-mail'
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn, MockEmpty } from '@/components/mock-ui'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockBtn,MockEmpty } from '@/components/mock-ui'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { openDeleteConfirm, openActionConfirm } from '@/components/ui/ConfirmPopup'
+import { openDeleteConfirm,openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { Card } from '@/components/ui/Card'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { cn } from '@/lib/utils'
-import type { AngebotDetail, AngebotHandwerkerRow, AngebotPosition } from '@/lib/types'
+import type { AngebotDetail,AngebotHandwerkerRow,AngebotPosition } from '@/lib/types'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
 import {
   darfAngebotAnKundeSenden,
@@ -99,7 +98,6 @@ export function AngebotVersandSection({
     zuweisungId: string
   }) => void
 }) {
-  const router = useRouter()
   const [kundeModalInternal, setKundeModalInternal] = useState(false)
   const kundeModalControlled = kundeModalOpen !== undefined
   const kundeModal = kundeModalControlled ? kundeModalOpen : kundeModalInternal

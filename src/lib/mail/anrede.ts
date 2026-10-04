@@ -1,4 +1,3 @@
-import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import {
   kundeAngebotBegruessung,
   type KundeAnredeKontext,
@@ -11,14 +10,6 @@ export type MailAnrede = 'du' | 'sie'
  * Typ `du` bleibt für Alttexte / mailText-Zweige, wird aber nicht mehr gewählt.
  */
 export function mailAnredeFromKundeTyp(_kundeTyp?: string | null): MailAnrede {
-  return 'sie'
-}
-
-export function mailAnredeFromKundenUndLead(
-  kundenTyp?: string | null,
-  leadKundentyp?: string | null
-): MailAnrede {
-  void resolveAngebotKundeTyp(kundenTyp, leadKundentyp)
   return 'sie'
 }
 

@@ -2,8 +2,8 @@
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
-import { useRef, useState } from 'react'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
+import { useRef,useState } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { DateInput } from '@/components/ui/DateInput'
@@ -13,7 +13,7 @@ import {
   OBJEKT_ANLAGE_WARTUNGSINTERVALL,
   OBJEKT_ANLAGE_WARTUNGSINTERVALL_LABELS,
 } from '@/lib/objektakte/labels'
-import type { ObjektAnlageStatus, ObjektEinheit } from '@/lib/objektakte/types'
+import type { ObjektAnlageStatus,ObjektEinheit } from '@/lib/objektakte/types'
 import type { ObjektAnlageWartungsintervall } from '@/lib/objektakte/labels'
 import type { Gewerk } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -59,57 +59,6 @@ export function emptyAnlageFormState(gewerke: Gewerk[]): ObjektAnlageFormState {
     wartungsintervall: '',
     letzteWartungAm: '',
     dokumentUrls: [],
-  }
-}
-
-function fmtJahr(iso: string | null | undefined): string {
-  if (!iso?.trim()) return ''
-  if (/^\d{4}$/.test(iso.trim())) return iso.trim()
-  const d = new Date(iso)
-  if (!Number.isNaN(d.getTime())) return String(d.getFullYear())
-  return iso.slice(0, 10)
-}
-
-export function anlageFormStateFromRow(a: {
-  bezeichnung: string
-  gewerk_id: string
-  standort?: string | null
-  objekt_einheit_id?: string | null
-  foto_url?: string | null
-  notiz?: string | null
-  status: ObjektAnlageStatus
-  hersteller?: string | null
-  modell?: string | null
-  seriennummer?: string | null
-  einbau_datum?: string | null
-  anschaffungswert_eur?: number | null
-  garantie_bis?: string | null
-  gewaehrleistung_bis?: string | null
-  wartungsintervall?: ObjektAnlageWartungsintervall | null
-  letzte_wartung_am?: string | null
-  dokument_urls?: string[] | null
-}): ObjektAnlageFormState {
-  return {
-    bezeichnung: a.bezeichnung,
-    gewerkId: a.gewerk_id,
-    standort: a.standort ?? '',
-    einheitId: a.objekt_einheit_id ?? '',
-    fotoUrl: a.foto_url ?? '',
-    notiz: a.notiz ?? '',
-    status: a.status,
-    hersteller: a.hersteller ?? '',
-    modell: a.modell ?? '',
-    seriennummer: a.seriennummer ?? '',
-    einbauDatum: fmtJahr(a.einbau_datum) || a.einbau_datum?.slice(0, 10) || '',
-    anschaffungswert:
-      a.anschaffungswert_eur != null && Number.isFinite(a.anschaffungswert_eur)
-        ? String(a.anschaffungswert_eur).replace('.', ',')
-        : '',
-    garantieBis: a.garantie_bis?.slice(0, 10) ?? '',
-    gewaehrleistungBis: a.gewaehrleistung_bis?.slice(0, 10) ?? '',
-    wartungsintervall: a.wartungsintervall ?? '',
-    letzteWartungAm: a.letzte_wartung_am?.slice(0, 10) ?? '',
-    dokumentUrls: [...(a.dokument_urls ?? [])],
   }
 }
 

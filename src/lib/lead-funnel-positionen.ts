@@ -1,6 +1,6 @@
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
 import { neuePositionsId } from '@/lib/angebot-positionen'
-import { festpreisMitteAusRange, type WizardPosition } from '@/lib/angebote/angebot-wizard-types'
+import { festpreisMitteAusRange,type WizardPosition } from '@/lib/angebote/angebot-wizard-types'
 import { BEREICH_TO_GEWERK } from '@/lib/utils'
 import type { Gewerk } from '@/lib/types'
 
@@ -15,16 +15,6 @@ export type LeadFunnelPosition = {
   gewerk_name?: string
   /** true = erscheint im Angebot/Rechnung; false = nur Projektdetails */
   relevant_fuer_rechnung?: boolean
-}
-
-export const RELEVANZ_RECHNUNG_OPTIONS = [
-  { value: 'false', label: 'Nur Projektdetails' },
-  { value: 'true', label: 'In Angebot / Rechnung' },
-] as const
-
-/** Fehlendes Flag = bisheriges Verhalten (übernehmen ins Angebot). */
-export function isRelevantFuerRechnung(pos: LeadFunnelPosition): boolean {
-  return pos.relevant_fuer_rechnung !== false
 }
 
 const TEXT_GEWERK_RULES: { match: RegExp; slugs: string[] }[] = [
@@ -71,10 +61,6 @@ export function resolveGewerkForFunnelPosition(
   }
   return { gewerk_id: '', gewerk_name: 'Freie Leistung', gewerk_slug: 'frei' }
 }
-
-export const LEISTUNG_EINHEITEN = ['pauschal', 'm²', 'Stück', 'lfm', 'lfd. m', 'Std.'] as const
-
-export const LEISTUNG_EINHEIT_OPTIONS = LEISTUNG_EINHEITEN.map((e) => ({ value: e, label: e }))
 
 function num(v: unknown, fallback = 0): number {
   const n = typeof v === 'number' ? v : Number(v)
@@ -145,21 +131,5 @@ export function funnelPositionToWizard(
     preis_min: fest,
     preis_max: fest,
     frei: !hatGewerk,
-  }
-}
-
-export function neueFreieWizardPosition(): WizardPosition {
-  return {
-    id: neuePositionsId(),
-    gewerk_id: '',
-    gewerk_name: 'Freie Leistung',
-    gewerk_slug: 'frei',
-    leistung: '',
-    beschreibung: '',
-    menge: 1,
-    einheit: 'pauschal',
-    preis_min: 0,
-    preis_max: 0,
-    frei: true,
   }
 }

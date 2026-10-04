@@ -38,15 +38,3 @@ export function emailKontaktMatch(a: string | null | undefined, b: string | null
   const eb = normalizeKontaktEmail(b)
   return Boolean(ea && eb && ea === eb)
 }
-
-export function stammdatenTypLabel(typ: StammdatenTyp): string {
-  if (typ === 'kunde') return 'Kunde'
-  if (typ === 'handwerker') return 'Partner'
-  return 'Partner'
-}
-
-export function stammdatenDetailHref(typ: StammdatenTyp, id: string): string {
-  if (typ === 'kunde') return `/kunden/${id}`
-  if (typ === 'handwerker') return `/handwerker/${id}`
-  return `/partner/${id}`
-}

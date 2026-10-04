@@ -2,9 +2,8 @@
 
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockUebersichtCard } from '@/components/mock-ui/MockUebersichtCard'
-import { useMemo, useState } from 'react'
+import { useMemo,useState } from 'react'
 import { ZeitraumIconPopover } from '@/components/ui/ZeitraumIconPopover'
 import {
   buildKundeWirtschaft,

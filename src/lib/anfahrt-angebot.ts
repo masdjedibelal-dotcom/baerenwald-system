@@ -1,11 +1,9 @@
 import {
-  neueArtikelZeile,
   istFreitextPosition,
   istGesamtrabattPosition,
   type DokumentArtikelZeile,
-  type DokumentZeile,
+  type DokumentZeile
 } from '@/lib/dokument-zeilen'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { AngebotPosition } from '@/lib/types'
 
 export const GEWERK_SLUG_ANFAHRT = '__anfahrt__'
@@ -17,15 +15,6 @@ export type AnfahrtGewerkBlockRef = {
   gewerkSlug?: string
 }
 
-export function parseAnfahrtPauschaleNetto(firm: FirmenEinstellungen): number {
-  const n = parseFloat(String(firm.anfahrt_pauschale_netto ?? '').replace(',', '.'))
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : 49
-}
-
-export function anfahrtLeistungText(firm: FirmenEinstellungen): string {
-  return firm.anfahrt_leistung_text?.trim() || 'Anfahrtskosten (Pauschale)'
-}
-
 export function isAnfahrtZeile(z: DokumentZeile): boolean {
   return (
     z.typ === 'artikel' &&
@@ -33,52 +22,10 @@ export function isAnfahrtZeile(z: DokumentZeile): boolean {
   )
 }
 
-export function findAnfahrtZeile(zeilen: DokumentZeile[]): DokumentArtikelZeile | undefined {
-  for (const z of zeilen) {
-    if (z.typ === 'artikel' && isAnfahrtZeile(z)) return z
-  }
-  return undefined
-}
-
 export function findAnfahrtZeilen(zeilen: DokumentZeile[]): DokumentArtikelZeile[] {
   return zeilen.filter(
     (z): z is DokumentArtikelZeile => z.typ === 'artikel' && isAnfahrtZeile(z)
   )
-}
-
-/** Anfahrt in einem bestimmten Gewerk-Abschnitt (gewerk_block_key). */
-export function findAnfahrtZeileForBlock(
-  zeilen: DokumentZeile[],
-  blockKey: string
-): DokumentArtikelZeile | undefined {
-  const key = blockKey.trim()
-  if (!key) return undefined
-  for (const z of zeilen) {
-    if (z.typ !== 'artikel' || !isAnfahrtZeile(z)) continue
-    if ((z.gewerk_block_key?.trim() || '') === key) return z
-  }
-  return undefined
-}
-
-export function hatAnfahrtFuerBlock(zeilen: DokumentZeile[], blockKey: string): boolean {
-  return Boolean(findAnfahrtZeileForBlock(zeilen, blockKey))
-}
-
-export function createAnfahrtZeile(firm: FirmenEinstellungen): DokumentArtikelZeile {
-  return neueArtikelZeile({
-    bezeichnung: anfahrtLeistungText(firm),
-    vkNetto: parseAnfahrtPauschaleNetto(firm),
-    menge: 1,
-    einheit: 'pauschal',
-    gewerkName: 'Allgemein',
-    gewerk_slug: GEWERK_SLUG_ANFAHRT,
-    kostenart: 'anfahrt',
-    kostenverteilung: 'lohn',
-  })
-}
-
-export function ohneAnfahrtZeilen(zeilen: DokumentZeile[]): DokumentZeile[] {
-  return zeilen.filter((z) => !isAnfahrtZeile(z))
 }
 
 /** Anfahrt dem Gewerk-Abschnitt zuordnen (nicht als eigener PDF-Block). */

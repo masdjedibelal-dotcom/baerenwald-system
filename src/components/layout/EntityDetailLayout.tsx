@@ -2,16 +2,16 @@
 
 import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { MockTabs } from '@/components/mock-ui/MockTabs'
-import type { ReactNode, TouchEvent } from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import type { ReactNode,TouchEvent } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import { usePathname,useSearchParams } from 'next/navigation'
 import { DetailMobileTopSlotProvider } from '@/components/layout/detail-mobile-top-slot'
 import {
   VorgangResolverBanner,
   vorgangResolverBannerVisible,
 } from '@/components/vorgang/VorgangResolverBanner'
 import { AkteRueckwegChip } from '@/components/vorgang/AkteRueckwegChip'
-import { DetailQuickBar, type QuickBarAction } from '@/components/vorgang/DetailQuickBar'
+import { DetailQuickBar,type QuickBarAction } from '@/components/vorgang/DetailQuickBar'
 import { PhaseStrip } from '@/components/vorgang/PhaseStrip'
 import type { VorgangPhasenExtras } from '@/components/vorgang/VorgangPhasenVerlauf'
 import type { AkteFromRef } from '@/lib/vorgang/akte-from'
@@ -97,43 +97,6 @@ export function DetailHead({
 
       {actions ? <div className="detail-head-actions min-w-0">{actions}</div> : null}
     </header>
-  )
-}
-
-/** Avatar für andere Bereiche (z. B. Kalender) — nicht im Detail-Kopf. */
-export function DetailVisual({
-  initials,
-  tone = 'green',
-  icon,
-  size = 'md',
-}: {
-  initials?: string
-  tone?: 'green' | 'gold' | 'gray'
-  icon?: ReactNode
-  size?: 'sm' | 'md' | 'lg'
-}) {
-  const toneClass = {
-    green: 'bg-bw-green-bg text-bw-primary',
-    gold: 'bg-bw-accent-bg text-bw-accent',
-    gray: 'bg-bw-hover text-bw-text-mid',
-  }[tone]
-
-  const sizeClass = {
-    sm: 'h-[26px] w-[26px] text-[length:var(--fs-meta)]',
-    md: 'h-11 w-11 text-[length:var(--fs-text)]',
-    lg: 'h-11 w-11 text-[length:var(--fs-text)] md:h-[44px] md:w-[44px] md:text-[length:var(--fs-text)]',
-  }[size]
-
-  return (
-    <div
-      className={cn(
-        'flex items-center justify-center rounded-pill font-semibold tracking-wide',
-        sizeClass,
-        toneClass
-      )}
-    >
-      {icon ?? initials?.slice(0, 2).toUpperCase() ?? '??'}
-    </div>
   )
 }
 

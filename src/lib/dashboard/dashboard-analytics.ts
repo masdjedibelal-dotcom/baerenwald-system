@@ -1,4 +1,4 @@
-import { formatMonatKurzJahr, formatDatum } from '@/lib/utils'
+import { formatMonatKurzJahr } from '@/lib/utils'
 import {
   endOfDay,
   endOfMonth,
@@ -13,7 +13,7 @@ import {
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
-import type { AngebotPosition, AuftragPosition } from '@/lib/types'
+import type { AngebotPosition,AuftragPosition } from '@/lib/types'
 import { C } from '@/lib/tokens/colors'
 
 export type DashboardZeitraumPreset =
@@ -23,9 +23,6 @@ export type DashboardZeitraumPreset =
   | 'dieses_jahr'
   | 'gesamt'
   | 'benutzerdefiniert'
-
-/** @deprecated Alias — nutze DashboardZeitraumPreset */
-export type DashboardZeitraum = DashboardZeitraumPreset
 
 export type DashboardZeitraumFilter = {
   preset: DashboardZeitraumPreset
@@ -100,17 +97,6 @@ export function getDashboardZeitraumRange(
   return null
 }
 
-/** @deprecated Nutze getDashboardZeitraumRange */
-export function zeitraumStartIso(
-  z: DashboardZeitraumPreset | DashboardZeitraumFilter,
-  now = new Date()
-): string | null {
-  const filter =
-    typeof z === 'string' ? parseDashboardZeitraum(z) : z
-  const range = getDashboardZeitraumRange(filter, now)
-  return range?.from.toISOString() ?? null
-}
-
 export function inZeitraum(
   iso: string | null | undefined,
   rangeOrStartIso: { from: Date; to: Date } | string | null
@@ -122,14 +108,6 @@ export function inZeitraum(
     return t >= new Date(rangeOrStartIso).getTime()
   }
   return t >= rangeOrStartIso.from.getTime() && t <= rangeOrStartIso.to.getTime()
-}
-
-export function dashboardZeitraumLabel(filter: DashboardZeitraumFilter): string {
-  if (filter.preset === 'benutzerdefiniert' && filter.von && filter.bis) {
-    const fmt = (d: string) => formatDatum(d)
-    return `${fmt(filter.von)} – ${fmt(filter.bis)}`
-  }
-  return DASHBOARD_ZEITRAUM_OPTIONS.find((o) => o.value === filter.preset)?.label ?? 'Gesamt'
 }
 
 export function buildDashboardZeitraumHref(filter: DashboardZeitraumFilter): string {
@@ -191,29 +169,6 @@ export function auftragNetto(auftrag: {
     ).netto
   }
   return auftragSummenAusPositionen(pos as AngebotPosition[]).netto
-}
-
-/**
- * CRM-Umsatz (eine Definition für Monate + Gewerk):
- * - Aufträge ab Angebotsannahme inkl. Direktauftrag (jeder nicht stornierte Auftrag)
- * - Direktrechnungen ohne Auftrag (gestellt/bezahlt; ersetzt/storniert/entwurf raus)
- * - Auftrag-Storno gesamt → fällt raus
- * - Korrekturen: aktuelle Angebots-/Rechnungssumme zählt (alte ersetzt_durch zählen nicht)
- */
-export function isUmsatzAuftragStatus(status: string | null | undefined): boolean {
-  const s = String(status ?? '').trim().toLowerCase()
-  return Boolean(s) && s !== 'storniert'
-}
-
-export function isUmsatzDirektRechnung(r: {
-  status?: string | null
-  auftrag_id?: string | null
-  ersetzt_durch?: string | null
-}): boolean {
-  if ((r.auftrag_id ?? '').trim()) return false
-  if ((r.ersetzt_durch ?? '').trim()) return false
-  const st = String(r.status ?? '').trim().toLowerCase()
-  return st === 'gesendet' || st === 'bezahlt' || st === 'versendet'
 }
 
 export type UmsatzMonat = {
@@ -280,55 +235,6 @@ export type BuildUmsatzverlaufOpts = {
   range?: { from: Date; to: Date } | null
 }
 
-/** Umsatzverlauf — gleiche Basis wie Gewerk (Aufträge + Direkt-RE). */
-export function buildUmsatzverlauf(
-  auftraege: Array<{
-    status: string
-    created_at: string
-    angebote?: unknown
-    auftrag_positionen?: AngebotPosition[] | null
-  }>,
-  rechnungen: Array<{
-    status?: string | null
-    created_at: string
-    netto?: number | null
-    auftrag_id?: string | null
-    ersetzt_durch?: string | null
-  }> = [],
-  monateCountOrOpts: number | BuildUmsatzverlaufOpts = 6,
-  nowArg = new Date()
-): UmsatzMonat[] {
-  const opts: BuildUmsatzverlaufOpts =
-    typeof monateCountOrOpts === 'number'
-      ? { monateCount: monateCountOrOpts, now: nowArg }
-      : monateCountOrOpts
-  const now = opts.now ?? nowArg
-  const months = buildMonthBuckets(opts.range, opts.monateCount ?? 6, now)
-  const byKey = new Map(months.map((m) => [m.key, m]))
-
-  for (const a of auftraege) {
-    if (!isUmsatzAuftragStatus(a.status)) continue
-    const created = new Date(a.created_at)
-    if (Number.isNaN(created.getTime())) continue
-    const bucket = byKey.get(monthKey(created))
-    if (!bucket) continue
-    const netto = auftragNetto(a as Parameters<typeof auftragNetto>[0])
-    if (a.status === 'abgeschlossen') bucket.abgeschlossen += netto
-    else bucket.offen += netto
-  }
-
-  for (const r of rechnungen) {
-    if (!isUmsatzDirektRechnung(r)) continue
-    const created = new Date(r.created_at)
-    if (Number.isNaN(created.getTime())) continue
-    const bucket = byKey.get(monthKey(created))
-    if (!bucket) continue
-    bucket.rechnungen += Number(r.netto) || 0
-  }
-
-  return months
-}
-
 /**
  * Eine Wahrheit für Umsatz (30.09.2026): Netto gestellter Rechnungen (offen oder bezahlt),
  * nach Rechnungsdatum. Stornierte Rechnungen und Storno-Gutschriften heben sich auf und
@@ -369,14 +275,6 @@ export function buildUmsatzAusRechnungen(
   return months
 }
 
-/** @deprecated Nutze buildUmsatzverlauf(..., { monateCount: 12 }) */
-export function buildUmsatzverlauf12m(
-  auftraege: Parameters<typeof buildUmsatzverlauf>[0],
-  now = new Date()
-): UmsatzMonat[] {
-  return buildUmsatzverlauf(auftraege, [], { monateCount: 12, now })
-}
-
 export type GewerkUmsatzZeile = {
   name: string
   netto: number
@@ -388,21 +286,6 @@ export type DashboardGewerkKatalog = {
   id: string
   name: string
   slug: string
-}
-
-const GEWERK_COLORS = [
-  C.green,
-  C.blue2,
-  C.amber,
-  C.purple2,
-  C.greenMuted,
-  C.orange,
-  C.teal2,
-  C.slate500,
-]
-
-export function gewerkColor(index: number): string {
-  return GEWERK_COLORS[index % GEWERK_COLORS.length]!
 }
 
 /** Interne Positions-Slugs — kein Katalog-Gewerk (Anfahrt, Nachlass, Freitext-Marker). */
@@ -519,93 +402,6 @@ function addScaledToGewerkMap(
     if (!(amt > 0)) continue
     target.set(name, (target.get(name) ?? 0) + sollNetto * (amt / partsSum))
   }
-}
-
-function positionenFromUmsatzAuftrag(a: {
-  angebote?:
-    | { positionen?: unknown }
-    | { positionen?: unknown }[]
-    | null
-  auftrag_positionen?: AngebotPosition[] | AuftragPosition[] | null
-}): unknown {
-  const ang = Array.isArray(a.angebote) ? a.angebote[0] : a.angebote
-  if (ang?.positionen) return ang.positionen
-  const pos = a.auftrag_positionen
-  if (!pos?.length) return null
-  const first = pos[0] as AuftragPosition & AngebotPosition
-  if ('preis_fix' in first || 'lohn_fix' in first || 'leistung_name' in first) {
-    return auftragPositionenToAngebotPositionen(pos as AuftragPosition[])
-  }
-  return pos
-}
-
-/**
- * Umsatz nach Gewerk — **dieselbe Euro-Basis** wie Monatsverlauf (`auftragNetto` + Direkt-RE-Netto).
- * Positionen steuern nur die Aufteilung auf Gewerke (skaliert auf den Netto-Soll).
- */
-export function buildGewerkUmsatz(
-  auftraege: Array<{
-    status?: string | null
-    angebote?:
-      | {
-          gesamt_fix?: number | null
-          gesamt_min?: number | null
-          gesamt_max?: number | null
-          positionen?: unknown
-        }
-      | {
-          gesamt_fix?: number | null
-          gesamt_min?: number | null
-          gesamt_max?: number | null
-          positionen?: unknown
-        }[]
-      | null
-    auftrag_positionen?: AngebotPosition[] | AuftragPosition[] | null
-  }>,
-  rechnungen: Array<{
-    positionen?: unknown
-    status?: string | null
-    auftrag_id?: string | null
-    ersetzt_durch?: string | null
-    netto?: number | null
-  }> = [],
-  gewerkeKatalog: DashboardGewerkKatalog[] = []
-): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
-  const lookup = buildGewerkLookup(gewerkeKatalog)
-  const map = new Map<string, number>()
-
-  for (const a of auftraege) {
-    if (!isUmsatzAuftragStatus(a.status)) continue
-    const soll = auftragNetto(a)
-    if (!(soll > 0)) continue
-    const anteile = gewerkAnteileFromPositionen(positionenFromUmsatzAuftrag(a), lookup)
-    addScaledToGewerkMap(map, anteile, soll)
-  }
-
-  for (const r of rechnungen) {
-    if (!isUmsatzDirektRechnung(r)) continue
-    const fromPos = gewerkAnteileFromPositionen(r.positionen, lookup)
-    let partsSum = 0
-    for (const amt of fromPos.values()) {
-      if (amt > 0) partsSum += amt
-    }
-    const soll =
-      Number(r.netto) > 0 ? Number(r.netto) : partsSum > 0 ? partsSum : 0
-    if (!(soll > 0)) continue
-    addScaledToGewerkMap(map, fromPos, soll)
-  }
-
-  const gesamt = Array.from(map.values()).reduce((a, b) => a + b, 0)
-  const zeilen = Array.from(map.entries())
-    .map(([name, netto]) => ({
-      name,
-      netto: Math.round(netto * 100) / 100,
-      anteil: gesamt > 0 ? Math.round((netto / gesamt) * 100) : 0,
-    }))
-    .sort((a, b) => b.netto - a.netto)
-
-  const gesamtRounded = Math.round(gesamt * 100) / 100
-  return { zeilen, gesamt: gesamtRounded }
 }
 
 /** Umsatz nach Gewerk aus derselben Quelle wie der Umsatzverlauf (istUmsatzRechnung). */
@@ -810,21 +606,4 @@ export function buildVertriebsFunnel(input: {
 
   const conversionGesamt = a > 0 ? Math.round((c / a) * 100) : 0
   return { stufen, conversionGesamt }
-}
-
-/** Zählt eindeutige Vorgänge (Lead-ID), Fallback ohne Lead = eigene ID. */
-export function countUniqueVorgaengeByLead(
-  rows: Array<{ id?: string | null; lead_id?: string | null }>
-): number {
-  const keys = new Set<string>()
-  for (const row of rows) {
-    const leadId = String(row.lead_id ?? '').trim()
-    if (leadId) {
-      keys.add(`lead:${leadId}`)
-      continue
-    }
-    const id = String(row.id ?? '').trim()
-    if (id) keys.add(`id:${id}`)
-  }
-  return keys.size
 }

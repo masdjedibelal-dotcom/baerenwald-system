@@ -1,4 +1,3 @@
-import { GEWERK_SLUG_ANFAHRT } from '@/lib/anfahrt-angebot'
 import { positionVkNettoStueck } from '@/lib/angebot-positionen'
 import { istPreisPosition } from '@/lib/dokument-zeilen'
 import type { DokumentArtikelZeile } from '@/lib/dokument-zeilen'
@@ -17,28 +16,6 @@ export type NeueLeistungSyncInput = {
 
 function normLeistungKey(gewerk_id: string, leistung: string): string {
   return `${gewerk_id.trim()}::${leistung.trim().toLowerCase()}`
-}
-
-export function shouldSyncNeueLeistung(input: NeueLeistungSyncInput): boolean {
-  if (input.preisliste_id?.trim()) return false
-  if (input.gewerk_slug === GEWERK_SLUG_ANFAHRT) return false
-  if (!input.gewerk_id?.trim()) return false
-  if (!input.leistung?.trim()) return false
-  return true
-}
-
-/** Doppelte Zeilen in einem Request zusammenführen. */
-export function dedupeNeueLeistungInputs(inputs: NeueLeistungSyncInput[]): NeueLeistungSyncInput[] {
-  const seen = new Set<string>()
-  const out: NeueLeistungSyncInput[] = []
-  for (const raw of inputs) {
-    if (!shouldSyncNeueLeistung(raw)) continue
-    const key = normLeistungKey(raw.gewerk_id, raw.leistung)
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(raw)
-  }
-  return out
 }
 
 export function syncInputsFromDokumentArtikel(
@@ -77,10 +54,6 @@ export function syncInputsFromProjektWasZeilen(
     preisliste_id: z.preisliste_id,
     vkNetto: 0,
   }))
-}
-
-export function preisFromVkNetto(vkNetto: number | undefined): number {
-  return Math.max(0, Math.round((Number(vkNetto) || 0) * 100) / 100)
 }
 
 export { normLeistungKey }

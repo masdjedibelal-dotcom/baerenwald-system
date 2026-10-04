@@ -1,4 +1,4 @@
-import type { AngebotHandwerkerRow, OrgFreigabeStatus } from '@/lib/types'
+import type { AngebotHandwerkerRow,OrgFreigabeStatus } from '@/lib/types'
 import { hasHwEinreichung } from '@/lib/partner/handwerker-einreichung'
 import {
   orgFreigabeBlockiertKundenversandStatus,
@@ -108,20 +108,6 @@ export function darfAngebotAnKundeSenden(
   if (!list.length) return true
   if (angebotStatus === 'handwerker_akzeptiert') return true
   return handwerkerFreigabeErledigt(list)
-}
-
-export function orgFreigabeBlockiertHandwerker(
-  orgStatus: OrgFreigabeStatus | null | undefined,
-  hvMeldungStatus?: string | null
-): boolean {
-  return orgFreigabeBlockiertPartner(orgStatus, hvMeldungStatus)
-}
-
-export function orgFreigabeBlockierHinweis(
-  orgStatus: OrgFreigabeStatus | null | undefined,
-  hvMeldungStatus?: string | null
-): string | null {
-  return orgFreigabePartnerBlockMessage(orgStatus, hvMeldungStatus)
 }
 
 export function handwerkerSendenBlockierHinweis(

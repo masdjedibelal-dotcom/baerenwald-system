@@ -80,16 +80,3 @@ export async function ensureUnifiedTeamAccount(
     handwerkerConflict: null,
   }
 }
-
-export async function teamAccountHasPartnerPortal(
-  admin: SupabaseClient,
-  authUserId: string
-): Promise<boolean> {
-  const { data, error } = await admin
-    .from('handwerker')
-    .select('id')
-    .eq('auth_user_id', authUserId)
-    .maybeSingle()
-  if (error) logDbError('lib/auth/unified-team-account:handwerker', error)
-  return Boolean(data?.id)
-}

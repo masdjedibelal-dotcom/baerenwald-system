@@ -1,8 +1,8 @@
-import { rebindLooseAnfahrtPositionen, rebindLooseAnfahrtZeilen } from '@/lib/anfahrt-angebot'
-import { normalizeAngebotPositionen, repairAngebotPositionen } from '@/lib/angebot-positionen'
+import { rebindLooseAnfahrtPositionen,rebindLooseAnfahrtZeilen } from '@/lib/anfahrt-angebot'
+import { normalizeAngebotPositionen,repairAngebotPositionen } from '@/lib/angebot-positionen'
 import { preislisteEinheitspreisNetto } from '@/lib/angebote/angebot-positionen-from-lead'
-import { angebotPositionenToDokumentZeilen, type DokumentZeile } from '@/lib/dokument-zeilen'
-import type { AngebotPosition, Gewerk, Preisliste } from '@/lib/types'
+import { angebotPositionenToDokumentZeilen,type DokumentZeile } from '@/lib/dokument-zeilen'
+import type { Gewerk,Preisliste } from '@/lib/types'
 
 function num(v: unknown): number {
   const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))

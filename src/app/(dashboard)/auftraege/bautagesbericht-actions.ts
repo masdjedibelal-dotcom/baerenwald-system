@@ -1,21 +1,15 @@
 'use server'
 
-import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import {
-  BAUTAGESBERICHT_MAX_FOTOS,
-  DEFAULT_BAUTAGESBERICHT_RISIKEN,
-  parseBautagesberichtFotos,
+  BAUTAGESBERICHT_MAX_FOTOS,parseBautagesberichtFotos,
   parseStringList,
   type AuftragBautagesbericht,
-  type BautagesberichtFoto,
+  type BautagesberichtFoto
 } from '@/lib/auftraege/bautagesbericht-types'
-import { renderBautagesberichtPdfBuffer } from '@/lib/auftraege/render-bautagesbericht-pdf'
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
-import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import type { Kunde } from '@/lib/types'
 
 function mapBericht(row: Record<string, unknown>): AuftragBautagesbericht {
@@ -112,174 +106,6 @@ export async function listAuftragBautagesberichte(auftragId: string): Promise<Au
   return rows
 }
 
-async function naechsteTagNummer(auftragId: string): Promise<number> {
-  const { data, error } = await supabaseAdmin
-    .from('auftrag_bautagesberichte')
-    .select('tag_nummer')
-    .eq('auftrag_id', auftragId)
-    .order('tag_nummer', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
-  return (Number(data?.tag_nummer) || 0) + 1
-}
-
-export type BautagesberichtInput = {
-  auftrag_id: string
-  datum: string
-  arbeitszeit_von?: string | null
-  arbeitszeit_bis?: string | null
-  wetter?: string | null
-  auftraggeber_name?: string | null
-  auftraggeber_adresse?: string | null
-  nachunternehmer_name?: string | null
-  nachunternehmer_firma?: string | null
-  leistungen?: string[]
-  behinderungen?: string | null
-  qualitaetssicherung?: string | null
-  risiken?: string[]
-  zusammenfassung?: string | null
-  personal_namen?: string[]
-  fotos?: BautagesberichtFoto[]
-  handwerker_id?: string | null
-}
-
-function normalizeFotosInput(
-  fotos: BautagesberichtFoto[] | null | undefined
-): BautagesberichtFoto[] | { ok: false; message: string } {
-  const list = parseBautagesberichtFotos(fotos)
-  if (list.length > BAUTAGESBERICHT_MAX_FOTOS) {
-    return { ok: false, message: `Maximal ${BAUTAGESBERICHT_MAX_FOTOS} Fotos pro Bautagesbericht.` }
-  }
-  return list
-}
-
-export async function createAuftragBautagesbericht(
-  input: BautagesberichtInput
-): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet' }
-
-  const fotosNorm = normalizeFotosInput(input.fotos)
-  if ('ok' in fotosNorm && fotosNorm.ok === false) return fotosNorm
-
-  const tagNummer = await naechsteTagNummer(input.auftrag_id)
-  const risiken =
-    input.risiken?.length ? input.risiken.filter((x) => x.trim()) : [...DEFAULT_BAUTAGESBERICHT_RISIKEN]
-
-  const { data, error } = await supabase
-    .from('auftrag_bautagesberichte')
-    .insert({
-      auftrag_id: input.auftrag_id,
-      tag_nummer: tagNummer,
-      datum: input.datum,
-      arbeitszeit_von: input.arbeitszeit_von?.trim() || null,
-      arbeitszeit_bis: input.arbeitszeit_bis?.trim() || null,
-      wetter: input.wetter?.trim() || null,
-      auftraggeber_name: input.auftraggeber_name?.trim() || null,
-      auftraggeber_adresse: input.auftraggeber_adresse?.trim() || null,
-      nachunternehmer_name: input.nachunternehmer_name?.trim() || null,
-      nachunternehmer_firma: input.nachunternehmer_firma?.trim() || null,
-      leistungen: (input.leistungen ?? []).filter((x) => x.trim()),
-      behinderungen: input.behinderungen?.trim() || null,
-      qualitaetssicherung: input.qualitaetssicherung?.trim() || null,
-      risiken,
-      zusammenfassung: input.zusammenfassung?.trim() || null,
-      personal_namen: (input.personal_namen ?? []).filter((x) => x.trim()),
-      fotos: fotosNorm,
-      handwerker_id: input.handwerker_id?.trim() || null,
-      sort_order: tagNummer,
-    })
-    .select('id')
-    .single()
-  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
-
-  if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-
-  await insertAuftragTimelineEvent({
-    auftrag_id: input.auftrag_id,
-    typ: 'bautagebuch',
-    titel: `Bautagesbericht Tag ${String(tagNummer).padStart(2, '0')} erstellt`,
-    beschreibung: input.zusammenfassung?.trim() || null,
-    erstellt_von: user.id,
-  })
-
-  revalidateAuftragDetail(input.auftrag_id)
-  return { ok: true, id: data.id as string }
-}
-
-export async function updateAuftragBautagesbericht(
-  id: string,
-  input: Omit<BautagesberichtInput, 'auftrag_id'>
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'Nicht angemeldet' }
-
-  const fotosNorm = normalizeFotosInput(input.fotos)
-  if ('ok' in fotosNorm && fotosNorm.ok === false) return fotosNorm
-
-  const { data: existing, error: loadErr } = await supabase
-    .from('auftrag_bautagesberichte')
-    .select('auftrag_id')
-    .eq('id', id)
-    .maybeSingle()
-  if (loadErr) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', loadErr)
-  if (loadErr || !existing) return { ok: false, message: 'Bautagesbericht nicht gefunden' }
-
-  const { error: error2 } = await supabase
-    .from('auftrag_bautagesberichte')
-    .update({
-      datum: input.datum,
-      arbeitszeit_von: input.arbeitszeit_von?.trim() || null,
-      arbeitszeit_bis: input.arbeitszeit_bis?.trim() || null,
-      wetter: input.wetter?.trim() || null,
-      auftraggeber_name: input.auftraggeber_name?.trim() || null,
-      auftraggeber_adresse: input.auftraggeber_adresse?.trim() || null,
-      nachunternehmer_name: input.nachunternehmer_name?.trim() || null,
-      nachunternehmer_firma: input.nachunternehmer_firma?.trim() || null,
-      leistungen: (input.leistungen ?? []).filter((x) => x.trim()),
-      behinderungen: input.behinderungen?.trim() || null,
-      qualitaetssicherung: input.qualitaetssicherung?.trim() || null,
-      risiken: (input.risiken ?? []).filter((x) => x.trim()),
-      zusammenfassung: input.zusammenfassung?.trim() || null,
-      personal_namen: (input.personal_namen ?? []).filter((x) => x.trim()),
-      fotos: fotosNorm,
-      handwerker_id: input.handwerker_id?.trim() || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-  if (error2) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error2)
-
-  if (error2) return { ok: false, message: error2.message }
-  revalidateAuftragDetail(existing.auftrag_id)
-  return { ok: true }
-}
-
-export async function deleteAuftragBautagesbericht(
-  id: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data: existing, error } = await supabase
-    .from('auftrag_bautagesberichte')
-    .select('auftrag_id, tag_nummer')
-    .eq('id', id)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
-  if (!existing) return { ok: false, message: 'Nicht gefunden' }
-
-  const { error: error2 } = await supabase.from('auftrag_bautagesberichte').delete().eq('id', id)
-  if (error2) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error2)
-  if (error2) return { ok: false, message: error2.message }
-  revalidateAuftragDetail(existing.auftrag_id)
-  return { ok: true }
-}
-
 export async function loadBautagesberichtFuerPdf(
   berichtId: string,
   auftragId: string
@@ -323,41 +149,4 @@ export async function loadBautagesberichtFuerPdf(
     auftragTitel: titelRaw?.trim() || kunde?.name?.trim() || 'Bauprojekt',
     fotoUrls,
   }
-}
-
-export async function generateBautagesberichtPdf(
-  berichtId: string,
-  auftragId: string
-): Promise<{ ok: true; pdfUrl: string } | { ok: false; message: string }> {
-  const loaded = await loadBautagesberichtFuerPdf(berichtId, auftragId)
-  if (!loaded.ok) return loaded
-
-  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
-  const buffer = await renderBautagesberichtPdfBuffer(loaded.bericht, firm, {
-    auftragTitel: loaded.auftragTitel,
-    kunde: loaded.kunde,
-    handwerkerName: loaded.bericht.handwerker?.name,
-    handwerkerFirma: loaded.bericht.handwerker?.firma,
-    fotoUrls: loaded.fotoUrls,
-  })
-
-  const path = `bautagesberichte/${auftragId}/${berichtId}.pdf`
-  const { error: upErr } = await supabaseAdmin.storage
-    .from('protokolle')
-    .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
-  if (upErr) logDbError('app/auftraege/bautagesbericht-actions:protokolle', upErr)
-
-  if (upErr) return { ok: false, message: upErr.message }
-
-  const { data: pub } = supabaseAdmin.storage.from('protokolle').getPublicUrl(path)
-  const pdfUrl = pub.publicUrl
-
-  const { error: __dbErr1 } = await supabaseAdmin
-    .from('auftrag_bautagesberichte')
-    .update({ pdf_url: pdfUrl, updated_at: new Date().toISOString() })
-    .eq('id', berichtId)
-  if (__dbErr1) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', __dbErr1)
-
-  revalidateAuftragDetail(auftragId)
-  return { ok: true, pdfUrl }
 }

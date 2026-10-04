@@ -1,9 +1,8 @@
 'use client'
 
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
-import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } from 'react'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
+import { useEffect,useId,useMemo,useState,useTransition,type ReactNode } from 'react'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Combobox } from '@/components/ui/Combobox'
@@ -30,8 +29,8 @@ import {
   type TerminKatFarbe,
 } from '@/lib/kalender/termin-kategorien'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
-import type { KalenderTermin, Kunde } from '@/lib/types'
-import { cn, formatWochentagDatumLang } from '@/lib/utils'
+import type { KalenderTermin,Kunde } from '@/lib/types'
+import { formatWochentagDatumLang } from '@/lib/utils'
 import {
   kalenderTerminEndeVergangen,
 } from '@/lib/kalender/termin-no-show-hint'
@@ -501,21 +500,6 @@ export function KalenderTerminEditorSheet({
         </form>
       )}
     </EditorSheet>
-  )
-}
-
-/** Runder + wie To-dos — für Kalender-Toolbar. */
-export function KalenderAddButton({
-  onClick,
-  label = 'Neuer Termin',
-}: {
-  onClick: () => void
-  label?: string
-}) {
-  return (
-    <MockBtn className="cal-toolbar__add" type="button" onClick={onClick} title={label} aria-label={label}>
-      <MockIcon n="plus" ctx="default" className="h-5 w-5" aria-hidden />
-    </MockBtn>
   )
 }
 

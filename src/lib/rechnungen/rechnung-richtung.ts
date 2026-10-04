@@ -12,9 +12,3 @@ export function isAusgehendeRechnung(r: {
 }): boolean {
   return !isEingehendeRechnung(r)
 }
-
-export function filterAusgehendeRechnungen<T extends { richtung?: string | null }>(
-  rows: T[]
-): T[] {
-  return rows.filter(isAusgehendeRechnung)
-}

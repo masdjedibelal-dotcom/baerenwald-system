@@ -15,7 +15,7 @@ import {
 } from '@/lib/auftraege/projekt-phasen'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
-import type { AuftragStatus, LeadStatus } from '@/lib/types'
+import type { AuftragStatus,LeadStatus } from '@/lib/types'
 
 async function assertAuftrag(auftragId: string) {
   const supabase = createClient()
@@ -27,44 +27,6 @@ async function assertAuftrag(auftragId: string) {
   if (error) logDbError('app/auftraege/kunden-update-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden' }
   return { ok: true as const, userId: user.id }
-}
-
-export async function updateAuftragProjektSteuerung(input: {
-  auftragId: string
-  status?: AuftragStatus
-  fortschritt?: number
-  naechster_schritt?: string | null
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await assertAuftrag(input.auftragId)
-  if (!gate.ok) return gate
-
-  const supabase = createClient()
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (input.status !== undefined) patch.status = input.status
-  if (input.fortschritt !== undefined) {
-    patch.fortschritt = Math.max(0, Math.min(100, Math.round(input.fortschritt)))
-  }
-  if (input.naechster_schritt !== undefined) {
-    patch.naechster_schritt = input.naechster_schritt?.trim() || null
-  }
-
-  const { error } = await supabase.from('auftraege').update(patch).eq('id', input.auftragId)
-  if (error) logDbError('app/auftraege/kunden-update-actions:auftraege', error)
-  if (error) return { ok: false, message: error.message }
-
-  if (input.status === 'abgeschlossen' || input.status === 'storniert') {
-    const { syncPortalLeadStatusAfterAuftragChange } = await import(
-      '@/lib/portal/sync-portal-lead-status'
-    )
-    await syncPortalLeadStatusAfterAuftragChange({
-      auftragId: input.auftragId,
-      status: input.status,
-      skipMieterMail: true,
-    })
-  }
-
-  revalidateAuftragDetail(input.auftragId)
-  return { ok: true }
 }
 
 export async function createKundenUpdateAndSend(input: {

@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAngebotList, revalidateAuftragList, revalidateKundeDetail, revalidateLeadDetail, revalidateLeadList, revalidateRechnungList } from '@/lib/crm-revalidate'
+import { revalidateAngebotList,revalidateAuftragList,revalidateKundeDetail,revalidateLeadDetail,revalidateLeadList,revalidateRechnungList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { berechneKundeGesamtumsatz } from '@/lib/kunden/kunde-umsatz'
@@ -353,42 +353,6 @@ export async function getPortalLoginHint(
   }
 }
 
-/** Globale Suche (Cmd+K) — Server Action wegen RLS-Fallback auf kunden. */
-export async function searchKundenGlobal(
-  term: string
-): Promise<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>[]> {
-  const q = term.trim().slice(0, 80).replace(/[%]/g, '')
-  if (q.length < 2) return []
-  const pct = `%${q}%`
-  const byId = new Map<
-    string,
-    Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>
-  >()
-  const { istHvPortalRollenKunde } = await import('@/lib/kunde-stammdaten')
-
-  for (const column of ['name', 'email', 'org_anzeigename'] as const) {
-    const { data } = await (() => { const db = createClient(); return db
-        .from('kunden')
-        .select('id, name, vorname, nachname, typ, email, portal_modus, org_anzeigename')
-        .ilike(column, pct)
-        .limit(8) })()
-    for (const row of data ?? []) {
-      if (!row?.id) continue
-      if (istHvPortalRollenKunde((row as { portal_modus?: string | null }).portal_modus)) {
-        continue
-      }
-      byId.set(
-        row.id as string,
-        row as Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname' | 'typ' | 'email' | 'org_anzeigename'>
-      )
-      if (byId.size >= 8) break
-    }
-    if (byId.size >= 8) break
-  }
-
-  return Array.from(byId.values()).slice(0, 8)
-}
-
 /** Stammdaten-Kopie für Listen-⋯-Menü. */
 function isMissingTableError(message: string | undefined | null): boolean {
   if (!message) return false
@@ -652,34 +616,6 @@ export async function mergeKunden(
     survivorId: survivor,
     message: 'Kunden wurden zusammengeführt.',
   }
-}
-
-export async function duplicateKunde(
-  kundeId: string
-): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const { data: src, error: loadErr } = await (() => { const db = createClient(); return db.from('kunden').select('*').eq('id', kundeId).maybeSingle() })()
-  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Kunde nicht gefunden.' }
-
-  const row = src as Record<string, unknown>
-  const payload: Record<string, unknown> = { ...row }
-  delete payload.id
-  delete payload.created_at
-  delete payload.updated_at
-  delete payload.auth_user_id
-  delete payload.kundennummer
-  delete payload.gesamt_umsatz
-  delete payload.letzte_aktivitaet
-  delete payload.spam_markiert_am
-  payload.ist_spam = false
-  payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
-  if (payload.email) payload.email = null
-
-  const { data: inserted, error: insErr } = await (() => { const db = createClient(); return db.from('kunden').insert(payload).select('id').single() })()
-  if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
-
-  const id = (inserted as { id: string }).id
-  revalidateKundeDetail(id)
-  return { ok: true, id }
 }
 
 /**

@@ -1,6 +1,6 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { PARTNER_UPLOAD_BUCKET, storagePathFromHwPdfStored } from '@/lib/partner/handwerker-einreichung'
+import { PARTNER_UPLOAD_BUCKET,storagePathFromHwPdfStored } from '@/lib/partner/handwerker-einreichung'
 
 /**
  * Anzeige-URL für gespeicherte Eintrag-Fotos.
@@ -15,13 +15,6 @@ export async function resolveEintragFotoDisplayUrl(
   if (!raw) return null
   if (/^https?:\/\//i.test(raw)) return raw
   return signedHandwerkerUploadUrl(raw, expiresIn)
-}
-
-export async function resolveEintragFotoDisplayUrls(
-  storedList: Array<string | null | undefined>,
-  expiresIn = 3600
-): Promise<(string | null)[]> {
-  return Promise.all(storedList.map((s) => resolveEintragFotoDisplayUrl(s, expiresIn)))
 }
 
 export async function signedHandwerkerUploadUrl(

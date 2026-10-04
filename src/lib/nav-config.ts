@@ -63,12 +63,6 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
   // P16/P17: Kalender und KI Analytics entfallen (Streichliste)
 ]
 
-/** @deprecated Legacy-Flat-Listen — aus SIDEBAR_NAV_GROUPS abgeleitet */
-export const SIDEBAR_PRIMARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS[0].items
-
-/** @deprecated Legacy-Flat-Listen — aus SIDEBAR_NAV_GROUPS abgeleitet */
-export const SIDEBAR_SECONDARY_NAV: NavItemDef[] = SIDEBAR_NAV_GROUPS.slice(1).flatMap((g) => g.items)
-
 /**
  * Bottom-Nav Spec §3: Dashboard · Vorgänge · + · Kunden · Mehr
  */

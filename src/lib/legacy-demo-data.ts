@@ -71,10 +71,6 @@ export function isLegacyDemoLead(lead: LeadLike): boolean {
   return false
 }
 
-export function countLegacyDemoLeads(leads: LeadLike[]): number {
-  return leads.filter(isLegacyDemoLead).length
-}
-
 export function filterOutLegacyDemoLeads<T extends LeadLike>(leads: T[]): T[] {
   return leads.filter((l) => !isLegacyDemoLead(l))
 }

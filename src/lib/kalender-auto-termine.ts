@@ -1,5 +1,4 @@
-import { revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
-import { logDbError } from '@/lib/errors/log-db-error'
+import { revalidateKalender,revalidateLeadDetail } from '@/lib/crm-revalidate'
 import type { KalenderTermin } from '@/lib/types'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -14,10 +13,6 @@ export function addDaysYmd(ymd: string, days: number): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-export function tomorrowYmd(): string {
-  return addDaysYmd(new Date().toISOString().slice(0, 10), 1)
-}
-
 type KalenderAutoTerminInput = {
   titel: string
   datum: string
@@ -26,64 +21,12 @@ type KalenderAutoTerminInput = {
   auftrag_id?: string | null
 }
 
-function mapKalenderRow(input: KalenderAutoTerminInput) {
-  return {
-    titel: input.titel,
-    datum: input.datum,
-    typ: input.typ,
-    lead_id: input.lead_id ?? null,
-    auftrag_id: input.auftrag_id ?? null,
-    uhrzeit_von: null,
-    uhrzeit_bis: null,
-    adresse: null,
-    beschreibung: null,
-    erledigt: false,
-  }
-}
-
-/** Automatische Kalendereinträge. Fehler nur loggen. */
-export async function insertKalenderAutoTermin(
-  input: KalenderAutoTerminInput,
-  opts?: { skipRevalidate?: boolean }
-): Promise<void> {
-  await insertKalenderAutoTermine([input], opts)
-}
-
 /** Mehrere Termine in einem Insert — deaktiviert: Termine nur manuell im Kalender. */
 export async function insertKalenderAutoTermine(
   _inputs: KalenderAutoTerminInput[],
   _opts?: { skipRevalidate?: boolean }
 ): Promise<void> {
   return
-}
-
-/** CRM-internes To-do — erscheint im Dashboard, nicht in der Anfrage-Terminliste. */
-export async function insertInternesTodo(input: {
-  titel: string
-  datum: string
-  lead_id?: string | null
-  auftrag_id?: string | null
-  beschreibung?: string | null
-}): Promise<void> {
-  const { error } = await supabaseAdmin.from('kalender_termine').insert({
-    titel: input.titel.trim(),
-    datum: input.datum,
-    typ: 'intern',
-    lead_id: input.lead_id ?? null,
-    auftrag_id: input.auftrag_id ?? null,
-    uhrzeit_von: null,
-    uhrzeit_bis: null,
-    adresse: null,
-    beschreibung: input.beschreibung?.trim() || null,
-    erledigt: false,
-  })
-  if (error) logDbError('lib/kalender-auto-termine:kalender_termine', error)
-  if (error) {
-    console.warn('[internes-todo]', error.message)
-    return
-  }
-  revalidateKalender()
-  if (input.lead_id) revalidateLeadDetail(input.lead_id)
 }
 
 export async function erledigeInterneNachfassTodos(
@@ -110,21 +53,4 @@ export async function erledigeInterneNachfassTodos(
   }
   revalidateKalender()
   revalidateLeadDetail(leadId)
-}
-
-/** Offenes Nachfass-To-do auf neues Datum legen (z. B. nach Gültigkeits-Verlängerung). */
-export async function planeInternesNachfassTodo(input: {
-  leadId: string | null | undefined
-  datum: string
-  kundeName: string
-  angebotRef: string
-}): Promise<void> {
-  if (!input.leadId?.trim()) return
-  await erledigeInterneNachfassTodos(input.leadId, input.angebotRef)
-  await insertInternesTodo({
-    titel: `Nachfassen: ${input.kundeName.trim() || 'Kunde'}`,
-    datum: input.datum,
-    lead_id: input.leadId,
-    beschreibung: `Angebot ${input.angebotRef} — Erinnerungs-Mail in 7 Tagen, falls keine Rückmeldung`,
-  })
 }

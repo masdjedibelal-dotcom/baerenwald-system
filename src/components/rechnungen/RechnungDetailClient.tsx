@@ -1,6 +1,5 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui'
 import {
   DetailShell,
   EntityDetailLayout,
@@ -8,14 +7,14 @@ import {
 } from '@/components/layout/EntityDetailLayout'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { openActionConfirm, ConfirmPopup } from '@/components/ui/ConfirmPopup'
-import { actionBusy, useTransition } from '@/components/ui/action-busy'
+import { openActionConfirm,ConfirmPopup } from '@/components/ui/ConfirmPopup'
+import { actionBusy,useTransition } from '@/components/ui/action-busy'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
-import { gesendetDetailSubline, rechnungStatusDisplay } from '@/lib/status/status-display'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
-import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
+import { naechsterSchrittText,primaryCta } from '@/lib/vorgang/primary-cta'
+import { gesendetDetailSubline,rechnungStatusDisplay } from '@/lib/status/status-display'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { useEffect,useMemo,useState } from 'react'
+import { DetailActionsBar,type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
@@ -23,12 +22,8 @@ import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import {
-  createGutschriftFromRechnung,
-  nehmeRechnungStornoZurueck,
-  sendRechnung,
-  sendZahlungsbestaetigung,
-  storniereRechnungOhneErsatz,
-  updateRechnungStatus,
+  createGutschriftFromRechnung,sendRechnung,storniereRechnungOhneErsatz,
+  updateRechnungStatus
 } from '@/app/(dashboard)/rechnungen/actions'
 import { ZahlungserinnerungMailModal } from '@/components/rechnungen/ZahlungserinnerungMailModal'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
@@ -71,7 +66,6 @@ import {
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { toast } from '@/components/ui/app-toast'
 import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewertungModal'
-import { loadHandwerkerBewertungZiele } from '@/app/(dashboard)/auftraege/handwerker-bewertung-actions'
 import type { HandwerkerBewertungZiel } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
@@ -212,7 +206,7 @@ export function RechnungDetailClient({
   const [mainTab, setMainTab] = useState<RechnungDetailTab>(RECHNUNG_DETAIL_DEFAULT_TAB)
   const [erinnerungModalOpen, setErinnerungModalOpen] = useState(false)
   const [bewertungOpen, setBewertungOpen] = useState(false)
-  const [bewertungZiele, setBewertungZiele] = useState<HandwerkerBewertungZiel[]>([])
+  const [bewertungZiele, ] = useState<HandwerkerBewertungZiel[]>([])
   const [rechnungConfirm, setRechnungConfirm] = useState<
     'gutschrift' | 'bezahlt' | 'unbezahlt' | null
   >(null)
@@ -269,7 +263,6 @@ export function RechnungDetailClient({
   const kundeEmail = isEingehend
     ? handwerker?.email?.trim() || ''
     : detail.kunden?.email?.trim() || lead?.kontakt_email?.trim() || ''
-  const kundeId = detail.kunden?.id ?? detail.kunde_id
 
   const tageUeberfaellig = detail.faellig_am ? tageSeitFaelligkeitRechnung(detail.faellig_am) : 0
   const ueberfaellig =
@@ -348,10 +341,6 @@ export function RechnungDetailClient({
           : {}),
     }))
     refresh()
-  }
-
-  function handleGutschrift() {
-    setRechnungConfirm('gutschrift')
   }
 
   function ausfuehrenGutschrift() {
@@ -435,19 +424,6 @@ export function RechnungDetailClient({
       setWizardBootstrap(res.bootstrap)
       setWizardKey((k) => k + 1)
       setWizardOpen(true)
-    })
-  }
-
-  function handleStornoZuruecknehmen() {
-    void actionBusy.run('Storno wird zurückgenommen…', async () => {
-      const r = await nehmeRechnungStornoZurueck(detail.id)
-      if (!r.ok) {
-        toast.systemError(r)
-        return
-      }
-      toast.success(TOAST.wieder_als_versendet)
-      setDetail((d) => ({ ...d, status: 'gesendet' }))
-      refresh()
     })
   }
 

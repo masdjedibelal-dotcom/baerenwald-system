@@ -33,15 +33,3 @@ export function latestAnalysenPerBereich(rows: KiClusterAnalyseRow[]): KiCluster
   }
   return KI_BEREICH_ORDER.filter((b) => byBereich.has(b)).map((b) => byBereich.get(b)!)
 }
-
-export function groupAnalysenByBereich(
-  rows: KiClusterAnalyseRow[]
-): Map<string, KiClusterAnalyseRow[]> {
-  const map = new Map<string, KiClusterAnalyseRow[]>()
-  for (const row of rows) {
-    const list = map.get(row.bereich) ?? []
-    list.push(row)
-    map.set(row.bereich, list)
-  }
-  return map
-}

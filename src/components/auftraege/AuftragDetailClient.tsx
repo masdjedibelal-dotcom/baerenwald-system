@@ -17,10 +17,10 @@ import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
+import { naechsterSchrittText,primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { useCallback,useEffect,useMemo,useState } from 'react'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { AuftragLeistungenTab } from '@/components/auftraege/AuftragDetailsTab'
@@ -31,8 +31,7 @@ import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewer
 import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { auftragHatGestellteKundenrechnung } from '@/lib/angebote/auftrag-korrektur-gate'
 import {
-  gewichteterFortschrittProzent,
-  normalizeLeistungStatus,
+  normalizeLeistungStatus
 } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { formatEurKurz } from '@/lib/vorgang/projekt-kontext-labels'
 import {
@@ -40,14 +39,10 @@ import {
   type RechnungErstellenOpts,
 } from '@/components/vorgang/VorgangZahlungTab'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
-import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
-import {
-  AuftragComplianceTab,
-} from '@/components/auftraege/AuftragComplianceTab'
 import { zaehleAuftragDokumente } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { auftragStatusDisplay } from '@/lib/status/status-display'
-import { formatAuftragsNr, auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
+import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
@@ -88,7 +83,7 @@ import {
   parseZahlungsplan,
   zahlplanAbgerechnetAusLinks,
 } from '@/lib/rechnungen/zahlungsplan'
-import { sendRechnung, updateRechnungStatus, korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
+import { sendRechnung,updateRechnungStatus,korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
 import { rechnungKorrekturModus } from '@/lib/rechnungen/rechnung-korrektur'
 import {
   defaultZahlungszielTage,
@@ -104,11 +99,10 @@ import { EinsatzRechnungenAkte } from '@/components/auftraege/EinsatzRechnungenA
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
 import {
-  loadAngebotKorrekturWizardBootstrap,
-  loadNachtragAngebotBootstrap,
+  loadAngebotKorrekturWizardBootstrap
 } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
-import { COPY_BUTTON, TOAST } from '@/lib/copy'
+import { COPY_BUTTON,TOAST } from '@/lib/copy'
 
 const AngebotWizard = dynamic(
   () => import('@/components/angebote/AngebotWizard').then((mod) => ({ default: mod.AngebotWizard })),
@@ -397,7 +391,6 @@ export function AuftragDetailClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
-  const isMobile = useIsMobile()
   const [detail, setDetail] = useState(initial)
   const [pending, startTransition] = useTransition()
 
@@ -469,25 +462,6 @@ export function AuftragDetailClient({
     setLeistungenOhneAngebotKey((k) => k + 1)
     setLeistungenOhneAngebotOpen(true)
   }, [])
-
-  const openNachtragAngebot = useCallback(() => {
-    if (!detail.angebot_id || !detail.lead_id) {
-      toast.error(TOAST.nachtrag_braucht_verknuepftes_angebot_und_anfrag)
-      return
-    }
-    startTransition(async () => {
-      const res = await loadNachtragAngebotBootstrap(detail.id)
-      if (!res.ok) {
-        toast.systemError(res)
-        return
-      }
-      setAngebotKorrekturBootstrap(res.bootstrap)
-      setAngebotKorrekturLead(res.lead)
-      setAngebotKorrekturKey((k) => k + 1)
-      setAngebotKorrekturOpen(true)
-      toast.info(TOAST.nachtrag_auftrag_unveraendert)
-    })
-  }, [detail.angebot_id, detail.id, detail.lead_id])
 
   const hauptvertraegeFuerNachtrag = useMemo(
     () => vertraegeListe.filter(istHauptvertragFuerNachtrag),
@@ -667,18 +641,6 @@ export function AuftragDetailClient({
     'Auftrag'
   const posCount = auftragPositionenFuerSumme(detail.auftrag_positionen).length
 
-  const istBauprojekt = useMemo(
-    () =>
-      auftragIstBauprojekt({
-        ist_bauprojekt: detail.ist_bauprojekt,
-        gewerkSlugs: (detail.auftrag_positionen ?? [])
-          .map((p) => p.gewerk_slug)
-          .filter(Boolean) as string[],
-        alleGewerke: gewerke as Gewerk[],
-      }),
-    [detail.ist_bauprojekt, detail.auftrag_positionen, gewerke]
-  )
-
   const auftragStatus = useMemo(() => auftragStatusDisplay(detail.status), [detail.status])
 
   const ang = Array.isArray(detail.angebote) ? detail.angebote[0] : detail.angebote
@@ -709,10 +671,6 @@ export function AuftragDetailClient({
         .length,
     [positionenAktiv]
   )
-  const fortschrittPct = useMemo(() => {
-    if (positionenAktiv.length) return gewichteterFortschrittProzent(positionenAktiv)
-    return auftragFortschritt(detail)
-  }, [positionenAktiv, detail])
 
   const auftragWertLabel = useMemo(() => {
     const ap = auftragPositionenFuerSumme(detail.auftrag_positionen)

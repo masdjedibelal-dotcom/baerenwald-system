@@ -1,13 +1,4 @@
-/** ISO-Kalenderwoche (Mo–So) und Jahr der KW. */
-export function isoKalenderwoche(datum: string | Date): { kw: number; jahr: number } {
-  const d = typeof datum === 'string' ? new Date(datum) : new Date(datum.getTime())
-  const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-  const day = utc.getUTCDay() || 7
-  utc.setUTCDate(utc.getUTCDate() + 4 - day)
-  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1))
-  const kw = Math.ceil(((utc.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
-  return { kw, jahr: utc.getUTCFullYear() }
-}
+
 
 export function montagDerKw(kw: number, jahr: number): Date {
   const simple = new Date(jahr, 0, 1 + (kw - 1) * 7)

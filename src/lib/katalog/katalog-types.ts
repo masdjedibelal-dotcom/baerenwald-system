@@ -1,41 +1,4 @@
 import { formatNumber } from '@/lib/format/geld-datum'
-/** Preiskatalog Position + Variante (neue Struktur). */
-
-export const KATALOG_KATEGORIEN = [
-  'Reparatur',
-  'Erneuerung',
-  'Wartung',
-  'Komplettsanierung',
-  'Teilleistung',
-  'Laufende Leistung',
-  'Nebenleistung',
-  'Entsorgung',
-  'Baumarbeiten',
-  'Verlegen',
-  'Aufbereitung',
-  'Abbruch',
-  'Innen',
-  'Außen',
-  'Wände',
-  'Decken',
-  'Sonstiges',
-] as const
-export type KatalogKategorie = (typeof KATALOG_KATEGORIEN)[number]
-
-export const KATALOG_EINHEITEN = [
-  'm²',
-  'lfd. m',
-  'm³',
-  'Stück',
-  'Stunde',
-  'pauschal',
-  'Monat',
-  'Saison',
-  'Besuch',
-  'm²/Monat',
-  'm²/Saison',
-] as const
-export type KatalogEinheit = (typeof KATALOG_EINHEITEN)[number]
 
 export type KatalogVariante = {
   id: string
@@ -61,8 +24,6 @@ export type KatalogPosition = {
   gewerk_slug?: string | null
   varianten: KatalogVariante[]
 }
-
-export type AngebotPositionQuelle = 'katalog' | 'frei'
 
 export function katalogVarianteLabel(v: KatalogVariante): string {
   const name = v.variante?.trim()

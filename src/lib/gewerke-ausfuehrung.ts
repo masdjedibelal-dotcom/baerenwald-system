@@ -1,6 +1,6 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AngebotPosition, Gewerk } from '@/lib/types'
+import type { AngebotPosition,Gewerk } from '@/lib/types'
 
 export type GewerkAusfuehrung = 'eigen' | 'fachbetrieb' | 'beides'
 
@@ -19,11 +19,6 @@ export function getHinweisForPosition(gewerkId: string, gewerke: Gewerk[]): stri
 export function istFachbetriebGewerk(gewerk: Gewerk | undefined): boolean {
   if (!gewerk) return false
   return normalizeGewerkAusfuehrung(gewerk.ausfuehrung) !== 'eigen'
-}
-
-/** Position zeigt optionalen Fachbetrieb-Hinweis (Gewerk-Einstellung). */
-export function positionKannFachbetriebHinweis(gewerkId: string | undefined, gewerke: Gewerk[]): boolean {
-  return istFachbetriebGewerk(gewerkById(gewerke, gewerkId))
 }
 
 export function resolveIstFachbetriebInPdf(
@@ -86,30 +81,6 @@ export function sanitizeAngebotPositionenForExport(
   gewerke: Gewerk[] = []
 ): AngebotPosition[] {
   return positionen.map((p) => sanitizeAngebotPositionForExport(p, gewerke))
-}
-
-export function gewerkAusfuehrungBadge(
-  ausfuehrung: GewerkAusfuehrung
-): { label: string; className: string } | null {
-  if (ausfuehrung === 'fachbetrieb') {
-    return {
-      label: 'Fachbetrieb',
-      className: 'bg-status-new-bg text-status-new-text',
-    }
-  }
-  if (ausfuehrung === 'beides') {
-    return {
-      label: 'Eigen + Partner',
-      className: 'bg-status-contact-bg text-status-contact-text',
-    }
-  }
-  if (ausfuehrung === 'eigen') {
-    return {
-      label: 'Eigenleistung',
-      className: 'bg-bw-green-bg text-bw-primary',
-    }
-  }
-  return null
 }
 
 export function gewerkById(gewerke: Gewerk[], gewerkId: string | undefined): Gewerk | undefined {

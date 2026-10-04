@@ -2,13 +2,12 @@
 import { EMPTY } from '@/lib/crm-labels'
 
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput,MockSelect,MockTextarea } from '@/components/mock-ui/MockForm'
 import { logDbError } from '@/lib/errors/log-db-error'
-import { openDeleteConfirm, ConfirmPopup } from '@/components/ui/ConfirmPopup'
+import { openDeleteConfirm,ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { useLocalTransition } from '@/components/ui/action-busy'
-import { Combobox } from '@/components/ui/Combobox'
 import { DateInput } from '@/components/ui/DateInput'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect,useMemo,useRef,useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -31,8 +30,8 @@ import {
   istEigeneUnterlageTyp,
 } from '@/lib/handwerker/compliance-katalog'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
-import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
-import { cn, formatDatum } from '@/lib/utils'
+import type { ComplianceDokumentTyp,PartnerDokument } from '@/lib/types'
+import { cn,formatDatum } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
 import { useFieldErrors } from '@/lib/validation/form-schema'
 
@@ -103,7 +102,7 @@ export function PartnerDokumentEditorSheet({
   existing: PartnerDokument | null
   onSaved?: () => void
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)

@@ -1,5 +1,5 @@
-import type { AuftragPosition } from '@/lib/types'
-import { istGewerkBeschreibungLeistungName } from '@/lib/dokument-zeilen'
+import type { AuftragPosition } from '@/lib/types';
+import { istGewerkBeschreibungLeistungName } from '@/lib/dokument-zeilen';
 
 export type GewerkOpt = { id: string; name: string; slug: string }
 
@@ -49,38 +49,4 @@ export function groupAuftragPositionenByGewerk(
   }
 
   return blocks
-}
-
-/** Wie groupAuftragPositionenByGewerk, ohne interne Gewerk-Beschreibungs-Zeilen. */
-export function groupAuftragPositionenByGewerkForAnzeige(
-  positionen: AuftragPosition[],
-  gewerke: GewerkOpt[]
-): AuftragGewerkBlock[] {
-  return groupAuftragPositionenByGewerk(
-    positionen.filter((p) => !istInterneAuftragGewerkBeschreibung(p)),
-    gewerke
-  ).filter((b) => b.positionen.length > 0)
-}
-
-/** Gewerke aus Auftragspositionen (für Bautagebuch-Phase). */
-export function gewerkOptionenAusPositionen(
-  positionen: AuftragPosition[],
-  gewerke: GewerkOpt[]
-): { id: string; name: string }[] {
-  return groupAuftragPositionenByGewerk(positionen, gewerke)
-    .map((b) => ({
-      id: b.gewerkId || b.key,
-      name: b.gewerkName,
-    }))
-    .filter((o) => o.name.trim())
-}
-
-export function gewerkSelectionFromEintrag(
-  e: { gewerk_id?: string | null; gewerk_phase_key?: string | null }
-): string {
-  return e.gewerk_id?.trim() || e.gewerk_phase_key?.trim() || ''
-}
-
-export function blockSummeVk(block: AuftragGewerkBlock): number {
-  return block.positionen.reduce((s, p) => s + (p.preis_fix ?? 0), 0)
 }

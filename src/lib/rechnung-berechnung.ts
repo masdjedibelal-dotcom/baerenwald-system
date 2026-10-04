@@ -1,4 +1,4 @@
-import { ZEILE_SLUG_FREITEXT, ZEILE_SLUG_GESAMTRABATT, istPreisPosition } from '@/lib/dokument-zeilen'
+import { ZEILE_SLUG_FREITEXT,ZEILE_SLUG_GESAMTRABATT,istPreisPosition } from '@/lib/dokument-zeilen'
 import type { AngebotPosition } from '@/lib/types'
 import { formatEuro } from '@/lib/format/geld-datum'
 
@@ -135,10 +135,6 @@ export function berechneRechnung(
   }
 }
 
-export function abschlag35aEur(lohnNetto: number): number {
-  return round2(lohnNetto * 0.2)
-}
-
 export type Hinweis35aAnteil = {
   /**
    * Ausgewiesener §35a-Betrag:
@@ -253,11 +249,6 @@ export function formatHinweis35aRechnung(
 export function kundeZeigt35a(typ: string | null | undefined): boolean {
   const t = (typ ?? 'privat').toLowerCase()
   return t === 'privat' || t === '' || t === 'sonstiges'
-}
-
-export function kundeKannReverseCharge13b(typ: string | null | undefined): boolean {
-  const t = (typ ?? '').toLowerCase()
-  return t === 'gewerbe' || t === 'hausverwaltung'
 }
 
 export function parseKleinunternehmerSetting(value: string | null | undefined): boolean {

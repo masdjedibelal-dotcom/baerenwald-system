@@ -1,11 +1,11 @@
 'use client'
 import { safeAction } from '@/lib/actions/safe-action'
 
-import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockInput,MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { C } from '@/lib/tokens/colors'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback,useEffect,useState } from 'react'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { toast } from '@/components/ui/app-toast'
@@ -38,7 +38,7 @@ export function KundenportalLinkVersendenModal({
   /** Nach erfolgreichem Versand (z. B. Stammdaten-Portal-Zeile → „eingeladen“) */
   onSent?: () => void
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [mailTo, setMailTo] = useState<string[]>([])

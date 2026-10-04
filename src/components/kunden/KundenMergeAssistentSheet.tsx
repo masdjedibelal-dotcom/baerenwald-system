@@ -3,13 +3,12 @@
 import { MockBtn } from '@/components/mock-ui'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { useTransition } from '@/components/ui/action-busy'
 import { mergeKunden } from '@/app/actions/kunden'
 import { listKundenDuplikatVorschlaege } from '@/app/actions/kunden-ansprechpartner'
-import { useRouter } from 'next/navigation'
 
 type Vorschlag = Awaited<ReturnType<typeof listKundenDuplikatVorschlaege>>[number]
 
@@ -26,7 +25,6 @@ export function KundenMergeAssistentSheet({
   onClose: () => void
   onMerged?: () => void
 }) {
-  const router = useRouter()
   const [rows, setRows] = useState<Vorschlag[]>([])
   const [loading, setLoading] = useState(false)
   const [pending, startTransition] = useTransition()

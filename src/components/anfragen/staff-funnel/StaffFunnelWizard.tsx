@@ -1,8 +1,8 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockFormSection, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { MockField,MockFormSection,MockInput,MockSelect } from '@/components/mock-ui/MockForm'
+import { useCallback,useEffect,useMemo,useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
@@ -10,7 +10,7 @@ import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { Toggle } from '@/components/ui/Toggle'
 import { Card } from '@/components/ui/Card'
 import { KundeAuswahlFeld } from '@/components/kunden/KundeAuswahlFeld'
-import { createAnfrage, searchMieterFuerHv, type MieterSuchTreffer } from '@/app/(dashboard)/anfragen/actions'
+import { createAnfrage,searchMieterFuerHv,type MieterSuchTreffer } from '@/app/(dashboard)/anfragen/actions'
 import { getKundeKurz } from '@/app/(dashboard)/angebote/actions'
 import { listGewerkeFuerFab } from '@/app/(dashboard)/neu/fab-neu-actions'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
@@ -23,10 +23,10 @@ import {
   groessePropLabel,
   type SituationValue,
 } from '@/lib/vorab-formular-config'
-import { defaultGroesseEinheit, GROESSEN_EINHEITEN, groesseEinheitLabel } from '@/lib/dokument-einheiten'
-import { KANAL_LABELS, cn } from '@/lib/utils'
-import type { Kunde, KundenObjekt, LeadKanal, Gewerk } from '@/lib/types'
-import { istKundeGewerbeTyp, istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
+import { defaultGroesseEinheit,GROESSEN_EINHEITEN,groesseEinheitLabel } from '@/lib/dokument-einheiten'
+import { KANAL_LABELS,cn } from '@/lib/utils'
+import type { Kunde,KundenObjekt,LeadKanal,Gewerk } from '@/lib/types'
+import { istKundeGewerbeTyp,istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import {
   DRINGLICHKEIT_OPTIONS,
   STAFF_ANLIEGEN,
@@ -53,7 +53,7 @@ import {
   StaffPreisIndikation,
 } from '@/components/anfragen/staff-funnel/StaffFunnelUi'
 import { AnlageTeilPicker } from '@/components/crm/AnlageTeilPicker'
-import { CONFIRM, TOAST } from '@/lib/copy'
+import { CONFIRM,TOAST } from '@/lib/copy'
 import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
 
 type StaffFunnelDraft = {
@@ -398,7 +398,7 @@ export function StaffFunnelWizard({
   const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
   const [hvObjekteLaden, setHvObjekteLaden] = useState(false)
   const [gewerke, setGewerke] = useState<Gewerk[]>([])
-  const [kundeAdresse, setKundeAdresse] = useState<{
+  const [, setKundeAdresse] = useState<{
     plz: string
     ort: string
     strasse: string

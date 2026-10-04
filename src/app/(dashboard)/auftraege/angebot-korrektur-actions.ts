@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -8,7 +8,7 @@ import { loadAngebotWizardBootstrap } from '@/app/(dashboard)/angebote/wizard-ac
 import { loadAnfrageDetail } from '@/lib/anfragen/load-anfrage-detail'
 import { syncAngebotPositionenZuAuftrag } from '@/lib/auftraege/sync-angebot-zu-auftrag'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
-import { plusDaysYmd, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
+import { plusDaysYmd,type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { LeadDetail } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import {
@@ -179,42 +179,5 @@ export async function syncAuftragAusAngebotKorrektur(input: {
   revalidateAuftragDetail(auftragId)
   revalidateAngebotDetail(angebotId)
   return sync
-}
-
-/** Phase 10: Nachtrag — neues Angebots-Canvas mit nachtragZu (erweitert Auftrag). */
-export async function loadNachtragAngebotBootstrap(auftragId: string): Promise<
-  | {
-      ok: true
-      bootstrap: AngebotWizardBootstrap
-      lead: LeadDetail
-    }
-  | { ok: false; message: string }
-> {
-  const loaded = await loadAngebotKorrekturWizardBootstrap(auftragId, {
-    ignoreGestellteRechnung: true,
-  })
-  if (!loaded.ok) return loaded
-
-  const { auftragKorrektur: _k, bereitsGesendet: _b, ...rest } = loaded.bootstrap
-  return {
-    ok: true,
-    lead: loaded.lead,
-    bootstrap: {
-      ...rest,
-      angebotId: null,
-      angebotsnr: null,
-      bereitsGesendet: false,
-      nachtragZu: { auftragId: auftragId.trim() },
-      positionen: [],
-      meta: {
-        ...rest.meta,
-        titel: 'Nachtrag',
-        leistungsumfang: rest.meta.leistungsumfang
-          ? `Nachtrag — ${rest.meta.leistungsumfang}`
-          : 'Nachtrag',
-        gueltig_bis: plusDaysYmd(14),
-      },
-    },
-  }
 }
 

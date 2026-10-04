@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAuftragDetail,revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -12,7 +12,7 @@ import {
   gewerkSlugsAusPositionen,
   istPflichtFuerProjekt,
 } from '@/lib/handwerker/compliance-partner-profile'
-import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
+import { notifyPartnerUnified,partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
 import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 import {
   bauvorhabenAusAuftrag,
@@ -26,7 +26,7 @@ import {
 import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'
 import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
 import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
-import { auftragIstBauprojekt, type GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
+import { auftragIstBauprojekt,type GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
 import { syncRahmenvertragComplianceDoc } from '@/lib/vertraege/sync-vertrag-compliance'
 import type {
   CompliancePoolItem,
@@ -345,58 +345,6 @@ export async function loadHandwerkerAcceptWizardBootstrap(input: {
   }
 }
 
-export async function loadRahmenVertragBootstrap(
-  handwerkerId: string,
-  vertragId?: string | null
-): Promise<{ ok: true; bootstrap: RahmenVertragWizardBootstrap } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data: hw, error } = await supabase.from('handwerker').select(HW_SELECT).eq('id', handwerkerId).maybeSingle()
-  if (error) logDbError('app/vertraege/wizard-actions:handwerker', error)
-  if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
-
-  let existingId = vertragId ?? null
-  let existingNr: string | null = null
-  let notizen = ''
-
-  if (!vertragId) {
-    const { data: existing, error } = await supabase
-      .from('handwerker_vertraege')
-      .select('id, vertrags_nr, notizen')
-      .eq('handwerker_id', handwerkerId)
-      .eq('typ', 'rahmen')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
-    if (existing) {
-      existingId = existing.id as string
-      existingNr = existing.vertrags_nr as string
-      notizen = (existing.notizen as string) ?? ''
-    }
-  } else {
-    const { data: v, error } = await supabase.from('handwerker_vertraege').select('*').eq('id', vertragId).maybeSingle()
-    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
-    if (v) {
-      existingNr = v.vertrags_nr as string
-      notizen = (v.notizen as string) ?? ''
-    }
-  }
-
-  const firm = await fetchFirmenEinstellungen(supabase)
-
-  return {
-    ok: true,
-    bootstrap: {
-      handwerker_id: handwerkerId,
-      vertrag_id: existingId,
-      vertrags_nr: existingNr,
-      handwerker: hw as VertragHandwerkerSnapshot,
-      firm,
-      notizen,
-    },
-  }
-}
-
 async function upsertVertragRow(
   input: {
     vertrag_id?: string | null
@@ -659,13 +607,6 @@ export async function listVertraegeFuerAuftrag(auftragId: string): Promise<Handw
     .order('created_at', { ascending: false })
   if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
   return (data ?? []) as HandwerkerVertragRow[]
-}
-
-export async function listHauptvertraegeFuerNachtrag(
-  auftragId: string
-): Promise<HandwerkerVertragRow[]> {
-  const alle = await listVertraegeFuerAuftrag(auftragId)
-  return alle.filter(istHauptvertragFuerNachtrag)
 }
 
 function parentVertragDatum(row: HandwerkerVertragRow): string | null {

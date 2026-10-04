@@ -1,14 +1,4 @@
-/**
- * Portal / Annahme: zuletzt versendete Positionen.
- * CRM-Entwurf (`positionen`) darf abweichen, bis erneut versendet wird.
- */
-export function angebotPositionenFuerPortal(row: {
-  positionen?: unknown
-  positionen_portal?: unknown | null
-}): unknown {
-  if (row.positionen_portal != null) return row.positionen_portal
-  return row.positionen ?? []
-}
+
 
 function round2(n: unknown): number {
   const v = typeof n === 'number' ? n : Number(n)

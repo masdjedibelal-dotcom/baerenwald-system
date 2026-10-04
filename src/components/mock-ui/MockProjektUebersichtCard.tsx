@@ -4,7 +4,7 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockProp } from '@/components/mock-ui/MockProp'
 import type { ReactNode } from 'react'
 import { formatEurRange } from '@/lib/angebote/angebot-wizard-types'
-import { formatDatum, formatDatumZeitraum } from '@/lib/utils'
+import { formatDatumZeitraum } from '@/lib/utils'
 
 export type ProjektUebersichtExtraRow = {
   label: string

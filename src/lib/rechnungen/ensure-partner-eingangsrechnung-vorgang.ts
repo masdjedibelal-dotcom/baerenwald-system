@@ -1,6 +1,6 @@
-import { logDbError } from '@/lib/errors/log-db-error'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import { normalizeHwRechnungStatus } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
+import { logDbError } from '@/lib/errors/log-db-error';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { normalizeHwRechnungStatus } from '@/lib/rechnungen/load-hw-eingangsrechnungen';
 
 export type EnsurePartnerEingangsRechnungResult =
   | { ok: true; rechnungId: string; created: boolean }
@@ -238,26 +238,4 @@ export async function ensurePartnerEingangsRechnungVorgang(
 
   const rechnungId = String(created.id)
   return { ok: true, rechnungId, created: true }
-}
-
-/** Alle vorhandenen Partner-PDFs als Vorgänge nachziehen. */
-export async function backfillPartnerEingangsRechnungVorgaenge(): Promise<{
-  ok: number
-  failed: number
-}> {
-  const { data, error } = await supabaseAdmin
-    .from('angebot_handwerker')
-    .select('id')
-    .not('hw_rechnung_pdf_url', 'is', null)
-    .limit(500)
-  if (error) logDbError('lib/rechnungen/ensure-partner-eingangsrechnung-vorgang:angebot_handwerker', error)
-
-  let ok = 0
-  let failed = 0
-  for (const row of data ?? []) {
-    const r = await ensurePartnerEingangsRechnungVorgang(String(row.id))
-    if (r.ok) ok += 1
-    else failed += 1
-  }
-  return { ok, failed }
 }

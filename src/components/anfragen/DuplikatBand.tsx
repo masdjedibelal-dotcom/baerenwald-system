@@ -5,7 +5,7 @@ import { MockSelect } from '@/components/mock-ui/MockForm'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -35,7 +35,7 @@ export function DuplikatBand({
   onForceOpenHandled?: () => void
   onDismissed?: () => void
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { applyFieldErrors } = useFieldErrors()
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [kandidaten, setKandidaten] = useState<{ id: string; label: string }[]>([])

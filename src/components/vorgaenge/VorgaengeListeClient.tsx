@@ -2,17 +2,17 @@
 import { EMPTY } from '@/lib/crm-labels'
 import { C } from '@/lib/tokens/colors'
 
-import { ListBulkBar, MockBadge, MockBtn, MockChip, MockEmpty, MockIcon, MockInput, MockPager, MockSortHead } from '@/components/mock-ui'
-import { MockEntityRowMenu, MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
+import { ListBulkBar,MockBadge,MockBtn,MockChip,MockEmpty,MockIcon,MockInput,MockPager,MockSortHead } from '@/components/mock-ui'
+import { MockEntityRowMenu,MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { useCallback,useEffect,useMemo,useState,type PointerEvent as ReactPointerEvent } from 'react'
 import { buildListReturnUrl } from '@/lib/list-return-url'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
-import { useExport, type ExportField } from '@/hooks/useExport'
+import { useExport,type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
 import { filterVorgaengeByPartnerName } from '@/lib/vorgang/filter-vorgaenge-by-partner-name'
@@ -38,28 +38,27 @@ import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { DateInput } from '@/components/ui/DateInput'
 import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
-import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
+import { useResizableColumns,type ResizableColDef } from '@/hooks/useResizableColumns'
 import type { EntityMenuItem } from '@/lib/entity-menu'
-import { PHASE_LABELS, unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
-import type { VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
+import { PHASE_LABELS } from '@/lib/vorgang/vorgang-labels'
+import type { VorgangListeRow,VorgangPhase } from '@/lib/vorgang/types'
 import type { VorgaengeListePagination } from '@/lib/vorgang/load-vorgaenge-liste'
 import {
   berechneVorgaengeListenSumme,
   parseVorgangWertLabelEuro,
 } from '@/lib/vorgang/vorgaenge-liste-summe'
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
-import { isVorgangErledigt, vorgangStatusKind } from '@/lib/vorgang/vorgang-offen'
+import { isVorgangErledigt,vorgangStatusKind } from '@/lib/vorgang/vorgang-offen'
 import {
   resolveRechnungKorrekturUi,
 } from '@/lib/rechnungen/rechnung-korrektur'
-import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
-import { cn, formatDatum } from '@/lib/utils'
+import { cn,formatDatum } from '@/lib/utils'
 import {
   hwRechnungStatusLabel,
   type HwEingangsrechnungListeRow,
   type HwRechnungStatus,
 } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
-import { formatEuro, formatNumber } from '@/lib/format/geld-datum'
+import { formatEuro } from '@/lib/format/geld-datum'
 import { TOAST } from '@/lib/copy'
 
 /** Spec §3/§14: Alle · Anfrage · Angebot · Auftrag · Rechnung · Wartung & Pflege */
@@ -107,8 +106,6 @@ function vorgaengeEmptyHint(opts: {
   }
   return 'Auftrag entsteht aus Angebot oder Notfall — starte mit einer Anfrage.'
 }
-
-
 
 const VORGAENGE_CHECK_COL: ResizableColDef = {
   id: 'check',
@@ -179,7 +176,6 @@ function rowMatchesStatusFilter(row: VorgangListeRow, selected: string[]): boole
 function dateKey(row: VorgangListeRow): string {
   return row.updatedAt.replace(/\D/g, '')
 }
-
 
 function istErledigt(row: VorgangListeRow): boolean {
   return ['bezahlt', 'storniert', 'abgeschlossen', 'abgelehnt', 'ersetzt', 'abgebrochen'].includes(row.unterstatus.toLowerCase())
@@ -273,7 +269,7 @@ export function VorgaengeListeClient({
     datum: true,
     status: true,
   }
-  const [flashKeys, setFlashKeys] = useState<Record<string, boolean>>({})
+  const [flashKeys, ] = useState<Record<string, boolean>>({})
   // Standard: wie geladen (zuletzt bearbeitet zuerst); „Fällig“ sortiert auf Klick
   const [sortCol, setSortCol] = useState<SortCol | null>(null)
   const [sortDir, setSortDir] = useState<1 | -1>(-1)
@@ -361,16 +357,6 @@ export function VorgaengeListeClient({
       if (!embedded) syncPhaseToUrl(filter, next)
     },
     [embedded, syncPhaseToUrl, filter]
-  )
-
-  const setRechnungRichtungFilter = useCallback(
-    (next: 'ausgehend' | 'eingehend') => {
-      setRechnungRichtung(next)
-      setStatusFilter([])
-      setLifecycle('offen')
-      if (!embedded) syncPhaseToUrl('rechnung', 'offen', next)
-    },
-    [embedded, syncPhaseToUrl]
   )
 
   useEffect(() => {
@@ -517,19 +503,6 @@ export function VorgaengeListeClient({
     }
     return { offen, erledigt }
   }, [baseRows, filter, rechnungRichtung])
-
-  const eingehendLifecycleCounts = useMemo(() => {
-    let offen = 0
-    let erledigt = 0
-    for (const v of baseRows) {
-      if (v.phase !== 'rechnung' || (v.rechnungRichtung ?? 'ausgehend') !== 'eingehend') {
-        continue
-      }
-      if (isVorgangErledigt(v)) erledigt += 1
-      else offen += 1
-    }
-    return { offen, erledigt }
-  }, [baseRows])
 
   const showHwEingang = filter === 'rechnung' && rechnungRichtung === 'eingehend'
   /** Offen/Erledigt-Toggle bei „Alle“ und „Rechnung“. */

@@ -53,8 +53,3 @@ export function bereicheFuerAnzeige(
 ): string[] {
   return bereicheMitLegacyGewerbeSituation(bereiche, situation)
 }
-
-export function situationFuerAnzeige(situation: string | null | undefined): string | null {
-  if (situation === 'gewerbe') return null
-  return situation?.trim() || null
-}

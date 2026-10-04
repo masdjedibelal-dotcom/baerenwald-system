@@ -18,8 +18,6 @@ export const POSITION_MENGE_EINHEITEN = [
 /** Größenangaben (Anfrage / Vorab) */
 export const GROESSEN_EINHEITEN = ['m²', 'lfm', 'lfd. m', 'Stück'] as const
 
-export type GroessenEinheit = (typeof GROESSEN_EINHEITEN)[number]
-
 export function groesseEinheitLabel(einheit: string): string {
   if (einheit === 'lfm') return 'lfm (Laufmeter)'
   return einheit

@@ -187,24 +187,3 @@ export async function findStammdatenDuplikate(
 
   return mergeTreffer(rows, typ, input.excludeId)
 }
-
-/**
- * Gleiche E-Mail/Telefon in anderen Stammdaten-Bereichen (Kunde ↔ Handwerker ↔ Partner).
- * Nur für Detail-Ansicht — kein Duplikat-Hinweis beim Anlegen.
- */
-export async function findVerwandteStammdatenKontakte(
-  input: KontaktInput
-): Promise<StammdatenKontaktTreffer[]> {
-  if (!kontaktRelevant(input)) return []
-
-  const email = input.email ?? null
-  const telefon = input.telefon ?? null
-
-  const [kunden, handwerker, partner] = await Promise.all([
-    input.excludeTyp === 'kunde' ? Promise.resolve([]) : kundenKontaktKandidaten(email, telefon),
-    input.excludeTyp === 'handwerker' ? Promise.resolve([]) : handwerkerKontaktKandidaten(email, telefon),
-    input.excludeTyp === 'partner' ? Promise.resolve([]) : partnerKontaktKandidaten(email, telefon),
-  ])
-
-  return mergeTreffer([...kunden, ...handwerker, ...partner], input.excludeTyp, input.excludeId)
-}

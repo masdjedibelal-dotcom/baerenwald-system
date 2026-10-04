@@ -69,16 +69,6 @@ export function recordRateLimitFailure(
   }
 }
 
-/** Alias für generische Nutzung (inkrementiert). */
-export function checkRateLimit(
-  key: string,
-  limit = 5,
-  windowMs = 15 * 60 * 1000,
-  namespace = 'default'
-): { allowed: boolean; remaining: number; retryAfterSec: number } {
-  return recordRateLimitFailure(key, limit, windowMs, namespace)
-}
-
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now()

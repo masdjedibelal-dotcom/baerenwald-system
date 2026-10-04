@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAuftragDetail, revalidateRechnungDetail, revalidateRechnungList } from '@/lib/crm-revalidate'
+import { revalidateAuftragDetail,revalidateRechnungDetail,revalidateRechnungList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -17,11 +17,11 @@ import {
   auftragPositionenToAngebotPositionen,
 } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
-import { normalizeAngebotPositionen, repairAngebotPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen,repairAngebotPositionen } from '@/lib/angebot-positionen'
 import { mergeAngebotSonderzeilen } from '@/lib/dokument-zeilen'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
-import { loadGewerkeAusfuehrung, sanitizeAngebotPositionenForExport } from '@/lib/gewerke-ausfuehrung'
-import { KUNDE_EMBED_SELECT, KUNDE_EMBED_SELECT_LEGACY, loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
+import { loadGewerkeAusfuehrung,sanitizeAngebotPositionenForExport } from '@/lib/gewerke-ausfuehrung'
+import { KUNDE_EMBED_SELECT,KUNDE_EMBED_SELECT_LEGACY,loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
 import {
   defaultRechnungWizardMeta,
   defaultZahlungszielTage,
@@ -34,19 +34,12 @@ import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leis
 import { normalizeFaelligAmYmd } from '@/lib/dates/werktag'
 import { mahnungFelderBeiFaelligkeitAenderung } from '@/lib/rechnungen/rechnung-zahlungsziel-patch'
 import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
-import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
   rechnungMaterialFingerprint,
   rechnungBrauchtStornoBeiAenderung,
   type RechnungMaterialSnapshot,
   linkRechnungKorrekturKette,
 } from '@/lib/rechnungen/rechnung-korrektur'
-import {
-  abschlagTextKontextFromWizard,
-  defaultAbschlagMailBetreff,
-  defaultAbschlagMailEinleitung,
-  defaultAbschlagPdfEinleitung,
-} from '@/lib/rechnungen/zahlungsplan-texte'
 import { berechneRechnungMitFirmeneinstellungen } from '@/lib/rechnungen/rechnung-speichern'
 import {
   abschlagBereitsAbgerechnet,
@@ -62,21 +55,19 @@ import {
   positionenFuerAbschlagRechnung,
   rechnungArtFuerZeile,
   rechnungBerechnungFuerAbschlagZeile,
-  rechnungPositionenMitAuftrag,
-  resolveAnredeKey,
-  standardRechnungZahlungstext,
+  rechnungPositionenMitAuftrag,standardRechnungZahlungstext,
   validateGestellteRechnungenGegenVk,
   zahlplanAbgerechnetAusLinks,
   zahlungsplanVorlage50_50,
   type Zahlungsplan,
-  type ZahlungsplanZeileBerechnet,
+  type ZahlungsplanZeileBerechnet
 } from '@/lib/rechnungen/zahlungsplan'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import { nextRechnungsnummerAusDb } from '@/lib/rechnungen/next-rechnungsnummer'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { raiseAuftragVkFuerSchlussrechnung } from '@/lib/rechnungen/sync-vk-nach-schlussrechnung'
-import type { AngebotPosition, AuftragPosition } from '@/lib/types'
+import type { AngebotPosition,AuftragPosition } from '@/lib/types'
 
 export type { RechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-types'
 
@@ -413,52 +404,6 @@ function berechneZahlungsplanMitIst(
     mwstSatz,
     zahlplanAbgerechnetAusLinks(rechnungen, korrekturEntwurfId)
   )
-}
-
-function abschlagMetaDefaults(
-  basis: Awaited<ReturnType<typeof positionenAusAuftrag>>,
-  zeile: import('@/lib/rechnungen/zahlungsplan').ZahlungsplanZeileBerechnet,
-  plan: Zahlungsplan,
-  bereitsGestelltBrutto: number,
-  zahlungszielTage: number,
-  kundeTyp: string | null | undefined,
-  firm: import('@/lib/einstellungen-keys').FirmenEinstellungen,
-  rechnungsnummerPlaceholder?: string | null
-): RechnungWizardMeta {
-  const base = defaultRechnungWizardMeta(zahlungszielTage, {
-    leistungszeitraum_von: basis.leistungszeitraum_von,
-    leistungszeitraum_bis: basis.leistungszeitraum_bis,
-    projektTitel: basis.projektTitel,
-    kundeTyp,
-    firm,
-  })
-  const anrede = resolveAnredeKey(mailAnredeFromKundeTyp(kundeTyp))
-  const ctx = abschlagTextKontextFromWizard({
-    anrede,
-    zeile,
-    projektTitel: basis.projektTitel ?? '',
-    auftragsReferenz: basis.auftragsReferenz,
-    gesamtNetto: basis.gesamtNetto,
-    gesamtBrutto: basis.gesamtBrutto,
-    bereitsGestelltBrutto,
-  })
-  const pdfVorlage = zeile.pdf_einleitung_vorlage?.trim()
-  const mailVorlage = zeile.mail_einleitung_vorlage?.trim()
-  const betreffVorlage = zeile.mail_betreff_vorlage?.trim()
-
-  return {
-    ...base,
-    einleitung: pdfVorlage || defaultAbschlagPdfEinleitung(ctx),
-    mail_einleitung: mailVorlage || defaultAbschlagMailEinleitung(ctx),
-    mail_betreff:
-      betreffVorlage ||
-      defaultAbschlagMailBetreff(ctx, rechnungsnummerPlaceholder?.trim() || 'Rechnung'),
-    zahlungsart: 'abschlaege',
-    abschlag_zeile_id: zeile.id,
-    zahlungsbedingungen: zeile.istSchluss
-      ? standardRechnungZahlungstext(zahlungszielTage)
-      : abschlagZahlungstextFuerRechnung(plan, basis.gesamtNetto, zahlungszielTage, zeile),
-  }
 }
 
 function zahlungstextFuerAbschlagZeile(
@@ -910,18 +855,6 @@ export async function loadRechnungWizardBootstrapFromAuftrag(
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : 'Laden fehlgeschlagen' }
   }
-}
-
-export async function loadRechnungWizardBootstrapFromAuftragAbschlag(
-  auftragId: string
-): Promise<{ ok: true; bootstrap: RechnungWizardBootstrap } | { ok: false; message: string }> {
-  return loadRechnungWizardBootstrapFromAuftrag(auftragId, { naechsterAbschlag: true })
-}
-
-function addDaysIsoLocal(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T12:00:00`)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
 }
 
 export async function loadRechnungWizardBootstrap(
@@ -2007,11 +1940,4 @@ export async function deleteRechnungEntwurf(
   revalidateRechnungList()
   if (rec.auftrag_id) revalidateAuftragDetail(rec.auftrag_id)
   return { ok: true }
-}
-
-/** Alias — gleiche Härte wie deleteRechnungEntwurf (nur Status entwurf). */
-export async function deleteRechnung(
-  rechnungId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  return deleteRechnungEntwurf(rechnungId)
 }

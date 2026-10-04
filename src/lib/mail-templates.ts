@@ -1,7 +1,7 @@
 import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import type { MailBranding } from '@/lib/mail-branding'
-import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
-import { buildPartnerSubject, buildSubject } from '@/lib/mail/build-subject'
+import { mailPrimaryButtonHtml,mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
+import { buildPartnerSubject,buildSubject } from '@/lib/mail/build-subject'
 import {
   buildPortalLoginLink,
   portalMailButtonLabel,
@@ -10,7 +10,6 @@ import {
 } from '@/lib/portal-utils'
 import { buildAuftragsbestaetigungMail } from '@/lib/mail/auftragsbestaetigung-mail'
 import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
-import { buildRechnungMail, type RechnungMailInput } from '@/lib/mail/rechnung-mail'
 import {
   zahlungserinnerungBetreff,
   zahlungserinnerungZahlbarBis,
@@ -25,9 +24,9 @@ import {
   type MailAnrede,
 } from '@/lib/mail/anrede'
 import { BEREICH_LABELS } from '@/lib/utils'
-import { filterAdressRueckfragen, type VorOrtRueckfrage } from '@/lib/anfrage-adresse'
+import { filterAdressRueckfragen,type VorOrtRueckfrage } from '@/lib/anfrage-adresse'
 import { anfrageBetreffNachAnlass } from '@/lib/email/meldung-mail-templates'
-import { formatEuro, formatNumber, formatEuroSpanne } from '@/lib/format/geld-datum'
+import { formatEuro,formatEuroSpanne } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
 
 function esc(s: string): string {
@@ -350,7 +349,6 @@ function formatWebsiteKurz(website: string): string {
     .replace(/\/$/, '')
 }
 
-
 function formatPreisSpanne(min: number | null | undefined, max: number | null | undefined): string | null {
   const a = min != null && Number.isFinite(min) ? min : null
   const b = max != null && Number.isFinite(max) ? max : null
@@ -533,90 +531,6 @@ export function mailAngebot(
   }
 }
 
-/** Kurz-Mail mit Angebotsnr. und PDF-Anhang (kompaktes Kundenlayout). */
-export function mailAngebotPdfUebersicht(
-  data: {
-    name: string
-    angebotsnr: string
-    leistungsumfang: string
-    gesamtBruttoFmt: string
-    gueltig_bis: string
-    dokument_typ?: 'einfach' | 'projekt'
-    projektbeschreibung_teaser?: string | null
-    anrede?: MailAnrede
-    kundeTyp?: string | null
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
-  const begruessung = esc(mailBegruessungZeile(anrede, data.name))
-  const tel = esc(b.telefon)
-  const telHref = tel.replace(/\s/g, '')
-  const adr = esc(b.adresseZeile)
-  const teaserRaw = data.projektbeschreibung_teaser?.trim() ?? ''
-  const teaser =
-    data.dokument_typ === 'projekt' && teaserRaw
-      ? `<p style="color:${C.gray700};font-size:15px;line-height:1.6;margin-top:8px;">${esc(teaserRaw.length > 280 ? `${teaserRaw.slice(0, 277)}…` : teaserRaw)}</p>`
-      : ''
-  const kicker = mailText(anrede, 'Dein persönliches Angebot', 'Ihr persönliches Angebot')
-  const intro = mailText(
-    anrede,
-    'vielen Dank für dein Vertrauen. Im Anhang findest du dein Angebot als PDF.',
-    'vielen Dank für Ihr Vertrauen. Im Anhang finden Sie Ihr Angebot als PDF.'
-  )
-  const fragen = mailText(
-    anrede,
-    'Bei Fragen sind wir gerne für dich da.',
-    'Bei Fragen stehen wir Ihnen gerne zur Verfügung.'
-  )
-  const betreff = buildSubject({
-    objekt: data.leistungsumfang,
-    ereignis: 'Angebot bereit',
-    nummer: data.angebotsnr,
-  })
-  return {
-    betreff,
-    html: `
-<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;background:white;">
-  <div style="background:${C.greenDark};padding:24px;text-align:center;">
-    <h1 style="color:white;font-size:20px;margin:0;">${esc(b.firmenname)}</h1>
-    <p style="color:${C.greenSoftBorder2};margin:4px 0 0;font-size:15px;">${esc(kicker)}</p>
-  </div>
-  <div style="padding:32px 24px;">
-    <p style="font-size:15px;color:${C.greenDark};">${begruessung}</p>
-    <br/>
-    <p style="color:${C.gray700};line-height:1.7;">
-      ${intro}
-    </p>
-    <br/>
-    <div style="background:${C.gray50};border-radius:8px;padding:16px;margin:16px 0;">
-      <p style="font-weight:bold;color:${C.greenDark};margin-bottom:8px;">Angebotsübersicht</p>
-      <p style="color:${C.gray700};font-size:15px;">Angebotsnr.: <strong>${esc(data.angebotsnr)}</strong></p>
-      <p style="color:${C.gray700};font-size:15px;">Leistung: ${esc(data.leistungsumfang || '—')}</p>
-      ${teaser}
-      <p style="color:${C.greenDark};font-weight:bold;font-size:15px;margin-top:8px;">
-        Gesamtbetrag: ${esc(data.gesamtBruttoFmt)} inkl. MwSt.
-      </p>
-      <p style="color:${C.gray500};font-size:12px;margin-top:8px;">Gültig bis: ${esc(data.gueltig_bis)}</p>
-    </div>
-    <p style="color:${C.gray700};line-height:1.7;">${fragen}</p>
-    <br/>
-    <div style="text-align:center;margin:24px 0;">
-      ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
-    </div>
-    <p style="color:${C.gray700};line-height:1.7;">
-      ${mailTeamGruss(anrede, b.firmenname)}
-    </p>
-    ${mailMeinBaerenwaldPsFooter({ anrede })}
-  </div>
-  <div style="background:${C.gray100};padding:16px 24px;font-size:11px;color:${C.gray500};text-align:center;">
-    ${esc(b.firmenname)} · ${adr}<br/>
-    Tel.: ${tel}
-  </div>
-</div>`,
-  }
-}
-
 export function mailAuftragsbestaetigung(
   data: {
     name: string
@@ -646,67 +560,6 @@ export function mailAuftragsbestaetigung(
     },
     b
   )
-}
-
-export function mailAngebotAnnahmeBestaetigung(
-  data: {
-    name: string
-    anrede: 'du' | 'sie'
-    zeilen: Array<{ gewerk: string; leistung: string; preis: string }>
-    zeitraum: string
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const intro =
-    data.anrede === 'du'
-      ? 'vielen Dank für die Bestätigung deines Auftrags. Hier ist die kurze Zusammenfassung:'
-      : 'vielen Dank für die Bestätigung Ihres Auftrags. Hier ist die kurze Zusammenfassung:'
-  const gruss =
-    data.anrede === 'du'
-      ? 'Viele Grüße<br/><strong>Dein Bärenwald Team</strong>'
-      : 'Mit freundlichen Grüßen<br/><strong>Ihr Bärenwald Team</strong>'
-
-  const zeilenHtml = data.zeilen
-    .map(
-      (z) => `
-      <tr>
-        <td style="padding:8px 0;border-bottom:1px solid ${C.gray200};color:${C.gray800};">${esc(z.gewerk)}</td>
-        <td style="padding:8px 0;border-bottom:1px solid ${C.gray200};color:${C.gray700};">${esc(z.leistung)}</td>
-        <td style="padding:8px 0;border-bottom:1px solid ${C.gray200};color:${C.greenDark};text-align:right;font-weight:600;">${esc(z.preis)}</td>
-      </tr>`
-    )
-    .join('')
-
-  const begruessung = esc(mailBegruessungZeile(data.anrede, data.name))
-  const betreff = buildSubject({
-    objekt: data.zeilen[0]?.leistung || data.zeilen[0]?.gewerk,
-    ereignis: 'Auftrag bestätigt',
-  })
-  return {
-    betreff,
-    html: mailHtmlBase(
-      `
-      <p>${begruessung}</p>
-      <p>${intro}</p>
-      <p style="margin:14px 0 6px;color:${C.gray900b};"><strong>Umsetzungszeitraum:</strong> ${esc(data.zeitraum)}</p>
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;margin:8px 0 16px;">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:8px 0;border-bottom:1px solid ${C.gray300};color:${C.gray500};font-size:12px;">Gewerk</th>
-            <th style="text-align:left;padding:8px 0;border-bottom:1px solid ${C.gray300};color:${C.gray500};font-size:12px;">Leistung</th>
-            <th style="text-align:right;padding:8px 0;border-bottom:1px solid ${C.gray300};color:${C.gray500};font-size:12px;">Preis</th>
-          </tr>
-        </thead>
-        <tbody>${zeilenHtml}</tbody>
-      </table>
-      <p>${gruss}</p>
-    `,
-      'Bestätigung Ihres Auftrags',
-      b,
-      undefined,
-      { anrede: data.anrede }
-    ),
-  }
 }
 
 export function mailUpdateHinweis(
@@ -825,127 +678,7 @@ export function mailProjektStatusUpdate(data: MailProjektUpdateInput, b: MailBra
   }
 }
 
-export function mailNachtrag(
-  data: {
-    name: string
-    grund: string
-    positionen: PosRow[]
-    gesamt_min: number
-    gesamt_max: number
-    bestaetigungsLink: string
-    anrede?: MailAnrede
-    kundeTyp?: string | null
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
-  const begruessung = esc(mailBegruessungZeile(anrede, data.name))
-  const betrag =
-    data.gesamt_min === data.gesamt_max
-      ? `${formatEuro(data.gesamt_min, { decimals: 0 })}`
-      : `${formatEuroSpanne(data.gesamt_min, data.gesamt_max)}`
-  const tel = esc(b.telefon)
-  const rows = data.positionen
-    .map((p) => {
-      const txt = esc(String(p.beschreibung || p.leistung || '').trim())
-      const g = Number(p.gesamt_fix ?? p.gesamt_min ?? 0)
-      return `<tr style="border-bottom:1px solid ${C.greenWash};"><td style="padding:8px 0;">${txt}</td><td style="padding:8px 0;text-align:right;">${formatEuro(g, { decimals: 0 })}</td></tr>`
-    })
-    .join('')
-  const betreff = buildSubject({
-    ereignis: 'Nachtrag',
-  })
-  const h2 = mailText(anrede, 'Nachtrag zu deinem Auftrag', 'Nachtrag zu Ihrem Auftrag')
-  const body = mailText(
-    anrede,
-    'bei den laufenden Arbeiten ist ein Zusatzaufwand entstanden, den wir dir transparent mitteilen.',
-    'bei den laufenden Arbeiten ist ein Zusatzaufwand entstanden, den wir Ihnen transparent mitteilen.'
-  )
-  return {
-    betreff,
-    html: mailHtmlBase(
-      `
-      <h2 style="color:${C.accent};margin:0 0 16px;">${h2}</h2>
-      <p>${begruessung}</p>
-      <p>${body}</p>
-      <div style="background:${C.accentBg3};border-radius:8px;padding:14px 16px;margin:16px 0;"><p style="margin:0;font-weight:600;">Grund: ${esc(data.grund)}</p></div>
-      <table width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;margin:16px 0;">${rows}</table>
-      ${greenBox(`
-        <p style="margin:0;font-size:12px;color:${C.green};">Mehrkosten gesamt</p>
-        <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:${C.greenDark};">+ ${esc(betrag)}</p>
-      `)}
-      ${btn(mailText(anrede, 'Nachtrag bestätigen →', 'Nachtrag bestätigen →'), data.bestaetigungsLink)}
-      <p style="font-size:15px;color:${C.gray500};">${mailText(anrede, 'Bei Fragen:', 'Bei Fragen:')} <a href="tel:${tel.replace(/\s/g, '')}" style="color:${C.green};">${tel}</a></p>
-    `,
-      `Nachtrag: +${betrag}`,
-      b,
-      undefined,
-      { anrede, statusLink: data.bestaetigungsLink }
-    ),
-  }
-}
-
-export function mailAbnahme(
-  data: {
-    name: string
-    gewerke: string[]
-    abnahmeDatum: string
-    anrede?: MailAnrede
-    kundeTyp?: string | null
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
-  const begruessung = esc(mailBegruessungZeile(anrede, data.name))
-  const gw = esc(data.gewerke.join(', '))
-  const tel = esc(b.telefon)
-  const h2 = mailText(anrede, 'Dein Projekt ist abgeschlossen', 'Ihr Projekt ist abgeschlossen')
-  const body1 = mailText(
-    anrede,
-    'alle Arbeiten wurden erfolgreich abgeschlossen und abgenommen.',
-    'alle Arbeiten wurden erfolgreich abgeschlossen und abgenommen.'
-  )
-  const proto = mailText(
-    anrede,
-    'Das Abnahmeprotokoll mit der vollständigen Dokumentation findest du im Anhang.',
-    'Das Abnahmeprotokoll mit der vollständigen Dokumentation finden Sie im Anhang.'
-  )
-  const danke = mailText(anrede, 'Vielen Dank für dein Vertrauen!', 'Vielen Dank für Ihr Vertrauen!')
-  const betreff = buildSubject({
-    objekt: data.gewerke.join(', '),
-    ereignis: 'Projekt abgeschlossen',
-  })
-  return {
-    betreff,
-    html: mailHtmlBase(
-      `
-      <h2 style="color:${C.green};margin:0 0 16px;">${h2}</h2>
-      <p>${begruessung}</p>
-      <p>${body1}</p>
-      ${greenBox(`
-        <table width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;">
-        <tr><td style="color:${C.green};padding:4px 0;width:40%;">Abnahmedatum:</td><td style="font-weight:600;color:${C.greenDark};padding:4px 0;">${esc(data.abnahmeDatum)}</td></tr>
-        <tr><td style="color:${C.green};padding:4px 0;">Gewerke:</td><td style="font-weight:600;color:${C.greenDark};padding:4px 0;">${gw}</td></tr>
-        </table>
-      `)}
-      <p>${proto}</p>
-      <p style="font-size:15px;color:${C.gray500};"><strong>Gewährleistung:</strong> Die gesetzliche Gewährleistung beträgt 5 Jahre ab Abnahme.</p>
-      <p>${danke}</p>
-      <p><a href="tel:${tel.replace(/\s/g, '')}" style="color:${C.green};">${tel}</a></p>
-    `,
-      h2,
-      b,
-      undefined,
-      { anrede }
-    ),
-  }
-}
-
 export { buildRechnungMail, rechnungMailBetreff, rechnungKorrekturMailBetreff, type RechnungMailInput } from '@/lib/mail/rechnung-mail'
-
-export function mailRechnung(data: RechnungMailInput, b: MailBranding) {
-  return buildRechnungMail(data, b)
-}
 
 export {
   zahlungserinnerungBetreff,
@@ -1150,119 +883,6 @@ export function mailHandwerkerLeistungZuweisung(
   }
 }
 
-export function mailHandwerkerErgaenzungBereit(
-  data: {
-    name: string
-    auftragTitel: string
-    gewerkName: string
-    bezugVertragVom?: string | null
-    portalLink: string
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const name = esc(data.name)
-  const titel = esc(data.auftragTitel.trim() || 'Ihr Auftrag')
-  const gewerk = esc(data.gewerkName.trim() || '—')
-  const bezug = data.bezugVertragVom?.trim()
-    ? esc(data.bezugVertragVom.trim())
-    : null
-
-  return {
-    betreff: buildPartnerSubject({
-      gewerk: data.gewerkName,
-      ereignis: 'Ergänzungsvereinbarung bereit',
-    }),
-    html: mailHtmlBase(
-      `
-      <h2 style="color:${C.green};margin:0 0 16px;">Ergänzungsvereinbarung liegt bereit</h2>
-      <p style="margin:0 0 16px;">Guten Tag ${name},</p>
-      <p style="margin:0 0 16px;line-height:1.6;">
-        Für Ihren laufenden Auftrag liegt eine <strong>Ergänzungsvereinbarung</strong> zum
-        Nachunternehmervertrag im Partner-Portal bereit — bitte prüfen Sie die Änderungen und
-        bestätigen Sie die Vereinbarung verbindlich.
-      </p>
-      ${greenBox(`
-        <table width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;">
-        ${detailRow('Auftrag', titel)}
-        ${detailRow('Gewerk', gewerk)}
-        ${bezug ? detailRow('Bezug Vertrag vom', bezug) : ''}
-        </table>
-      `)}
-      <p style="margin:16px 0 8px;font-size:15px;font-weight:600;color:${C.greenDark};">Nächste Schritte im Portal:</p>
-      <ol style="font-size:15px;line-height:1.75;padding-left:20px;margin:0 0 20px;color:${C.gray700};">
-        <li>Ergänzungsvereinbarung lesen und prüfen</li>
-        <li>Verbindlich bestätigen</li>
-      </ol>
-      ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
-      <p style="font-size:15px;color:${C.gray500};margin:16px 0 0;">Link:<br/>
-        <a href="${esc(data.portalLink)}" style="color:${C.green};word-break:break-all;">${esc(data.portalLink)}</a>
-      </p>
-    `,
-      `Ergänzungsvereinbarung bereit — ${data.gewerkName || 'Auftrag'}`,
-      b,
-      undefined,
-      { skipMeinBaerenwaldPs: true }
-    ),
-  }
-}
-
-export function mailHandwerkerProjektvertragBereit(
-  data: {
-    name: string
-    auftragTitel: string
-    gewerkName: string
-    vertragsNr: string
-    portalLink: string
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const name = esc(data.name)
-  const titel = esc(data.auftragTitel.trim() || 'Ihr Auftrag')
-  const gewerk = esc(data.gewerkName.trim() || '—')
-  const nr = esc(data.vertragsNr.trim() || '—')
-
-  return {
-    betreff: buildPartnerSubject({
-      gewerk: data.gewerkName,
-      ereignis: 'Projektvertrag bereit',
-    }),
-    html: mailHtmlBase(
-      `
-      <h2 style="color:${C.green};margin:0 0 16px;">Projektvertrag liegt bereit</h2>
-      <p style="margin:0 0 16px;">Guten Tag ${name},</p>
-      <p style="margin:0 0 16px;line-height:1.6;">
-        Ihr Angebot wurde übernommen. Der <strong>Projekt-Nachunternehmervertrag</strong> steht im Partner-Portal bereit —
-        bitte prüfen Sie die Unterlagen-Checkliste und bestätigen Sie den Vertrag verbindlich.
-      </p>
-      ${greenBox(`
-        <table width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;">
-        ${detailRow('Auftrag', titel)}
-        ${detailRow('Gewerk', gewerk)}
-        ${detailRow('Vertrags-Nr.', nr)}
-        </table>
-      `)}
-      <p style="margin:16px 0 8px;font-size:15px;font-weight:600;color:${C.greenDark};">Nächste Schritte im Portal:</p>
-      <ol style="font-size:15px;line-height:1.75;padding-left:20px;margin:0 0 20px;color:${C.gray700};">
-        <li>Projektvertrag lesen und prüfen</li>
-        <li>Pflicht-Unterlagen laut Checkliste hochladen (falls noch offen)</li>
-        <li>Vertrag verbindlich bestätigen</li>
-      </ol>
-      <p style="font-size:15px;color:${C.gray500};margin:0 0 16px;line-height:1.6;">
-        Erst nach Ihrer Bestätigung wird der Auftrag für Sie freigeschaltet.
-      </p>
-      ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
-      <p style="font-size:15px;color:${C.gray500};margin:16px 0 0;">Link:<br/>
-        <a href="${esc(data.portalLink)}" style="color:${C.green};word-break:break-all;">${esc(data.portalLink)}</a>
-      </p>
-    `,
-      `Projektvertrag bereit — ${data.gewerkName || 'Auftrag'}`,
-      b,
-      undefined,
-      { skipMeinBaerenwaldPs: true }
-    ),
-  }
-}
-
 export function mailHandwerkerAnfrage(
   data: {
     name: string
@@ -1334,88 +954,5 @@ export function mailHandwerkerAnfrage(
       undefined,
       { skipMeinBaerenwaldPs: true }
     ),
-  }
-}
-
-export function mailHandwerkerBautagebuchAnfrage(
-  data: {
-    name: string
-    auftragTitel: string
-    portalLink: string
-    notiz?: string | null
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const name = esc(data.name)
-  const titel = esc(data.auftragTitel)
-  const notizBlock = data.notiz?.trim()
-    ? `<p style="font-size:15px;line-height:1.6;margin:16px 0;"><strong>Hinweis von Bärenwald:</strong><br/>${esc(data.notiz.trim()).replace(/\n/g, '<br/>')}</p>`
-    : ''
-  return {
-    betreff: buildPartnerSubject({
-      gewerkOrt: data.auftragTitel.trim() || null,
-      ereignis: 'Tagebucheintrag angefordert',
-    }),
-    html: mailHtmlBase(
-      `
-      <h2 style="color:${C.green};margin:0 0 16px;">Tagebucheintrag angefordert</h2>
-      <p style="margin:0 0 16px;">Guten Tag ${name},</p>
-      <p style="margin:0 0 16px;">Bärenwald bittet dich um einen <strong>Bautagebuch-Eintrag</strong> zum Auftrag <strong>${titel}</strong>.</p>
-      ${notizBlock}
-      ${btnSecondary('Zum Auftrag im Partner-Portal →', data.portalLink)}
-      <p style="font-size:15px;color:${C.gray500};margin:16px 0 0;">Die Aufgabe findest du unter Planer → Aufgaben oder direkt beim Auftrag im Bautagebuch.</p>
-    `,
-      `Tagebucheintrag: ${data.auftragTitel}`,
-      b,
-      undefined,
-      { skipMeinBaerenwaldPs: true }
-    ),
-  }
-}
-
-export function mailAbschlussdokumentation(
-  data: { name: string; anrede: 'du' | 'sie'; nachricht: string },
-  _b: MailBranding
-): { betreff: string; htmlBody: string } {
-  const projekt = data.anrede === 'du' ? 'dein Projekt' : 'Ihr Projekt'
-  return {
-    betreff: buildSubject({
-      ereignis: 'Projekt abgeschlossen',
-    }),
-    htmlBody: `<p>anbei erhalten Sie die Abschlussdokumentation zu ${projekt}.</p>
-      <p style="font-size:15px;color:${C.gray500};">Das PDF enthält eine Zusammenfassung aller durchgeführten Arbeiten, Dokumentation und Fotos.</p>
-      <p>Vielen Dank für Ihr Vertrauen!</p>`,
-  }
-}
-
-export function mailHandwerkerFormular(
-  data: { name: string; tabName: string; auftragName: string; adresse?: string | null; link: string },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const name = esc(data.name)
-  const tel = esc(b.telefon)
-  const adr = data.adresse?.trim() ? ` · ${esc(data.adresse.trim())}` : ''
-  return {
-    betreff: buildPartnerSubject({
-      gewerkOrt: data.auftragName.trim() || null,
-      ereignis: `Formular: ${data.tabName}`,
-    }),
-    html: mailHtmlBase(
-      `
-      <h2 style="color:${C.green};margin:0 0 16px;">Formular zum Ausfüllen</h2>
-      <p>Guten Tag ${name},</p>
-      <p>bitte füllen Sie das folgende Formular aus:</p>
-      ${greenBox(`
-        <p style="margin:0;font-size:15px;font-weight:600;color:${C.greenDark};">${esc(data.tabName)}</p>
-        <p style="margin:4px 0 0;font-size:15px;color:${C.green};">${esc(data.auftragName)}${adr}</p>
-      `)}
-      ${btn('Formular öffnen →', data.link)}
-      <p style="font-size:15px;color:${C.gray500};">Bei Fragen: <a href="tel:${tel.replace(/\s/g, '')}" style="color:${C.green};">${tel}</a></p>
-    `,
-      `Formular: ${data.tabName}`,
-      b,
-      undefined,
-      { skipMeinBaerenwaldPs: true }
-    )
   }
 }

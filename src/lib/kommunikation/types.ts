@@ -2,23 +2,6 @@ export type KommunikationKontextTyp = 'anfrage' | 'angebot' | 'auftrag' | 'rechn
 
 export type KommunikationMailVorlageKontext = KommunikationKontextTyp | 'alle'
 
-export const KOMMUNIKATION_KONTEXT_LABELS: Record<KommunikationKontextTyp, string> = {
-  anfrage: 'Anfrage',
-  angebot: 'Angebot',
-  auftrag: 'Auftrag',
-  rechnung: 'Rechnung',
-  kunde: 'Kunde',
-}
-
-export const KOMMUNIKATION_VORLAGE_KONTEXT_OPTIONS: { value: KommunikationMailVorlageKontext; label: string }[] = [
-  { value: 'alle', label: 'Alle Kontexte' },
-  { value: 'anfrage', label: 'Anfrage' },
-  { value: 'angebot', label: 'Angebot' },
-  { value: 'auftrag', label: 'Auftrag' },
-  { value: 'rechnung', label: 'Rechnung' },
-  { value: 'kunde', label: 'Kunde' },
-]
-
 export type MailComposeContext = {
   kontextTyp: KommunikationKontextTyp
   kundeId: string
@@ -62,35 +45,4 @@ export function parseEmailLogIdFromHtml(html: string): string | null {
 
 export function freitextMailTyp(kontext: KommunikationKontextTyp): string {
   return `freitext_${kontext}`
-}
-
-export function freitextMailTypLabel(typ: string, kontextTyp?: string | null): string {
-  if (typ.startsWith('antwort_')) {
-    const k = typ.replace('antwort_', '') as KommunikationKontextTyp
-    return `Antwort (${KOMMUNIKATION_KONTEXT_LABELS[k] ?? kontextTyp ?? 'E-Mail'})`
-  }
-  if (typ === 'antwort') return 'Antwort (E-Mail)'
-  if (typ.startsWith('freitext_')) {
-    const k = typ.replace('freitext_', '') as KommunikationKontextTyp
-    return `E-Mail (${KOMMUNIKATION_KONTEXT_LABELS[k] ?? kontextTyp ?? 'Freitext'})`
-  }
-  const map: Record<string, string> = {
-    anfrage_bestaetigung: 'Anfrage-Bestätigung',
-    angebot: 'Angebot',
-    angebot_nachfass: 'Angebot-Erinnerung',
-    auftragsbestaetigung: 'Auftragsbestätigung',
-    update_hinweis: 'Update',
-    projekt_update: 'Bautagebuch / Update',
-    rechnung: 'Rechnung',
-    zahlungsbestaetigung: 'Zahlungsbestätigung',
-    zahlungserinnerung: 'Zahlungserinnerung',
-    bautagebuch: 'Bautagebuch',
-    nachtrag: 'Nachtrag',
-    abnahmeprotokoll: 'Abnahme',
-    abschlussdokumentation: 'Abschluss',
-    besichtigung_termin: 'Besichtigungstermin',
-    regie_information: 'Regie-Information (Kunde)',
-    regie_entscheidung_partner: 'Regie-Entscheidung (Partner)',
-  }
-  return map[typ] ?? typ
 }

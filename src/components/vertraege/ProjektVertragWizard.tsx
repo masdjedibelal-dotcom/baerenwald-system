@@ -3,8 +3,8 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
-import { useCallback, useMemo, useState } from 'react'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
+import { useCallback,useMemo,useState } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { Card } from '@/components/ui/Card'
@@ -27,9 +27,9 @@ import {
 } from '@/lib/vertraege/build-vertrag-texte'
 import { NachtragPositionenEditor } from '@/components/vertraege/NachtragPositionenEditor'
 import type { AuftragPosition } from '@/lib/types'
-import type { NachtragPositionDraft, ProjektVertragWizardBootstrap, ProjektVertragWizardMeta } from '@/lib/vertraege/types'
+import type { NachtragPositionDraft,ProjektVertragWizardBootstrap,ProjektVertragWizardMeta } from '@/lib/vertraege/types'
 import { cn } from '@/lib/utils'
-import { COPY_BUTTON, TOAST } from '@/lib/copy'
+import { COPY_BUTTON,TOAST } from '@/lib/copy'
 import { useFieldErrors } from '@/lib/validation/form-schema'
 
 /** Sichtbare Phasen ≤3: Partner · Inhalt (+ Unterlagen bei Accept) · PDF */
@@ -64,7 +64,7 @@ export function ProjektVertragWizard({
   const acceptMode = bootstrap.accept_mode
   const nachtragMode = bootstrap.nachtrag_mode
   const pdfStep = 3
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { applyFieldErrors } = useFieldErrors()
 
   const [step, setStep] = useState(1)
   const [meta, setMetaState] = useState<ProjektVertragWizardMeta>(() => bootstrap.meta)

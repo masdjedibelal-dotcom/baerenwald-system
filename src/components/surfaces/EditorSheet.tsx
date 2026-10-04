@@ -15,7 +15,6 @@ import {
 import { createPortal } from 'react-dom'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { toast } from '@/components/ui/app-toast'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
@@ -29,7 +28,7 @@ import {
   updateEditorSheetHistoryPop,
 } from '@/lib/surfaces/editor-sheet-history'
 import { useAutoFormDirty } from '@/lib/surfaces/form-dirty'
-import { CONFIRM, TOAST } from '@/lib/copy'
+import { CONFIRM,TOAST } from '@/lib/copy'
 import { cn } from '@/lib/utils'
 
 export type EditorSheetContext = 'detail' | 'canvas'

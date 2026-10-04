@@ -50,9 +50,7 @@ import {
   Inbox,
   Info,
   Layers2,
-  LayoutDashboard,
-  LayoutGrid,
-  LayoutTemplate,
+  LayoutDashboard,LayoutTemplate,
   Link,
   List,
   ListChecks,
@@ -108,7 +106,7 @@ import {
   Key,
   Paperclip,
   QrCode,
-  Undo2,
+  Undo2
 } from 'lucide-react'
 
 /**
@@ -269,39 +267,4 @@ export function resolveMockIcon(n: MockIconName | string): LucideIcon {
     throw new Error(`Unbekanntes Mock-Icon: "${n}"`)
   }
   return ICON_MAP[n]
-}
-
-/** Semantische Alias-Namen für CRM-Detail-Tabs (Mock-Vokabular). */
-export const DETAIL_TAB_ICONS = {
-  stammdaten: 'clipboard-list',
-  details: 'list-details',
-  uebersicht: 'layout-dashboard',
-  zahlplan: 'calculator',
-  finanzen: 'calculator',
-  bautagebuch: 'clipboard-list',
-  baustelle: 'tool',
-  verlauf: 'history',
-  timeline: 'history',
-  aktivitaet: 'history',
-  dokumente: 'files',
-  notizen: 'messages',
-  schritte: 'checklist',
-  leistung: 'list-numbers',
-  positionen: 'list-numbers',
-  projekt: 'list-details',
-  compliance: 'shield-check',
-  organisation: 'building',
-  kommunikation: 'mail',
-  vorgaenge: 'folders',
-  auftraege: 'briefcase',
-} as const satisfies Record<string, MockIconName>
-
-export type DetailTabIconKey = keyof typeof DETAIL_TAB_ICONS
-
-export function resolveDetailTabIcon(key: DetailTabIconKey | string): LucideIcon {
-  const name = DETAIL_TAB_ICONS[key as DetailTabIconKey]
-  if (!name) {
-    throw new Error(`Kein Detail-Tab-Icon für: "${key}"`)
-  }
-  return resolveMockIcon(name)
 }

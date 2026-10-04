@@ -85,15 +85,3 @@ export type FachdokuSlotRow = {
   erledigt_am: string | null
   signed_url?: string | null
 }
-
-export function fachdokuOffenCount(slots: Array<Pick<FachdokuSlotRow, 'status'>>): number {
-  return slots.filter((s) => String(s.status).toLowerCase() === 'offen').length
-}
-
-export function fachdokuChipLabel(slots: Array<Pick<FachdokuSlotRow, 'status'>>): string | null {
-  if (!slots.length) return null
-  const offen = fachdokuOffenCount(slots)
-  const total = slots.length
-  if (offen === 0) return `Fachdoku ${total}/${total}`
-  return `Fachdoku ${total - offen}/${total} offen`
-}

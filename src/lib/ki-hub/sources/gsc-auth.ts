@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { logDbError } from '@/lib/errors/log-db-error'
-import { createSign, randomBytes } from 'crypto'
+import { createSign,randomBytes } from 'crypto'
 import { getPublicAppUrl } from '@/lib/utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -97,17 +97,6 @@ export async function saveGscOAuthRefreshToken(token: string): Promise<void> {
   )
   if (error) logDbError('lib/ki-hub/sources/gsc-auth:einstellungen', error)
   if (error) throw new Error(error.message)
-}
-
-export async function hasGscOAuthRefreshToken(): Promise<boolean> {
-  return Boolean(await resolveGscRefreshToken())
-}
-
-export async function resolveGscAuthMode(): Promise<GscAuthMode> {
-  const oauthClient = getGscOAuthClientConfig()
-  if (oauthClient && (await resolveGscRefreshToken())) return 'oauth'
-  if (parseServiceAccount()) return 'service_account'
-  return 'none'
 }
 
 async function refreshOAuthAccessToken(

@@ -2,7 +2,7 @@
 import { DateInput } from '@/components/ui/DateInput'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -15,9 +15,9 @@ import {
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { MockSegment } from '@/components/mock-ui/MockSegment'
-import { MobileEditableBlock, MobileOverviewField } from '@/components/ui/MobileEditSheet'
+import { MobileEditableBlock,MobileOverviewField } from '@/components/ui/MobileEditSheet'
 import { SignatureCanvas } from '@/components/ui/SignatureCanvas'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
@@ -30,7 +30,6 @@ import {
   saveAndSendAbnahmeprotokoll,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
-import { istAuftragPositionFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
 import type { AuftragStatus } from '@/lib/types'
 import {
   ABNAHME_ERGEBNIS_LABEL,
@@ -46,12 +45,12 @@ import {
   type AbnahmeMangelCheckItem,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
-import { downloadPdfFromBase64, pdfBlobUrlFromBase64 } from '@/lib/download-pdf-base64'
+import { downloadPdfFromBase64,pdfBlobUrlFromBase64 } from '@/lib/download-pdf-base64'
 import { PdfViewer } from '@/components/ui/PdfViewer'
-import type { AngebotPosition, AuftragPosition, Gewerk } from '@/lib/types'
+import type { AngebotPosition,AuftragPosition,Gewerk } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
-import { CONFIRM, COPY_BUTTON, TOAST } from '@/lib/copy'
+import { CONFIRM,COPY_BUTTON,TOAST } from '@/lib/copy'
 import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
 
 const ABNAHME_ERGEBNIS_UI: Record<AbnahmeErgebnis, { label: string; cls: string }> = {
@@ -244,13 +243,6 @@ export function AbnahmeprotokollCreateWizard({
   function buildSaveMaengel() {
     return maengelListe
   }
-
-  /** Gate: Positionen ohne dokumentierten Abschluss (leistung_status ≠ erledigt). */
-  const undokumentiert = useMemo(() => {
-    const alle = positionen.filter(istAuftragPositionFuerSumme)
-    const offen = alle.filter((p) => String(p.leistung_status ?? '').toLowerCase() !== 'erledigt')
-    return { n: offen.length, m: alle.length }
-  }, [positionen])
 
   const hasSignatur = (() => {
     const sigOk = (u?: string | null) => {

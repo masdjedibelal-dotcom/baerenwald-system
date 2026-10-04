@@ -1,5 +1,4 @@
 import type { ObjektHistorieRow } from '@/lib/objektakte/types'
-import type { VorgangPhase } from '@/lib/vorgang/types'
 import { summeObjektVorgangKosten } from '@/lib/objektakte/resolve-objekt-vorgang-kosten'
 
 export type ObjektKpiSnapshot = {
@@ -54,12 +53,4 @@ export function computeObjektKpis(
     anlagenAnzahl,
     nachGewerk,
   }
-}
-
-export function phaseChipLabelHistorie(phase: VorgangPhase | 'bestand'): string {
-  if (phase === 'bestand') return 'Wartung & Pflege'
-  if (phase === 'anfrage') return 'Anfrage'
-  if (phase === 'angebot') return 'Angebot'
-  if (phase === 'auftrag') return 'Auftrag'
-  return 'Rechnung'
 }

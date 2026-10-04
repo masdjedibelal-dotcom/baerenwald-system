@@ -23,21 +23,3 @@ export function auftragHwStatusLabel(status: string | null | undefined): string 
   if (v === 'erledigt') return 'Erledigt'
   return AUFTRAG_HW_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? status ?? 'Ausstehend'
 }
-
-export function auftragHwStatusBadgeClass(status: string | null | undefined): string {
-  const v = (status ?? '').toLowerCase()
-  if (
-    v === 'akzeptiert' ||
-    v === 'angenommen' ||
-    v === 'zugewiesen' ||
-    v === 'bestaetigt' ||
-    v === 'erledigt'
-  ) {
-    return 'bg-status-order-bg text-status-order-text'
-  }
-  if (v === 'abgelehnt') return 'bg-status-cancel-bg text-status-cancel-text'
-  if (v === 'ersetzt') return 'bg-bw-hover text-bw-text-muted line-through'
-  if (v === 'angefragt') return 'bg-status-new-bg text-status-new-text'
-  if (v === 'warten') return 'bg-status-contact-bg text-status-contact-text'
-  return 'bg-bw-hover text-bw-text-muted'
-}

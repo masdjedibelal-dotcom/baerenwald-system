@@ -1,7 +1,6 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
-import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { formatEuro } from '@/lib/format/geld-datum'
 
@@ -62,45 +61,6 @@ export function StaffChoiceGrid({
           </MockBtn>
         )
       })}
-    </div>
-  )
-}
-
-export function StaffSkipHint({ onSkip }: { onSkip: () => void }) {
-  return (
-    <MockBtn className="mt-4 text-[length:var(--fs-meta)] font-medium text-[var(--text-3)] underline-offset-2 hover:text-[var(--text)] hover:underline" type="button" onClick={onSkip}>
-      Weiß ich nicht / überspringen
-    </MockBtn>
-  )
-}
-
-export function StaffStepTitle({
-  title,
-  sub,
-}: {
-  title: string
-  sub?: string
-}) {
-  return (
-    <div className="mb-1">
-      <h2 className="sf-step-title">{title}</h2>
-      {sub ? <p className="sf-step-sub">{sub}</p> : <div className="mb-5" />}
-    </div>
-  )
-}
-
-/** CRM-only Felder — klar vom Website-Funnel getrennt. */
-export function StaffInternBlock({
-  title = 'Nur intern (CRM)',
-  children,
-}: {
-  title?: string
-  children: ReactNode
-}) {
-  return (
-    <div className="sf-intern">
-      <div className="sf-intern-label">{title}</div>
-      {children}
     </div>
   )
 }

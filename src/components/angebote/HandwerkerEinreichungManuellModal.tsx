@@ -1,5 +1,5 @@
 'use client'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
@@ -27,7 +27,7 @@ export function HandwerkerEinreichungManuellModal({
   gewerkName: string
   onSaved: () => void
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const [preisNetto, setPreisNetto] = useState('')
   const [preisBrutto, setPreisBrutto] = useState('')

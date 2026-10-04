@@ -2,11 +2,11 @@
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useEffect,useMemo,useState } from 'react'
+import { usePathname,useRouter } from 'next/navigation'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
-import { hideRouteBusy, showRouteBusy } from '@/components/ui/action-busy'
+import { hideRouteBusy,showRouteBusy } from '@/components/ui/action-busy'
 import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
 import {
   angebotNrAnzeige,
@@ -16,10 +16,10 @@ import {
   formatEurKurz,
   rechnungStatusKurz,
 } from '@/lib/vorgang/projekt-kontext-labels'
-import { hrefWithAkteFrom, type AkteFromRef } from '@/lib/vorgang/akte-from'
+import { hrefWithAkteFrom,type AkteFromRef } from '@/lib/vorgang/akte-from'
 import { resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import { buildAnfragePhaseSheetProps } from '@/lib/anfragen/funnel-bedarf-rows'
-import { formatDatum, kanalLabel, cn } from '@/lib/utils'
+import { formatDatum,kanalLabel,cn } from '@/lib/utils'
 import type { LeadDetail } from '@/lib/types'
 
 export type PhaseKind = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
@@ -479,6 +479,3 @@ export function buildPhaseRows(
     },
   ]
 }
-
-/** @deprecated unused — kept for typecheck of optional children patterns */
-export type VorgangPhasenVerlaufSlot = ReactNode

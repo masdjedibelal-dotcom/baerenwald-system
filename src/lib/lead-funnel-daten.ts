@@ -1,10 +1,8 @@
 import {
   BEREICHE,
   FACHDETAILS_CONFIG,
-  GROESSEN_CONFIG,
-  KUNDENTYP_OPTIONS,
-  normalizeSituation,
-  situationLabel,
+  GROESSEN_CONFIG,normalizeSituation,
+  situationLabel
 } from '@/lib/vorab-formular-config'
 import {
   websiteFachdetailOptionLabel,
@@ -17,7 +15,7 @@ import {
   meldeQuestionDisplayLabel,
 } from '@/lib/anfragen/melde-fachdetail-labels'
 import { coerceBereicheArray } from '@/lib/lead-gewerbe-storage'
-import { BEREICH_LABELS, FACHDETAIL_TO_LEISTUNG, SITUATION_LABELS } from '@/lib/utils'
+import { BEREICH_LABELS,FACHDETAIL_TO_LEISTUNG,SITUATION_LABELS } from '@/lib/utils'
 
 export type LeadFunnelDaten = {
   fachdetails?: Record<string, string | string[]>
@@ -908,11 +906,6 @@ export function fachdetailsForProjektUebersicht(
     .filter((e) => shouldShowFachdetailInProjektUebersicht(e.configKey, bereiche))
 }
 
-export function kundentypFunnelLabel(value: string | undefined): string {
-  if (!value) return ''
-  return KUNDENTYP_OPTIONS.find((k) => k.value === value)?.label ?? value
-}
-
 export function groesseDisplay(
   bereich: string,
   wert: number | string,
@@ -1027,52 +1020,5 @@ export function collectGroessenFromFunnelDaten(
     if (n != null && bereich) out[bereich] = n
   }
 
-  return out
-}
-
-/** CRM-Formular → funnel_daten (Fachdetails als string[] pro Config-Key). */
-export function buildFunnelDatenFromForm(input: {
-  fachdetails: Record<string, string[]>
-  groessen: Record<string, number>
-  groessen_einheiten?: Record<string, string>
-  kundentyp: string
-  quelle: string
-  extra?: Record<string, unknown>
-}): LeadFunnelDaten {
-  const fachdetails: Record<string, string[]> = {}
-  for (const [k, arr] of Object.entries(input.fachdetails)) {
-    if (arr?.length) fachdetails[k] = arr
-  }
-  const groessen: Record<string, number> = {}
-  for (const [k, v] of Object.entries(input.groessen)) {
-    if (Number.isFinite(v) && v > 0) groessen[k] = v
-  }
-  const groessen_einheiten: Record<string, string> = {}
-  for (const [k, v] of Object.entries(input.groessen_einheiten ?? {})) {
-    if (v?.trim()) groessen_einheiten[k] = v.trim()
-  }
-  return {
-    ...input.extra,
-    fachdetails,
-    groessen,
-    ...(Object.keys(groessen_einheiten).length ? { groessen_einheiten } : {}),
-    kundentyp: input.kundentyp,
-    quelle: input.quelle,
-  }
-}
-
-export function parseFunnelFachdetailsArrays(
-  raw: unknown
-): Record<string, string[]> {
-  const parsed = parseLeadFunnelDaten(raw)
-  const fd = parsed.fachdetails ?? {}
-  const fdTop = parsed as Record<string, unknown>
-  const out: Record<string, string[]> = {}
-  for (const { configKey, values } of flattenFachdetailsForDisplay(
-    fd as Record<string, unknown>,
-    fdTop
-  )) {
-    if (values.length) out[configKey] = values
-  }
   return out
 }

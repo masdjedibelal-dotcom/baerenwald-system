@@ -1,22 +1,21 @@
 'use client'
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn, MockEmpty } from '@/components/mock-ui'
+import { MockBtn,MockEmpty } from '@/components/mock-ui'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { openDeleteConfirm, openActionConfirm } from '@/components/ui/ConfirmPopup'
+import { openDeleteConfirm,openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useTransition } from '@/components/ui/action-busy'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useCallback, useState } from 'react'
+import { useCallback,useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { toast } from '@/components/ui/app-toast'
 import { HandwerkerEinreichungManuellModal } from '@/components/angebote/HandwerkerEinreichungManuellModal'
 import { HandwerkerEinreichungPruefung } from '@/components/angebote/HandwerkerEinreichungPruefung'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
 import { cn } from '@/lib/utils'
-import type { AngebotDetail, AngebotHandwerkerRow } from '@/lib/types'
+import type { AngebotDetail,AngebotHandwerkerRow } from '@/lib/types'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { labelHandwerkerAblehnung } from '@/lib/angebote/ablehnung-labels'
 import { handwerkerZuweisungAktiv } from '@/lib/angebote/angebot-handwerker-flow'
@@ -367,7 +366,6 @@ export function AngebotHandwerkerPartnerSection({
   positionen: AngebotPosition[]
   gueltigBis: string
 }) {
-  const router = useRouter()
   const [wizardBootstrap, setWizardBootstrap] = useState<ProjektVertragWizardBootstrap | null>(null)
   const [wizardPending, startWizardTransition] = useTransition()
   const rows = ohnePartnerLvZuweisungen(detail.angebot_handwerker ?? []).filter(

@@ -1,6 +1,5 @@
 'use client'
 
-
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
@@ -15,8 +14,7 @@ import {
   duplicateAuftragHref,
   duplicateRechnung,
 } from '@/app/(dashboard)/crm/list-copy-actions'
-import { duplicateKunde } from '@/app/actions/kunden'
-import { duplicateHandwerker, deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
+import { deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { TOAST } from '@/lib/copy'
 
 export function runDeleteVorgang(
@@ -106,28 +104,6 @@ export function runDuplicateRechnung(rechnungId: string, router: AppRouterInstan
     else {
       toast.success(TOAST.rechnungsentwurf_kopiert)
       router.push(`/rechnungen/${r.id}`)
-    }
-  })
-}
-
-export function runDuplicateKunde(kundeId: string, router: AppRouterInstance) {
-  void actionBusy.run('Kunde wird kopiert…', async () => {
-    const r = await duplicateKunde(kundeId)
-    if (!r.ok) toast.systemError(r)
-    else {
-      toast.success(TOAST.kunde_kopiert)
-      router.push(`/kunden/${r.id}`)
-    }
-  })
-}
-
-export function runDuplicateHandwerker(handwerkerId: string, router: AppRouterInstance) {
-  void actionBusy.run('Partner wird kopiert…', async () => {
-    const r = await duplicateHandwerker(handwerkerId)
-    if (!r.ok) toast.systemError(r)
-    else {
-      toast.success(TOAST.partner_kopiert)
-      router.push(`/handwerker/${r.id}`)
     }
   })
 }

@@ -70,26 +70,6 @@ ${rows}
 </table>`
 }
 
-export function buildMelderBestaetigungHtml(input: {
-  melderName: string
-  orgName: string
-  objektTitel: string
-  kategorie: string
-  referenz?: string
-}): string {
-  const kat = meldeKategorieLabel(input.kategorie)
-  return `<!DOCTYPE html>
-<html lang="de">
-<body style="font-family:system-ui,sans-serif;color:${C.textInk};line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
-  <p>Guten Tag ${esc(input.melderName)},</p>
-  <p>wir haben Ihre <strong>${esc(kat)}</strong>-Meldung für <strong>${esc(input.objektTitel)}</strong> erhalten.</p>
-  <p>${esc(input.orgName)} und Bärenwald koordinieren den nächsten Schritt.</p>
-  ${input.referenz ? `<p style="color:${C.greenMuted2};font-size:15px">Referenz: ${esc(input.referenz)}</p>` : ''}
-  <p style="margin-top:24px">Mit freundlichen Grüßen<br/>Bärenwald München</p>
-</body>
-</html>`
-}
-
 export type OrgNeueMeldungMailInput = {
   objektTitel: string
   melderName: string
@@ -171,20 +151,6 @@ export function mailOrgNeueMeldung(
   }
 }
 
-/** @deprecated Nutze mailOrgNeueMeldung — HTML-Fragment ohne Mail-Hülle. */
-export function buildOrgNeueMeldungHtml(input: OrgNeueMeldungMailInput): string {
-  const kat = meldeKategorieLabel(input.kategorie)
-  return `<!DOCTYPE html>
-<html lang="de">
-<body style="font-family:system-ui,sans-serif;color:${C.textInk};line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
-  <p>Neuer Vorgang — <strong>${esc(input.objektTitel)}</strong></p>
-  <p><strong>Art:</strong> ${esc(kat)}<br/>
-  <strong>Melder:</strong> ${esc(input.melderName)}${input.melderEinheit ? ` (${esc(input.melderEinheit)})` : ''}</p>
-  ${input.beschreibung ? `<p>${esc(input.beschreibung)}</p>` : ''}
-</body>
-</html>`
-}
-
 export function anfrageBetreffNachAnlass(anlass: LeadAnlass | null | undefined, objektTitel: string): string {
   const ereignis =
     anlass === 'meldung'
@@ -227,48 +193,6 @@ export function mailOrgFreigabeAngefordert(
   return {
     betreff,
     html: mailHtmlBase(body, 'Freigabe erforderlich', b, undefined, {
-      anrede: 'sie',
-      portalAudience: 'organisation',
-      portalLink: data.portalLink,
-    }),
-  }
-}
-
-/** Unter Schwelle / Notfall: Angebot nur zur Information — kein Freigabe-Request. */
-export function mailOrgAngebotZurInfo(
-  data: {
-    orgName: string
-    objektTitel: string
-    betragEur: number
-    portalLink: string
-    schwelleLabel?: string
-    /** schwelle | akut — steuert den Info-Text */
-    bypassGrund?: 'schwelle' | 'akut' | null
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const betreff = buildSubject({
-    objekt: data.objektTitel,
-    ereignis: 'Angebot zur Information',
-  })
-  const schwelle =
-    data.schwelleLabel?.trim() != null && data.schwelleLabel.trim() !== ''
-      ? ` (${esc(data.schwelleLabel.trim())})`
-      : ''
-  const grundAbsatz =
-    data.bypassGrund === 'akut'
-      ? `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">Wegen der Einstufung als <strong>Akut / Sofortmaßnahme</strong> ist eine Freigabe bzw. Annahme oder Ablehnung <strong>nicht erforderlich</strong>. Wir kümmern uns direkt um den Auftrag. Diese Mail dient nur der Information; den Stand sehen Sie jederzeit im Auftraggeber-Portal.</p>`
-      : `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">Aufgrund Ihrer erteilten Freigabeschwelle${schwelle} liegt der Betrag darunter — eine Freigabe bzw. Annahme oder Ablehnung ist <strong>nicht erforderlich</strong>. Wir kümmern uns direkt um den Auftrag. Diese Mail dient nur der Information; den Stand sehen Sie jederzeit im Auftraggeber-Portal.</p>`
-  const body = `
-    <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">Guten Tag,</p>
-    <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">für <strong>${esc(data.objektTitel)}</strong> liegt ein Angebot über <strong>${esc(
-      formatEuro(data.betragEur, { style: 'currency' })
-    )}</strong> vor.</p>
-    ${grundAbsatz}
-  `
-  return {
-    betreff,
-    html: mailHtmlBase(body, 'Angebot zur Information', b, undefined, {
       anrede: 'sie',
       portalAudience: 'organisation',
       portalLink: data.portalLink,
@@ -381,38 +305,6 @@ export function mailAngebotEntscheidung(
     betreff,
     html: mailHtmlBase(body, `Angebot ${aktionLabel}`, b, undefined, {
       skipMeinBaerenwaldPs: true,
-    }),
-  }
-}
-
-export function mailOrgPortalEinladung(
-  data: {
-    name: string
-    orgAnzeigename?: string | null
-    portalLink: string
-    anrede: 'du' | 'sie'
-    text: string
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const betreff = 'Auftraggeber-Portal – Zugang bereit'
-  const org = data.orgAnzeigename?.trim()
-  const intro = org
-    ? data.anrede === 'du'
-      ? `hier ist dein Zugang zum Auftraggeber-Portal für <strong>${esc(org)}</strong>.`
-      : `hier ist Ihr Zugang zum Auftraggeber-Portal für <strong>${esc(org)}</strong>.`
-    : esc(data.text)
-  const body = `
-    <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${data.anrede === 'du' ? `Hallo ${esc(data.name)},` : `Guten Tag ${esc(data.name)},`}</p>
-    <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</p>
-    <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${data.anrede === 'du' ? 'Melde dich mit deiner E-Mail an — Meldungen, Freigaben und Objekte im Blick.' : 'Melden Sie sich mit Ihrer E-Mail an — Meldungen, Freigaben und Objekte im Blick.'}</p>
-  `
-  return {
-    betreff,
-    html: mailHtmlBase(body, 'Auftraggeber-Portal', b, undefined, {
-      anrede: data.anrede,
-      portalAudience: 'organisation',
-      portalLink: data.portalLink,
     }),
   }
 }

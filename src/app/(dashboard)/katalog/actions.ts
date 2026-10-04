@@ -3,7 +3,7 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import type { KatalogPosition, KatalogVariante } from '@/lib/katalog/katalog-types'
+import type { KatalogPosition,KatalogVariante } from '@/lib/katalog/katalog-types'
 
 function mapVariante(r: Record<string, unknown>): KatalogVariante {
   return {
@@ -168,48 +168,6 @@ export async function listKatalogPositionen(opts?: {
     })
   }
   return out
-}
-
-export async function updateKatalogVariantePreis(
-  varianteId: string,
-  preis: number
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('katalog_varianten')
-    .update({ preis: Math.max(0, Math.round(preis * 100) / 100) })
-    .eq('id', varianteId)
-  if (error) logDbError('app/katalog/actions:katalog_varianten', error)
-  if (error) return { ok: false, message: error.message }
-  return { ok: true }
-}
-
-export async function setKatalogVarianteAktiv(
-  varianteId: string,
-  aktiv: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('katalog_varianten')
-    .update({ aktiv })
-    .eq('id', varianteId)
-  if (error) logDbError('app/katalog/actions:katalog_varianten', error)
-  if (error) return { ok: false, message: error.message }
-  return { ok: true }
-}
-
-export async function setKatalogPositionAktiv(
-  positionId: string,
-  aktiv: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('katalog_positionen')
-    .update({ aktiv })
-    .eq('id', positionId)
-  if (error) logDbError('app/katalog/actions:katalog_positionen', error)
-  if (error) return { ok: false, message: error.message }
-  return { ok: true }
 }
 
 /** Freie Position für KI-Lernbasis speichern — kein Katalog-Insert. */

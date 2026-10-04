@@ -99,29 +99,3 @@ export async function loadLatestMarketingMetrics(): Promise<MarketingMetricRow[]
 
   return rows
 }
-
-export function marketingMetricsToQuellen(
-  rows: MarketingMetricRow[]
-): {
-  posthog: KiHubQuelleResult<Record<string, unknown>>
-  resend: KiHubQuelleResult<Record<string, unknown>>
-  google: KiHubQuelleResult<Record<string, unknown>>
-} {
-  const byQuelle = new Map(rows.map((r) => [r.quelle, r]))
-
-  function mapRow(quelle: string): KiHubQuelleResult<Record<string, unknown>> {
-    const row = byQuelle.get(quelle)
-    if (!row) return { status: 'unavailable', error: 'Noch nicht synchronisiert' }
-    const status = (row.wert.sync_status as KiHubQuelleResult<Record<string, unknown>>['status']) ?? 'ok'
-    if (status !== 'ok') {
-      return { status, error: String(row.wert.error ?? 'Fehler'), data: row.wert }
-    }
-    return { status: 'ok', data: row.wert }
-  }
-
-  return {
-    posthog: mapRow('posthog'),
-    resend: mapRow('resend'),
-    google: mapRow('google'),
-  }
-}

@@ -1,9 +1,8 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui'
 import { MockTextarea } from '@/components/mock-ui/MockForm'
 import { logDbError } from '@/lib/errors/log-db-error'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback,useEffect,useRef,useState,type ReactNode } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
@@ -68,7 +67,7 @@ export function useDetailQuickActions({
   dokument?: DetailQuickDokumentTarget | null
   onSaved?: () => void
 }): { quickBar: QuickBarAction[]; sheets: ReactNode } {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [notizOpen, setNotizOpen] = useState(false)
   const [notizText, setNotizText] = useState('')
   const [pending, setPending] = useState(false)

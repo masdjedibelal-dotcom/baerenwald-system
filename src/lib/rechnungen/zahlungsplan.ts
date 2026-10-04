@@ -1,9 +1,8 @@
-import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
-import { berechneRechnung, type RechnungBerechnung } from '@/lib/rechnung-berechnung'
+import { normalizeAngebotPositionen,summenAusPositionen } from '@/lib/angebot-positionen'
+import { berechneRechnung,type RechnungBerechnung } from '@/lib/rechnung-berechnung'
 import type { AngebotPosition } from '@/lib/types'
-import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { effektivesFaelligAmYmd } from '@/lib/dates/werktag'
-import { formatEuro, formatNumber } from '@/lib/format/geld-datum'
+import { formatEuro,formatNumber } from '@/lib/format/geld-datum'
 
 function neueZahlungsplanId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -189,20 +188,6 @@ export function parseZahlungsplan(raw: unknown): Zahlungsplan | null {
   }
 }
 
-export function zahlungsplanAusAnzahlung50(gesamtNetto: number): Zahlungsplan {
-  const half = Math.round(gesamtNetto * 50) / 100
-  return {
-    modus: 'abschlagsplan',
-    zeilen: [
-      { ...neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 50 }), id: neueZahlungsplanId() },
-      {
-        ...neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0 }),
-        id: neueZahlungsplanId(),
-      },
-    ],
-  }
-}
-
 export function zahlungsplanVorlage50_50(): Zahlungsplan {
   return {
     modus: 'abschlagsplan',
@@ -216,44 +201,6 @@ export function zahlungsplanVorlage50_50(): Zahlungsplan {
       }),
     ],
   }
-}
-
-/** Mock-Label „Anzahlung 30% + Rest“ */
-export function zahlungsplanVorlage30_70(): Zahlungsplan {
-  return {
-    modus: 'abschlagsplan',
-    zeilen: [
-      neueZahlungsplanZeile({ titel: 'Anzahlung', typ: 'prozent', wert: 30, faellig_am: plusDaysIso(7) }),
-      neueZahlungsplanZeile({
-        titel: 'Schlussrechnung',
-        typ: 'prozent',
-        wert: 70,
-        faellig_am: plusDaysIso(60),
-      }),
-    ],
-  }
-}
-
-/** Mock-Vorlage „30 / 40 / 30“ */
-export function zahlungsplanVorlage30_40_30(): Zahlungsplan {
-  return {
-    modus: 'abschlagsplan',
-    zeilen: [
-      neueZahlungsplanZeile({ titel: '1. Abschlag', typ: 'prozent', wert: 30, faellig_am: plusDaysIso(14) }),
-      neueZahlungsplanZeile({ titel: '2. Abschlag', typ: 'prozent', wert: 40, faellig_am: plusDaysIso(45) }),
-      neueZahlungsplanZeile({
-        titel: 'Schlussrechnung',
-        typ: 'prozent',
-        wert: 30,
-        faellig_am: plusDaysIso(75),
-      }),
-    ],
-  }
-}
-
-/** @deprecated Alias — nutze zahlungsplanVorlage30_40_30 */
-export function zahlungsplanVorlage3x(): Zahlungsplan {
-  return zahlungsplanVorlage30_40_30()
 }
 
 export function rechnungFuerAbschlagZeile(
@@ -302,20 +249,6 @@ export function rechnungenZuAbschlagZeile<
     out.push(r)
   }
   return out
-}
-
-/** Letzte stornierte Rechnung zu einer Planzeile (Rate wieder „geplant“). */
-export function stornierteRechnungFuerAbschlagZeile(
-  zeileId: string,
-  rechnungen: RechnungAbschlagLink[]
-): RechnungAbschlagLink | null {
-  let latest: RechnungAbschlagLink | null = null
-  for (const r of rechnungen) {
-    if (r.zahlungsplan_abschlag_id === zeileId && String(r.status) === 'storniert') {
-      latest = r
-    }
-  }
-  return latest
 }
 
 export function zahlplanRateStatus(
@@ -446,47 +379,6 @@ export function berechneZahlungsplan(
   return { gesamtNetto, gesamtBrutto, zeilen }
 }
 
-export type AbschlagAuftragSummeAbweichung = {
-  zeileId: string
-  titel: string
-  rechnungsnummer: string | null
-  gestelltBrutto: number
-  sollBrutto: number
-}
-
-/**
- * Gestellter Abschlag weicht von % der *aktuellen* Auftragssumme ab.
- * Schlussrate und Entwürfe/Stornos zählen nicht — die bleiben bewusst auf Ist-Betrag.
- */
-export function abschlagWeichtVonAktuellerAuftragssummeAb(
-  plan: Zahlungsplan,
-  gesamtNetto: number,
-  links: RechnungAbschlagLink[],
-  mwstSatz = 19
-): AbschlagAuftragSummeAbweichung[] {
-  const soll = berechneZahlungsplan(plan, gesamtNetto, mwstSatz)
-  const out: AbschlagAuftragSummeAbweichung[] = []
-  for (const z of soll.zeilen) {
-    if (z.istSchluss) continue
-    const link = rechnungFuerAbschlagZeile(z.id, links)
-    if (!link) continue
-    const st = String(link.status ?? '').toLowerCase()
-    if (st === 'storniert' || st === 'entwurf') continue
-    if (String(link.beleg_typ ?? 'rechnung') === 'gutschrift') continue
-    const gestellt = Number(link.brutto)
-    if (!Number.isFinite(gestellt)) continue
-    if (Math.abs(gestellt - z.brutto) <= 0.05) continue
-    out.push({
-      zeileId: z.id,
-      titel: z.titel?.trim() || `Abschlag ${z.index}`,
-      rechnungsnummer: link.rechnungsnummer?.trim() || null,
-      gestelltBrutto: gestellt,
-      sollBrutto: z.brutto,
-    })
-  }
-  return out
-}
-
 /**
  * Prüft, ob Abschläge die Auftragssumme (VK netto) überschreiten können.
  * Typisch: mehrere %- oder Betragszeilen ohne Deckel (z. B. 60 %+60 %+Rest → 120 %).
@@ -599,25 +491,6 @@ export function abschlagAbzugNetto(r: RechnungAbschlagLink): number {
   const brutto = Number(r.brutto)
   if (!Number.isFinite(brutto) || Math.abs(brutto) < 0.0001) return 0
   return Math.round(Math.abs(brutto) * 100) / 100
-}
-
-/** MwSt.-Satz der Abzugszeile = Satz der Original-Abschlagsrechnung. */
-export function abschlagAbzugMwstSatz(r: RechnungAbschlagLink): number | undefined {
-  const s = Number(r.mwst_satz)
-  if (s === 0 || s === 7 || s === 19) return s
-  const mwst = Number(r.mwst_betrag)
-  if (Number.isFinite(mwst) && Math.abs(mwst) < 0.01) return 0
-  const netto = Number(r.netto)
-  const brutto = Number(r.brutto)
-  if (
-    Number.isFinite(netto) &&
-    Number.isFinite(brutto) &&
-    Math.abs(netto) > 0.0001 &&
-    Math.abs(brutto - netto) < 0.02
-  ) {
-    return 0
-  }
-  return undefined
 }
 
 export type SchlussAbrechnungZeile = {
@@ -802,12 +675,6 @@ export function buildSchlussrechnungPositionen(input: {
 
 export function rechnungArtFuerZeile(zeile: ZahlungsplanZeileBerechnet): RechnungArt {
   return zeile.istSchluss ? 'schluss' : 'abschlag'
-}
-
-export function positionAnzeigeLabel(p: AngebotPosition): string {
-  const name = (p.leistung_name || p.beschreibung || p.leistung || 'Position').trim()
-  const gewerk = p.gewerk_name?.trim()
-  return gewerk ? `${gewerk}: ${name}` : name
 }
 
 /** Positionen, die bereits anderen Abschlagszeilen zugeordnet sind. */
@@ -1024,36 +891,6 @@ export function auftragHatZahlungOffen(input: {
   return bezahltBrutto < vkBrutto - 0.5
 }
 
-/**
- * Soft-Warning für UI: bereits gestellte/bezahlte RE-Brutto vs. VK-Brutto
- * (ohne neue Rechnung).
- */
-export function softWarnGestellteRechnungenGegenVk(input: {
-  bestehende: RechnungAbschlagLink[]
-  gesamtNetto: number
-  mwstSatz?: number
-  ausserRechnungId?: string | null
-  toleranzEur?: number
-}):
-  | { warn: false }
-  | { warn: true; message: string; gestelltBrutto: number; vkBrutto: number } {
-  const mwst = input.mwstSatz ?? 19
-  const toleranz = input.toleranzEur ?? 0.5
-  const vkBrutto =
-    Math.round(Math.max(0, input.gesamtNetto) * (1 + mwst / 100) * 100) / 100
-  const gestelltBrutto = summeGestellteRechnungenBrutto(
-    input.bestehende,
-    input.ausserRechnungId
-  )
-  if (gestelltBrutto <= vkBrutto + toleranz) return { warn: false }
-  return {
-    warn: true,
-    gestelltBrutto,
-    vkBrutto,
-    message: `Bereits gestellte Rechnungen (${formatEuro(gestelltBrutto)} brutto) übersteigen die Auftragssumme (${formatEuro(vkBrutto)} brutto).`,
-  }
-}
-
 export function naechsteOffeneAbschlagZeile(
   plan: Zahlungsplan,
   kontext: AuftragAbrechnungKontext,
@@ -1262,48 +1099,6 @@ export function rechnungBerechnungFuerAbschlagZeile(
     })
   }
   return leereRechnungBerechnung(voll)
-}
-
-/** @deprecated Plan-Prozent als Listenbetrag — nicht mehr für Abschlagsrechnungen genutzt. */
-export function rechnungBerechnungFuerListe(
-  voll: RechnungBerechnung,
-  zeile: ZahlungsplanZeileBerechnet | null,
-  rechnungArt: 'voll' | 'abschlag' | 'schluss'
-): RechnungBerechnung {
-  if (rechnungArt !== 'abschlag' || !zeile) return voll
-  const ratio = voll.netto > 0 ? zeile.netto / voll.netto : 0
-  const mwst_betrag = Math.round((zeile.brutto - zeile.netto) * 100) / 100
-  return {
-    ...voll,
-    netto: zeile.netto,
-    brutto: zeile.brutto,
-    mwst_betrag,
-    lohn_netto: Math.round(voll.lohn_netto * ratio * 100) / 100,
-    material_netto: Math.round(voll.material_netto * ratio * 100) / 100,
-    mwst_aufschluesselung:
-      voll.mwst_aufschluesselung.length && ratio > 0
-        ? voll.mwst_aufschluesselung.map((z) => ({
-            satz: z.satz,
-            netto: Math.round(z.netto * ratio * 100) / 100,
-            mwst: Math.round(z.mwst * ratio * 100) / 100,
-          }))
-        : voll.mwst_aufschluesselung,
-  }
-}
-
-export function zahlungsplanLabelFuerAngebot(plan: Zahlungsplan | null): string {
-  if (!plan?.zeilen.length) return ''
-  return plan.zeilen
-    .map((z) => {
-      if (z.typ === 'rest') return `${z.titel}: Restbetrag`
-      if (z.typ === 'prozent') return `${z.titel}: ${z.wert} %`
-      return `${z.titel}: ${formatEuro(z.wert)} netto`
-    })
-    .join(' · ')
-}
-
-export function resolveAnredeKey(_anrede?: AngebotMailAnrede | null): AngebotMailAnrede {
-  return 'sie'
 }
 
 /**

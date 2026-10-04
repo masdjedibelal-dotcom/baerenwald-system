@@ -3,8 +3,7 @@
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useMemo,useState } from 'react'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
 import {
   DokumenteVorgangAccordions,
@@ -15,7 +14,7 @@ import {
   INDIVIDUELL_TYP_SLUG,
   istEigeneUnterlageTyp,
 } from '@/lib/handwerker/compliance-katalog'
-import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
+import type { ComplianceDokumentTyp,PartnerDokument } from '@/lib/types'
 import { resolveAkteVorgangTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
@@ -65,7 +64,6 @@ export function HandwerkerAkteDokumente({
     angebot_notizen?: string | null
   }[]
 }) {
-  const router = useRouter()
   const isMobile = useIsMobile()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editDoc, setEditDoc] = useState<PartnerDokument | null>(null)

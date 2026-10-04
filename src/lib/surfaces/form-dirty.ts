@@ -4,7 +4,7 @@
  */
 'use client'
 
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect,useRef,useState,type RefObject } from 'react'
 
 let dirtyHoldCount = 0
 let beforeUnloadBound = false
@@ -26,10 +26,6 @@ export function acquireGlobalDirtyHold(): () => void {
   return () => {
     dirtyHoldCount = Math.max(0, dirtyHoldCount - 1)
   }
-}
-
-export function isAnyFormDirty(): boolean {
-  return dirtyHoldCount > 0
 }
 
 export function serializeFormFields(root: HTMLElement | null | undefined): string {

@@ -4,11 +4,11 @@ import {
   type KostenartZeile,
 } from '@/lib/angebot-kosten-split'
 import { GEWERK_SLUG_ANFAHRT } from '@/lib/anfahrt-angebot'
-import { neuePositionsId, positionVkNettoStueck } from '@/lib/angebot-positionen'
-import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { neuePositionsId,positionVkNettoStueck } from '@/lib/angebot-positionen'
+import { defaultFirmenEinstellungen,type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { resolvePositionBeschreibungExport } from '@/lib/gewerke-ausfuehrung'
 import { withResolvedGewerkMeta } from '@/lib/angebote/resolve-position-gewerk'
-import type { AngebotPosition, Gewerk } from '@/lib/types'
+import type { AngebotPosition,Gewerk } from '@/lib/types'
 import type { WizardPosition } from '@/lib/angebote/angebot-wizard-types'
 import { formatEuro } from '@/lib/format/geld-datum'
 
@@ -330,43 +330,6 @@ export function gesamtrabattBetrag(zeilen: DokumentZeile[], artikelNetto: number
   if (!r) return 0
   const artikelBrutto = r.modus === 'ziel_brutto' ? summeArtikelBrutto(zeilen) : undefined
   return gesamtrabattAbzugFromModus(r.modus, r.wert, artikelNetto, artikelBrutto)
-}
-
-export function getGesamtrabattZeile(zeilen: DokumentZeile[]): DokumentGesamtrabattZeile | null {
-  return zeilen.find((z): z is DokumentGesamtrabattZeile => z.typ === 'gesamtrabatt') ?? null
-}
-
-/** Positionen ohne dokumentweiten Gesamtrabatt (für Gewerk-Blöcke / Positionsliste). */
-export function zeilenOhneGesamtrabatt(zeilen: DokumentZeile[]): DokumentZeile[] {
-  return zeilen.filter((z) => z.typ !== 'gesamtrabatt')
-}
-
-/** Gesamtrabatt immer am Ende, ohne Gewerk-Zuordnung. */
-export function mitDokumentGesamtrabatt(
-  positionen: DokumentZeile[],
-  gesamtrabatt?: DokumentGesamtrabattZeile | null
-): DokumentZeile[] {
-  const rabatt =
-    gesamtrabatt !== undefined
-      ? gesamtrabatt
-      : getGesamtrabattZeile(positionen)
-  const ohne = zeilenOhneGesamtrabatt(positionen)
-  if (!rabatt) return ohne
-  const clean = { ...rabatt }
-  delete (clean as DokumentGesamtrabattZeile & { gewerk_block_key?: string }).gewerk_block_key
-  return [...ohne, clean]
-}
-
-export function setGesamtrabattInZeilen(
-  zeilen: DokumentZeile[],
-  patch: Partial<DokumentGesamtrabattZeile> | null
-): DokumentZeile[] {
-  if (patch === null) return zeilenOhneGesamtrabatt(zeilen)
-  const existing = getGesamtrabattZeile(zeilen)
-  const next: DokumentGesamtrabattZeile = existing
-    ? { ...existing, ...patch }
-    : { ...neueGesamtrabattZeile(), ...patch }
-  return mitDokumentGesamtrabatt(zeilen, next)
 }
 
 export function dokumentZeilenToAngebotPositionen(

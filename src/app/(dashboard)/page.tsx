@@ -3,20 +3,17 @@ import { createClient } from '@/lib/supabase-server'
 import { DashboardClient } from '@/components/dashboard/DashboardClient'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
-import { isAktiverAuftragStatus } from '@/lib/dashboard-mock-mapping'
 import {
   buildGewerkUmsatzAusRechnungen,
   buildHandwerkerRanking,
   buildKundenRanking,
   buildUmsatzAusRechnungen,
   istUmsatzRechnung,
-  buildVertriebsFunnel,
-  countUniqueVorgaengeByLead,
-  getDashboardZeitraumRange,
+  buildVertriebsFunnel,getDashboardZeitraumRange,
   inZeitraum,
   parseDashboardZeitraum,
   auftragNetto,
-  type DashboardZeitraumFilter,
+  type DashboardZeitraumFilter
 } from '@/lib/dashboard/dashboard-analytics'
 import {
   emptyDashboardMarketingSnapshot,
@@ -258,12 +255,6 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     positionen?: unknown
     netto?: number | null
   }>
-
-  const leadsZ = leads.filter((l) => {
-    if (!inZeitraum(l.created_at, zeitraumRange)) return false
-    return String(l.status ?? '').toLowerCase() !== 'abgebrochen'
-  })
-  const angeboteZ = angebote.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
   const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
   const rechnungenZ = rechnungen.filter((r) =>
     inZeitraum(String((r as { rechnungsdatum?: string | null }).rechnungsdatum || r.created_at), zeitraumRange)

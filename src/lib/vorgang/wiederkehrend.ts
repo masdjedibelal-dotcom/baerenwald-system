@@ -25,32 +25,10 @@ export type VorgangWiederkehr = {
   wiederkehr_turnus: WiederkehrTurnus | null
 }
 
-export function defaultVorgangWiederkehr(): VorgangWiederkehr {
-  return { ist_wiederkehrend: false, wiederkehr_turnus: null }
-}
-
 export function parseWiederkehrTurnus(raw: unknown): WiederkehrTurnus | null {
   if (typeof raw !== 'string') return null
   const t = raw.trim() as WiederkehrTurnus
   return (WIEDERKEHR_TURNUS_VALUES as readonly string[]).includes(t) ? t : null
-}
-
-export function wiederkehrTurnusLabel(
-  turnus: string | null | undefined
-): string | null {
-  if (!turnus?.trim()) return null
-  const parsed = parseWiederkehrTurnus(turnus)
-  if (parsed) return WIEDERKEHR_TURNUS_LABELS[parsed]
-  return turnus.trim()
-}
-
-/** Pill-Text für Listen: „Monatlich“ oder „Wiederkehrend“. */
-export function bestandPillLabel(opts: {
-  ist_wiederkehrend?: boolean | null
-  wiederkehr_turnus?: string | null
-}): string | null {
-  if (!opts.ist_wiederkehrend) return null
-  return wiederkehrTurnusLabel(opts.wiederkehr_turnus) || 'Wiederkehrend'
 }
 
 export function normalizeVorgangWiederkehr(input: {

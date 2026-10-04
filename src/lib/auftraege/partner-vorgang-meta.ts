@@ -1,8 +1,4 @@
-/**
- * Metadaten für Partner-Portal „Vorgänge“ — CRM setzt, Portal cleart nach Annahme.
- */
 
-export type AenderungTyp = 'neu' | 'geaendert' | 'entfernt'
 
 export type PositionPartnerSnapshot = {
   handwerker_id: string | null
@@ -108,29 +104,6 @@ export function metaPartnerAenderung(
   }
 
   return Object.keys(patch).length ? patch : null
-}
-
-/** Neue Leistung mit Handwerker — vor dem Senden. */
-export function metaNeueLeistungMitPartner(
-  preisPartner?: number | null,
-  handwerkerStatus: string = 'zugewiesen'
-): Record<string, unknown> {
-  return {
-    aenderung_typ: 'neu',
-    preis_alt: null,
-    handwerker_status: handwerkerStatus,
-    ...(preisPartner != null && Number.isFinite(preisPartner) && preisPartner >= 0
-      ? { preis_partner: roundPreis(preisPartner) }
-      : {}),
-  }
-}
-
-/** Leistung entfernt — Zeile behalten, HW muss bestätigen. */
-export function metaLeistungEntfernt(): Record<string, unknown> {
-  return {
-    aenderung_typ: 'entfernt',
-    handwerker_status: 'angefragt',
-  }
 }
 
 /** Beim Senden an Handwerker: pending + aenderung_typ sicherstellen. */

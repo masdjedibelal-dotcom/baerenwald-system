@@ -1,9 +1,8 @@
 'use client'
 
-import { MockField, MockFormSection, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockField,MockFormSection,MockInput,MockSelect } from '@/components/mock-ui/MockForm'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect,useRef,useState } from 'react'
 import { useLocalTransition } from '@/components/ui/action-busy'
 import {
   updateHandwerker,
@@ -58,7 +57,6 @@ export function PartnerEditSheet({
   focus?: 'stamm' | 'bank'
   onSaved?: () => void
 }) {
-  const router = useRouter()
   const [pending, startTransition] = useLocalTransition()
   const [firma, setFirma] = useState('')
   const [gewerkSlug, setGewerkSlug] = useState('')

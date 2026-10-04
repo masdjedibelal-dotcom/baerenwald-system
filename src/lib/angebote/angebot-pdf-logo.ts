@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'fs'
-import { dirname, join } from 'path'
+import { existsSync,readFileSync } from 'fs'
+import { dirname,join } from 'path'
 import {
   BRAND_ALT,
   BRAND_LOGO_GREEN_ON_WHITE,
@@ -19,20 +19,6 @@ function crmProjectRoots(): string[] {
     dir = parent
   }
   return Array.from(new Set(roots))
-}
-
-/** file:// mit korrekt encodierten Pfadsegmenten (Umlaute in „Bärenwald“). */
-export function pathToFileUrl(absPath: string): string {
-  const normalized = absPath.replace(/\\/g, '/')
-  const parts = normalized.split('/')
-  const encoded = parts
-    .map((seg, i) => {
-      if (i === 0 && seg === '') return ''
-      if (/^[A-Za-z]:$/.test(seg)) return seg
-      return encodeURIComponent(seg)
-    })
-    .join('/')
-  return encoded.startsWith('/') ? `file://${encoded}` : `file:///${encoded}`
 }
 
 /**

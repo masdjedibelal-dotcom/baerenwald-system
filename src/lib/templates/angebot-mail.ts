@@ -5,12 +5,9 @@ import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
-  mailKundenContactLine,
-  mailKundenGruss,
-  mailKundenStandardOptions,
-  mailSummaryBlock,
+  mailKundenContactLine,mailKundenStandardOptions,
+  mailSummaryBlock
 } from '@/lib/mail-templates'
-import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
 import type { PortalMailAudience } from '@/lib/portal-utils'
 import { formatEuro } from '@/lib/format/geld-datum'
@@ -172,26 +169,6 @@ export function isDefaultAngebotEinleitung(text: string, leistungsumfang: string
   return variants.has(t)
 }
 
-export function isDefaultAngebotSchluss(text: string): boolean {
-  const t = text.trim()
-  if (!t) return true
-  if (t === ANGEBOT_MAIL_SCHLUSS_STANDARD.du.trim() || t === ANGEBOT_MAIL_SCHLUSS_STANDARD.sie.trim()) {
-    return true
-  }
-  const teamDu = 'Dein Bärenwald München Team'
-  const teamSie = 'Ihr Bärenwald München Team'
-  return (
-    t === 'Wir freuen uns von dir zu hören.\n\nViele Grüße\nDein Bärenwald Team' ||
-    t === 'Wir freuen uns auf Ihre Rückmeldung.\n\nMit freundlichen Grüßen\nIhr Bärenwald Team' ||
-    t === 'Wir freuen uns auf Ihre Rückmeldung.\n\nMit freundlichen Grüßen,\nBärenwald München' ||
-    t === defaultAngebotPdfSchlusstext('du', teamDu).trim() ||
-    t === defaultAngebotPdfSchlusstext('sie', teamSie).trim() ||
-    t === 'Mit freundlichen Grüßen\nDein Bärenwald München Team' ||
-    t === 'Mit freundlichen Grüßen\nIhr Bärenwald München Team' ||
-    (t.includes('unterzeichn') && t.includes('zurück'))
-  )
-}
-
 export function defaultAngebotPdfSchlusstext(anrede: AngebotMailAnrede, teamLabel: string): string {
   if (anrede === 'du') {
     return `Wir haben dieses Angebot mit Sorgfalt für dich zusammengestellt. Wenn du Fragen hast oder einzelne Positionen besprechen möchtest — melde dich einfach. Wir sind für dich da.
@@ -259,19 +236,6 @@ export function splitAngebotMailGreeting(text: string): {
   let i = 1
   while (i < lines.length && !lines[i].trim()) i++
   return { greeting: first, body: lines.slice(i).join('\n') }
-}
-
-/** Fließtext für den kombinierten E-Mail-Editor (ohne Begrüßung & ohne Angebotsbox). */
-export function angebotMailBodyForEditor(
-  einleitung: string | undefined,
-  schluss: string | undefined,
-  anrede: AngebotMailAnrede,
-  leistungsumfang: string
-): string {
-  const einlRaw = resolveAngebotMailEinleitung(einleitung, anrede, leistungsumfang)
-  const { body: einl } = splitAngebotMailGreeting(einlRaw)
-  const sch = resolveAngebotMailSchluss(schluss, anrede)
-  return `${(einl || einlRaw).trim()}\n\n${ANGEBOT_MAIL_BOX_MARKER}\n\n${sch}`
 }
 
 /**
@@ -471,74 +435,4 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
     disclaimer,
     mailKundenStandardOptions(anredeKey, data.portalLink, data.portalAudience)
   )
-}
-
-export type NachfassMailInput = AngebotMailInput
-
-export function gueltigReminderMailBetreff(
-  objekt: string | null | undefined,
-  angebotsnr: string
-): string {
-  return buildSubject({
-    objekt,
-    ereignis: 'Angebot läuft bald aus',
-    nummer: angebotsnr.trim() || undefined,
-  })
-}
-
-/** Erinnerung 7 Tage nach Versand/Verlängerung — weiß, schlicht, ohne Summary-Card. */
-export function buildAngebotGueltigReminderMail(
-  data: NachfassMailInput,
-  branding: MailBranding
-): { betreff: string; html: string } {
-  const { angebotsnr, leistungsumfang, gueltig_bis, anrede } = data
-
-  const tel = esc(branding.telefon)
-  const telHref = tel.replace(/\s/g, '')
-
-  const h1 = anrede === 'du' ? 'Dein Angebot ist noch gültig' : 'Ihr Angebot ist noch gültig'
-  const anredeText = esc(kundeAngebotBegruessung(anrede, data))
-
-  const bodyDu = `dein Angebot <strong>${esc(angebotsnr)}</strong> für „${esc(leistungsumfang)}“ läuft am <strong>${esc(gueltig_bis)}</strong> aus. Wenn du noch Fragen hast oder das Angebot annehmen möchtest, melde dich gerne bei uns.`
-  const bodySie = `Ihr Angebot <strong>${esc(angebotsnr)}</strong> für „${esc(leistungsumfang)}“ läuft am <strong>${esc(gueltig_bis)}</strong> aus. Bei Fragen oder zur Annahme des Angebots stehen wir Ihnen gerne zur Verfügung.`
-
-  const cta =
-    anrede === 'du'
-      ? 'Melde dich einfach — wir helfen gerne weiter.'
-      : 'Melden Sie sich einfach — wir helfen gerne weiter.'
-
-  const disclaimer =
-    anrede === 'du'
-      ? 'Du erhältst diese Erinnerung zu deinem Angebot.'
-      : 'Sie erhalten diese Erinnerung zu Ihrem Angebot.'
-
-  const content = `
-      <h1 style="font-size:22px;font-weight:700;color:${C.gray900};margin:0 0 20px;">${h1}</h1>
-      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${anredeText}</p>
-      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${anrede === 'du' ? bodyDu : bodySie}</p>
-      <p style="font-size:15px;color:${C.gray700};margin:0 0 20px;line-height:1.6;">${cta}</p>
-      <p style="margin:0 0 20px;">
-        ${mailPrimaryButtonHtml('Jetzt anrufen →', `tel:${telHref}`, { margin: '0', size: 'sm' })}
-      </p>`
-
-  const betreff = gueltigReminderMailBetreff(leistungsumfang, angebotsnr)
-  const preheader = `${angebotsnr} · gültig bis ${gueltig_bis}`
-  const html = mailHtmlBase(content, preheader, branding, disclaimer, { anrede })
-  return { betreff, html }
-}
-
-/** @deprecated Alias — nutzt buildAngebotGueltigReminderMail */
-export function nachfassMailBetreff(
-  objekt: string | null | undefined,
-  angebotsnr: string
-): string {
-  return gueltigReminderMailBetreff(objekt, angebotsnr)
-}
-
-/** @deprecated Alias — nutzt buildAngebotGueltigReminderMail */
-export function buildNachfassMail(data: NachfassMailInput, branding: MailBranding): {
-  betreff: string
-  html: string
-} {
-  return buildAngebotGueltigReminderMail(data, branding)
 }

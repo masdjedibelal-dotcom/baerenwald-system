@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAuftragDetail, revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
+import { revalidateAuftragDetail,revalidateHandwerkerDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import type { HandwerkerBewertungWerte } from '@/lib/handwerker/bewertung-kategorien'
@@ -102,90 +102,4 @@ export async function saveHandwerkerBewertungen(
 
   revalidateAuftragDetail(auftragId)
   return { ok: true, gespeichert }
-}
-
-/** Handwerker-Ziele für Bewertung-UI (ohne volles AuftragDetail). */
-export async function loadHandwerkerBewertungZiele(
-  auftragId: string
-): Promise<
-  | {
-      ok: true
-      ziele: {
-        handwerkerId: string
-        name: string
-        firma: string | null
-        gewerkName: string | null
-        gewerkId: string | null
-      }[]
-    }
-  | { ok: false; message: string }
-> {
-  const supabase = createClient()
-  const id = auftragId.trim()
-  if (!id) return { ok: false, message: 'Auftrag fehlt.' }
-
-  const { data: ah, error: ahErr } = await supabase
-    .from('auftrag_handwerker')
-    .select('handwerker_id, gewerk_id, handwerker(id, name, firma), gewerke(id, name)')
-    .eq('auftrag_id', id)
-  if (ahErr) logDbError('app/auftraege/handwerker-bewertung-actions:auftrag_handwerker', ahErr)
-
-  if (ahErr) return { ok: false, message: ahErr.message }
-
-  const map = new Map<
-    string,
-    {
-      handwerkerId: string
-      name: string
-      firma: string | null
-      gewerkName: string | null
-      gewerkId: string | null
-    }
-  >()
-
-  for (const row of ah ?? []) {
-    const hwRaw = row.handwerker
-    const hw = (Array.isArray(hwRaw) ? hwRaw[0] : hwRaw) as
-      | { id?: string; name?: string; firma?: string | null }
-      | null
-    const gwRaw = row.gewerke
-    const gw = (Array.isArray(gwRaw) ? gwRaw[0] : gwRaw) as { id?: string; name?: string } | null
-    const hid = String(row.handwerker_id ?? hw?.id ?? '')
-    if (!hid || !hw?.name) continue
-    map.set(hid, {
-      handwerkerId: hid,
-      name: hw.name,
-      firma: hw.firma ?? null,
-      gewerkName: gw?.name ?? null,
-      gewerkId: (row.gewerk_id as string | null) ?? gw?.id ?? null,
-    })
-  }
-
-  if (map.size === 0) {
-    const { data: pos, error } = await supabase
-      .from('auftrag_positionen')
-      .select('handwerker_id, gewerk_name, handwerker(id, name, firma)')
-      .eq('auftrag_id', id)
-    if (error) logDbError('app/auftraege/handwerker-bewertung-actions:auftrag_positionen', error)
-    for (const p of pos ?? []) {
-      const hwRaw = p.handwerker
-      const hw = (Array.isArray(hwRaw) ? hwRaw[0] : hwRaw) as
-        | { id?: string; name?: string; firma?: string | null }
-        | null
-      const hid = String(p.handwerker_id ?? hw?.id ?? '')
-      if (!hid || !hw?.name || map.has(hid)) continue
-      map.set(hid, {
-        handwerkerId: hid,
-        name: hw.name,
-        firma: hw.firma ?? null,
-        gewerkName: (p.gewerk_name as string | null) ?? null,
-        gewerkId: null,
-      })
-    }
-  }
-
-  return {
-    ok: true,
-    ziele: Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'de')),
-  }
 }

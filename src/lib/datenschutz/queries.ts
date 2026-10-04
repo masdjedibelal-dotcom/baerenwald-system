@@ -1,19 +1,15 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
-  fotosAusMelderFunnel,
-  istMelderKanal,
-  leadHatMelderPersonenbezogeneDaten,
+  fotosAusMelderFunnel,leadHatMelderPersonenbezogeneDaten,
   melderLeadAnzeigeTitel,
-  MELDER_KANALE,
+  MELDER_KANALE
 } from '@/lib/datenschutz/melder-leads'
 import type {
   DatenschutzAnfrageRow,
   DatenschutzFaelligRow,
   DatenschutzFristRow,
-  DatenschutzLoeschlogRow,
-  DatenschutzVvtRow,
-  MelderLeadKurz,
+  DatenschutzLoeschlogRow
 } from '@/lib/datenschutz/types'
 
 function monthsAgoDateOnly(months: number): string {
@@ -79,17 +75,6 @@ export async function loadDatenschutzAnfragen(): Promise<DatenschutzAnfrageRow[]
   return data as DatenschutzAnfrageRow[]
 }
 
-export async function loadDatenschutzVvt(): Promise<DatenschutzVvtRow[]> {
-  const { data, error } = await supabaseAdmin
-    .from('datenschutz_vvt')
-    .select('*')
-    .eq('aktiv', true)
-    .order('sort_order')
-  if (error) logDbError('lib/datenschutz/queries:datenschutz_vvt', error)
-  if (error || !data) return []
-  return data as DatenschutzVvtRow[]
-}
-
 async function loadLeadIdsMitAuftrag(): Promise<Set<string>> {
   const { data, error } = await supabaseAdmin
     .from('angebote')
@@ -108,40 +93,6 @@ async function loadLeadIdsMitAuftrag(): Promise<Set<string>> {
     ids.add(String((row as { id: string }).id))
   }
   return ids
-}
-
-export async function searchMelderLeadsByEmail(email: string): Promise<MelderLeadKurz[]> {
-  const q = email.trim().toLowerCase()
-  if (!q) return []
-  const { data, error } = await supabaseAdmin
-    .from('leads')
-    .select('id, melder_name, melder_email, melder_einheit, kanal, status, created_at, auftraggeber_kunde_id')
-    .in('kanal', MELDER_KANALE)
-    .ilike('melder_email', q)
-    .order('created_at', { ascending: false })
-    .limit(50)
-  if (error) logDbError('lib/datenschutz/queries:leads', error)
-  if (error || !data) return []
-  return data as MelderLeadKurz[]
-}
-
-export async function loadMelderLeadForAuskunft(leadId: string) {
-  const { data, error } = await supabaseAdmin
-    .from('leads')
-    .select(
-      `
-      id, created_at, updated_at, kanal, status, anlass,
-      melder_name, melder_einheit, melder_telefon, melder_email,
-      notizen, kontakt_nachricht, plz, strasse, hausnummer, funnel_daten,
-      auftraggeber:auftraggeber_kunde_id(name, org_anzeigename),
-      kunden_objekte:kunde_objekt_id(titel, plz, ort)
-    `
-    )
-    .eq('id', leadId)
-    .maybeSingle()
-  if (error) logDbError('lib/datenschutz/queries:leads', error)
-  if (error || !data) return null
-  return data
 }
 
 export async function loadDatenschutzFaellige(): Promise<DatenschutzFaelligRow[]> {
@@ -381,9 +332,4 @@ export async function loadDatenschutzFaellige(): Promise<DatenschutzFaelligRow[]
   }
 
   return out
-}
-
-export async function countDatenschutzFaellige(): Promise<number> {
-  const rows = await loadDatenschutzFaellige()
-  return rows.length
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
-import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useCallback,useEffect,useState,useTransition } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
 import {
@@ -79,7 +79,7 @@ function statusCopy(status: PushCapabilityStatus, hasSub: boolean): {
 export function EinstellungenBenachrichtigungenClient() {
   const [prefs, setPrefs] = useState<CrmPushPrefs>({ ...CRM_PUSH_PREF_DEFAULTS })
   const [vapid, setVapid] = useState<string | null>(null)
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { applyFieldErrors } = useFieldErrors()
   const [hasSub, setHasSub] = useState(false)
   const [cap, setCap] = useState<PushCapabilityStatus>('unsupported')
   const [pending, startTransition] = useTransition()

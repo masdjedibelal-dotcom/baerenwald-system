@@ -5,7 +5,7 @@ import {
   type RechnungAbschlagLink,
   type Zahlungsplan,
   type ZahlungsplanZeile,
-} from '@/lib/rechnungen/zahlungsplan'
+} from '@/lib/rechnungen/zahlungsplan';
 
 /** Rate ist „fest“ (gestellt oder bezahlt) — Zeile darf nicht umgebaut/gelöscht werden. */
 export function zahlplanZeileIstEingefroren(
@@ -14,32 +14,6 @@ export function zahlplanZeileIstEingefroren(
 ): boolean {
   const st = zahlplanRateStatus(zeileId, links)
   return st === 'gestellt' || st === 'bezahlt'
-}
-
-export function zahlplanHatEingefroreneZeilen(
-  plan: Zahlungsplan | null | undefined,
-  links: RechnungAbschlagLink[]
-): boolean {
-  if (!plan?.zeilen?.length) return false
-  return plan.zeilen.some((z) => zahlplanZeileIstEingefroren(z.id, links))
-}
-
-/** Gesamten Plan löschen nur, wenn keine Rate gestellt/bezahlt ist. */
-export function zahlplanDarfGeloeschtWerden(
-  plan: Zahlungsplan | null | undefined,
-  links: RechnungAbschlagLink[]
-): { ok: true } | { ok: false; message: string } {
-  if (!plan?.zeilen?.length) {
-    return { ok: false, message: 'Kein Abschlagsplan vorhanden.' }
-  }
-  if (zahlplanHatEingefroreneZeilen(plan, links)) {
-    return {
-      ok: false,
-      message:
-        'Plan kann nicht gelöscht werden: Mindestens eine Rate ist bereits gestellt oder bezahlt. Zuerst betroffene Rechnungen korrigieren oder stornieren.',
-    }
-  }
-  return { ok: true }
 }
 
 /**

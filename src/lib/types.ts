@@ -627,17 +627,6 @@ export type AngebotDetail = Angebot & {
   angebot_handwerker?: AngebotHandwerkerRow[] | null
 }
 
-/** Kompakte Zeile für Angebotsliste & Side-Panel */
-export type AngebotListeEintrag = Omit<Angebot, 'kunden' | 'leads'> & {
-  kunden?: Pick<Kunde, 'id' | 'name' | 'email' | 'plz' | 'ort'> | null
-  leads?: Pick<Lead, 'id' | 'situation' | 'bereiche' | 'kontakt_name' | 'plz'> | null
-  angebot_handwerker?: Array<
-    Pick<AngebotHandwerkerRow, 'id' | 'status' | 'handwerker_id' | 'gewerk_id'> & {
-      handwerker?: { name: string } | null
-    }
-  > | null
-}
-
 export type AuftragStatus =
   | 'offen'
   | 'in_arbeit'
@@ -1423,26 +1412,4 @@ export type Rechnung = {
     'id' | 'gesamt_fix' | 'gesamt_min' | 'gesamt_max' | 'leistungsumfang' | 'notizen'
   > | null
   auftraege?: Pick<Auftrag, 'id' | 'titel'> | null
-}
-
-/** Nur Felder der Listen-Abfrage `/rechnungen` (kunden je nach Join ein Objekt oder Array) */
-export type RechnungListeZeile = Pick<
-  Rechnung,
-  | 'id'
-  | 'rechnungsnummer'
-  | 'status'
-  | 'brutto'
-  | 'rechnungsdatum'
-  | 'faellig_am'
-  | 'bezahlt_at'
-  | 'erinnerung_7_sent_at'
-  | 'erinnerung_21_sent_at'
-  | 'positionen'
-  | 'lohn_netto'
-  | 'material_netto'
-  | 'netto'
-  | 'mwst_satz'
-> & {
-  kunden?: { name: string; vorname?: string | null; nachname?: string | null; typ?: string | null } | { name: string; vorname?: string | null; nachname?: string | null; typ?: string | null }[] | null
-  auftraege?: { titel: string } | { titel: string }[] | null
 }

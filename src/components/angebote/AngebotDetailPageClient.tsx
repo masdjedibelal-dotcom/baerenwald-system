@@ -6,7 +6,7 @@ import {
   type DetailShellGroup,
 } from '@/components/layout/EntityDetailLayout'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Combobox } from '@/components/ui/Combobox'
@@ -18,14 +18,14 @@ import {
   angebotDarfDirektAuftragOhneHvFreigabe,
   resolveAnfrageFreigabeRegeln,
 } from '@/lib/anfragen/anfrage-akut-schwelle'
-import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DetailActionsBar, type DetailActionDef } from '@/components/layout/DetailActionsBar'
+import { naechsterSchrittText,primaryCta } from '@/lib/vorgang/primary-cta'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import { DetailActionsBar,type DetailActionDef } from '@/components/layout/DetailActionsBar'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
-import { formatEurBetrag, istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
+import { formatEurBetrag,istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { AnfrageNotizenTab } from '@/components/anfragen/AnfrageNotizenTab'
@@ -35,7 +35,7 @@ import { toast } from '@/components/ui/app-toast'
 import {
   acceptAngebotAndCreateAuftrag,
 } from '@/app/(dashboard)/angebote/angebot-flow-actions'
-import { loadAngebotWizardBootstrap, loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
+import { loadAngebotWizardBootstrap,loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
 import { AngebotAuswahlModal } from '@/components/angebote/AngebotAuswahlModal'
 import type { AngebotAuswahlZeile } from '@/components/angebote/AngebotAuswahlPanel'
 import {
@@ -46,7 +46,7 @@ import {
 } from '@/app/(dashboard)/angebote/actions'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
-import { AngebotAnhaengeTab, anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
+import { AngebotAnhaengeTab,anzahlAngebotAnhaenge } from '@/components/angebote/AngebotAnhaengeTab'
 import { rechnungIstAlsAkteUnterlage } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCard'
 import { AngebotLeistungenTab } from '@/components/angebote/AngebotDetailsTab'
@@ -70,10 +70,10 @@ import {
 } from '@/lib/angebot-einfach'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
-import { angebotStatusDisplay, angebotInhaltGeaendertNachVersand, gesendetDetailSubline } from '@/lib/status/status-display'
+import { angebotStatusDisplay,angebotInhaltGeaendertNachVersand,gesendetDetailSubline } from '@/lib/status/status-display'
 import { variantToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { gesendetAmWert } from '@/lib/angebot-einfach'
-import { angebotDarfImWizardBearbeitetWerden, angebotWizardBearbeitenSperrgrund, type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
+import { angebotDarfImWizardBearbeitetWerden,angebotWizardBearbeitenSperrgrund,type AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type {
   AngebotDetail,
@@ -86,8 +86,7 @@ import type {
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import {
-  darfAngebotAnKundeSenden,
-  hatAngebotHandwerker,
+  hatAngebotHandwerker
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { summenAusPositionen } from '@/lib/angebot-positionen'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
@@ -173,7 +172,7 @@ export function AngebotDetailPageClient({
   kiVisualisierungen?: import('@/lib/visualize/types').KiVisualisierung[]
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors, clearFieldErrors } = useFieldErrors()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refresh, hardRefresh } = useCrmRefresh()
@@ -540,24 +539,6 @@ export function AngebotDetailPageClient({
       hatAuftraggeber: Boolean(lead?.auftraggeber_kunde_id?.trim() || ag?.id),
     })
   }, [auftragId, lead, summenMail.nettoMax])
-
-  const direktAuftragUnterSchwelleHinweis = useMemo(() => {
-    if (!unterSchwelleDirektAuftrag || !lead) return null
-    const ag = lead.auftraggeber
-    const regeln = resolveAnfrageFreigabeRegeln({
-      portalModus: ag?.portal_modus,
-      freigabeModus: ag?.freigabe_modus,
-      orgSchwelleEur: ag?.freigabe_schwelle_eur,
-      orgNotfallDirekt: ag?.notfall_direkt,
-      objektSchwelleEur: lead.kunden_objekte?.freigabe_schwelle_eur,
-      objektNotfallDirekt: lead.kunden_objekte?.notfall_direkt,
-    })
-    if (regeln.schwelleEur == null || regeln.schwelleEur <= 0) return null
-    return {
-      betragEur: summenMail.nettoMax,
-      schwelleEur: regeln.schwelleEur,
-    }
-  }, [unterSchwelleDirektAuftrag, lead, summenMail.nettoMax])
 
   const runDirektAuftrag = useCallback(() => {
     startTransition(async () => {

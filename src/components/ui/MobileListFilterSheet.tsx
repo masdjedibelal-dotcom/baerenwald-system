@@ -65,20 +65,3 @@ export function MobileListFilterSheet({
     </div>
   )
 }
-
-export function MobileFilterSection({
-  label,
-  children,
-  className,
-}: {
-  label: string
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <section className={cn('mobile-filter-section', className)}>
-      <h3 className="mobile-filter-section__label">{label}</h3>
-      {children}
-    </section>
-  )
-}

@@ -1,10 +1,9 @@
 'use server'
 
-import { revalidateKundeDetail, revalidateKundeObjekt, revalidateLeadDetail, revalidateLeadList } from '@/lib/crm-revalidate'
+import { revalidateKundeDetail,revalidateKundeObjekt,revalidateLeadList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { kundeHatOrgKennung } from '@/app/actions/kunden-organisation'
-import { leadVertragsKundeId, resolveLeadKunde } from '@/lib/lead-display-helpers'
 import {
   validateKundenObjektInput,
   type KundenObjektInput,
@@ -252,71 +251,5 @@ export async function deleteKundenObjekt(
 
   revalidateKundeDetail(kundeId)
   revalidateLeadList()
-  return { ok: true }
-}
-
-export async function setLeadKundeObjekt(
-  leadId: string,
-  kundeObjektId: string | null
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const objektId = kundeObjektId?.trim() || null
-
-  const { data: lead, error: leadErr } = await supabase
-    .from('leads')
-    .select(
-      'kunde_id, auftraggeber_kunde_id, kunden!kunde_id(id), auftraggeber:kunden!auftraggeber_kunde_id(id)'
-    )
-    .eq('id', leadId)
-    .maybeSingle()
-  if (leadErr) logDbError('app/actions/kunden-objekte:leads', leadErr)
-
-  if (leadErr || !lead) {
-    return { ok: false, message: leadErr?.message ?? 'Anfrage nicht gefunden.' }
-  }
-
-  const melder = resolveLeadKunde(lead.kunden as never)
-  const agRaw = lead.auftraggeber as { id?: string } | { id?: string }[] | null
-  const ag = Array.isArray(agRaw) ? agRaw[0] : agRaw
-  const kundeId = leadVertragsKundeId({
-    kunde_id: lead.kunde_id,
-    auftraggeber_kunde_id: lead.auftraggeber_kunde_id,
-    kunden: melder,
-    auftraggeber: ag,
-  })
-
-  if (objektId) {
-    if (!kundeId) {
-      return { ok: false, message: 'Kein Kunde mit dieser Anfrage verknüpft.' }
-    }
-    const { data: objekt, error: objErr } = await supabase
-      .from('kunden_objekte')
-      .select('id, kunde_id')
-      .eq('id', objektId)
-      .maybeSingle()
-    if (objErr) logDbError('app/actions/kunden-objekte:kunden_objekte', objErr)
-
-    if (objErr || !objekt) {
-      return { ok: false, message: objErr?.message ?? 'Objekt nicht gefunden.' }
-    }
-    if (objekt.kunde_id !== kundeId) {
-      return {
-        ok: false,
-        message: 'Dieses Objekt gehört nicht zum Kunden dieser Anfrage.',
-      }
-    }
-  }
-
-  const { error: error2 } = await supabase
-    .from('leads')
-    .update({
-      kunde_objekt_id: objektId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', leadId)
-  if (error2) logDbError('app/actions/kunden-objekte:leads', error2)
-
-  if (error2) return { ok: false, message: error2.message }
-  revalidateLeadDetail(leadId)
   return { ok: true }
 }

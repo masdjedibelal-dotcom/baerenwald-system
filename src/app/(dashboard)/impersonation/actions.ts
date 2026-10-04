@@ -6,7 +6,6 @@ import {
   createPortalImpersonationUrl,
   type ImpersonationTargetType,
 } from '@/lib/portal/create-impersonation-token'
-import { publicWebsiteBaseUrl } from '@/lib/portal-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 async function resolveKundeTarget(kundeId: string): Promise<
@@ -104,36 +103,6 @@ async function resolveHandwerkerTarget(handwerkerId: string): Promise<
     roleLabel: `Partner / ${label}`,
     targetType: 'handwerker',
     next: '/partner',
-  }
-}
-
-/** Mieter-Ansicht: Lead ohne Auth — signierter Kurzzeit-Deep-Link zur Statusseite (read-only). */
-export async function openMieterStatusPreview(leadId: string): Promise<
-  { ok: true; url: string } | { ok: false; message: string }
-> {
-  const gate = await requireCrmAdmin()
-  if (!gate.ok) return gate
-
-  const { data: lead, error } = await supabaseAdmin
-    .from('leads')
-    .select('id, melde_tracking_token, einladung_token, kontakt_email')
-    .eq('id', leadId)
-    .maybeSingle()
-  if (error) logDbError('app/impersonation/actions:leads', error)
-  if (error || !lead) return { ok: false, message: error?.message ?? 'Lead nicht gefunden.' }
-
-  const token =
-    (lead.melde_tracking_token as string | null)?.trim() ||
-    (lead.einladung_token as string | null)?.trim()
-  if (!token) {
-    return {
-      ok: false,
-      message: 'Kein Status-Token am Lead — Mieter-Ansicht nicht verfügbar.',
-    }
-  }
-  return {
-    ok: true,
-    url: `${publicWebsiteBaseUrl()}/melden/status/${encodeURIComponent(token)}`,
   }
 }
 

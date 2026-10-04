@@ -1,18 +1,16 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAuftragDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { COPY_ERROR } from '@/lib/copy/errors'
 import { logDbError } from '@/lib/errors/log-db-error'
-import { createNachtragManuell } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import { setWeitereArbeitAnerkennung } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
-import { neuePositionsId, normalizeAngebotPositionen } from '@/lib/angebot-positionen'
+import { neuePositionsId,normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import {
   notifyPartnerUnified,
   partnerVorgangLink,
 } from '@/lib/partner/notify-partner-unified'
-import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { writePartnerPositionsAnfrageStatus } from '@/lib/status/write-partner-positions-anfrage-status'
@@ -23,36 +21,6 @@ import {
   appendRegieMailWarnings,
   sendRegieEntscheidungMailsAfterWrite,
 } from '@/lib/auftraege/send-regie-entscheidung-mails'
-
-export type PartnerPositionsAnfrageRow = {
-  id: string
-  auftrag_id: string
-  handwerker_id: string
-  titel: string
-  begruendung: string | null
-  schaetzung_eur: number | null
-  schaetzung_minuten: number | null
-  status: string
-  position_id: string | null
-  nachtrag_id: string | null
-  created_at: string
-  handwerker_name?: string | null
-}
-
-export type WeitereArbeitInPruefungRow = {
-  id: string
-  leistung_name: string
-  beschreibung: string | null
-  handwerker_id: string | null
-  handwerker_name: string | null
-  created_at: string
-  preis_partner?: number | null
-  stundensatz?: number | null
-  stundensatz_kunde?: number | null
-  menge?: number | null
-  einheit?: string | null
-  foto_urls?: string[]
-}
 
 /** Snapshot für Regie-Korrektur vor Annehmen/Ablehnen. */
 export type RegiePositionBearbeitenSnapshot = {
@@ -74,109 +42,6 @@ async function crmAuth() {
   } = await supabase.auth.getUser()
   if (!user) return { ok: false as const, message: 'Nicht angemeldet.' }
   return { ok: true as const, userId: user.id }
-}
-
-export async function listPartnerPositionsAnfragen(
-  auftragId: string
-): Promise<PartnerPositionsAnfrageRow[]> {
-  const { data, error } = await supabaseAdmin
-    .from('partner_positions_anfragen')
-    .select(
-      'id, auftrag_id, handwerker_id, titel, begruendung, schaetzung_eur, schaetzung_minuten, status, position_id, nachtrag_id, created_at, handwerker:handwerker_id(name)'
-    )
-    .eq('auftrag_id', auftragId)
-    .order('created_at', { ascending: false })
-  // begleitend: Listen-UI hat keinen Fehlerkanal — leere Liste statt Abbruch
-  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:partner_positions_anfragen', error)
-
-  if (error) return []
-
-  return (data ?? []).map((r) => {
-    const hw = r.handwerker as { name?: string | null } | { name?: string | null }[] | null
-    const name = Array.isArray(hw) ? hw[0]?.name : hw?.name
-    return {
-      id: String(r.id),
-      auftrag_id: String(r.auftrag_id),
-      handwerker_id: String(r.handwerker_id),
-      titel: String(r.titel),
-      begruendung: (r.begruendung as string | null) ?? null,
-      schaetzung_eur: r.schaetzung_eur != null ? Number(r.schaetzung_eur) : null,
-      schaetzung_minuten:
-        r.schaetzung_minuten != null ? Number(r.schaetzung_minuten) : null,
-      status: String(r.status),
-      position_id: (r.position_id as string | null) ?? null,
-      nachtrag_id: (r.nachtrag_id as string | null) ?? null,
-      created_at: String(r.created_at),
-      handwerker_name: name ?? null,
-    }
-  })
-}
-
-export async function listWeitereArbeitInPruefung(
-  auftragId: string
-): Promise<WeitereArbeitInPruefungRow[]> {
-  const { data, error } = await supabaseAdmin
-    .from('auftrag_positionen')
-    .select(
-      'id, leistung_name, beschreibung, handwerker_id, anerkennung_status, typ, verguetung, preis_partner, stundensatz, stundensatz_kunde, menge, einheit, created_at, handwerker:handwerker_id(name)'
-    )
-    .eq('auftrag_id', auftragId)
-    .eq('anerkennung_status', 'in_pruefung')
-    .order('created_at', { ascending: false })
-  // begleitend: Listen-UI hat keinen Fehlerkanal — leere Liste statt Abbruch
-  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', error)
-
-  const rows = data ?? []
-  if (!rows.length) return []
-
-  const ids = rows.map((r) => String(r.id))
-  const fotoByPos = new Map<string, string[]>()
-
-  const { data: eintraege, error: error2 } = await supabaseAdmin
-    .from('position_eintraege')
-    .select('position_id, eintrag_fotos(storage_path)')
-    .in('position_id', ids)
-  // begleitend: Fotos optional — Liste der Positionen bleibt ohne sie korrekt
-  if (error2) logDbError('app/auftraege/partner-positions-anfrage-actions:position_eintraege', error2)
-
-  for (const e of eintraege ?? []) {
-    const posId = String(e.position_id)
-    const fotosRaw = Array.isArray(e.eintrag_fotos) ? e.eintrag_fotos : []
-    for (const f of fotosRaw) {
-      const path = String(
-        (f as { storage_path?: string | null }).storage_path ?? ''
-      ).trim()
-      if (!path) continue
-      const url =
-        (await signedHandwerkerUploadUrl(path)) ??
-        (/^https?:\/\//i.test(path) ? path : null)
-      if (!url) continue
-      const list = fotoByPos.get(posId) ?? []
-      if (!list.includes(url)) list.push(url)
-      fotoByPos.set(posId, list)
-    }
-  }
-
-  return rows.map((r) => {
-    const hw = r.handwerker as { name?: string | null } | { name?: string | null }[] | null
-    const name = Array.isArray(hw) ? hw[0]?.name : hw?.name
-    const id = String(r.id)
-    return {
-      id,
-      leistung_name: String(r.leistung_name ?? ''),
-      beschreibung: (r.beschreibung as string | null) ?? null,
-      handwerker_id: (r.handwerker_id as string | null) ?? null,
-      handwerker_name: name ?? null,
-      created_at: String(r.created_at ?? ''),
-      preis_partner: r.preis_partner != null ? Number(r.preis_partner) : null,
-      stundensatz: r.stundensatz != null ? Number(r.stundensatz) : null,
-      stundensatz_kunde:
-        r.stundensatz_kunde != null ? Number(r.stundensatz_kunde) : null,
-      menge: r.menge != null ? Number(r.menge) : null,
-      einheit: (r.einheit as string | null) ?? null,
-      foto_urls: fotoByPos.get(id) ?? [],
-    }
-  })
 }
 
 type DecideResult = { ok: true; message?: string } | { ok: false; message: string }
@@ -557,167 +422,6 @@ export async function decidePartnerPositionsAnfrageIntern(input: {
       mailRes.warnings
     ),
   }
-}
-
-/**
- * Pfad B: Kunden-Nachtrag-Entwurf anlegen (bestehender Nachtrag-Flow).
- */
-export async function decidePartnerPositionsAnfrageNachtrag(input: {
-  anfrageId: string
-  notiz?: string | null
-}): Promise<DecideResult> {
-  const auth = await crmAuth()
-  if (!auth.ok) return { ok: false, message: auth.message }
-
-  const anfrage = await loadAnfrage(input.anfrageId)
-  if (!anfrage || anfrage.status !== 'offen') {
-    return { ok: false, message: 'Anfrage nicht offen.' }
-  }
-
-  const auftragId = String(anfrage.auftrag_id)
-  const titel = String(anfrage.titel)
-  const eur =
-    anfrage.schaetzung_eur != null && Number.isFinite(Number(anfrage.schaetzung_eur))
-      ? Number(anfrage.schaetzung_eur)
-      : 0
-  const fest = Math.round(Math.max(0, eur) * 100) / 100
-
-  const { data: siblings, error } = await supabaseAdmin
-    .from('auftrag_positionen')
-    .select('gewerk_slug, gewerk_name')
-    .eq('auftrag_id', auftragId)
-    .eq('handwerker_id', String(anfrage.handwerker_id))
-    .limit(1)
-  // begleitend: Gewerk-Defaults für Nachtrag-Zeile
-  if (error) logDbError('app/auftraege/partner-positions-anfrage-actions:auftrag_positionen', error)
-
-  const sib = siblings?.[0]
-  const positionen: AngebotPosition[] = [
-    {
-      id: neuePositionsId(),
-      gewerk_id: '',
-      gewerk_name: String(sib?.gewerk_name ?? 'Nachtrag'),
-      gewerk_slug: String(sib?.gewerk_slug ?? '') || undefined,
-      leistung: 'Nachtrag',
-      beschreibung:
-        String(anfrage.begruendung ?? '').trim() || titel || 'Zusatzleistung',
-      lohn_netto: fest,
-      material_netto: 0,
-      gesamt_min: fest,
-      gesamt_max: fest,
-      menge: 1,
-      einheit: 'Stk.',
-      preis_typ: 'fix',
-      handwerker_id: String(anfrage.handwerker_id),
-    },
-  ]
-
-  const nachtrag = await createNachtragManuell({
-    auftragId,
-    grund: `Partner-Meldung: ${titel}`,
-    beschreibung: [
-      anfrage.begruendung ? String(anfrage.begruendung) : null,
-      input.notiz?.trim() || null,
-      anfrage.schaetzung_minuten
-        ? `Zeitschätzung Partner: ${anfrage.schaetzung_minuten} Min`
-        : null,
-    ]
-      .filter(Boolean)
-      .join('\n'),
-    positionen,
-    handwercher_bestaetigt: false,
-  })
-
-  if (!nachtrag.ok) return { ok: false, message: nachtrag.message }
-
-  const { error: __dbErr2 } = await writePartnerPositionsAnfrageStatus(
-    supabaseAdmin,
-    input.anfrageId,
-    'nachtrag',
-    {
-      nachtrag_id: nachtrag.id,
-      crm_notiz: input.notiz?.trim() || null,
-      decided_at: new Date().toISOString(),
-      decided_by: auth.userId,
-      updated_at: new Date().toISOString(),
-    }
-  )
-  // tragend: Anfrage muss auf „nachtrag“ stehen
-  if (__dbErr2) {
-    logDbError('app/auftraege/partner-positions-anfrage-actions:partner_positions_anfragen', __dbErr2)
-    return { ok: false, message: COPY_ERROR.saveFailed }
-  }
-
-  await writeAuditEvent({
-    entityType: 'auftrag',
-    entityId: auftragId,
-    aktion: 'partner_positions_anfrage_nachtrag',
-    actorId: auth.userId,
-    actorRolle: 'crm',
-    payload: { anfrage_id: input.anfrageId, nachtrag_id: nachtrag.id },
-  })
-
-  revalidateAuftragDetail(auftragId)
-  return {
-    ok: true,
-    message: 'Nachtrag-Entwurf angelegt — bitte an Kunden senden.',
-  }
-}
-
-export async function decidePartnerPositionsAnfrageAblehnen(input: {
-  anfrageId: string
-  notiz?: string | null
-}): Promise<DecideResult> {
-  const auth = await crmAuth()
-  if (!auth.ok) return { ok: false, message: auth.message }
-
-  const anfrage = await loadAnfrage(input.anfrageId)
-  if (!anfrage || anfrage.status !== 'offen') {
-    return { ok: false, message: 'Anfrage nicht offen.' }
-  }
-
-  const auftragId = String(anfrage.auftrag_id)
-  const { error: __dbErr3 } = await writePartnerPositionsAnfrageStatus(
-    supabaseAdmin,
-    input.anfrageId,
-    'abgelehnt',
-    {
-      crm_notiz: input.notiz?.trim() || null,
-      decided_at: new Date().toISOString(),
-      decided_by: auth.userId,
-      updated_at: new Date().toISOString(),
-    }
-  )
-  // tragend: Ablehnungs-Status der Anfrage
-  if (__dbErr3) {
-    logDbError('app/auftraege/partner-positions-anfrage-actions:partner_positions_anfragen', __dbErr3)
-    return { ok: false, message: COPY_ERROR.saveFailed }
-  }
-
-  // begleitend: Partner-Mail / Audit — Ablehnung ist bereits gespeichert
-  const projekt = await auftragTitel(auftragId)
-  await notifyPartnerUnified({
-    handwerkerId: String(anfrage.handwerker_id),
-    typ: 'entfernt',
-    projektName: projekt,
-    link: partnerVorgangLink(auftragId),
-    leistungName: String(anfrage.titel),
-    auftragId,
-    aenderungTyp: 'entfernt',
-    sendMail: true,
-  })
-
-  await writeAuditEvent({
-    entityType: 'auftrag',
-    entityId: auftragId,
-    aktion: 'partner_positions_anfrage_abgelehnt',
-    actorId: auth.userId,
-    actorRolle: 'crm',
-    payload: { anfrage_id: input.anfrageId, notiz: input.notiz ?? null },
-  })
-
-  revalidateAuftragDetail(auftragId)
-  return { ok: true, message: 'Meldung abgelehnt — Partner benachrichtigt.' }
 }
 
 /**

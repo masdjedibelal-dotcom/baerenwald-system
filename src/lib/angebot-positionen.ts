@@ -565,19 +565,6 @@ export function summenAusPositionen(
   }
 }
 
-/** Aggregierte Netto-Summen für DB-Felder / Editor-Zusammenfassung */
-export function berechneGesamt(positionen: AngebotPosition[]) {
-  const pos = normalizeAngebotPositionen(positionen)
-  const s = summenAusPositionen(pos, 19)
-  return {
-    lohn_netto: s.lohnZeileMin,
-    material_netto: s.materialZeileMin,
-    gesamt_min: s.nettoMin,
-    gesamt_max: s.nettoMax,
-    summen: s,
-  }
-}
-
 /** Zeilensumme Netto (ohne MwSt) */
 export function zeilenNettoMinMax(p: AngebotPosition): { min: number; max: number } {
   const m = p.menge || 1

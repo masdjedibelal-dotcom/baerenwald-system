@@ -2,11 +2,11 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockInput } from '@/components/mock-ui/MockForm'
-import { MockField, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField,MockSelect,MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { MockSegment } from '@/components/mock-ui/MockSegment'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMailPreview'
 import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
@@ -23,7 +23,6 @@ import {
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KundeModal } from '@/components/kunden/KundeModal'
@@ -45,7 +44,7 @@ import { heuteYmd } from '@/lib/angebot-einfach'
 import { anfrageVorhaben } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
-import { normalizeKundeNamen, splitDeutscherVollname } from '@/lib/kunde-namen'
+import { normalizeKundeNamen,splitDeutscherVollname } from '@/lib/kunde-namen'
 import {
   normalizeVorgangWiederkehr,
   WIEDERKEHR_TURNUS_LABELS,
@@ -57,7 +56,7 @@ import {
   saveAngebotWizardDraft,
   sendAngebotWizard,
 } from '@/app/(dashboard)/angebote/wizard-actions'
-import { createAnfrageFuerKunde, discardOrphanDirektAngebotLead } from '@/app/(dashboard)/neu/fab-neu-actions'
+import { createAnfrageFuerKunde,discardOrphanDirektAngebotLead } from '@/app/(dashboard)/neu/fab-neu-actions'
 import { updateLeadMelderUndLeistungsort } from '@/app/(dashboard)/anfragen/actions'
 import { angebotWizardPositionenFromLead } from '@/lib/angebote/angebot-positionen-from-lead'
 import {
@@ -89,11 +88,9 @@ import { findAnfahrtZeilen } from '@/lib/anfahrt-angebot'
 import {
   dokumentArtikelToWizardPosition,
   dokumentZeilenToAngebotPositionen,
-  formatEurBetrag,
-  neueArtikelZeile,
-  wizardPositionToDokumentZeile,
+  formatEurBetrag,wizardPositionToDokumentZeile,
   type DokumentArtikelZeile,
-  type DokumentZeile,
+  type DokumentZeile
 } from '@/lib/dokument-zeilen'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
@@ -139,9 +136,9 @@ import type {
   LeadDetail,
   Preisliste,
 } from '@/lib/types'
-import { BEREICH_LABELS, formatDatum } from '@/lib/utils'
-import { ZAHLFRIST_SEG_OPTIONS, type ZahlfristSeg } from '@/lib/zahlfrist'
-import { COPY_BUTTON, TOAST } from '@/lib/copy'
+import { BEREICH_LABELS,formatDatum } from '@/lib/utils'
+import { ZAHLFRIST_SEG_OPTIONS,type ZahlfristSeg } from '@/lib/zahlfrist'
+import { COPY_BUTTON,TOAST } from '@/lib/copy'
 import type { DocCanvasGap } from '@/lib/surfaces/document-canvas-chrome'
 import { useFieldErrors } from '@/lib/validation/form-schema'
 
@@ -238,7 +235,7 @@ export function AngebotWizard({
 }) {
   void _handwerker
   const firm = firmProp ?? defaultFirmenEinstellungen()
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [leadState, setLeadState] = useState(lead)
 
   const name = kundenName(leadState)

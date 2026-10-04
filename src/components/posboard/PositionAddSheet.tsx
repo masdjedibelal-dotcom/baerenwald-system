@@ -1,15 +1,13 @@
 'use client'
 
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBtn, MockEmpty } from '@/components/mock-ui'
-import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockBtn,MockEmpty } from '@/components/mock-ui'
+import { MockInput,MockSelect } from '@/components/mock-ui/MockForm'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
-import { listKatalogPositionen, listVerwendetePositionen } from '@/app/(dashboard)/katalog/actions'
+import { listKatalogPositionen,listVerwendetePositionen } from '@/app/(dashboard)/katalog/actions'
 import {
   katalogPreisLabel,
   katalogVarianteLabel,
@@ -17,7 +15,7 @@ import {
   type KatalogVariante,
 } from '@/lib/katalog/katalog-types'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
-import { formatEurBetrag, type GesamtrabattModus } from '@/lib/dokument-zeilen'
+import { formatEurBetrag,type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import { REGIE_BADGE_LABEL } from '@/lib/auftraege/regie-display'
 import { Toggle } from '@/components/ui/Toggle'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'

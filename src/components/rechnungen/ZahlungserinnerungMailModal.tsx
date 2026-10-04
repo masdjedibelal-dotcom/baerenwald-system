@@ -3,17 +3,16 @@ import { safeAction } from '@/lib/actions/safe-action'
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockInput } from '@/components/mock-ui/MockForm'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useTransition } from '@/components/ui/action-busy'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect,useRef,useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { CollapsibleMailPreview } from '@/components/ui/CollapsibleMailPreview'
 import { toast } from '@/components/ui/app-toast'
-import { cn, formatDatum } from '@/lib/utils'
+import { cn,formatDatum } from '@/lib/utils'
 import {
   previewZahlungserinnerungMail,
   sendZahlungserinnerungMail,
@@ -51,8 +50,7 @@ export function ZahlungserinnerungMailModal({
   erinnerung21SentAt?: string | null
   onSent?: () => void
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
-  const router = useRouter()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   const [pending, startTransition] = useTransition()

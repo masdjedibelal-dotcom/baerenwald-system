@@ -2,20 +2,18 @@
 import { DateInput } from '@/components/ui/DateInput'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput,MockSelect,MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { useEffect,useMemo,useState } from 'react'
 import { createHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { saveKunde } from '@/app/actions/kunden'
 import { toast } from '@/components/ui/app-toast'
 import {
-  istKundeFirmaPflichtTyp,
-  istKundeHausverwaltungTyp,
-  istKundeNurGewerbeTyp,
+  istKundeFirmaPflichtTyp,istKundeNurGewerbeTyp
 } from '@/lib/kunde-stammdaten'
 import {
   createAngebotHref,
@@ -85,14 +83,14 @@ export function NeuErstellenClient({
 }: {
   gewerkeOptionen?: GewerkOpt[]
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const router = useRouter()
   const searchParams = useSearchParams()
   const presetParam = searchParams.get('art')
   const preset = isPreset(presetParam) ? presetParam : null
 
   const [art, setArt] = useState<Art>(preset ? PRESET_MAP[preset][0] : '')
-  const [vorgangTyp, setVorgangTyp] = useState<VorgangTyp>(preset ? PRESET_MAP[preset][1] : '')
+  const [, setVorgangTyp] = useState<VorgangTyp>(preset ? PRESET_MAP[preset][1] : '')
   const [f, setF] = useState<Record<string, string>>({ type: 'privat' })
   const [gewerkSlugs, setGewerkSlugs] = useState<Set<string>>(() => new Set())
   const [pending, startTransition] = useTransition()
@@ -116,7 +114,6 @@ export function NeuErstellenClient({
   const kundeTyp = kundeTypFromUi(f.type ?? 'privat')
   const firmaPflicht = istKundeFirmaPflichtTyp(kundeTyp)
   const istGewerbe = istKundeNurGewerbeTyp(kundeTyp)
-  const istHausverwaltung = istKundeHausverwaltungTyp(kundeTyp)
 
   const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }))
 
@@ -204,11 +201,6 @@ export function NeuErstellenClient({
       toast.success(TOAST.partner_angelegt)
       router.push(`/handwerker/${r.id}`)
     })
-  }
-
-  function finishList(href: string, toastMsg?: string) {
-    if (toastMsg) toast.success(toastMsg)
-    router.push(href)
   }
 
   return (

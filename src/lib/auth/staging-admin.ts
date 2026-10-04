@@ -2,7 +2,6 @@
 
 export const STAGING_SUPABASE_REF = 'soqownnkxmtfgvsbrgsl'
 export const STAGING_WEBSITE_ORIGIN = 'https://staging--baerenwald.netlify.app'
-export const STAGING_CRM_ORIGIN = 'https://staging--baerenwald-backend.netlify.app'
 
 export const STAGING_ADMIN_EMAIL = 'admin@staging.baerenwald.test'
 export const STAGING_ADMIN_PASSWORD = 'StagingTest!2026'

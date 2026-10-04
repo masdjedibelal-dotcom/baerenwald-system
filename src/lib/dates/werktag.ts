@@ -37,13 +37,6 @@ export function tageZwischenYmd(vonYmd: string, bisYmd: string): number {
   return Math.floor((bis.getTime() - von.getTime()) / 86400000)
 }
 
-export function isWochenendeYmd(ymd: string): boolean {
-  const d = parseYmdLocal(ymd.trim().slice(0, 10))
-  if (Number.isNaN(d.getTime())) return false
-  const dow = d.getDay()
-  return dow === 0 || dow === 6
-}
-
 /**
  * Fälligkeit auf Samstag/Sonntag → nächster Werktag (Montag).
  * Feiertage sind nicht enthalten.

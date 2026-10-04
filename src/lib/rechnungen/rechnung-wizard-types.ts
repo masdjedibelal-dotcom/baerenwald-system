@@ -1,8 +1,8 @@
-import type { RechnungArt, RechnungAbschlagLink, Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
+import type { RechnungArt,RechnungAbschlagLink,Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import { standardRechnungZahlungstext } from '@/lib/rechnungen/zahlungsplan'
-import type { AngebotPosition, Kunde, RechnungStatus } from '@/lib/types'
+import type { AngebotPosition,Kunde,RechnungStatus } from '@/lib/types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import { kundeZeigt35a, parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
+import { kundeZeigt35a,parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import {
   defaultRechnungEinleitung,
   defaultRechnungHinweise,
@@ -118,16 +118,6 @@ export type RechnungWizardBootstrap = {
 export function rechnungDarfImWizardBearbeitetWerden(status: string): boolean {
   const s = (status ?? '').toLowerCase()
   return s === 'entwurf'
-}
-
-/** Deaktiviert-mit-Grund — Detail-CTA wechselt bei Gesendet/Bezahlt auf „Rechnung korrigieren“. */
-export function rechnungWizardBearbeitenSperrgrund(status: string): string | null {
-  if (rechnungDarfImWizardBearbeitetWerden(status)) return null
-  const s = (status ?? '').toLowerCase()
-  if (s === 'gesendet' || s === 'versendet' || s === 'bezahlt' || s === 'storniert') {
-    return 'Gesendet — Korrektur über Storno'
-  }
-  return 'Diese Rechnung kann nicht mehr im Wizard bearbeitet werden.'
 }
 
 /** Nur Entwürfe hart löschen (ohne Nummer/Versand). */

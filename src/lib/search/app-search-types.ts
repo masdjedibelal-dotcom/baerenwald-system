@@ -26,7 +26,3 @@ export type AppSearchHit = {
   sub?: string
   href: string
 }
-
-export type AppSearchResponse = {
-  hits: AppSearchHit[]
-}

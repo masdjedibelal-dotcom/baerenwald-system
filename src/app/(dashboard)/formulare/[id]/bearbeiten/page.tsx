@@ -1,9 +1,8 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { loadFormularTemplate } from '@/app/(dashboard)/formulare/actions'
 import { FormularTemplateForm } from '@/components/formulare/FormularTemplateForm'
-import type { FormularTemplate, Gewerk } from '@/lib/types'
+import type { FormularTemplate,Gewerk } from '@/lib/types'
 
 export default async function FormularBearbeitenPage({ params }: { params: { id: string } }) {
   const supabase = createClient()

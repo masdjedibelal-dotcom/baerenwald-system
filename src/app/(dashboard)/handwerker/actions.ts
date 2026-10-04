@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAuftragDetail, revalidateHandwerkerDetail, revalidateHandwerkerList } from '@/lib/crm-revalidate'
+import { revalidateAuftragDetail,revalidateHandwerkerDetail,revalidateHandwerkerList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -12,7 +12,7 @@ import {
   parseStoredDocumentRef,
   VERTRAEGE_PDFS_BUCKET,
 } from '@/lib/partnerDocUtils'
-import type { Handwerker, PartnerDokument } from '@/lib/types'
+import type { Handwerker,PartnerDokument } from '@/lib/types'
 import { authUserIsCrmTeam } from '@/lib/auth/is-crm-staff'
 import { planPartnerDokumentStatusWrite } from '@/lib/status/write-partner-dokument-status'
 
@@ -809,42 +809,6 @@ export async function getPartnerPortalLoginHint(
   }
 }
 
-/** Stammdaten-Kopie für Listen-⋯-Menü. */
-export async function duplicateHandwerker(
-  handwerkerId: string
-): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data: src, error: loadErr } = await supabase
-    .from('handwerker')
-    .select('*')
-    .eq('id', handwerkerId)
-    .maybeSingle()
-  if (loadErr) logDbError('app/handwerker/actions:handwerker', loadErr)
-  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Partner nicht gefunden.' }
-
-  const row = src as Record<string, unknown>
-  const payload: Record<string, unknown> = { ...row }
-  delete payload.id
-  delete payload.created_at
-  delete payload.updated_at
-  delete payload.auth_user_id
-  delete payload.portal_gesperrt_am
-  payload.ist_portal_gesperrt = false
-  payload.name = row.name ? `Kopie: ${String(row.name)}` : 'Kopie'
-  if (payload.email) payload.email = null
-
-  const { data: inserted, error: insErr } = await supabase
-    .from('handwerker')
-    .insert(payload)
-    .select('id')
-    .single()
-  if (insErr) logDbError('app/handwerker/actions:handwerker', insErr)
-
-  if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
-  revalidateHandwerkerList()
-  return { ok: true, id: inserted.id as string }
-}
-
 /**
  * Partner vom Portal ausschließen / wieder freigeben.
  * Gesperrt → Flag ist_portal_gesperrt; reines Partner-Auth wird gebannt.
@@ -915,7 +879,6 @@ export async function setHandwerkerPortalGesperrt(
   revalidateHandwerkerDetail(id)
   return { ok: true }
 }
-
 
 /**
  * Partner löschen — Verträge werden mitgelöscht; blockiert bei Einbehalten oder aktiven Zuweisungen.

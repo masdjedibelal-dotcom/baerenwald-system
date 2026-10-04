@@ -9,10 +9,6 @@ export function buildMeldeLink(orgKennung: string, meldeSlug?: string | null): s
   return base
 }
 
-export function buildEinladungErgaenzenLink(token: string): string {
-  return `${publicWebsiteBaseUrl()}/melden/ergaenzen/${encodeURIComponent(token.trim())}`
-}
-
 export function orgFreigabeBlockiertPartner(
   status: OrgFreigabeStatus | null | undefined,
   hvMeldungStatus?: string | null
@@ -61,34 +57,6 @@ export function orgFreigabeBlockiertKundenversandStatus(
   return status === 'abgelehnt'
 }
 
-export const ANLASS_LABELS: Record<string, string> = {
-  meldung: 'Meldung',
-  projekt: 'Projekt',
-  servicepaket: 'Servicepaket',
-  katalog: 'Katalog',
-  fixauftrag: 'Fixauftrag',
-  sonstiges: 'Sonstiges',
-}
-
-export const HV_MELDUNG_STATUS_LABELS: Record<string, string> = {
-  neu: 'Neu',
-  notmassnahme: 'Läuft — Notmaßnahme',
-  angebot_eingefordert: 'Angebot eingefordert',
-  kleinreparatur: 'Kleinreparatur',
-  abgelehnt: 'Abgelehnt',
-  abgeschlossen: 'Abgeschlossen',
-  hm_pruefung: 'Hausmeister-Prüfung',
-  hm_erledigt: 'Vom Hausmeister erledigt',
-}
-
-export const KOSTENTRAEGER_LABELS: Record<string, string> = {
-  gemeinschaft: 'Gemeinschaft (WEG)',
-  sondereigentum: 'Sondereigentum',
-  mieter: 'Mieter',
-  versicherung: 'Versicherung',
-  unklar: 'Noch unklar',
-}
-
 export const ORG_FREIGABE_LABELS: Record<OrgFreigabeStatus, string> = {
   // Flow-Vereinfachung 30.09.2026: ein Wartezustand „Wartet auf Zustimmung“ — einzige Quelle
   nicht_noetig: 'Nicht nötig',
@@ -96,16 +64,4 @@ export const ORG_FREIGABE_LABELS: Record<OrgFreigabeStatus, string> = {
   beschluss_ausstehend: 'Wartet auf Zustimmung',
   freigegeben: 'Zugestimmt',
   abgelehnt: 'Abgelehnt',
-}
-
-export const EINLADUNG_STATUS_LABELS: Record<string, string> = {
-  offen: 'Einladung offen',
-  ergaenzt: 'Ergänzt',
-  entfallen: 'Entfallen',
-}
-
-export const ERFASSUNG_VON_LABELS: Record<string, string> = {
-  melder: 'Melder',
-  organisation: 'Organisation',
-  crm: 'CRM',
 }

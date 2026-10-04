@@ -98,9 +98,6 @@ export const SOFORTMASSNAHME_FAELLE_KATALOG: readonly SofortmassnahmeFall[] = [
   },
 ] as const
 
-export const ALL_AKUT_FALL_IDS: readonly AkutFallId[] =
-  SOFORTMASSNAHME_FAELLE_KATALOG.map((f) => f.id)
-
 const FALL_BY_ID = new Map(
   SOFORTMASSNAHME_FAELLE_KATALOG.map((f) => [f.id, f] as const)
 )

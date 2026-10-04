@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-export type PageHeaderCrumb = { label: string; href?: string }
-
 /**
  * Optionale Page-Meta unterhalb der TopBar.
  * Der Seitentitel kommt aus der TopBar (Desktop) bzw. der Mobile-Screen-Titelzeile

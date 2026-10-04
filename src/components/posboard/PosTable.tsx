@@ -4,7 +4,7 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { useMemo,useState,type CSSProperties,type ReactNode } from 'react'
 import {
   DndContext,
   PointerSensor,
@@ -16,13 +16,11 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import {
-  SortableContext,
-  arrayMove,
-  useSortable,
-  verticalListSortingStrategy,
+  SortableContext,useSortable,
+  verticalListSortingStrategy
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { PosAddRow, type PosAddKind } from '@/components/posboard/PosAddRow'
+import { PosAddRow,type PosAddKind } from '@/components/posboard/PosAddRow'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -749,15 +747,4 @@ export function PosTable({
       )}
     </div>
   )
-}
-
-export type PosTableActionItem = EntityMenuItem
-
-export function posTableMenuIcon(icon: string): ReactNode {
-  return <MockIcon ctx="default" n={icon} size={15} />
-}
-
-/** @internal test helper */
-export function posTableArrayMove<T>(arr: T[], from: number, to: number): T[] {
-  return arrayMove(arr, from, to)
 }

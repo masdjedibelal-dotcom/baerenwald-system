@@ -185,7 +185,7 @@ export async function inviteBenutzer(
   if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
   if (error2) return { ok: false, message: error2.message }
 
-  const { data: invited, error: error3 } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
+  const { data: invited } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
   if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
   const neu = (invited?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === trimmed)
   if (neu) {
@@ -266,24 +266,5 @@ export async function updateBenutzerProfil(
 
   revalidateEinstellungenPath('/einstellungen/benutzer')
   revalidateEinstellungenPath('/einstellungen/profil')
-  return { ok: true }
-}
-
-export async function setBenutzerAktiv(
-  id: string,
-  aktiv: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { data: user, error: gErr } = await supabaseAdmin.auth.admin.getUserById(id)
-  if (gErr) logDbError('app/einstellungen/benutzer/actions:query', gErr)
-  if (gErr || !user?.user) return { ok: false, message: gErr?.message ?? 'Nutzer nicht gefunden' }
-  if (!crmRoleFromUser(user.user as User)) {
-    return { ok: false, message: 'Nur CRM-Mitarbeiter können hier geändert werden.' }
-  }
-  const { error: error2 } = await supabaseAdmin.auth.admin.updateUserById(id, {
-    ban_duration: aktiv ? 'none' : '876600h',
-  })
-  if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
-  if (error2) return { ok: false, message: error2.message }
-  revalidateEinstellungenPath('/einstellungen/benutzer')
   return { ok: true }
 }

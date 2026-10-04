@@ -3,19 +3,14 @@
 src/app/(dashboard)/angebote/nachfass-cron.ts:23:angebote:anrede  # Nachfassen entfällt (Streichliste) → P16/P17
 src/app/(dashboard)/auftraege/actions.ts:778:formular_eintraege:gewerk_id  # Formulare per Link entfallen → P18
 src/app/(dashboard)/auftraege/actions.ts:778:formular_eintraege:bemerkungen  # Formulare per Link entfallen → P18
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:57:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:57:nachtraege:handwercher_bestaetigt  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:57:nachtraege:handwercher_bestaetigt_at  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:242:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:242:nachtraege:handwercher_bestaetigt  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:242:nachtraege:handwercher_bestaetigt_at  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:283:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:395:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:402:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:419:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:419:nachtraege:handwercher_bestaetigt  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:460:nachtraege:handwercher_bestaetigt  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
-src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:460:nachtraege:handwercher_bestaetigt_at  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
+src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:48:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
+src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:48:nachtraege:handwercher_bestaetigt  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
+src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:48:nachtraege:handwercher_bestaetigt_at  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
+src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:227:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
+src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:339:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
+src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:346:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
+src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:363:nachtraege:beschreibung  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
+src/app/(dashboard)/auftraege/nachtrag-baustopp-actions.ts:363:nachtraege:handwercher_bestaetigt  # Nachtrags-Objekt entfällt, Behinderung als Mitteilung → P13
 src/app/(dashboard)/kalender/actions.ts:114:leads:ort  # Kalender entfällt → P17
 src/app/(dashboard)/kalender/actions.ts:146:leads:ort  # Kalender entfällt → P17
 src/app/api/cron/einbehalte/route.ts:38:einbehalte:freigabe_reminder_30_sent_at  # Einbehalt/Bürgschaft entfallen → P17

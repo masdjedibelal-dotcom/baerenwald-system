@@ -60,11 +60,6 @@ function parseChat(raw: unknown): GptVizChatMessage[] {
     .filter((v): v is GptVizChatMessage => v !== null)
 }
 
-export function isGptProjektStudio(raw: unknown): boolean {
-  const fd = parseLeadFunnelDaten(raw)
-  return fd.projekt_studio === true
-}
-
 export function parseGptProjektStudioFunnel(
   raw: unknown
 ): GptProjektStudioFunnelDaten | null {
@@ -97,21 +92,4 @@ export function parseGptProjektStudioFunnel(
     render_count: typeof fd.render_count === 'number' ? fd.render_count : undefined,
     funnel_quelle: fd.funnel_quelle as GptProjektStudioFunnelDaten['funnel_quelle'],
   }
-}
-
-export function gptHeroBildUrl(studio: GptProjektStudioFunnelDaten): string | null {
-  return studio.zielbild_url?.trim() || studio.ergebnis_bild_url?.trim() || null
-}
-
-export function gptGalerieUrls(studio: GptProjektStudioFunnelDaten): string[] {
-  const urls = new Set<string>()
-  for (const u of studio.ist_bilder_urls ?? []) urls.add(u)
-  for (const v of studio.ergebnis_historie ?? []) {
-    if (v.url?.trim()) urls.add(v.url.trim())
-  }
-  const ergebnis = studio.ergebnis_bild_url?.trim()
-  if (ergebnis) urls.add(ergebnis)
-  const ziel = studio.zielbild_url?.trim()
-  if (ziel) urls.add(ziel)
-  return Array.from(urls)
 }

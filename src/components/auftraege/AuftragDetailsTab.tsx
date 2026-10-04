@@ -1,7 +1,7 @@
 'use client'
 
 import { MockTabs } from '@/components/mock-ui'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect,useMemo,useRef,useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
@@ -12,16 +12,14 @@ import {
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { PartnerAufgabeBearbeitenSheet } from '@/components/auftraege/PartnerAufgabeBearbeitenSheet'
-import { CrmPositionEintragModal, type CrmTagebuchEditSeed } from '@/components/auftraege/CrmPositionEintragModal'
+import { CrmPositionEintragModal,type CrmTagebuchEditSeed } from '@/components/auftraege/CrmPositionEintragModal'
 import {
   AuftragBautagebuchSection,
   type BautagebuchListenEintrag,
 } from '@/components/auftraege/AuftragBautagebuchSection'
 import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
-import { clearAuftragHandwerkerPositionen } from '@/app/(dashboard)/auftraege/handwerker-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { decideWeitereArbeitMitNotify } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
-import { AuftragPartnerPositionsPruefungPanel } from '@/components/auftraege/AuftragPartnerPositionsPruefungPanel'
 import {
   updateAuftragNotizen,
   updateAuftragProjektFelder,
@@ -31,7 +29,7 @@ import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragSummenAusPositionen } from '@/lib/rechnungen/zahlungsplan'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
-import type { AngebotDetail, AuftragDetail, Lead } from '@/lib/types'
+import type { AngebotDetail,AuftragDetail,Lead } from '@/lib/types'
 import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-titel'
 
 type AuftragLeadSnap = Pick<
@@ -315,27 +313,6 @@ export function AuftragLeistungenTab({
         }
       }
       toast.success(ids.length === 1 ? 'Als erledigt markiert.' : `${ids.length} Leistungen erledigt.`)
-      clearSelection?.()
-      onSaved?.()
-    })
-  }
-
-  function abwaehlenZuweisung(ids: string[], clearSelection?: () => void) {
-    if (disabled || !ids.length) return
-    void actionBusy.run('Zuweisung wird zurückgezogen…', async () => {
-      const r = await clearAuftragHandwerkerPositionen({
-        auftragId: detail.id,
-        positionIds: ids,
-      })
-      if (!r.ok) {
-        toast.systemError(r)
-        throw new Error(r.message)
-      }
-      toast.success(
-        r.cleared === 1
-          ? 'Zuweisung zurückgezogen — Partner sieht die Leistung nicht mehr.'
-          : `${r.cleared} Zuweisungen zurückgezogen.`
-      )
       clearSelection?.()
       onSaved?.()
     })

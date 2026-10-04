@@ -4,7 +4,7 @@ import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-type
 import { isAusgehendeRechnung } from '@/lib/rechnungen/rechnung-richtung'
 import { rechnungDokumentBezeichnung } from '@/lib/rechnungen/zahlungsplan'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import type { Angebot, AngebotHandwerkerRow, AuftragDetail, DokumentArt, LeadDokumentRow } from '@/lib/types'
+import type { Angebot,AngebotHandwerkerRow,AuftragDetail,DokumentArt,LeadDokumentRow } from '@/lib/types'
 import { DOKUMENT_ART_LABEL } from '@/lib/types'
 import {
   parseHwAnhangStoragePaths,
@@ -79,13 +79,6 @@ export function dokumentTypLabel(quelle: AuftragDokumentQuelle): string {
     default:
       return 'Dokument'
   }
-}
-
-/** Neueste zuerst; ohne Datum unten; bei Gleichstand alphabetisch (wie Kunden-/Partnerportal). */
-export function sortDokumentZeilenNachDatum<T extends { datum: string; name: string }>(
-  rows: T[]
-): T[] {
-  return sortDokumentZeilen(rows, 'datum', 'desc')
 }
 
 export function sortDokumentZeilen<
@@ -242,10 +235,6 @@ export function handwerkerDokumentZeilen(rows: AngebotHandwerkerRow[]): AuftragD
     // nur unter Vorgänge → Rechnung → Eingehend (CRM).
   }
   return out
-}
-
-export function zaehleHandwerkerDokumente(rows: AngebotHandwerkerRow[]): number {
-  return handwerkerDokumentZeilen(rows).length
 }
 
 export function abnahmeDokumentZeile(

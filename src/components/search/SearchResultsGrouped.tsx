@@ -76,7 +76,3 @@ export function SearchResultsGrouped({
     </div>
   )
 }
-
-export function flattenSearchGroups(groups: SearchGroupBlock[]): AppSearchHit[] {
-  return groups.flatMap((g) => g.hits)
-}

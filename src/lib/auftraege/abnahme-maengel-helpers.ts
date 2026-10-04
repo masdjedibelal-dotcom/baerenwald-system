@@ -1,4 +1,4 @@
-import type { AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
+import type { AbnahmeMangel,AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 
 export type AbnahmeMangelStatus = 'offen' | 'in_bearbeitung' | 'behoben' | 'abgenommen'
 
@@ -28,16 +28,6 @@ export function isMangelOffen(m: Pick<AbnahmeMangel, 'status'>): boolean {
 
 export function countOffeneMaengel(maengel: AbnahmeMangel[]): number {
   return maengel.filter(isMangelOffen).length
-}
-
-export function appendMangelVerlauf(
-  m: AbnahmeMangel,
-  typ: string,
-  notiz?: string | null,
-  at = new Date().toISOString()
-): AbnahmeMangel {
-  const verlauf = [...(m.verlauf ?? []), { at, typ, notiz: notiz?.trim() || null }]
-  return { ...m, verlauf }
 }
 
 export function normalizeMaengel(maengel: AbnahmeMangel[]): AbnahmeMangel[] {

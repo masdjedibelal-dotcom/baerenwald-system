@@ -1,4 +1,4 @@
-import { splitNettoStueck, type KostenartZeile } from '@/lib/angebot-kosten-split'
+import { splitNettoStueck,type KostenartZeile } from '@/lib/angebot-kosten-split'
 import { defaultAngebotRechtshinweise } from '@/lib/angebote/angebot-rechtshinweise'
 import {
   auftragDarfKorrektur,
@@ -16,12 +16,12 @@ import {
 } from '@/lib/einstellungen-keys'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
 import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
-import type { AngebotPosition, AngebotStatus } from '@/lib/types'
+import type { AngebotPosition,AngebotStatus } from '@/lib/types'
 import { neuePositionsId } from '@/lib/angebot-positionen'
 import {
   bereicheFuerAnzeige,
 } from '@/lib/lead-gewerbe-storage'
-import { formatNumber, formatEuroSpanne } from '@/lib/format/geld-datum'
+import { formatEuroSpanne } from '@/lib/format/geld-datum'
 
 export type AngebotDokumentTyp = 'einfach' | 'projekt'
 
@@ -37,13 +37,6 @@ export function initialDokumentTypFromLead(
   const immer = IMMER_PROJEKT_BEREICHE as readonly string[]
   if (bereiche.some((b) => immer.includes(b))) return 'projekt'
   return 'einfach'
-}
-
-export function leadHatProjektEmpfehlung(bereicheRaw: unknown, situation: string | null | undefined): boolean {
-  const bereiche = bereicheFuerAnzeige(bereicheRaw, situation)
-  if (bereiche.length >= 2) return true
-  const immer = IMMER_PROJEKT_BEREICHE as readonly string[]
-  return bereiche.some((b) => immer.includes(b))
 }
 
 /** Persistierte Varianten (Spalte varianten) — Positionen B nur bei Zwei-Varianten-Angeboten. */
@@ -228,12 +221,6 @@ export function plusDaysYmd(days: number): string {
 /** Anzeige eines Betrags (Gesamt/Position) — kein Von-bis. */
 export function formatEurRange(min: number, max: number): string {
   return formatEuroSpanne(min, max, { decimals: 0 })
-}
-
-export function summeWizardPositionen(positions: WizardPosition[]) {
-  const preis_min = positions.reduce((s, p) => s + Number(p.preis_min || 0), 0)
-  const preis_max = positions.reduce((s, p) => s + Number(p.preis_max || 0), 0)
-  return { preis_min, preis_max }
 }
 
 export function wizardPositionsToAngebot(
@@ -433,12 +420,6 @@ export function syncProjektTitelInBeschreibung(
   return out
 }
 
-/** Standard „Wichtige Hinweise“ für Projekt-Angebote (editierbar im Wizard). */
-export const STANDARD_WICHTIGE_HINWEISE_PROJEKT =
-  'Handwerkliche Leistungen erfolgen ausschließlich durch externe Fach- und Subunternehmen. ' +
-  'Bärenwald München übernimmt Projektsteuerung, Koordination und Qualitätskontrolle. ' +
-  'Endgültige Preise können sich nach exaktem Aufmaß anpassen.'
-
 /**
  * Status, in denen das Angebot im Wizard geladen und gespeichert werden darf.
  *
@@ -459,17 +440,6 @@ export function angebotDarfImWizardBearbeitetWerden(status: string): boolean {
   if ((ANGEBOT_WIZARD_BEARBEITBAR as readonly string[]).includes(s)) return true
   // status_einfach-Aliases (Portal/CRM-Listen)
   return s === 'gesendet' || s === 'abgelaufen'
-}
-
-/** Angebot liegt beim Kunden/HV und wartet auf Annahme oder Ablehnung. */
-export function angebotWartetAufKundenentscheidung(status: string): boolean {
-  const s = String(status ?? '').toLowerCase()
-  return (
-    s === 'gesendet_kunde' ||
-    s === 'gesendet' ||
-    s === 'abgelaufen' ||
-    (s.includes('gesendet') && !s.includes('handwerker'))
-  )
 }
 
 /** Wizard-Load/Save: Entwurf… oder AG-Korrektur nur mit Auftrag-Kontext (nicht Angebotsstatus). */

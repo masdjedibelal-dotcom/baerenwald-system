@@ -1,9 +1,7 @@
 import type { MailBranding } from '@/lib/mail-branding'
 import {
   kundeAngebotBegruessung,
-  kundeAnredeKontextFromEmpfaenger,
-  kundeRechnungsempfaengerAusStammdaten,
-  type KundeRechnungsempfaenger,
+  kundeAnredeKontextFromEmpfaenger,type KundeRechnungsempfaenger
 } from '@/lib/kunde-rechnungsempfaenger'
 import { buildSubject } from '@/lib/mail/build-subject'
 import {

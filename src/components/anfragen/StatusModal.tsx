@@ -4,8 +4,8 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { DateInput } from '@/components/ui/DateInput'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
-import { useEffect, useState } from 'react'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
+import { useEffect,useState } from 'react'
 import { Combobox } from '@/components/ui/Combobox'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import {
@@ -24,7 +24,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import type { LeadDetail } from '@/lib/types'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
-import { anfrageAdresseAusPayload, formatAnfrageAdresseZeile } from '@/lib/anfrage-adresse'
+import { anfrageAdresseAusPayload,formatAnfrageAdresseZeile } from '@/lib/anfrage-adresse'
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import { VERLOREN_GRUND_LABELS } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
@@ -81,7 +81,7 @@ export function StatusModal({
   /** Nach 3× Nicht erreichbar: Verloren-Sheet öffnen */
   onSuggestVerloren?: () => void
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [datum, setDatum] = useState(todayISO())
   const [uhrzeit, setUhrzeit] = useState('10:00')
   const [notiz, setNotiz] = useState('')

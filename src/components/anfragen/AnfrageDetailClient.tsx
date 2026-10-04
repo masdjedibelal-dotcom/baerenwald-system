@@ -10,10 +10,10 @@ import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { useTransition } from '@/components/ui/action-busy'
 
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { naechsterSchrittText, primaryCta } from '@/lib/vorgang/primary-cta'
+import { naechsterSchrittText,primaryCta } from '@/lib/vorgang/primary-cta'
 import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
@@ -21,25 +21,19 @@ import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { isLegacyDetailTabAlias } from '@/lib/vorgang/detail-tab-helpers'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { leadAngebotFunnelFromListe } from '@/lib/lead-angebot-funnel'
-import { leadKontaktAnzeigeName, leadVertragsKundeId } from '@/lib/lead-display-helpers'
-import { LeistungenTab, leistungenFromAnfrage } from '@/components/leistungen'
+import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
+import { LeistungenTab,leistungenFromAnfrage } from '@/components/leistungen'
 import { AnfrageZahlungTab } from '@/components/anfragen/AnfrageZahlungTab'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import {
-  loadRechnungWizardBootstrapFromAuftrag,
-  loadRechnungWizardKunde,
-} from '@/app/(dashboard)/rechnungen/wizard-actions'
-import { buildStandaloneRechnungWizardBootstrap } from '@/lib/rechnungen/rechnung-wizard-bootstrap-helpers'
-import {
-  defaultRechnungWizardMeta,
-  type RechnungWizardBootstrap,
+  type RechnungWizardBootstrap
 } from '@/lib/rechnungen/rechnung-wizard-types'
-import { StatusModal, type StatusModalKind } from '@/components/anfragen/StatusModal'
+import { StatusModal,type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
 import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
-import { deleteAnfrage, restoreAnfrage, updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
+import { deleteAnfrage,restoreAnfrage,updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
@@ -70,10 +64,28 @@ import {
   listAnfrageHandwerkerEinholungen,
   type AnfragePartnerEinholungRow,
 } from '@/app/(dashboard)/anfragen/anfrage-handwerker-anfragen-actions'
-import { leadIstAkut, leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
+import { leadIstAkut,leadWartetAufHvStartFreigabe } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { anfrageTitel } from '@/lib/vorgang/vorgang-anzeige-titel'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
+import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
+import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
+import { loadAnfrageWizardBootstrap } from '@/app/(dashboard)/anfragen/wizard-bootstrap-action'
+import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
+import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import type {
+  Gewerk,
+  Handwerker,
+  KalenderTermin,
+  KundenObjekt,
+  LeadDetail,
+  LeadNotizRow,
+  Preisliste,
+} from '@/lib/types'
+import { formatDatum,kanalLabel } from '@/lib/utils'
+import { anfrageStatusDisplay } from '@/lib/status/status-display'
+import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
+import { TOAST } from '@/lib/copy'
 
 const AngebotWizard = dynamic(
   () =>
@@ -96,24 +108,6 @@ const RechnungWizard = dynamic(
     loading: () => <CrmInlineLoading label="Rechnung-Assistent wird geladen …" minHeight={120} />,
   }
 )
-import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
-import { loadAngebotWizardBootstrapKopie } from '@/app/(dashboard)/angebote/wizard-actions'
-import { loadAnfrageWizardBootstrap } from '@/app/(dashboard)/anfragen/wizard-bootstrap-action'
-import type { ProjektKontext } from '@/lib/crm/projekt-kontext-types'
-import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
-import type {
-  Gewerk,
-  Handwerker,
-  KalenderTermin,
-  KundenObjekt,
-  LeadDetail,
-  LeadNotizRow,
-  Preisliste,
-} from '@/lib/types'
-import { formatDatum, kanalLabel } from '@/lib/utils'
-import { anfrageStatusDisplay } from '@/lib/status/status-display'
-import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
-import { TOAST } from '@/lib/copy'
 
 type AnfrageDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
 
@@ -260,7 +254,7 @@ export function AnfrageDetailClient({
   const isMobile = useIsMobile()
   const { refresh, generation } = useCrmRefresh()
   const [lead, setLead] = useState(initial)
-  const [pending, startTransition] = useTransition()
+  const [pending, ] = useTransition()
   const [statusModalKind, setStatusModalKind] = useState<StatusModalKind | null>(null)
   const [wvOpen, setWvOpen] = useState(false)
   const [zusammenfuehrenOpen, setZusammenfuehrenOpen] = useState(false)
@@ -281,7 +275,7 @@ export function AnfrageDetailClient({
   const [rechnungWizardOpen, setRechnungWizardOpen] = useState(false)
   const [rechnungWizardBootstrap, setRechnungWizardBootstrap] =
     useState<RechnungWizardBootstrap | null>(null)
-  const [rechnungWizardKey, setRechnungWizardKey] = useState(0)
+  const [rechnungWizardKey, ] = useState(0)
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
   const [anfragenOpen, setAnfragenOpen] = useState(false)
@@ -411,7 +405,6 @@ export function AnfrageDetailClient({
     lead.kunden?.telefon?.trim() ||
     lead.kontakt_telefon?.trim() ||
     null
-  const auftragId = leadStatusData.auftrag_id as string | undefined
   const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
     telefon: leadTel,
     email: leadEmail,
@@ -490,57 +483,6 @@ export function AnfrageDetailClient({
     })
   }, [partnerLvAngebotPositionen, openAngebotWizard, lead, liveFirm])
 
-  const openWeitereRechnung = useCallback(() => {
-    startTransition(async () => {
-      const ok = await ensureWizardData()
-      if (!ok) return
-      const aufId =
-        projektKontext?.auftrag?.id?.trim() ||
-        (typeof auftragId === 'string' ? auftragId.trim() : '') ||
-        ''
-      if (aufId) {
-        const res = await loadRechnungWizardBootstrapFromAuftrag(aufId, { vollOhnePlan: true })
-        if (!res.ok) {
-          toast.systemError(res)
-          return
-        }
-        setRechnungWizardBootstrap(res.bootstrap)
-        setRechnungWizardKey((k) => k + 1)
-        setRechnungWizardOpen(true)
-        return
-      }
-      const kundeId =
-        leadVertragsKundeId(lead) ||
-        lead.kunden?.id?.trim() ||
-        lead.kunde_id?.trim() ||
-        ''
-      if (!kundeId) {
-        toast.error(TOAST.kein_kunde_verknuepft_rechnung_nicht_moeglich)
-        return
-      }
-      const k = await loadRechnungWizardKunde(kundeId)
-      if (!k.ok) {
-        toast.systemError(k)
-        return
-      }
-      if (!liveFirm) {
-        toast.error(TOAST.firmeneinstellungen_fehlen)
-        return
-      }
-      setRechnungWizardBootstrap({
-        ...buildStandaloneRechnungWizardBootstrap(liveFirm),
-        kundeId: k.kunde.id,
-        kunde: k.kunde,
-        meta: defaultRechnungWizardMeta(k.zahlungszielTage, {
-          kundeTyp: k.kunde.typ,
-          firm: liveFirm,
-        }),
-      })
-      setRechnungWizardKey((k) => k + 1)
-      setRechnungWizardOpen(true)
-    })
-  }, [ensureWizardData, projektKontext?.auftrag?.id, auftragId, lead, liveFirm])
-
   useEffect(() => {
     const kopieId = angebotKopieVonQuelleId?.trim()
     if (!kopieId) {
@@ -580,8 +522,6 @@ export function AnfrageDetailClient({
     router.replace(`/anfragen/${lead.id}`, { scroll: false })
   }, [angebotWizardInitial, lead.id, openNeuesKundenAngebot, router])
 
-  const hasAngebote = angeboteListe.length > 0
-
   const openAngebotAuswahl = useCallback(() => {
     if (angeboteListe.length === 0) {
       openNeuesKundenAngebot()
@@ -608,17 +548,6 @@ export function AnfrageDetailClient({
     }
     openAngebotAuswahl()
   }, [openAngebotAuswahl, openHvWarteHinweis, wartetAufHvFreigabe])
-
-  const openHandwerkerEinholen = useCallback(() => {
-    const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
-    if (href) router.push(`${href}#angebot-versand-handwerker`)
-    else openNeuesKundenAngebot()
-  }, [angebotFlowSnapshot?.angebotHref, angeboteListe, openNeuesKundenAngebot, router])
-
-  const openAngebotAnKunde = useCallback(() => {
-    const href = angebotFlowSnapshot?.angebotHref ?? (angeboteListe[0] ? `/angebote/${angeboteListe[0].id}` : null)
-    if (href) router.push(`${href}#angebot-versand-kunde`)
-  }, [angebotFlowSnapshot?.angebotHref, angeboteListe, router])
 
   const openDirektBeauftragen = useCallback(() => {
     void (async () => {

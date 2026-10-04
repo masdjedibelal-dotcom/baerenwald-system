@@ -1,19 +1,16 @@
 'use client'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
-import { C } from '@/lib/tokens/colors'
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockInput } from '@/components/mock-ui/MockForm'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockField, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockField,MockSelect } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockSegment } from '@/components/mock-ui/MockSegment'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { buildSubject } from '@/lib/mail/build-subject'
-import { openActionConfirm } from '@/components/ui/ConfirmPopup'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { createPortal } from 'react-dom'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -26,7 +23,6 @@ import { PosBoard } from '@/components/posboard/PosBoard'
 import { LeistungszeitraumFields } from '@/components/dokumente/LeistungszeitraumFields'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { DateInput } from '@/components/ui/DateInput'
-import { ACTION_ICON_STROKE } from '@/components/ui/ActionIcon'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import {
@@ -46,7 +42,7 @@ import { toast } from '@/components/ui/app-toast'
 import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
-import { normalizeKundeNamen, splitDeutscherVollname } from '@/lib/kunde-namen'
+import { normalizeKundeNamen,splitDeutscherVollname } from '@/lib/kunde-namen'
 import {
   istKundeFirmaPflichtTyp,
   istKundeGewerbeTyp,
@@ -70,12 +66,10 @@ import {
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
   dokumentZeilenToAngebotPositionen,
-  formatEurBetrag,
-  neueArtikelZeile,
-  type DokumentArtikelZeile,
-  type DokumentZeile,
+  formatEurBetrag,type DokumentArtikelZeile,
+  type DokumentZeile
 } from '@/lib/dokument-zeilen'
-import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen,summenAusPositionen } from '@/lib/angebot-positionen'
 import {
   berechneHinweis35aAnteil,
   berechneRechnung,
@@ -87,7 +81,7 @@ import {
   defaultRechnungKorrekturMitStornoMailEinleitung,
   defaultRechnungMailEinleitung,
 } from '@/lib/mail/rechnung-mail'
-import { defaultFirmenEinstellungen, type FirmenEinstellungen } from '@/lib/einstellungen-keys'
+import { defaultFirmenEinstellungen,type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
   dokumentZeilenToPosBoardLines,
   posBoardLinesToDokumentZeilen,
@@ -101,15 +95,11 @@ import type {
 import {
   berechneSchlussAbrechnung,
   berechneZahlungsplan,
-  emptyZahlungsplan,
-  neueZahlungsplanZeile,
-  zahlplanAbgerechnetAusLinks,
+  emptyZahlungsplan,zahlplanAbgerechnetAusLinks,
   zahlplanRateStatus,
-  type Zahlungsplan,
-  type ZahlungsplanAbschlagTyp,
-  type ZahlungsplanZeile,
+  type Zahlungsplan,type ZahlungsplanZeile
 } from '@/lib/rechnungen/zahlungsplan'
-import type { Gewerk, Kunde, KundeAnsprechpartner, KundenObjekt, Preisliste } from '@/lib/types'
+import type { Gewerk,Kunde,KundeAnsprechpartner,KundenObjekt,Preisliste } from '@/lib/types'
 import {
   normalizeVorgangWiederkehr,
   WIEDERKEHR_TURNUS_LABELS,
@@ -128,28 +118,11 @@ import {
 } from '@/lib/zahlfrist'
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
-import { COPY_BUTTON, TOAST } from '@/lib/copy'
+import { TOAST } from '@/lib/copy'
 import type { DocCanvasGap } from '@/lib/surfaces/document-canvas-chrome'
 import { useFieldErrors } from '@/lib/validation/form-schema'
 
 type Rechnungsart = 'abschlag' | 'schluss'
-
-/** P09: keine Vorlagen (50/50 usw.) mehr — Abschläge einzeln stellen. */
-const PLAN_PRESETS: { name: string; build: () => Zahlungsplan }[] = []
-
-/** Form ohne IDs/Titel — zum Erkennen der aktiven Vorlage. */
-function planShapeKey(plan: Zahlungsplan): string {
-  return plan.zeilen.map((z) => `${z.typ}:${Number(z.wert) || 0}`).join('|')
-}
-
-function matchingPlanPresetName(plan: Zahlungsplan): string | null {
-  if (!plan.zeilen.length) return null
-  const key = planShapeKey(plan)
-  for (const p of PLAN_PRESETS) {
-    if (planShapeKey(p.build()) === key) return p.name
-  }
-  return null
-}
 
 function formatDateDe(ymd: string): string {
   return formatDateDeYmd(ymd)
@@ -190,8 +163,7 @@ export function RechnungWizard({
   onClose: () => void
   onDone?: (rechnungId: string) => void
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
-  const router = useRouter()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const firm = firmProp ?? defaultFirmenEinstellungen()
   const [kunde, setKunde] = useState(bootstrap.kunde)
   const [kundeId, setKundeId] = useState(bootstrap.kundeId || '')
@@ -289,7 +261,7 @@ export function RechnungWizard({
   )
 
   const [mounted, setMounted] = useState(false)
-  const [step, setStep] = useState(1)
+  const [, ] = useState(1)
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(initialZeilen)
   const [meta, setMeta] = useState<RechnungWizardMeta>(() => bootstrap.meta)
   const [rechnungTitel, setRechnungTitel] = useState(
@@ -376,7 +348,7 @@ export function RechnungWizard({
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap.rechnungId)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
   const [ustg13bHilfeOpen, setUstg13bHilfeOpen] = useState(false)
-  const [hintsOpen, setHintsOpen] = useState(true)
+  const [, setHintsOpen] = useState(true)
   const savedSnapshotRef = useRef<string | null>(null)
 
   const hasPlan = plan.zeilen.length > 0
@@ -621,49 +593,6 @@ export function RechnungWizard({
       })
     : defaultRechnungMailEinleitung('sie')
 
-  function scrollToSection(sec: number) {
-    requestAnimationFrame(() => {
-      document
-        .getElementById(`section-${sec}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }
-
-  function goToSection(sec: number) {
-    setStep(sec)
-    scrollToSection(sec)
-  }
-
-  function goPrevStep() {
-    const next = step === 4 ? 2 : Math.max(1, step - 1)
-    goToSection(next)
-  }
-
-  async function goNextStep() {
-    if (step === 1) {
-      const artikel = zeilen.filter((z): z is DokumentArtikelZeile => z.typ === 'artikel')
-      if (!artikel.length) {
-        toast.error(TOAST.noch_keine_position)
-      }
-    }
-    if (step === 2 && hasPlan && !planOk) {
-      toast.error(TOAST.plan_anpassen_100)
-    }
-    const next = step === 2 ? 4 : Math.min(4, step + 1)
-    const enteringVersand = next === 4
-    if (enteringVersand) {
-      const id = await persistDraft()
-      if (!id) {
-        toast.error(TOAST.entwurf_pruefen)
-      }
-      if (!mailBetreff.trim()) setMailBetreff(defaultBetreff)
-      if (!einleitung.trim()) {
-        setEinleitung(defaultMailEinleitung)
-      }
-    }
-    goToSection(next)
-  }
-
   function buildMetaForSave(): RechnungWizardMeta {
     const planAktiv = hatAuftrag && hasPlan
     const zb = patchZahlungsbedingungenMitZahlfrist(
@@ -732,30 +661,6 @@ export function RechnungWizard({
       modus: 'abschlagsplan',
       zeilen: p.zeilen.map((z) => (z.id === id ? { ...z, ...patch } : z)),
     }))
-  }
-
-  function addPlanZeile() {
-    setPlan((p) => ({
-      ...p,
-      modus: 'abschlagsplan',
-      zeilen: [
-        ...p.zeilen,
-        neueZahlungsplanZeile({
-          titel: `${p.zeilen.length + 1}. Abschlag`,
-          typ: 'prozent',
-          wert: 0,
-        }),
-      ],
-    }))
-  }
-
-  function removePlanZeile(id: string) {
-    setPlan((p) => ({
-      ...p,
-      modus: 'abschlagsplan',
-      zeilen: p.zeilen.filter((z) => z.id !== id),
-    }))
-    setAktivRate((cur) => (cur === id ? null : cur))
   }
 
   function enablePlan() {
@@ -1172,15 +1077,6 @@ export function RechnungWizard({
     finishAndLeave(id)
   }
 
-  async function handleWeiter() {
-    if (saving) return
-    try {
-      await goNextStep()
-    } catch (e) {
-      toast.systemError(e, 'ui', 'Weiter fehlgeschlagen.')
-    }
-  }
-
   if (!mounted) return null
 
   const displayBrutto = schlussAbrechnung
@@ -1443,30 +1339,6 @@ export function RechnungWizard({
       />
     </div>
   )
-
-  function requestVersenden() {
-    if (saving) return
-    openActionConfirm({
-      title: istKorrekturMitStorno
-        ? 'Korrektur mit Storno wirklich versenden?'
-        : istKorrekturVersand
-          ? 'Korrektur wirklich versenden?'
-          : 'Rechnung wirklich versenden?',
-      body: istKorrekturMitStorno
-        ? 'Storno-Gutschrift und neue Rechnung gehen als zwei PDFs per E-Mail an den Kunden.'
-        : istKorrekturVersand
-          ? 'Die korrigierte Rechnung geht per E-Mail an den Kunden.'
-          : 'Die Rechnung wird per E-Mail an den Kunden gesendet.',
-      confirmLabel: istKorrekturVersand
-        ? 'Korrektur jetzt versenden'
-        : 'Jetzt versenden',
-      cancelLabel: 'Abbrechen',
-      busyLabel: null,
-      onConfirm: () => {
-        void handleFinish(true)
-      },
-    })
-  }
 
   const hatLeistungszeile = zeilen.some(
     (z) => z.typ === 'artikel' && z.bezeichnung.trim()

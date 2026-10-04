@@ -1,10 +1,6 @@
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { Preisliste } from '@/lib/types'
 
-/** Leistungen mit hohem Materialanteil → niedrigerer Lohnanteil. */
-const MATERIAL_HEAVY =
-  /fliesen|material|estrich|parkett|laminat|vinyl|sanitär|armatur|wdvs|dämm|flies|bodenbelag|verputz/i
-
 export type KostenartZeile = 'leistung' | 'anfahrt'
 
 /**
@@ -13,43 +9,6 @@ export type KostenartZeile = 'leistung' | 'anfahrt'
  * - lohn / material: 100 % in eine Kategorie (wird im PDF ausgewiesen)
  */
 export type KostenVerteilung = 'allgemein' | 'lohn' | 'material'
-
-export const KOSTEN_VERTEILUNG_LABELS: Record<KostenVerteilung, string> = {
-  allgemein: 'Allgemein',
-  lohn: 'Arbeitskosten',
-  material: 'Materialkosten',
-}
-
-function numSetting(raw: string | undefined, fallback: number): number {
-  const n = parseFloat(String(raw ?? '').replace(',', '.'))
-  return Number.isFinite(n) ? n : fallback
-}
-
-/** Standard-Lohnanteil in % (Rest = Material) — Einstellungen → Firma. */
-export function standardLohnAnteilProzent(firm: FirmenEinstellungen): number {
-  const p = numSetting(firm.lohn_anteil_standard_prozent, 75)
-  return Math.min(100, Math.max(0, p))
-}
-
-/**
- * Lohnanteil 0–100 für automatische Aufteilung (§ 35a / Materialausweis).
- * Anfahrt = 100 % Lohn (kein Material).
- */
-export function lohnAnteilProzent(opts: {
-  firm: FirmenEinstellungen
-  leistung?: string
-  kostenart?: KostenartZeile
-  preisliste?: Preisliste | null
-}): number {
-  if (opts.kostenart === 'anfahrt') return 100
-
-  let pct = standardLohnAnteilProzent(opts.firm)
-  const text = `${opts.leistung ?? ''} ${opts.preisliste?.leistung ?? ''}`.trim()
-  if (text && MATERIAL_HEAVY.test(text)) {
-    pct = Math.min(pct, 45)
-  }
-  return pct
-}
 
 /** Netto-Stückpreis → Lohn + Material (Summe = netto). */
 export function splitNettoStueck(

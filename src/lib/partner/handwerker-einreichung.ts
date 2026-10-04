@@ -2,15 +2,6 @@ import type { AngebotHandwerkerRow } from '@/lib/types'
 
 export const PARTNER_UPLOAD_BUCKET = 'handwerker-uploads'
 
-export type HwEinreichungStatus =
-  | 'offen'
-  | 'eingereicht'
-  | 'bestaetigt'
-  | 'abgelehnt'
-  | 'uebernommen'
-  | 'rueckfrage'
-  | string
-
 export function hwStatusLabel(status: string | null | undefined): string {
   const v = (status ?? '').toLowerCase()
   if (v === 'eingereicht') return 'Eingereicht'

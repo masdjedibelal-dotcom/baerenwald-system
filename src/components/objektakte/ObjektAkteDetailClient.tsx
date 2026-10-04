@@ -8,18 +8,13 @@ import {
 } from '@/components/layout/EntityDetailLayout'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import Link from 'next/link'
-import { Suspense, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense,useEffect,useMemo,useState } from 'react'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
-import { ObjektAnlagenSection } from '@/components/objektakte/ObjektAnlagenSection'
-import { ObjektHistorieSection } from '@/components/objektakte/ObjektHistorieSection'
-import { ObjektUebersichtKpiCard } from '@/components/objektakte/ObjektUebersichtKpiCard'
 import { VersammlungsberichtDialog } from '@/components/objektakte/VersammlungsberichtDialog'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
@@ -28,8 +23,8 @@ import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClien
 import { updateKundenObjektFreigabe } from '@/app/actions/kunden-objekte'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
 import type { ObjektKpiSnapshot } from '@/lib/objektakte/compute-objekt-kpis'
-import type { ObjektAkteDetailPayload, ObjektHistorieRow } from '@/lib/objektakte/types'
-import type { Gewerk, Kunde, KundenObjekt } from '@/lib/types'
+import type { ObjektAkteDetailPayload,ObjektHistorieRow } from '@/lib/objektakte/types'
+import type { Gewerk,Kunde,KundenObjekt } from '@/lib/types'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 
 type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'anlagen' | 'historie' | 'vorgaenge' | 'akte'
@@ -68,11 +63,9 @@ export function ObjektAkteDetailClient({
   vorgaengeRows?: VorgangListeRow[]
   gewerke?: Gewerk[]
 }) {
-  const router = useRouter()
   const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
   const [berichtOpen, setBerichtOpen] = useState(false)
   const [objektModalOpen, setObjektModalOpen] = useState(false)
-  const jahr = new Date().getFullYear()
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
   const [objektState, setObjektState] = useState(objekt)
   const [legalUrls, setLegalUrls] = useState({
@@ -122,14 +115,6 @@ export function ObjektAkteDetailClient({
     [akte.einheiten]
   )
 
-  const bewohnerAktiv = useMemo(
-    () => akte.bewohner.filter((b) => b.aktiv !== false),
-    [akte.bewohner]
-  )
-
-  const einheitenAnzahl = einheiten.length
-  const personenAnzahl = bewohnerAktiv.length
-
   const flaecheGesamt = useMemo(
     () =>
       einheiten.reduce((s, e) => s + (e.wohnflaeche_m2 != null ? Number(e.wohnflaeche_m2) : 0), 0),
@@ -137,7 +122,6 @@ export function ObjektAkteDetailClient({
   )
 
   const akteCount = akte.notizen.length + akte.dokumente.length + akte.fremdVorgaenge.length
-  const anlagenAnzahl = akte.anlagen.length
 
   const kundeVorgaenge = useMemo(
     () =>
@@ -166,14 +150,6 @@ export function ObjektAkteDetailClient({
           <div className="vgid-name">{objektState.titel}</div>
           {adresse ? <div className="vgid-meta">{adresse}</div> : null}
           <div className="vgid-chips" style={{ marginTop: 10 }}>
-            <span className="vgid-chip ghost">
-              <MockIcon ctx="default" n="building" size={14} />
-              {einheitenAnzahl} {einheitenAnzahl === 1 ? 'Einheit' : 'Einheiten'}
-            </span>
-            <span className="vgid-chip ghost">
-              <MockIcon ctx="default" n="users" size={14} />
-              {personenAnzahl} {personenAnzahl === 1 ? 'Person' : 'Personen'}
-            </span>
             {flaecheGesamt > 0 ? (
               <span className="vgid-chip ghost">
                 <MockIcon ctx="default" n="building" size={14} />
@@ -281,12 +257,6 @@ export function ObjektAkteDetailClient({
       crumbBackLabel="Zurück zu Details"
       head={{
         title: objektState.titel,
-        titleBadges:
-          einheitenAnzahl > 0 ? (
-            <MockBadge kind="aktiv">
-              {einheitenAnzahl} {einheitenAnzahl === 1 ? 'Einheit' : 'Einheiten'}
-            </MockBadge>
-          ) : null,
         badges: adresse ? <span>{adresse}</span> : null,
         actions: (
           <DetailActionsBar

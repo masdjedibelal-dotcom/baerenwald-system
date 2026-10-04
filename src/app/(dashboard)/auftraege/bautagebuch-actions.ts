@@ -16,19 +16,16 @@ import {
   kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
-import type { AuftragPosition, Kunde } from '@/lib/types'
+import type { AuftragPosition,Kunde } from '@/lib/types'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
-import { auftragBautagebuchEintragUrl, projektUrlFromToken } from '@/lib/projekt/projekt-url'
+import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { sendMail } from '@/lib/mail-service'
-import { BAUTAGEBUCH_MAX_FOTOS, bautagebuchFotoUrls, resolveBautagebuchFotosForCrm } from '@/lib/auftraege/bautagebuch-fotos'
+import { bautagebuchFotoUrls,resolveBautagebuchFotosForCrm } from '@/lib/auftraege/bautagebuch-fotos'
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
 import { normalizeUrlList } from '@/lib/utils'
 import { richTextToPlain } from '@/lib/rich-text'
 import type { AuftragBautagebuchEintrag } from '@/lib/types'
-
-const GEWERK_UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function bautagebuchDbErrorMessage(message: string): string {
   if (/gewerk_id.*schema cache/i.test(message) || /gewerk_phase_key.*schema cache/i.test(message)) {
@@ -41,16 +38,6 @@ function bautagebuchDbErrorMessage(message: string): string {
   return message
 }
 
-function gewerkPhaseFromSelection(selected: string | null | undefined): {
-  gewerk_id: string | null
-  gewerk_phase_key: string | null
-} {
-  const v = selected?.trim()
-  if (!v) return { gewerk_id: null, gewerk_phase_key: null }
-  if (GEWERK_UUID_RE.test(v)) return { gewerk_id: v, gewerk_phase_key: null }
-  return { gewerk_id: null, gewerk_phase_key: v }
-}
-
 async function assertAuftrag(auftragId: string) {
   const supabase = createClient()
   const {
@@ -61,16 +48,6 @@ async function assertAuftrag(auftragId: string) {
   if (error) logDbError('app/auftraege/bautagebuch-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden', userId: null }
   return { ok: true as const, userId: user.id }
-}
-
-function normalizeBautagebuchFotoInput(
-  urls: string[] | null | undefined
-): string[] | { ok: false; message: string } {
-  const list = bautagebuchFotoUrls(normalizeUrlList(urls))
-  if (list.length > BAUTAGEBUCH_MAX_FOTOS) {
-    return { ok: false, message: `Maximal ${BAUTAGEBUCH_MAX_FOTOS} Fotos pro Bautagebuch-Eintrag.` }
-  }
-  return list
 }
 
 function mapEintrag(row: Record<string, unknown>): AuftragBautagebuchEintrag {
@@ -186,132 +163,6 @@ async function syncTimelineFromEintrag(
   return { ok: true, timelineId }
 }
 
-export async function createAuftragBautagebuchEintrag(input: {
-  auftragId: string
-  titel: string
-  beschreibung?: string | null
-  datum: string
-  gewerk_phase?: string | null
-  foto_urls?: string[]
-}): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const gate = await assertAuftrag(input.auftragId)
-  if (!gate.ok) return gate
-  const titel = input.titel.trim()
-  if (!titel) return { ok: false, message: 'Titel fehlt' }
-  const phase = gewerkPhaseFromSelection(input.gewerk_phase)
-  const fotos = normalizeBautagebuchFotoInput(input.foto_urls)
-  if (!Array.isArray(fotos)) return fotos
-
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('auftrag_bautagebuch_eintraege')
-    .insert({
-      auftrag_id: input.auftragId,
-      titel,
-      beschreibung: input.beschreibung?.trim() || null,
-      datum: input.datum.slice(0, 10),
-      gewerk_id: phase.gewerk_id,
-      gewerk_phase_key: phase.gewerk_phase_key,
-      foto_urls: fotos,
-    })
-    .select('id')
-    .single()
-  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
-
-  if (error || !data) {
-    return { ok: false, message: bautagebuchDbErrorMessage(error?.message ?? 'Speichern fehlgeschlagen') }
-  }
-  revalidateAuftragDetail(input.auftragId)
-  return { ok: true, id: data.id as string }
-}
-
-export async function updateAuftragBautagebuchEintrag(input: {
-  auftragId: string
-  eintragId: string
-  titel?: string
-  beschreibung?: string | null
-  datum?: string
-  gewerk_phase?: string | null
-  foto_urls?: string[]
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await assertAuftrag(input.auftragId)
-  if (!gate.ok) return gate
-
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (input.titel !== undefined) patch.titel = input.titel.trim()
-  if (input.beschreibung !== undefined) patch.beschreibung = input.beschreibung?.trim() || null
-  if (input.datum !== undefined) patch.datum = input.datum.slice(0, 10)
-  if (input.gewerk_phase !== undefined) {
-    const phase = gewerkPhaseFromSelection(input.gewerk_phase)
-    patch.gewerk_id = phase.gewerk_id
-    patch.gewerk_phase_key = phase.gewerk_phase_key
-  }
-  if (input.foto_urls !== undefined) {
-    const fotos = normalizeBautagebuchFotoInput(input.foto_urls)
-    if (!Array.isArray(fotos)) return fotos
-    patch.foto_urls = fotos
-  }
-
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('auftrag_bautagebuch_eintraege')
-    .update(patch)
-    .eq('id', input.eintragId)
-    .eq('auftrag_id', input.auftragId)
-  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
-
-  if (error) return { ok: false, message: bautagebuchDbErrorMessage(error.message) }
-
-  const { data: row, error: error2 } = await supabaseAdmin
-    .from('auftrag_bautagebuch_eintraege')
-    .select('*')
-    .eq('id', input.eintragId)
-    .maybeSingle()
-  if (error2) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error2)
-
-  if (row && (row as { fuer_kunde_freigegeben?: boolean }).fuer_kunde_freigegeben) {
-    const e = mapEintrag(row as Record<string, unknown>)
-    await syncTimelineFromEintrag(e, gate.userId, true)
-  }
-
-  revalidateAuftragDetail(input.auftragId)
-  return { ok: true }
-}
-
-export async function deleteAuftragBautagebuchEintrag(input: {
-  auftragId: string
-  eintragId: string
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await assertAuftrag(input.auftragId)
-  if (!gate.ok) return gate
-
-  const { data: row, error } = await supabaseAdmin
-    .from('auftrag_bautagebuch_eintraege')
-    .select('timeline_id')
-    .eq('id', input.eintragId)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error)
-
-  const supabase = createClient()
-  const { error: error2 } = await supabase
-    .from('auftrag_bautagebuch_eintraege')
-    .delete()
-    .eq('id', input.eintragId)
-    .eq('auftrag_id', input.auftragId)
-  if (error2) logDbError('app/auftraege/bautagebuch-actions:auftrag_bautagebuch_eintraege', error2)
-
-  if (error2) return { ok: false, message: bautagebuchDbErrorMessage(error2.message) }
-
-  const tlId = (row as { timeline_id?: string } | null)?.timeline_id
-  if (tlId) {
-    const { error: __dbErr2 } = await supabaseAdmin.from('auftrag_timeline').delete().eq('id', tlId)
-    if (__dbErr2) logDbError('app/auftraege/bautagebuch-actions:auftrag_timeline', __dbErr2)
-  }
-
-  revalidateAuftragDetail(input.auftragId)
-  return { ok: true }
-}
-
 async function loadBautagebuchMailKontext(auftragId: string, anredeOverride?: AngebotMailAnrede) {
   const { data: auf, error } = await supabaseAdmin
     .from('auftraege')
@@ -343,7 +194,7 @@ async function loadBautagebuchMailKontext(auftragId: string, anredeOverride?: An
     .order('sort_order', { ascending: true })
   if (error2) logDbError('app/auftraege/bautagebuch-actions:auftrag_positionen', error2)
 
-  const { data: gwRows, error: error3 } = await supabaseAdmin.from('gewerke').select('id, name, slug').eq('aktiv', true)
+  const { data: gwRows } = await supabaseAdmin.from('gewerke').select('id, name, slug').eq('aktiv', true)
   if (error2) logDbError('app/auftraege/bautagebuch-actions:gewerke', error2)
 
   return {
@@ -411,26 +262,6 @@ export async function getBautagebuchMailDefaults(
     defaultNachricht: nachricht,
     defaultTo: [ctx.kundeEmail],
     projektTitel: ctx.projektTitel,
-  }
-}
-
-export async function previewBautagebuchKundenMail(input: {
-  auftragId: string
-  eintragId: string
-  betreff: string
-  nachricht: string
-  anrede: AngebotMailAnrede
-}): Promise<
-  | { ok: true; html: string; defaultTo: string[]; defaultCc: string[] }
-  | { ok: false; message: string }
-> {
-  const built = await buildBautagebuchKundenMail(input)
-  if (!built.ok) return built
-  return {
-    ok: true,
-    html: built.html,
-    defaultTo: [built.kundeEmail],
-    defaultCc: [],
   }
 }
 

@@ -20,8 +20,6 @@ export const RECHNUNG_BELEG_TYP_LABELS: Record<RechnungBelegTyp, string> = {
   gutschrift: 'Gutschrift',
 }
 
-export const DEFAULT_ZAHLUNGSZIEL_TAGE = 14
-
 /** Standard-MwSt.-Satz, wenn Zeile keinen eigenen Satz hat */
 export const DEFAULT_MWST_SATZ = 19
 
@@ -34,9 +32,3 @@ export const HINWEIS_KLEINUNTERNEHMER =
 /** § 13b UStG — Reverse Charge Bauleistungen */
 export const HINWEIS_REVERSE_CHARGE_13B =
   'Steuerschuldnerschaft des Leistungsempfängers gemäß § 13b UStG (Reverse Charge). Die USt. ist vom Leistungsempfänger zu entrichten.'
-
-/** § 35a Abs. 3 EStG — nur wenn Lohnkosten auf der Rechnung ausgewiesen sind (Platzhalter {lohnNetto}) */
-export const HINWEIS_35A_TEMPLATE =
-  'Steuerlicher Hinweis gemäß § 35a Abs. 3 EStG: Der ausgewiesene Lohnkostenanteil in Höhe von {lohnNetto} (inkl. Anfahrt und Maschinenkosten, soweit enthalten; ohne Materialkosten) kann bei der Einkommensteuer geltend gemacht werden.'
-
-export const MWST_SAETZE_RECHNUNG = [0, 7, 19] as const

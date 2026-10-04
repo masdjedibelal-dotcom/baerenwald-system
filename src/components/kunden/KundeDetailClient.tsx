@@ -6,8 +6,7 @@ import {
   EntityDetailLayout,
   type DetailShellGroup,
 } from '@/components/layout/EntityDetailLayout'
-import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
@@ -18,8 +17,8 @@ import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense,useEffect,useMemo,useRef,useState } from 'react'
+import { useRouter,useSearchParams } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { Card } from '@/components/ui/Card'
 import { CustomFieldRenderer } from '@/components/ui/CustomFieldRenderer'
@@ -41,36 +40,28 @@ import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
 import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
 import { EntityKundenStammdatenCard } from '@/components/crm/EntityKundenStammdatenCard'
-import type { Kunde, KundenObjekt } from '@/lib/types'
+import type { Kunde,KundenObjekt } from '@/lib/types'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { useCrmRefresh } from '@/hooks/useCrmRefresh'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
-import { createAngebotHref, createRechnungHref } from '@/lib/crm/create-entry'
+import { createAngebotHref } from '@/lib/crm/create-entry'
 import { showRouteBusy } from '@/components/ui/action-busy'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
-import { buildKundeWirtschaft } from '@/lib/kunden/kunde-wirtschaft'
 import { useKundenMailCompose } from '@/components/kommunikation/useKundenMailCompose'
-import { mailComposeContextFromKunde } from '@/app/(dashboard)/kommunikation/actions'
-import { saveKundeCustomFieldValue, mergeKunden } from '@/app/actions/kunden'
+import { saveKundeCustomFieldValue,mergeKunden } from '@/app/actions/kunden'
 import { getPortalLoginHint } from '@/app/actions/kunden'
-import { getKundenPortalMailDraft, previewKundenPortalMail, sendKundenPortalLinkMail } from '@/app/actions/mails'
+import { previewKundenPortalMail,sendKundenPortalLinkMail } from '@/app/actions/mails'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import {
-  buildPortalLoginLink,
-  defaultPortalInviteBetreff,
-  defaultPortalInviteText,
+  buildPortalLoginLink
 } from '@/lib/portal-utils'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
-import type { CustomFieldDefinition, CustomFieldValueRow } from '@/lib/custom-fields'
+import type { CustomFieldDefinition,CustomFieldValueRow } from '@/lib/custom-fields'
 import { kundeRechnungsempfaengerAusStammdaten } from '@/lib/kunde-rechnungsempfaenger'
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
-import type { BewohnerPrivatkundeLink } from '@/app/actions/objektakte-actions'
-import Link from 'next/link'
-import { EINHEIT_BEWOHNER_ROLLE_LABELS } from '@/lib/objektakte/labels'
-import type { EinheitBewohnerRolle } from '@/lib/objektakte/types'
 import { TOAST } from '@/lib/copy'
 
 const QUELLE_LABELS: Record<string, string> = {
@@ -110,17 +101,15 @@ export function KundeDetailClient({
   customValues: initialValues,
   kundenObjekte = [],
   vorgaengeRows = [],
-  bewohnerLinks = [],
 }: {
   kunde: KundeDetailPayload
   customFieldDefs: CustomFieldDefinition[]
   customValues: CustomFieldValueRow[]
   kundenObjekte?: KundenObjekt[]
   vorgaengeRows?: VorgangListeRow[]
-  bewohnerLinks?: BewohnerPrivatkundeLink[]
 }) {
   const router = useRouter()
-  const { refresh, generation } = useCrmRefresh()
+  const { refresh } = useCrmRefresh()
   const mailCompose = useKundenMailCompose()
   const [kunde, setKunde] = useState(initialKunde)
   const [tab, setTab] = useState<KundeDetailTab>('uebersicht')
@@ -136,7 +125,7 @@ export function KundeDetailClient({
   const [customValues, setCustomValues] = useState(initialValues)
   const customSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [portalModalOpen, setPortalModalOpen] = useState(false)
-  const [portalLoading, setPortalLoading] = useState(false)
+  const [, ] = useState(false)
   const [portalSending, setPortalSending] = useState(false)
   const [portalLink, setPortalLink] = useState('')
   const [portalTo, setPortalTo] = useState('')
@@ -144,7 +133,7 @@ export function KundeDetailClient({
   const [portalBetreff, setPortalBetreff] = useState('')
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
-  const [portalAnrede, setPortalAnrede] = useState<'du' | 'sie'>('sie')
+  const [portalAnrede, ] = useState<'du' | 'sie'>('sie')
 
   const [mergePickerOpen, setMergePickerOpen] = useState(false)
   const [mergeOther, setMergeOther] = useState<Pick<Kunde, 'id' | 'name' | 'vorname' | 'nachname'> | null>(
@@ -251,18 +240,6 @@ export function KundeDetailClient({
 
   const zeigtObjekteTab = istKundeGewerbeTyp(kunde.typ)
 
-  const wirtschaftSnap = useMemo(() => buildKundeWirtschaft(kunde, 'all'), [kunde])
-
-  const letzterKontaktLabel = useMemo(() => {
-    const mails = kunde.email_logs ?? []
-    const latest = mails[0]?.created_at
-    if (!latest) return '—'
-    const d = new Date(latest)
-    if (Number.isNaN(d.getTime())) return '—'
-    const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
-    return `${days[d.getDay()]} · ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
-  }, [kunde.email_logs])
-
   const kundeSeitLabel = useMemo(() => {
     const raw = kunde.created_at
     if (!raw) return null
@@ -270,21 +247,6 @@ export function KundeDetailClient({
     if (Number.isNaN(d.getTime())) return null
     return `Kunde seit ${formatMonatKurzJahr(d)}`
   }, [kunde.created_at])
-
-  async function openPortalModal() {
-    setPortalLoading(true)
-    const draft = await getKundenPortalMailDraft(kunde.id)
-    setPortalLoading(false)
-    if (!draft.ok) return
-    setPortalLink(draft.portalLink)
-    setPortalTo(draft.to)
-    setPortalCc(draft.cc.join('; '))
-    setPortalBetreff(draft.betreff)
-    setPortalText(draft.text)
-    setPortalHtml(draft.html)
-    setPortalAnrede('sie')
-    setPortalModalOpen(true)
-  }
 
   async function sendenPortalLink() {
     setPortalSending(true)
@@ -367,59 +329,6 @@ export function KundeDetailClient({
 
   const fixedOverview = (
     <div className="space-y-4">
-      {bewohnerLinks.length > 0 ? (
-        <MockCard title="Verknüpft mit Objektakte" icon="building">
-          <p
-            className="mb-3 text-[length:var(--fs-meta)] leading-relaxed"
-            style={{ color: 'var(--text-3)' }}
-          >
-            Dieser Privatkunde stammt aus einer Einheit einer Hausverwaltung. Portal-Zugang bleibt
-            über die HV — eigene Vorgänge nur im CRM.
-          </p>
-          <ul className="space-y-2" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {bewohnerLinks.map((l) => {
-              const rolleLabel =
-                l.rolle === 'eigentuemer' || l.rolle === 'mieter'
-                  ? EINHEIT_BEWOHNER_ROLLE_LABELS[l.rolle as EinheitBewohnerRolle]
-                  : l.rolle || 'Person'
-              return (
-                <li
-                  key={l.bewohnerId}
-                  style={{
-                    border: '0.03125rem solid var(--border)',
-                    borderRadius: 10,
-                    padding: '0.625rem 0.75rem',
-                    background: 'var(--bg-soft)',
-                  }}
-                >
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--fs-text)' }}>
-                    {rolleLabel}: {l.bewohnerName}
-                  </p>
-                  <p
-                    style={{
-                      margin: 'var(--sp-row) 0 0',
-                      fontSize: 'var(--fs-meta)',
-                      color: 'var(--text-3)',
-                    }}
-                  >
-                    {l.einheitBezeichnung} ·{' '}
-                    <Link
-                      href={`/kunden/${l.hvKundeId}/objekte/${l.objektId}`}
-                      className="text-bw-link hover:underline"
-                    >
-                      {l.objektTitel}
-                    </Link>
-                    {' · '}
-                    <Link href={`/kunden/${l.hvKundeId}`} className="text-bw-link hover:underline">
-                      {l.hvName}
-                    </Link>
-                  </p>
-                </li>
-              )
-            })}
-          </ul>
-        </MockCard>
-      ) : null}
       <EntityKundenStammdatenCard
         kundeId={kunde.id}
         kundeTyp={kunde.typ}

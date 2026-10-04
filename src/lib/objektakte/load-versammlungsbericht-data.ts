@@ -213,8 +213,6 @@ export async function loadVersammlungsberichtPayload(input: {
   const von = input.von.trim()
   const bis = input.bis.trim()
   if (!kid || !oid) return null
-
-  const supabaseAnlagen = createClient()
   const [objekt, historie, kundeRes, anlagenRows] = await Promise.all([
     loadKundenObjektForAkte(kid, oid),
     loadObjektHistorie(kid, oid),

@@ -6,12 +6,12 @@ import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import 'server-only'
 
-import { normalizeAngebotPositionen, summenAusPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { istGewerkBeschreibungPosition } from '@/lib/dokument-zeilen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import type { AngebotPosition, AuftragPosition } from '@/lib/types'
+import type { AngebotPosition,AuftragPosition } from '@/lib/types'
 import {
   auftragSummenAusPositionen,
   istAbschlagPauschalPosition,
@@ -162,78 +162,6 @@ async function appendOrUpdateAuftragPositionen(
   }
 }
 
-async function mergeAngebotPositionen(
-  angebotId: string,
-  fromWizard: AngebotPosition[]
-): Promise<void> {
-  const { data: ang, error } = await supabaseAdmin
-    .from('angebote')
-    .select('positionen')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (error) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', error)
-  if (!ang) return
-
-  const existing = normalizeAngebotPositionen(ang.positionen)
-  const byKey = new Map(existing.map((p) => [posKey(p), p]))
-
-  for (const w of fromWizard) {
-    const k = posKey(w)
-    const prev = byKey.get(k)
-    if (prev) {
-      byKey.set(k, {
-        ...prev,
-        menge: w.menge,
-        lohn_netto: w.lohn_netto,
-        material_netto: w.material_netto,
-        vk_netto: w.vk_netto ?? w.gesamt_min,
-        gesamt_min: w.gesamt_min,
-        gesamt_max: w.gesamt_max,
-        beschreibung: w.beschreibung || prev.beschreibung,
-        einheit: w.einheit || prev.einheit,
-      })
-    } else {
-      byKey.set(k, { ...w, id: w.id?.trim() || crypto.randomUUID() })
-    }
-  }
-
-  const next = Array.from(byKey.values())
-  const summen = summenAusPositionen(next, 19)
-  const { error: __dbErr2 } = await supabaseAdmin
-    .from('angebote')
-    .update({
-      positionen: next,
-      // Listen (Vorgänge/Aufträge) lesen gesamt_* — nicht nur positionen-JSON
-      gesamt_min: summen.nettoMin,
-      gesamt_max: summen.nettoMax,
-      gesamt_fix: summen.nettoMin,
-    })
-    .eq('id', angebotId)
-  if (__dbErr2) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', __dbErr2)
-}
-
-/** Angebots-Summenfelder an aktuelle Positionen anbinden (Listenanzeige). */
-async function syncAngebotGesamtFelder(angebotId: string): Promise<void> {
-  const { data: ang, error } = await supabaseAdmin
-    .from('angebote')
-    .select('positionen')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (error) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', error)
-  if (!ang) return
-  const pos = normalizeAngebotPositionen(ang.positionen)
-  const summen = summenAusPositionen(pos, 19)
-  const { error: __dbErr3 } = await supabaseAdmin
-    .from('angebote')
-    .update({
-      gesamt_min: summen.nettoMin,
-      gesamt_max: summen.nettoMax,
-      gesamt_fix: summen.nettoMin,
-    })
-    .eq('id', angebotId)
-  if (__dbErr3) logDbError('lib/rechnungen/sync-vk-nach-schlussrechnung:angebote', __dbErr3)
-}
-
 /**
  * Nur aufrufen, wenn Schlussrechnung + gestellte Raten die Auftragssumme übersteigen würden.
  * Hebt Auftrag (und Angebot) an — löscht nichts, senkt nichts.
@@ -256,7 +184,7 @@ export async function raiseAuftragVkFuerSchlussrechnung(input: {
   const neededVkBrutto = Math.round((bereits + neueBrutto) * 100) / 100
   const neededVkNetto = Math.round((neededVkBrutto / ratio) * 100) / 100
 
-  let { vkNetto, angebotId, auftragPos } = await loadAuftragVkNetto(auftragId)
+  let { vkNetto, auftragPos } = await loadAuftragVkNetto(auftragId)
   const vkBrutto = Math.round(Math.max(0, vkNetto) * ratio * 100) / 100
   if (neededVkBrutto <= vkBrutto + 0.5) {
     return { ok: true, vkNetto, adjusted: false }
@@ -268,7 +196,7 @@ export async function raiseAuftragVkFuerSchlussrechnung(input: {
     // Das angenommene Angebot bleibt unverändert (Dokument, das der Kunde angenommen hat) — nur der Auftrag zieht mit.
   }
 
-  ;({ vkNetto, angebotId, auftragPos } = await loadAuftragVkNetto(auftragId))
+  ;({ vkNetto, auftragPos } = await loadAuftragVkNetto(auftragId))
   if (vkNetto + 0.01 < neededVkNetto) {
     const delta = Math.round((neededVkNetto - vkNetto) * 100) / 100
     if (delta > 0.5) {
@@ -277,7 +205,6 @@ export async function raiseAuftragVkFuerSchlussrechnung(input: {
       vkNetto = Math.round((vkNetto + delta) * 100) / 100
     }
   }
-
 
   await insertAuftragTimelineEvent({
     auftrag_id: auftragId,

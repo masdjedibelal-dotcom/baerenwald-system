@@ -80,10 +80,3 @@ export function alternatePartnerDocBucket(bucket: string): string | null {
   if (bucket === HANDWERKER_UPLOADS_BUCKET) return PARTNER_DOCS_BUCKET
   return null
 }
-
-/** Relativer Storage-Pfad im CRM-Bucket partner-dokumente (Legacy). */
-export function partnerDokumentStoragePath(datei_url: string | null | undefined): string | null {
-  const ref = parseStoredDocumentRef(datei_url)
-  if (!ref || ref.bucket !== PARTNER_DOCS_BUCKET) return null
-  return ref.path
-}

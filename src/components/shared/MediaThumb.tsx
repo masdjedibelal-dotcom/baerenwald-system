@@ -1,7 +1,7 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback,useEffect,useState } from 'react'
 import { refreshHandwerkerMediaUrl } from '@/app/(dashboard)/auftraege/handwerker-media-actions'
 import { cn } from '@/lib/utils'
 import { C } from '@/lib/tokens/colors'
@@ -118,32 +118,4 @@ export function MediaThumb({
   }
 
   return <span className={shellClass}>{img}</span>
-}
-
-export function MediaThumbStrip({
-  urls,
-  max = 3,
-  size = 'sm',
-  className,
-}: {
-  urls: string[]
-  max?: number
-  size?: MediaThumbSize
-  className?: string
-}) {
-  const list = urls.filter(Boolean).slice(0, max)
-  if (!list.length) return null
-  const rest = urls.length - list.length
-  return (
-    <div className={cn('flex shrink-0 items-center gap-1', className)}>
-      {list.map((u, i) => (
-        <MediaThumb key={`${u.slice(0, 48)}-${i}`} src={u} size={size} />
-      ))}
-      {rest > 0 ? (
-        <span className={`text-fs-caption font-bold tabular-nums text-[var(--text-3,${C.grayNeutral2})]`}>
-          +{rest}
-        </span>
-      ) : null}
-    </div>
-  )
 }

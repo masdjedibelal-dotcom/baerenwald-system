@@ -1,30 +1,30 @@
 'use client'
 
-import { ListBulkBar, MockBtn, MockChip, MockEmpty, MockIcon, MockPager, MockSortHead } from '@/components/mock-ui'
-import { MockEntityRowMenu, MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { ListBulkBar,MockBtn,MockChip,MockEmpty,MockIcon,MockPager,MockSortHead } from '@/components/mock-ui'
+import { MockEntityRowMenu,MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter,useSearchParams } from 'next/navigation'
+import { useCallback,useEffect,useMemo,useState } from 'react'
 import { buildListReturnUrl } from '@/lib/list-return-url'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { openFabCreate } from '@/components/neu/FabCreateHost'
-import { useExport, type ExportField } from '@/hooks/useExport'
+import { useExport,type ExportField } from '@/hooks/useExport'
 import { useListPage } from '@/hooks/useListPage'
 import { runMockListExport } from '@/lib/mock-list-export'
-import { runDuplicateHandwerker, runDeleteHandwerker } from '@/lib/list-actions'
+import { runDeleteHandwerker } from '@/lib/list-actions'
 import { COPY_ROLE } from '@/lib/copy'
 import { listSortDirNum } from '@/lib/list-mock-sort'
-import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
+import { handwerkerDisplayName,handwerkerGfName } from '@/lib/handwerker-stammdaten'
 import { cn } from '@/lib/utils'
 import { MobileListFilterSheet } from '@/components/ui/MobileListFilterSheet'
 import { PullToRefresh } from '@/components/ui/PullToRefresh'
 import { SwipeRow } from '@/components/ui/SwipeRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { useResizableColumns, type ResizableColDef } from '@/hooks/useResizableColumns'
+import { useResizableColumns,type ResizableColDef } from '@/hooks/useResizableColumns'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { toast } from '@/components/ui/app-toast'
 import { ListRowCheck } from '@/components/ui/ListRowCheck'
@@ -579,7 +579,6 @@ export function HandwerkerListeClient({
             const primaryGewerk = pills[0] ?? null
             const tel = h.telefon?.trim() || ''
             const mail = h.email?.trim() || ''
-            const copy = () => runDuplicateHandwerker(h.id, router)
             const edit = () => openDetail(h.id)
             const del = () => {
               void runDeleteHandwerker(h.id, router, handwerkerDisplayName(h))

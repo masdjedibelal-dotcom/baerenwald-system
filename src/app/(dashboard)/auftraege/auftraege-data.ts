@@ -20,8 +20,7 @@ import type {
   AuftragDetail,
   AuftragPartnerAufgabe,
   AuftragPosition,
-  AuftragTimelineEvent,
-  FormularTemplate,
+  AuftragTimelineEvent
 } from '@/lib/types'
 
 function parsePositionen(raw: unknown): AngebotPosition[] {
@@ -350,15 +349,4 @@ export async function loadRechnungenForAuftrag(auftragId: string) {
   return (data ?? []).filter(
     (r) => String((r as { richtung?: string | null }).richtung ?? '') !== 'eingehend'
   )
-}
-
-export async function listFormularTemplates(): Promise<FormularTemplate[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('formular_templates')
-    .select('*')
-    .eq('aktiv', true)
-    .order('name')
-  if (error) logDbError('app/auftraege/auftraege-data:formular_templates', error)
-  return (data ?? []) as FormularTemplate[]
 }

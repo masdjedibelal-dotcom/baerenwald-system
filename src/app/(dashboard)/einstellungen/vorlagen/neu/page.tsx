@@ -1,7 +1,6 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { AngebotNeuForm } from '@/components/angebote/AngebotNeuForm'
-import type { Gewerk, Handwerker, Preisliste } from '@/lib/types'
+import type { Gewerk,Handwerker,Preisliste } from '@/lib/types'
 
 export default async function VorlageNeuPage() {
   const supabase = createClient()

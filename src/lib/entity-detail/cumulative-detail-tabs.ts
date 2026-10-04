@@ -14,8 +14,6 @@ export const CUMULATIVE_DETAIL_LABEL = {
   rechnung: 'Rechnung',
 } as const
 
-export type CumulativeDetailPhase = keyof typeof CUMULATIVE_DETAIL_TAB
-
 /** Query-Aliase → stabile Tab-ID für frühere Phasen. */
 export function resolveCumulativeDetailTabAlias(raw: string): string | null {
   const tab = raw.trim().toLowerCase().replace(/^#/, '')

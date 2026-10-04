@@ -1,17 +1,17 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAuftragDetail,revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
-import { filterHandwerkerFuerGewerkSlug, handwerkerHatGewerkSlug } from '@/lib/handwerker/gewerk-match'
+import { filterHandwerkerFuerGewerkSlug,handwerkerHatGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import type { AuftragHandwerkerZuweisungStatus } from '@/lib/auftraege/auftrag-handwerker-status'
 import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import { metaBeimSendenAnHandwerker } from '@/lib/auftraege/partner-vorgang-meta'
-import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
+import { notifyPartnerUnified,partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
 import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
 import {
   listHandwerkerFuerGewerk,
@@ -56,7 +56,6 @@ function mapHandwerkerMitEinsatz(
         : null,
   }))
 }
-
 
 async function loadEinsatzMeta(
   supabase: SupabaseClient,
@@ -498,136 +497,6 @@ export async function assignAuftragHandwerkerPosition(input: {
   return { ok: true }
 }
 
-/**
- * Zuweisung einer oder mehrerer Auftragspositionen zurückziehen.
- * Partner sieht die Leistung danach nicht mehr (Filter über handwerker_id).
- */
-export async function clearAuftragHandwerkerPositionen(input: {
-  auftragId: string
-  positionIds: string[]
-}): Promise<{ ok: true; cleared: number } | { ok: false; message: string }> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-
-  const supabase = gate.db
-  const auftragId = input.auftragId.trim()
-  const positionIds = [
-    ...new Set(input.positionIds.map((id) => id.trim()).filter(Boolean)),
-  ]
-  if (!auftragId || !positionIds.length) {
-    return { ok: false, message: 'Auftrag oder Position fehlt.' }
-  }
-
-  const { data: auftrag, error: aErr } = await supabase
-    .from('auftraege')
-    .select('id, status, angebot_id')
-    .eq('id', auftragId)
-    .maybeSingle()
-  if (aErr) logDbError('app/auftraege/handwerker-actions:auftraege', aErr)
-  if (aErr || !auftrag) return { ok: false, message: 'Auftrag nicht gefunden.' }
-  if (String(auftrag.status ?? '') === 'storniert') {
-    return { ok: false, message: 'Stornierte Aufträge können nicht geändert werden.' }
-  }
-
-  const { data: positions, error: pErr } = await supabase
-    .from('auftrag_positionen')
-    .select(
-      'id, auftrag_id, handwerker_id, gewerk_slug, gewerk_name, leistung_name, handwerker(name)'
-    )
-    .eq('auftrag_id', auftragId)
-    .in('id', positionIds)
-  if (pErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', pErr)
-
-  if (pErr) return { ok: false, message: pErr.message }
-  const rows = positions ?? []
-  if (!rows.length) return { ok: false, message: 'Positionen nicht gefunden.' }
-
-  const assigned = rows.filter((r) => String(r.handwerker_id ?? '').trim())
-  if (!assigned.length) {
-    return { ok: false, message: 'Keine Zuweisung zum Zurückziehen.' }
-  }
-
-  const { error: upErr } = await supabase
-    .from('auftrag_positionen')
-    .update({
-      handwerker_id: null,
-      handwerker_status: null,
-      handwerker_angefragt_at: null,
-    })
-    .eq('auftrag_id', auftragId)
-    .in(
-      'id',
-      assigned.map((r) => String(r.id))
-    )
-  if (upErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', upErr)
-
-  if (upErr) return { ok: false, message: upErr.message }
-
-  // auftrag_handwerker aufräumen, wenn keine Positionen mehr für HW+Gewerk
-  const touched = new Map<string, { handwerkerId: string; gewerkSlug: string | null }>()
-  for (const r of assigned) {
-    const hwId = String(r.handwerker_id ?? '').trim()
-    if (!hwId) continue
-    const slug = (r.gewerk_slug as string | null)?.trim() || null
-    touched.set(`${hwId}::${slug ?? ''}`, { handwerkerId: hwId, gewerkSlug: slug })
-  }
-
-  for (const { handwerkerId, gewerkSlug } of Array.from(touched.values())) {
-    let restQ = supabase
-      .from('auftrag_positionen')
-      .select('id')
-      .eq('auftrag_id', auftragId)
-      .eq('handwerker_id', handwerkerId)
-      .limit(1)
-    if (gewerkSlug) restQ = restQ.eq('gewerk_slug', gewerkSlug)
-    const { data: rest } = await restQ
-    if ((rest ?? []).length > 0) continue
-
-    if (gewerkSlug) {
-      const { data: gw, error } = await supabase
-        .from('gewerke')
-        .select('id')
-        .eq('slug', gewerkSlug)
-        .maybeSingle()
-      if (error) logDbError('app/auftraege/handwerker-actions:gewerke', error)
-      if (gw?.id) {
-        const { error: __dbErr3 } = await supabase
-          .from('auftrag_handwerker')
-          .delete()
-          .eq('auftrag_id', auftragId)
-          .eq('handwerker_id', handwerkerId)
-          .eq('gewerk_id', gw.id)
-        if (__dbErr3) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', __dbErr3)
-      }
-    } else {
-      const { error: __dbErr4 } = await supabase
-        .from('auftrag_handwerker')
-        .delete()
-        .eq('auftrag_id', auftragId)
-        .eq('handwerker_id', handwerkerId)
-      if (__dbErr4) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', __dbErr4)
-    }
-  }
-
-  const names = assigned.map((r) => {
-    const hw = Array.isArray(r.handwerker) ? r.handwerker[0] : r.handwerker
-    const hwName = (hw as { name?: string } | null)?.name?.trim() || 'Partner'
-    return `${r.leistung_name ?? 'Leistung'} ← ${hwName}`
-  })
-  await logHwTimeline(
-    auftragId,
-    assigned.length === 1 ? 'Zuweisung zurückgezogen' : 'Zuweisungen zurückgezogen',
-    names.join('; '),
-    String(assigned[0]?.handwerker_id ?? '') || null
-  )
-
-  revalidateAuftragDetail(auftragId)
-  const angebotId = String(auftrag.angebot_id ?? '').trim()
-  if (angebotId) revalidateAngebotDetail(angebotId)
-
-  return { ok: true, cleared: assigned.length }
-}
-
 /** TC-11d: Partner hat abgelehnt → anderen Partner zuweisen und erneut anfragen. */
 export async function replaceAuftragHandwerkerUndSenden(input: {
   auftragId: string
@@ -940,175 +809,5 @@ export async function replaceAuftragHandwerkerUndSenden(input: {
     revalidateLeadDetail(String(leadId))
   }
 
-  return { ok: true }
-}
-
-export async function updateAuftragHandwerkerStatus(input: {
-  auftragId: string
-  zuweisungId: string
-  status: AuftragHandwerkerZuweisungStatus
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-
-  const supabase = gate.db
-
-  const { data: row, error: findErr } = await supabase
-    .from('auftrag_handwerker')
-    .select('id, handwerker_id, gewerk_id, gewerke(name), handwerker(name)')
-    .eq('id', input.zuweisungId)
-    .eq('auftrag_id', input.auftragId)
-    .maybeSingle()
-  if (findErr) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', findErr)
-  if (findErr || !row) return { ok: false, message: 'Zuweisung nicht gefunden' }
-
-  const { error: error2 } = await writeAuftragHandwerkerStatus(
-    supabase,
-    input.zuweisungId,
-    input.status
-  )
-  if (error2) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error2)
-  if (error2) return { ok: false, message: error2.message }
-
-  const gewerkId = (row as { gewerk_id?: string }).gewerk_id
-  const handwerkerId = row.handwerker_id as string
-  if (gewerkId && handwerkerId) {
-    const { data: gw, error } = await supabase.from('gewerke').select('slug, name').eq('id', gewerkId).maybeSingle()
-    if (error) logDbError('app/auftraege/handwerker-actions:gewerke', error)
-    let posQuery = supabase
-      .from('auftrag_positionen')
-      .select('id')
-      .eq('auftrag_id', input.auftragId)
-      .eq('handwerker_id', handwerkerId)
-    if (gw?.slug) {
-      posQuery = posQuery.eq('gewerk_slug', gw.slug as string)
-    } else if (gw?.name) {
-      posQuery = posQuery.eq('gewerk_name', gw.name as string)
-    }
-    const { data: posRows } = await posQuery
-    const now = new Date().toISOString()
-    for (const p of posRows ?? []) {
-      const { error: __dbErr5 } = await supabase
-        .from('auftrag_positionen')
-        .update({
-          handwerker_status: input.status,
-          handwerker_angefragt_at: input.status === 'angefragt' ? now : null,
-        })
-        .eq('id', p.id as string)
-      if (__dbErr5) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', __dbErr5)
-    }
-  }
-
-  const gwRaw = row.gewerke as unknown
-  const gwName = (Array.isArray(gwRaw) ? gwRaw[0] : gwRaw) as { name?: string } | null
-  const hwRaw = row.handwerker as unknown
-  const hwName = (Array.isArray(hwRaw) ? hwRaw[0] : hwRaw) as { name?: string } | null
-
-  await logHwTimeline(
-    input.auftragId,
-    `Status geändert: ${hwName?.name ?? 'Partner'}`,
-    `${gwName?.name ?? 'Gewerk'} → ${input.status}`,
-    row.handwerker_id as string
-  )
-
-  revalidateAuftragDetail(input.auftragId)
-  return { ok: true }
-}
-
-export async function updateAuftragPositionHandwerkerStatus(input: {
-  auftragId: string
-  positionId: string
-  status: AuftragHandwerkerZuweisungStatus
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-
-  const supabase = gate.db
-  const now = new Date().toISOString()
-
-  const { data: pos, error: posErr } = await supabase
-    .from('auftrag_positionen')
-    .select('id, auftrag_id, leistung_name, handwerker_id')
-    .eq('id', input.positionId)
-    .maybeSingle()
-  if (posErr) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', posErr)
-  if (posErr) return { ok: false, message: posErr.message }
-  if (!pos) return { ok: false, message: 'Position nicht gefunden' }
-  if (pos.auftrag_id !== input.auftragId) {
-    return { ok: false, message: 'Position gehört nicht zu diesem Auftrag' }
-  }
-
-  const { error: error2 } = await supabase
-    .from('auftrag_positionen')
-    .update({
-      handwerker_status: input.status,
-      handwerker_angefragt_at: input.status === 'angefragt' ? now : null,
-    })
-    .eq('id', input.positionId)
-  if (error2) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', error2)
-  if (error2) return { ok: false, message: error2.message }
-
-  await logHwTimeline(
-    input.auftragId,
-    `Leistungs-Status geändert`,
-    `${pos.leistung_name} → ${input.status}`,
-    pos.handwerker_id as string | null
-  )
-
-  revalidateAuftragDetail(input.auftragId)
-  return { ok: true }
-}
-
-export async function updateAuftragHandwerkerDetails(input: {
-  auftragId: string
-  zuweisungId: string
-  vereinbarter_preis?: number | null
-  absprachen?: string | null
-  notizen?: string | null
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-
-  const supabase = gate.db
-  const patch: Record<string, unknown> = {}
-  if (input.vereinbarter_preis !== undefined) patch.vereinbarter_preis = input.vereinbarter_preis
-  if (input.absprachen !== undefined) patch.absprachen = input.absprachen?.trim() || null
-  if (input.notizen !== undefined) patch.notizen = input.notizen?.trim() || null
-
-  const { error } = await supabase
-    .from('auftrag_handwerker')
-    .update(patch)
-    .eq('id', input.zuweisungId)
-    .eq('auftrag_id', input.auftragId)
-  if (error) logDbError('app/auftraege/handwerker-actions:auftrag_handwerker', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAuftragDetail(input.auftragId)
-  return { ok: true }
-}
-
-export async function updateAuftragPositionDetails(input: {
-  auftragId: string
-  positionId: string
-  preis_fix?: number | null
-  absprachen?: string | null
-  notizen_intern?: string | null
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-
-  const supabase = gate.db
-  const patch: Record<string, unknown> = {}
-  if (input.preis_fix !== undefined) patch.preis_fix = input.preis_fix
-  if (input.absprachen !== undefined) patch.absprachen = input.absprachen?.trim() || null
-  if (input.notizen_intern !== undefined) patch.notizen_intern = input.notizen_intern?.trim() || null
-
-  const { error } = await supabase
-    .from('auftrag_positionen')
-    .update(patch)
-    .eq('id', input.positionId)
-    .eq('auftrag_id', input.auftragId)
-  if (error) logDbError('app/auftraege/handwerker-actions:auftrag_positionen', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAuftragDetail(input.auftragId)
   return { ok: true }
 }

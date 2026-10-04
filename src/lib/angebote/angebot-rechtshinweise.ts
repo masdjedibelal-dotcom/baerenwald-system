@@ -5,10 +5,8 @@ import {
 } from '@/lib/rechnung-berechnung'
 import {
   HINWEIS_KLEINUNTERNEHMER,
-  HINWEIS_REVERSE_CHARGE_13B,
-  HINWEIS_35A_TEMPLATE,
+  HINWEIS_REVERSE_CHARGE_13B
 } from '@/lib/rechnung-config'
-import { formatEuro } from '@/lib/format/geld-datum'
 
 export type AngebotRechtshinweise = {
   hinweis_35a: boolean
@@ -50,27 +48,7 @@ export function parseRechtshinweiseFromWizardMeta(
   }
 }
 
-export function formatHinweis35a(lohnNetto: number): string {
-  const f = (n: number) => formatEuro(n, { suffix: false })
-  return HINWEIS_35A_TEMPLATE.replace('{lohnNetto}', `${f(lohnNetto)} €`)
-}
-
 export { HINWEIS_KLEINUNTERNEHMER, HINWEIS_REVERSE_CHARGE_13B }
-
-export function kannHinweis35aAngebot(
-  _kundeTyp: string | null | undefined,
-  _firm: FirmenEinstellungen,
-  _lohnNetto: number
-): boolean {
-  return true
-}
-
-export function kannHinweis13bAngebot(
-  _kundeTyp: string | null | undefined,
-  _firm: FirmenEinstellungen
-): boolean {
-  return true
-}
 
 /** USt + Steuernummer für PDF-Fuß (wie Musterangebot). */
 export function firmenSteuerFooterZeilen(firm: FirmenEinstellungen): string[] {
@@ -87,9 +65,4 @@ export function firmenBankverbindungZeilen(firm: FirmenEinstellungen): string[] 
   if (firm.iban?.trim()) lines.push(`IBAN: ${firm.iban.trim()}`)
   if (firm.bic?.trim()) lines.push(`BIC: ${firm.bic.trim()}`)
   return lines
-}
-
-/** @deprecated Nutze firmenSteuerFooterZeilen + firmenBankverbindungZeilen */
-export function firmenSteuerBankZeilen(firm: FirmenEinstellungen): string[] {
-  return [...firmenSteuerFooterZeilen(firm), ...firmenBankverbindungZeilen(firm)]
 }

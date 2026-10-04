@@ -189,37 +189,6 @@ export async function ensureRechnungsnummerFuerVersand(
   return { ok: false, message: 'Rechnungsnummer konnte nicht vergeben werden.' }
 }
 
-/** @deprecated Nicht beim Öffnen von Entwürfen aufrufen — sonst Lücken in der Nummernfolge. */
-export async function maybeUpgradeLegacyRechnungsnummer(
-  supabase: SupabaseClient,
-  rechnungId: string,
-  current: string | null | undefined,
-  status: string,
-  belegTyp: RechnungBelegNummerTyp = 'rechnung'
-): Promise<string> {
-  if (String(status ?? '').toLowerCase() === 'entwurf') {
-    return current?.trim() ?? ''
-  }
-  const res = await ensureRechnungsnummerFuerVersand(supabase, rechnungId, current, belegTyp)
-  return res.ok ? res.nummer : current?.trim() ?? ''
-}
-
-/**
- * Eingabe aus dem Wizard: volle Nummer oder nur Suffix (z. B. 2070 → RE2026-2070).
- */
-export function normalizeRechnungsnummerInput(
-  raw: string,
-  typ: RechnungBelegNummerTyp = 'rechnung'
-): string | null {
-  const t = raw.trim().toUpperCase().replace(/\s+/g, '')
-  if (!t) return null
-  if (isRe2026FormatNummer(t, typ)) return t
-  if (/^\d{1,8}$/.test(t)) {
-    return `${rechnungsnummerPrefix(typ)}${t}`
-  }
-  return null
-}
-
 /** Prüft, ob die Nummer noch frei ist (außer der eigenen Entwurfs-ID). */
 export async function rechnungsnummerIstFrei(
   supabase: SupabaseClient,

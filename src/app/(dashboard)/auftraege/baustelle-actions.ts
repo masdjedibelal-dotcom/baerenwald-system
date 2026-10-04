@@ -3,8 +3,6 @@
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import {
   parseStringListJson,
   type AuftragBaustellenDokument,
@@ -13,9 +11,6 @@ import {
   type AuftragWochenbericht,
   type BaustellenDokumentTyp,
 } from '@/lib/auftraege/baustelle-types'
-import { kwZeitraum } from '@/lib/auftraege/kalenderwoche'
-import { renderWochenberichtPdfBuffer } from '@/lib/auftraege/render-wochenbericht-pdf'
-import { renderRegieberichtSammelPdfBuffer } from '@/lib/auftraege/render-regiebericht-sammel-pdf'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import type { Kunde } from '@/lib/types'
 
@@ -101,30 +96,6 @@ export async function loadAuftragBaustelleTeam(auftragId: string): Promise<Auftr
   }
 }
 
-export async function saveAuftragBaustelleTeam(
-  auftragId: string,
-  team: AuftragBaustelleTeam
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const g = await gate(auftragId)
-  if (!g.ok) return g
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('auftraege')
-    .update({
-      bauleiter_name: team.bauleiter_name?.trim() || null,
-      bauleiter_telefon: team.bauleiter_telefon?.trim() || null,
-      bauleiter_email: team.bauleiter_email?.trim() || null,
-      bau_mannschaft: team.bau_mannschaft.filter((x) => x.trim()),
-      bau_nachunternehmer_name: team.bau_nachunternehmer_name?.trim() || null,
-      bau_nachunternehmer_firma: team.bau_nachunternehmer_firma?.trim() || null,
-    })
-    .eq('id', auftragId)
-  if (error) logDbError('app/auftraege/baustelle-actions:auftraege', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAuftragDetail(auftragId)
-  return { ok: true }
-}
-
 export async function listAuftragRegiearbeiten(auftragId: string): Promise<AuftragRegiearbeit[]> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -137,78 +108,6 @@ export async function listAuftragRegiearbeiten(auftragId: string): Promise<Auftr
   return (data ?? []).map((r) => mapRegie(r as Record<string, unknown>))
 }
 
-export async function createAuftragRegiearbeit(input: {
-  auftrag_id: string
-  datum: string
-  bezeichnung: string
-  beschreibung?: string | null
-  personen_anzahl: number
-  stunden: number
-  material?: string | null
-}): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const g = await gate(input.auftrag_id)
-  if (!g.ok) return g
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('auftrag_regiearbeiten')
-    .insert({
-      auftrag_id: input.auftrag_id,
-      datum: input.datum,
-      bezeichnung: input.bezeichnung.trim(),
-      beschreibung: input.beschreibung?.trim() || null,
-      personen_anzahl: Math.max(1, input.personen_anzahl),
-      stunden: Math.max(0, input.stunden),
-      material: input.material?.trim() || null,
-    })
-    .select('id')
-    .single()
-  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_regiearbeiten', error)
-  if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
-  revalidateAuftragDetail(input.auftrag_id)
-  return { ok: true, id: data.id as string }
-}
-
-export async function updateAuftragRegiearbeit(
-  id: string,
-  auftragId: string,
-  input: Omit<Parameters<typeof createAuftragRegiearbeit>[0], 'auftrag_id'>
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const g = await gate(auftragId)
-  if (!g.ok) return g
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('auftrag_regiearbeiten')
-    .update({
-      datum: input.datum,
-      bezeichnung: input.bezeichnung.trim(),
-      beschreibung: input.beschreibung?.trim() || null,
-      personen_anzahl: Math.max(1, input.personen_anzahl),
-      stunden: Math.max(0, input.stunden),
-      material: input.material?.trim() || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .eq('auftrag_id', auftragId)
-  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_regiearbeiten', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAuftragDetail(auftragId)
-  return { ok: true }
-}
-
-export async function deleteAuftragRegiearbeit(
-  id: string,
-  auftragId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const g = await gate(auftragId)
-  if (!g.ok) return g
-  const supabase = createClient()
-  const { error } = await supabase.from('auftrag_regiearbeiten').delete().eq('id', id).eq('auftrag_id', auftragId)
-  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_regiearbeiten', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAuftragDetail(auftragId)
-  return { ok: true }
-}
-
 export async function listAuftragWochenberichte(auftragId: string): Promise<AuftragWochenbericht[]> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -219,88 +118,6 @@ export async function listAuftragWochenberichte(auftragId: string): Promise<Auft
   if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
   if (error) return []
   return (data ?? []).map((r) => mapWoche(r as Record<string, unknown>))
-}
-
-async function naechsteWochenNummer(auftragId: string): Promise<number> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('auftrag_wochenberichte')
-    .select('wochen_nummer')
-    .eq('auftrag_id', auftragId)
-    .order('wochen_nummer', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
-  return ((data as { wochen_nummer?: number } | null)?.wochen_nummer ?? 0) + 1
-}
-
-export async function createAuftragWochenbericht(input: {
-  auftrag_id: string
-  kalenderwoche: number
-  jahr: number
-  fazit?: string | null
-  ausblick?: string | null
-}): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const g = await gate(input.auftrag_id)
-  if (!g.ok) return g
-  const { von, bis } = kwZeitraum(input.kalenderwoche, input.jahr)
-  const wochenNummer = await naechsteWochenNummer(input.auftrag_id)
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('auftrag_wochenberichte')
-    .insert({
-      auftrag_id: input.auftrag_id,
-      wochen_nummer: wochenNummer,
-      kalenderwoche: input.kalenderwoche,
-      jahr: input.jahr,
-      von_datum: von,
-      bis_datum: bis,
-      fazit: input.fazit?.trim() || null,
-      ausblick: input.ausblick?.trim() || null,
-    })
-    .select('id')
-    .single()
-  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
-  if (error || !data) return { ok: false, message: error?.message ?? 'Anlegen fehlgeschlagen' }
-  revalidateAuftragDetail(input.auftrag_id)
-  return { ok: true, id: data.id as string }
-}
-
-export async function updateAuftragWochenbericht(
-  id: string,
-  auftragId: string,
-  patch: { fazit?: string | null; ausblick?: string | null }
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const g = await gate(auftragId)
-  if (!g.ok) return g
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('auftrag_wochenberichte')
-    .update({
-      fazit: patch.fazit?.trim() || null,
-      ausblick: patch.ausblick?.trim() || null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .eq('auftrag_id', auftragId)
-  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAuftragDetail(auftragId)
-  return { ok: true }
-}
-
-export async function deleteAuftragWochenbericht(
-  id: string,
-  auftragId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const g = await gate(auftragId)
-  if (!g.ok) return g
-  const supabase = createClient()
-  const { error } = await supabase.from('auftrag_wochenberichte').delete().eq('id', id).eq('auftrag_id', auftragId)
-  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAuftragDetail(auftragId)
-  return { ok: true }
 }
 
 export async function listAuftragBaustellenDokumente(auftragId: string): Promise<AuftragBaustellenDokument[]> {
@@ -358,24 +175,6 @@ export async function createBaustellenDokumentEintrag(input: {
 
   revalidateAuftragDetail(input.auftragId)
   return { ok: true, id: data.id as string }
-}
-
-export async function deleteBaustellenDokument(
-  id: string,
-  auftragId: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const g = await gate(auftragId)
-  if (!g.ok) return g
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('auftrag_baustellen_dokumente')
-    .delete()
-    .eq('id', id)
-    .eq('auftrag_id', auftragId)
-  if (error) logDbError('app/auftraege/baustelle-actions:auftrag_baustellen_dokumente', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAuftragDetail(auftragId)
-  return { ok: true }
 }
 
 type TagesberichtKurz = {
@@ -525,94 +324,5 @@ export async function loadRegieSammelPdfDaten(
     jahr,
     vonDatum,
     bisDatum,
-  }
-}
-
-async function persistGeneriertesPdf(
-  auftragId: string,
-  typ: BaustellenDokumentTyp,
-  titel: string,
-  buffer: Buffer,
-  meta: { kalenderwoche?: number; jahr?: number; wochen_nummer?: number; referenz_id?: string }
-): Promise<string> {
-  const path = `baustellen-dokumente/${auftragId}/${Date.now()}-${typ}.pdf`
-  const { error: upErr } = await supabaseAdmin.storage
-    .from('protokolle')
-    .upload(path, buffer, { contentType: 'application/pdf', upsert: true })
-  if (upErr) logDbError('app/auftraege/baustelle-actions:protokolle', upErr)
-  if (upErr) throw new Error(upErr.message)
-  const { data: pub } = supabaseAdmin.storage.from('protokolle').getPublicUrl(path)
-  await createBaustellenDokumentEintrag({
-    auftragId,
-    typ,
-    titel,
-    datei_url: pub.publicUrl,
-    kalenderwoche: meta.kalenderwoche ?? null,
-    jahr: meta.jahr ?? null,
-    wochen_nummer: meta.wochen_nummer ?? null,
-    quelle: 'generiert',
-    referenz_id: meta.referenz_id ?? null,
-  })
-  return pub.publicUrl
-}
-
-export async function generateUndSpeichereWochenberichtPdf(
-  wochenberichtId: string,
-  auftragId: string
-): Promise<{ ok: true; pdfUrl: string } | { ok: false; message: string }> {
-  const loaded = await loadWochenberichtPdfDaten(wochenberichtId, auftragId)
-  if (!loaded.ok) return loaded
-  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
-  const buffer = await renderWochenberichtPdfBuffer(firm, loaded)
-  try {
-    const pdfUrl = await persistGeneriertesPdf(
-      auftragId,
-      'wochenbericht',
-      `Wochenbericht ${String(loaded.woche.wochen_nummer).padStart(2, '0')} KW ${loaded.woche.kalenderwoche}`,
-      buffer,
-      {
-        kalenderwoche: loaded.woche.kalenderwoche,
-        jahr: loaded.woche.jahr,
-        wochen_nummer: loaded.woche.wochen_nummer,
-        referenz_id: wochenberichtId,
-      }
-    )
-    const { error: __dbErr1 } = await supabaseAdmin
-      .from('auftrag_wochenberichte')
-      .update({ pdf_url: pdfUrl, updated_at: new Date().toISOString() })
-      .eq('id', wochenberichtId)
-    if (__dbErr1) logDbError('app/auftraege/baustelle-actions:auftrag_wochenberichte', __dbErr1)
-    revalidateAuftragDetail(auftragId)
-    return { ok: true, pdfUrl }
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'PDF fehlgeschlagen' }
-  }
-}
-
-export async function generateUndSpeichereRegieSammelPdf(
-  auftragId: string,
-  kalenderwoche: number,
-  jahr: number
-): Promise<{ ok: true; pdfUrl: string } | { ok: false; message: string }> {
-  const { von, bis } = kwZeitraum(kalenderwoche, jahr)
-  const loaded = await loadRegieSammelPdfDaten(auftragId, von, bis, kalenderwoche, jahr)
-  if (!loaded.ok) return loaded
-  if (!loaded.regiearbeiten.length) {
-    return { ok: false, message: 'Keine Regiearbeiten in dieser Kalenderwoche.' }
-  }
-  const firm = await fetchFirmenEinstellungen(supabaseAdmin)
-  const buffer = await renderRegieberichtSammelPdfBuffer(firm, loaded)
-  try {
-    const pdfUrl = await persistGeneriertesPdf(
-      auftragId,
-      'regiebericht',
-      `Regiebericht KW ${kalenderwoche}/${jahr}`,
-      buffer,
-      { kalenderwoche, jahr }
-    )
-    revalidateAuftragDetail(auftragId)
-    return { ok: true, pdfUrl }
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'PDF fehlgeschlagen' }
   }
 }

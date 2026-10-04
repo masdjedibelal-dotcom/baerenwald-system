@@ -1,9 +1,9 @@
 'use client'
 
-import { MockBtn, MockChip } from '@/components/mock-ui'
+import { MockBtn,MockChip } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { DashboardLazyMount } from '@/components/dashboard/DashboardLazyMount'
@@ -19,7 +19,6 @@ import {
   umsatzMonatGesamt,
 } from '@/lib/dashboard/dashboard-analytics'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
-import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatWochentagDatumLang } from '@/lib/utils'
 import { formatEuro } from '@/lib/format/geld-datum'

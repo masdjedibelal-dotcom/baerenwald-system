@@ -6,7 +6,6 @@ import {
   parseLeadFunnelDaten,
   type LeadFunnelDaten,
 } from '@/lib/lead-funnel-daten'
-import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import type { Gewerk } from '@/lib/types'
 
 export type ProjektErgaenzung = {
@@ -167,11 +166,4 @@ export function persistWasZeilenInFunnel(
     was_zeilen: zeilen,
     positionen,
   }
-}
-
-export function bereicheForWasParse(lead: {
-  bereiche?: string[] | null
-  situation?: string | null
-}): string[] {
-  return bereicheFuerAnzeige(lead.bereiche, lead.situation)
 }

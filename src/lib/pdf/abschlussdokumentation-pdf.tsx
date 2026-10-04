@@ -1,7 +1,7 @@
 import type { AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import type { AbnahmeMangel } from '@/lib/auftraege/abnahme-protokoll-types'
 import type { AbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
-import type { AuftragBautagebuchEintrag, AuftragPosition, Kunde } from '@/lib/types'
+import type { AuftragPosition,Kunde } from '@/lib/types'
 
 /** Eingabedaten für Abschlussdokumentation-PDF (HTML-Rendering). */
 export type AbschlussdokuPdfInput = {
@@ -27,7 +27,4 @@ export type AbschlussdokuPdfInput = {
   mitBautagebuch: boolean
   mitFotos: boolean
 }
-
-/** @deprecated Legacy — bautagebuch war früher AuftragBautagebuchEintrag[] */
-export type AbschlussdokuBautagebuchLegacy = AuftragBautagebuchEintrag
 

@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { isStagingSupabase } from '@/lib/auth/staging-admin'
-import { splitTelegramChunks, TELEGRAM_MAX_MESSAGE_CHARS } from '@/lib/copilot/message-limits'
+import { splitTelegramChunks,TELEGRAM_MAX_MESSAGE_CHARS } from '@/lib/copilot/message-limits'
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN ?? ''}`
 
@@ -93,17 +93,4 @@ export async function sendTelegramTyping(): Promise<void> {
     console.error('[copilot/telegram] sendChatAction', err)
     return undefined
   })
-}
-
-export async function downloadTelegramFile(fileId: string): Promise<Buffer> {
-  requireTelegramConfig()
-  const fileRes = await fetch(`${TELEGRAM_API}/getFile?file_id=${encodeURIComponent(fileId)}`)
-  const fileData = (await fileRes.json()) as { ok?: boolean; result?: { file_path?: string } }
-  const filePath = fileData.result?.file_path
-  if (!filePath) throw new Error('Telegram getFile: kein file_path')
-
-  const fileBuffer = await fetch(
-    `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${filePath}`
-  )
-  return Buffer.from(await fileBuffer.arrayBuffer())
 }

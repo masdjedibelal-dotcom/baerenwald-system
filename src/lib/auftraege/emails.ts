@@ -1,7 +1,4 @@
-import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { sendMail } from '@/lib/mail-service'
-import type { AuftragStatus } from '@/lib/types'
-import { AUFTRAG_STATUS_LABELS, getPublicAppUrl } from '@/lib/utils'
 
 export async function sendEmailHtml(input: {
   to: string
@@ -26,31 +23,4 @@ export async function sendEmailHtml(input: {
   })
   if (!r.success) return { ok: false, message: r.error ?? 'Versand fehlgeschlagen' }
   return { ok: true }
-}
-
-function absUrl(path: string) {
-  return `${getPublicAppUrl()}${path.startsWith('/') ? path : `/${path}`}`
-}
-
-export function buildInternFormularSubmittedHtml(input: {
-  templateName: string
-  kunde: string
-  auftragId: string
-  handwerkerName?: string
-}) {
-  const url = absUrl(`/auftraege/${input.auftragId}`)
-  const hw = input.handwerkerName
-    ? `<br/><strong>Partner:</strong> ${input.handwerkerName}`
-    : ''
-  return `
-  <p>Ein Partner-Formular wurde abgesendet.</p>
-  <p><strong>Template:</strong> ${input.templateName}<br/>
-  <strong>Kunde:</strong> ${input.kunde}<br/>
-  <strong>Auftrag:</strong> ${input.auftragId}${hw}</p>
-  <p style="margin-top:12px;">${mailPrimaryButtonHtml('Jetzt ansehen', url, { margin: '0', size: 'sm' })}</p>
-  `
-}
-
-export function statusLabelDe(status: AuftragStatus) {
-  return AUFTRAG_STATUS_LABELS[status]
 }

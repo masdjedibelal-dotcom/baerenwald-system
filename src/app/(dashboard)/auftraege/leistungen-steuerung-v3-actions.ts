@@ -5,16 +5,12 @@ import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-position-handwerker-erbe'
-import { syncAuftragIstBauprojekt } from '@/lib/auftraege/sync-auftrag-ist-bauprojekt'
-import { syncProjektvertragStilleFuerAuftrag } from '@/lib/vertraege/sync-projektvertrag-stille'
 import { gewerkIdFuerPosition } from '@/lib/auftraege/auftrag-angebot-handwerker-match'
 import {
   metaBeimSendenAnHandwerker,
-  metaErstzuweisung,
-  metaLeistungEntfernt,
-  metaPartnerAenderung,
+  metaErstzuweisung,metaPartnerAenderung
 } from '@/lib/auftraege/partner-vorgang-meta'
-import { notifyPartnerUnified, partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
+import { notifyPartnerUnified,partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
 import { provisionProjektvertragFireAndForget } from '@/lib/vertraege/provision-projektvertrag'
 import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
@@ -34,75 +30,6 @@ async function assertAuftrag(auftragId: string) {
   if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftraege', error)
   if (error || !data) return { ok: false as const, message: 'Auftrag nicht gefunden', supabase: null }
   return { ok: true as const, supabase }
-}
-
-export async function bulkDeleteAuftragPositionenV3(
-  auftragId: string,
-  positionIds: string[],
-  opts?: { projektName?: string }
-): Promise<{ ok: true; deleted: number; markiert: number } | { ok: false; message: string }> {
-  const gate = await assertAuftrag(auftragId)
-  if (!gate.ok) return gate
-  const ids = Array.from(new Set(positionIds.map((id) => id.trim()).filter(Boolean)))
-  if (!ids.length) return { ok: false, message: 'Keine Positionen ausgewählt.' }
-
-  const { data: rows, error: loadErr } = await gate.supabase!
-    .from('auftrag_positionen')
-    .select('id, leistung_name, handwerker_id, handwerker_status, aenderung_typ, preis_partner')
-    .eq('auftrag_id', auftragId)
-    .in('id', ids)
-  if (loadErr) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', loadErr)
-
-  if (loadErr) return { ok: false, message: loadErr.message }
-
-  let deleted = 0
-  let markiert = 0
-  const projektName = opts?.projektName?.trim() || 'Projekt'
-
-  for (const row of rows ?? []) {
-    const id = String(row.id)
-    const hwId = row.handwerker_id ? String(row.handwerker_id) : null
-
-    if (hwId) {
-      const { error } = await gate.supabase!
-        .from('auftrag_positionen')
-        .update(metaLeistungEntfernt())
-        .eq('id', id)
-        .eq('auftrag_id', auftragId)
-      if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
-      if (error) return { ok: false, message: error.message }
-      markiert++
-
-      const notify = await notifyPartnerUnified({
-        handwerkerId: hwId,
-        typ: 'entfernt',
-        projektName,
-        leistungName: String(row.leistung_name ?? ''),
-        link: partnerVorgangLink(auftragId),
-        auftragId,
-        positionIds: [id],
-        aenderungTyp: 'entfernt',
-      })
-      if (!notify.ok) return { ok: false, message: notify.error }
-
-      syncProjektvertragStilleFireAndForget(auftragId, hwId)
-    } else {
-      const { error } = await gate.supabase!
-        .from('auftrag_positionen')
-        .delete()
-        .eq('id', id)
-        .eq('auftrag_id', auftragId)
-      if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
-      if (error) return { ok: false, message: error.message }
-      deleted++
-    }
-  }
-
-  await syncAuftragIstBauprojekt(auftragId)
-  void syncProjektvertragStilleFuerAuftrag(auftragId)
-
-  revalidateAuftragDetail(auftragId)
-  return { ok: true, deleted, markiert }
 }
 
 export async function zuweiseHandwerkerAnPositionenV3(input: {
@@ -417,75 +344,4 @@ export async function sendAuftragLeistungenAnHandwerkerV3(input: {
 
   revalidateAuftragDetail(input.auftragId)
   return { ok: true, gesendet, handwerker: byHw.size }
-}
-
-export async function notifyPartnerPositionGeaendertV3(input: {
-  auftragId: string
-  angebotId?: string | null
-  positionId: string
-  projektName: string
-  gewerke?: GewerkOpt[]
-}): Promise<{ ok: true; skipped?: boolean } | { ok: false; message: string }> {
-  const gate = await assertAuftrag(input.auftragId)
-  if (!gate.ok) return gate
-
-  const { data: pos, error } = await gate.supabase!
-    .from('auftrag_positionen')
-    .select(
-      'id, leistung_name, handwerker_id, gewerk_slug, gewerk_name, aenderung_typ, preis_alt, preis_partner, handwerker_status'
-    )
-    .eq('id', input.positionId)
-    .eq('auftrag_id', input.auftragId)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
-
-  if (!pos?.handwerker_id) return { ok: true, skipped: true }
-
-  const aenderungTyp = (pos.aenderung_typ ?? '') as 'neu' | 'geaendert' | 'entfernt' | ''
-  if (!aenderungTyp || aenderungTyp === 'neu') {
-    return { ok: true, skipped: true }
-  }
-
-  const hwId = String(pos.handwerker_id)
-
-  const notify = await notifyPartnerUnified({
-    handwerkerId: hwId,
-    typ: aenderungTyp === 'entfernt' ? 'entfernt' : 'geaendert',
-    projektName: input.projektName,
-    leistungName: String(pos.leistung_name ?? ''),
-    link: partnerVorgangLink(input.auftragId),
-    auftragId: input.auftragId,
-    positionIds: [input.positionId],
-    aenderungTyp,
-    preisAlt: pos.preis_alt != null ? Number(pos.preis_alt) : null,
-  })
-
-  if (!notify.ok) return { ok: false, message: notify.error }
-
-  syncProjektvertragStilleFireAndForget(input.auftragId, hwId)
-  return { ok: true }
-}
-
-export async function countUnsentZugewieseneLeistungenV3(
-  auftragId: string
-): Promise<{ ok: true; count: number } | { ok: false; message: string }> {
-  const gate = await assertAuftrag(auftragId)
-  if (!gate.ok) return gate
-
-  const { data, error } = await gate.supabase!
-    .from('auftrag_positionen')
-    .select('id, handwerker_id, handwerker_status, aenderung_typ')
-    .eq('auftrag_id', auftragId)
-    .not('handwerker_id', 'is', null)
-  if (error) logDbError('app/auftraege/leistungen-steuerung-v3-actions:auftrag_positionen', error)
-
-  if (error) return { ok: false, message: error.message }
-
-  const count = (data ?? []).filter((p) => {
-    if ((p.aenderung_typ ?? '') === 'entfernt') return false
-    const st = (p.handwerker_status ?? '').toLowerCase()
-    return st === 'zugewiesen' || st === '' || st === 'ausstehend'
-  }).length
-
-  return { ok: true, count }
 }

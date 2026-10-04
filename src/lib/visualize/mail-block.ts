@@ -1,14 +1,6 @@
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { C } from '@/lib/tokens/colors'
 
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-.replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
 /** Grüner Block für Angebots-Mail, wenn KI-Visualisierung im Angebot ist. */
 export function mailKiVisualisierungBlock(
   anrede: AngebotMailAnrede,

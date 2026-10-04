@@ -1,15 +1,4 @@
-/** Positions-Lebenszyklus (Spec Bautagebuch neu). status = leistung_status.
- * Contract-Spiegel: handwerks-plattform/src/lib/partner/position-lebenszyklus.ts */
 
-export const POSITION_TYPEN = ['lv', 'regie', 'material'] as const
-export type PositionTyp = (typeof POSITION_TYPEN)[number]
-
-export const POSITION_VERGUETUNGEN = ['festpreis', 'aufwand'] as const
-export type PositionVerguetung = (typeof POSITION_VERGUETUNGEN)[number]
-
-/** Spec-status — DB-Spalte leistung_status */
-export const POSITION_LEBENSZYKLUS = ['offen', 'in_arbeit', 'erledigt'] as const
-export type PositionLebenszyklus = (typeof POSITION_LEBENSZYKLUS)[number]
 
 export const EINTRAG_TYPEN = [
   'start',
@@ -71,39 +60,12 @@ export type EintragFoto = {
   display_url?: string | null
 }
 
-export type PositionMaterial = {
-  id: string
-  position_id: string
-  bezeichnung: string
-  menge: number
-  einzelpreis: number
-  beleg_foto_id?: string | null
-  created_at?: string | null
-}
-
 export type AuftragTagesspanne = {
   auftrag_id: string
   tag: string
   spanne_von: string
   spanne_bis: string
   foto_count: number
-}
-
-export function isPositionLebenszyklus(
-  v: string | null | undefined
-): v is PositionLebenszyklus {
-  return !!v && (POSITION_LEBENSZYKLUS as readonly string[]).includes(v)
-}
-
-export function lebenszyklusLabel(status: string | null | undefined): string {
-  switch (status) {
-    case 'in_arbeit':
-      return 'In Arbeit'
-    case 'erledigt':
-      return 'Erledigt'
-    default:
-      return 'Offen'
-  }
 }
 
 export function eintragTypLabel(typ: string | null | undefined): string {

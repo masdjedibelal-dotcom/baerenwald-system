@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateLeadList, revalidatePartnerList, revalidateRechnungList, revalidateVorgaengeListe } from '@/lib/crm-revalidate'
+import { revalidateLeadList,revalidateRechnungList,revalidateVorgaengeListe } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { createRechnungEntwurf } from '@/app/(dashboard)/rechnungen/actions'
@@ -143,33 +143,4 @@ export async function duplicateRechnung(
   if (!res.ok) return res
   revalidateRechnungList()
   return { ok: true, id: res.id }
-}
-
-export async function duplicatePartner(
-  partnerId: string
-): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data: src, error: loadErr } = await supabase.from('partner').select('*').eq('id', partnerId).maybeSingle()
-  if (loadErr) logDbError('app/crm/list-copy-actions:partner', loadErr)
-  if (loadErr || !src) return { ok: false, message: loadErr?.message ?? 'Partner nicht gefunden.' }
-
-  const row = src as Record<string, unknown>
-  const payload: Record<string, unknown> = { ...row }
-  delete payload.id
-  delete payload.created_at
-  delete payload.updated_at
-  payload.name = `Kopie: ${String(row.name ?? 'Partner')}`
-  payload.aktiv = row.aktiv ?? true
-  if (payload.email) payload.email = null
-
-  const { data: inserted, error: insErr } = await supabase
-    .from('partner')
-    .insert(payload)
-    .select('id')
-    .single()
-  if (insErr) logDbError('app/crm/list-copy-actions:partner', insErr)
-
-  if (insErr || !inserted) return { ok: false, message: insErr?.message ?? 'Kopie fehlgeschlagen.' }
-  revalidatePartnerList()
-  return { ok: true, id: inserted.id as string }
 }

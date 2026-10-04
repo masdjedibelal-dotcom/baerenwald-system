@@ -6,21 +6,16 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
   mailAnfrageBestaetigung,
-  mailHtmlBase,
-  mailUpdateHinweis,
-  mailZahlungserinnerung,
+  mailHtmlBase,mailZahlungserinnerung
 } from '@/lib/mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { emailLogHtmlMarker } from '@/lib/kommunikation/types'
 import { logLeadEmailTimelineEvent } from '@/lib/kommunikation/log-lead-email-timeline'
 import type { MailBranding } from '@/lib/mail-branding'
-import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
-import { ensureKundenTokenForAuftrag } from '@/lib/projekt/kunden-token'
-import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import { zahlungserinnerungZahlbarBis } from '@/lib/mail/zahlungserinnerung-mail'
 import { buildInternSubject } from '@/lib/mail/build-subject'
-import { effektivesFaelligAmYmd, ymdAusIsoInZezone } from '@/lib/dates/werktag'
+import { effektivesFaelligAmYmd,ymdAusIsoInZezone } from '@/lib/dates/werktag'
 import {
   cronMahnungFuerRechnung,
   inferZahlungserinnerungStufeFromBetreff,
@@ -524,60 +519,6 @@ export async function sendZahlungserinnerungen(): Promise<{
   }
 
   return { ok: true, bearbeitet: ergebnis.length, details: ergebnis }
-}
-
-export async function buildKundenUpdateVorschau(auftragId: string): Promise<{
-  betreff: string
-  html: string
-  an: string
-} | null> {
-  const { data: auf, error } = await supabaseAdmin
-    .from('auftraege')
-    .select('kunden_token, kunden(name, email, typ)')
-    .eq('id', auftragId)
-    .maybeSingle()
-  if (error) logDbError('app/actions/mails:auftraege', error)
-  if (error || !auf) return null
-  let token = (auf as { kunden_token?: string | null }).kunden_token?.trim()
-  if (!token) {
-    const t = await ensureKundenTokenForAuftrag(auftragId)
-    token = t ?? undefined
-  }
-  if (!token) return null
-  const k = (auf as { kunden?: { name?: string; email?: string | null; typ?: string | null } | null })
-    .kunden
-  const name = String(k?.name ?? 'Kundin/Kunde').trim()
-  const an = String(k?.email ?? '').trim()
-  if (!an) return null
-  const url = projektUrlFromToken(token)
-  const branding = await getMailBranding(supabaseAdmin)
-  const tpl = mailUpdateHinweis({ name, statusLink: url, kundeTyp: k?.typ ?? null }, branding)
-  return { betreff: tpl.betreff, html: tpl.html, an }
-}
-
-export async function sendKundenUpdateMailFromAuftrag(input: {
-  auftragId: string
-  an: string
-  betreff: string
-  html: string
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { data: auf, error } = await supabaseAdmin
-    .from('auftraege')
-    .select('id, kunde_id')
-    .eq('id', input.auftragId)
-    .maybeSingle()
-  if (error) logDbError('app/actions/mails:auftraege', error)
-  if (!auf) return { ok: false, message: 'Auftrag nicht gefunden' }
-  const r = await sendMail({
-    typ: 'update_hinweis',
-    an: input.an,
-    betreff: input.betreff,
-    html: input.html,
-    auftragId: input.auftragId,
-    kundeId: (auf as { kunde_id?: string | null }).kunde_id ?? null,
-  })
-  if (!r.success) return { ok: false, message: r.error ?? 'Versand fehlgeschlagen' }
-  return { ok: true }
 }
 
 function escapeHtml(s: string): string {

@@ -11,22 +11,8 @@ import {
   tageZwischenYmd,
   ymdAusIsoInZezone,
   heuteYmdInZezone,
-  effektivesFaelligAmYmd,
-  parseYmdLocal,
-  formatYmdLocal,
+  effektivesFaelligAmYmd
 } from '@/lib/dates/werktag'
-
-export type MahnverlaufStufeId = 'rechnung' | 'stufe1' | 'stufe2' | 'intern30'
-
-export type MahnverlaufStufeState = 'done' | 'active' | 'open' | 'skipped'
-
-export type MahnverlaufStufe = {
-  id: MahnverlaufStufeId
-  label: string
-  sentAt: string | null
-  state: MahnverlaufStufeState
-  hint?: string
-}
 
 export type RechnungMahnKontext = {
   status: string
@@ -38,11 +24,6 @@ export type RechnungMahnKontext = {
   faellig_am?: string | null
   bezahlt_at?: string | null
 }
-
-export type RechnungListeMahnKontext = Pick<
-  RechnungMahnKontext,
-  'status' | 'erinnerung_7_sent_at' | 'erinnerung_21_sent_at'
->
 
 /** Tage seit effektiver Fälligkeit (Sa/So → Montag). */
 export function tageSeitFaelligkeitRechnung(faelligAm: string | null | undefined): number {
@@ -189,122 +170,9 @@ export function cronMahnungFuerRechnung(
   return null
 }
 
-export function rechnungHatMahnverlauf(ctx: RechnungMahnKontext): boolean {
-  if ((ctx.beleg_typ ?? 'rechnung') === 'gutschrift') return false
-  return Boolean(
-    ctx.erinnerung_7_sent_at ||
-      ctx.erinnerung_21_sent_at ||
-      ctx.intern_warnung_30_at
-  )
-}
-
 export function aktuelleMahnstufeNummer(ctx: RechnungMahnKontext): 0 | 1 | 2 | 3 {
   if (ctx.intern_warnung_30_at) return 3
   if (ctx.erinnerung_21_sent_at) return 2
   if (ctx.erinnerung_7_sent_at) return 1
   return 0
-}
-
-export function mahnstufeListenLabel(ctx: RechnungListeMahnKontext): string | null {
-  const st = (ctx.status ?? '').toLowerCase()
-  if (st === 'bezahlt' || st === 'storniert') return null
-  if (ctx.erinnerung_21_sent_at) return 'Mahnung 2'
-  if (ctx.erinnerung_7_sent_at) return 'Mahnung 1'
-  return null
-}
-
-export function mahnstufeStatusZusatz(ctx: RechnungListeMahnKontext): string | null {
-  return mahnstufeListenLabel(ctx)
-}
-
-export function naechsteZahlungserinnerungStufe(
-  ctx: RechnungMahnKontext
-): 1 | 2 | null {
-  const st = (ctx.status ?? '').toLowerCase()
-  if (st !== 'gesendet') return null
-  if ((ctx.beleg_typ ?? 'rechnung') === 'gutschrift') return null
-  if (!ctx.gesendet_at?.trim()) return null
-  if (tageSeitMahnAnker(ctx.faellig_am, ctx.gesendet_at) < MAHNUNG_STUFE1_AB_TAGE_UEBERFAELLIG) {
-    return null
-  }
-  const letzteYmd = letzteZahlungserinnerungYmd({
-    erinnerung_7_sent_at: ctx.erinnerung_7_sent_at,
-    erinnerung_21_sent_at: ctx.erinnerung_21_sent_at,
-  })
-  if (letzteYmd != null) {
-    const gap = tageZwischenYmd(letzteYmd, heuteYmdInZezone())
-    if (gap < MAHNUNG_MIN_TAGE_ZWISCHEN_ERINNERUNGEN) return null
-  }
-  if (!ctx.erinnerung_7_sent_at) return 1
-  if (
-    !ctx.erinnerung_21_sent_at &&
-    tageSeitZeitpunkt(ctx.erinnerung_7_sent_at) >= MAHNUNG_STUFE2_TAGE_NACH_ERSTER
-  ) {
-    return 2
-  }
-  return null
-}
-
-export function buildRechnungMahnverlauf(ctx: RechnungMahnKontext): MahnverlaufStufe[] {
-  const st = (ctx.status ?? '').toLowerCase()
-  const abgeschlossen = st === 'bezahlt' || st === 'storniert'
-  const tage = tageSeitMahnAnker(ctx.faellig_am, ctx.gesendet_at)
-  const naechste = abgeschlossen ? null : naechsteZahlungserinnerungStufe(ctx)
-
-  const stufeState = (
-    sentAt: string | null | undefined,
-    stufe: 1 | 2
-  ): MahnverlaufStufeState => {
-    if (sentAt) return 'done'
-    if (abgeschlossen) return 'skipped'
-    if (naechste === stufe) return 'active'
-    return 'open'
-  }
-
-  const internState: MahnverlaufStufeState = ctx.intern_warnung_30_at
-    ? 'done'
-    : abgeschlossen
-      ? 'skipped'
-      : tage >= 30
-        ? 'active'
-        : 'open'
-
-  return [
-    {
-      id: 'rechnung',
-      label: 'Rechnung versendet',
-      sentAt: ctx.gesendet_at ?? null,
-      state: ctx.gesendet_at || st === 'gesendet' || abgeschlossen ? 'done' : 'open',
-      hint: 'Ursprungsrechnung — alle Mahnstufen beziehen sich auf diese Nummer.',
-    },
-    {
-      id: 'stufe1',
-      label: '1. Zahlungserinnerung',
-      sentAt: ctx.erinnerung_7_sent_at ?? null,
-      state: stufeState(ctx.erinnerung_7_sent_at, 1),
-      hint:
-        'Automatisch ab Tag nach max(Fälligkeit, Versand); nie an aufeinanderfolgenden Tagen.',
-    },
-    {
-      id: 'stufe2',
-      label: '2. Zahlungserinnerung',
-      sentAt: ctx.erinnerung_21_sent_at ?? null,
-      state: stufeState(ctx.erinnerung_21_sent_at, 2),
-      hint: 'Zweite Erinnerung frühestens 7 Tage nach der ersten — dieselbe Rechnungsnummer.',
-    },
-    {
-      id: 'intern30',
-      label: 'Interne Warnung (30 Tage)',
-      sentAt: ctx.intern_warnung_30_at ?? null,
-      state: internState,
-      hint: 'Nur intern — kein Kundenbeleg.',
-    },
-  ]
-}
-
-/** Test-Hilfe: YMD + n Tage (lokal). */
-export function addDaysYmdLocal(ymd: string, days: number): string {
-  const d = parseYmdLocal(ymd.slice(0, 10))
-  d.setDate(d.getDate() + days)
-  return formatYmdLocal(d)
 }

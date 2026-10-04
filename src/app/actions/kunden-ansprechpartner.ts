@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidateKundeDetail } from '@/lib/crm-revalidate'
-import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import type { KundeAnsprechpartner } from '@/lib/types'
 

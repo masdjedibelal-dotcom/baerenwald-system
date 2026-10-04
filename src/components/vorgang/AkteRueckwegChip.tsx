@@ -2,13 +2,11 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useCallback, useMemo } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback,useMemo } from 'react'
+import { useRouter,useSearchParams } from 'next/navigation'
 import {
   akteFromHref,
-  akteFromLabel,
-  hrefClearingAkteFrom,
-  parseAkteFromParam,
+  akteFromLabel,parseAkteFromParam
 } from '@/lib/vorgang/akte-from'
 import { cn } from '@/lib/utils'
 
@@ -46,15 +44,4 @@ export function AkteRueckwegChip({
       </MockBtn>
     </nav>
   )
-}
-
-/** Hilfs-Hook: from aus URL strippen (z. B. nach Tab-Wechsel lokal). */
-export function useClearAkteFromReplace() {
-  const router = useRouter()
-  const pathname = usePathname() ?? '/'
-  const searchParams = useSearchParams()
-  return useCallback(() => {
-    if (!searchParams.get('from')) return
-    router.replace(hrefClearingAkteFrom(pathname, new URLSearchParams(searchParams.toString())))
-  }, [router, pathname, searchParams])
 }

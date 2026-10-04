@@ -1,4 +1,4 @@
-import type { HausmeisterAmObjekt, OrgHausmeister } from '@/lib/org/org-hausmeister-types'
+import type { HausmeisterAmObjekt,OrgHausmeister } from '@/lib/org/org-hausmeister-types'
 
 export type ObjektKontaktRolle = 'hausmeister' | 'ansprechpartner' | 'beirat' | 'dienstleister' | 'notfall' | 'sonstiges'
 
@@ -146,29 +146,6 @@ export type ObjektAnlageInput = {
   wartungsintervall?: ObjektAnlageWartungsintervall | null
   letzte_wartung_am?: string | null
   dokument_urls?: string[] | null
-}
-
-/** Alle Felder aus bestehender Anlage — z. B. für Status-Update ohne Datenverlust. */
-export function anlageToInput(a: ObjektAnlage): ObjektAnlageInput {
-  return {
-    bezeichnung: a.bezeichnung,
-    gewerk_id: a.gewerk_id,
-    standort: a.standort,
-    objekt_einheit_id: a.objekt_einheit_id,
-    einbau_datum: a.einbau_datum,
-    foto_url: a.foto_url,
-    notiz: a.notiz,
-    status: a.status,
-    hersteller: a.hersteller,
-    modell: a.modell,
-    seriennummer: a.seriennummer,
-    anschaffungswert_eur: a.anschaffungswert_eur,
-    garantie_bis: a.garantie_bis,
-    gewaehrleistung_bis: a.gewaehrleistung_bis,
-    wartungsintervall: a.wartungsintervall,
-    letzte_wartung_am: a.letzte_wartung_am,
-    dokument_urls: a.dokument_urls ?? [],
-  }
 }
 
 export type ObjektAnlageVorgangRow = {

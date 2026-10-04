@@ -85,11 +85,6 @@ export function kundeStrasseHausnummerZeile(k: KundeAdresseZeilePick): string | 
   return str || nr || null
 }
 
-/** Denormalisiertes adresse-Feld für Alt-Code / Export. */
-export function kundeAdresseLegacy(k: KundeAdresseZeilePick): string | null {
-  return kundeStrasseHausnummerZeile(k)
-}
-
 export function computeKundeNameField(input: {
   typ: string
   name?: string | null

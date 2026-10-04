@@ -5,12 +5,12 @@ import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-po
 import type { AuftragPosition } from '@/lib/types'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
 import { filterKundenAngebote } from '@/lib/angebote/partner-einholung'
-import { leadKontaktAnzeigeName, leadVertragsKundeId, resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
+import { leadKontaktAnzeigeName,leadVertragsKundeId,resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import { createClient } from '@/lib/supabase-server'
-import { leadAuftraggeberEmbed, leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
-import type { AngebotPosition, LeadKanal } from '@/lib/types'
-import { betragAnzeigeBrutto, nettoZuBrutto } from '@/lib/angebot-einfach'
+import { leadAuftraggeberEmbed,leadKundeEmbed } from '@/lib/supabase/lead-kunde-embed'
+import type { LeadKanal } from '@/lib/types'
+import { betragAnzeigeBrutto } from '@/lib/angebot-einfach'
 import { auftragBrauchtHandwerkerAktion } from '@/lib/vorgang/handwerker-aktion-offen'
 import {
   hatGestellteEndabrechnung,
@@ -21,7 +21,7 @@ import {
   resolveVorgang,
 } from '@/lib/vorgang/resolve-vorgang'
 import { parseVorgangWertLabelEuro } from '@/lib/vorgang/vorgaenge-liste-summe'
-import type { ResolvedVorgang, VorgangListeRow, VorgangPhase } from '@/lib/vorgang/types'
+import type { ResolvedVorgang,VorgangListeRow,VorgangPhase } from '@/lib/vorgang/types'
 import { unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
 import { resolveListeWiederkehr } from '@/lib/vorgang/wiederkehrend'
 import {
@@ -30,17 +30,11 @@ import {
   parseZahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
 import { formatEuro } from '@/lib/format/geld-datum'
-import {
-  gesamtrabattAbzugFromModus,
-  parseGesamtrabattMetaFromPosition,
-  ZEILE_SLUG_GESAMTRABATT,
-} from '@/lib/dokument-zeilen'
 
 export type { VorgangListeRow } from '@/lib/vorgang/types'
 
 export { computeVorgaengeKpis, countVorgaengeByPhase } from '@/lib/vorgang/vorgaenge-kpis'
 export type { VorgaengeKpis } from '@/lib/vorgang/vorgaenge-kpis'
-
 
 const VORGAENGE_LEAD_SELECT = `
   id,
@@ -1210,25 +1204,5 @@ export function detailHrefForPhase(phase: VorgangPhase, entityId: string, leadId
       return `/rechnungen/${entityId}`
     default:
       return `/anfragen/${leadId}`
-  }
-}
-
-/** Stift-Icon in der Liste: Leistungen — Ausnahme Angebot → direkt Bearbeiten (Wizard). */
-export function bearbeitenHrefForPhase(
-  phase: VorgangPhase,
-  entityId: string,
-  leadId: string
-): string {
-  switch (phase) {
-    case 'anfrage':
-      return `/anfragen/${leadId}?tab=leistungen`
-    case 'angebot':
-      return `/angebote/${entityId}?bearbeiten=1`
-    case 'auftrag':
-      return `/auftraege/${entityId}?tab=leistungen`
-    case 'rechnung':
-      return `/rechnungen/${entityId}?tab=leistungen`
-    default:
-      return `/anfragen/${leadId}?tab=leistungen`
   }
 }

@@ -6,7 +6,6 @@ import { type MailInlineLogoAttachment } from '@/lib/mail/mail-logo-inline.serve
 import { createClient } from '@/lib/supabase-server'
 import 'server-only'
 
-import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertEmailLogRow } from '@/lib/kommunikation/insert-email-log'
 import {
   isMailCatcherActive,

@@ -1,8 +1,7 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import { AngebotNeuForm } from '@/components/angebote/AngebotNeuForm'
-import type { AngebotVorlage, Gewerk, Handwerker, Preisliste } from '@/lib/types'
+import type { AngebotVorlage,Gewerk,Handwerker,Preisliste } from '@/lib/types'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 
 function inferMitPreisen(v: AngebotVorlage): boolean {

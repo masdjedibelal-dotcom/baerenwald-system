@@ -1,10 +1,6 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui'
-import { MockEmpty } from '@/components/mock-ui/MockEmpty'
 import { useMemo } from 'react'
-import Link from 'next/link'
-import { AuftragAuftragdetailsTab } from '@/components/auftraege/AuftragDetailsTab'
 import { VorgangZahlungTab } from '@/components/vorgang/VorgangZahlungTab'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
@@ -13,40 +9,8 @@ import type {
   RechnungAuswahlZeile,
   RechnungWizardBootstrap,
 } from '@/lib/rechnungen/rechnung-wizard-types'
-import type { AuftragDetail, LeadDetail, Rechnung } from '@/lib/types'
+import type { AuftragDetail,Rechnung } from '@/lib/types'
 import type { RechnungErstellenOpts } from '@/components/vorgang/VorgangZahlungTab'
-
-/** Read-only Auftragskontext auf der Rechnung. */
-export function RechnungAuftragdetailsTab({
-  auftragDetail,
-  lead,
-}: {
-  auftragDetail: AuftragDetail | null
-  lead?: LeadDetail | null
-}) {
-  if (!auftragDetail) {
-    return (
-      <MockEmpty
-        icon="briefcase"
-        title="Kein Auftrag verknüpft"
-        hint="Diese Rechnung ist keinem Auftrag zugeordnet."
-      />
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <Link href={`/auftraege/${auftragDetail.id}`}>
-          <MockBtn sm kind="ghost" icon="external-link">
-            Zum Auftrag
-          </MockBtn>
-        </Link>
-      </div>
-      <AuftragAuftragdetailsTab detail={auftragDetail} lead={lead} editable={false} />
-    </div>
-  )
-}
 
 function detailToAuswahlZeile(detail: Rechnung): RechnungAuswahlZeile {
   const extra = detail as Rechnung & {

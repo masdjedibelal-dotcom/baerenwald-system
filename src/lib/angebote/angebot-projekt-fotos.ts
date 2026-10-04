@@ -40,7 +40,3 @@ export function parseProjektFotos(raw: unknown): AngebotProjektFoto[] {
   }
   return out
 }
-
-export function projektFotoUrls(fotos: AngebotProjektFoto[]): string[] {
-  return fotos.map((f) => f.url)
-}

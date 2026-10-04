@@ -2,7 +2,7 @@ import 'server-only'
 
 import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { auftragIstBauprojekt, gewerkSlugsSuggerierenBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
+import { auftragIstBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
 import type { GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
 
 /** Nachunternehmervertrag nur bei Bauprojekt — Standardauftrag: Portal-Annahme reicht. */

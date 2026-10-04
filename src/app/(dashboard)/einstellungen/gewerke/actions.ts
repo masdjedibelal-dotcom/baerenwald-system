@@ -1,9 +1,7 @@
 'use server'
 
-import { revalidateEinstellungenPath, revalidatePreislistenList } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
-import { revalidateWizardContext } from '@/lib/wizard-context'
 import {
   normalizeGewerkAusfuehrung,
   type GewerkAusfuehrung,
@@ -57,61 +55,4 @@ export async function loadGewerkeEinstellungen(): Promise<GewerkMitCount[]> {
       anzahl_leistungen: counts.get(row.id) ?? 0,
     }
   })
-}
-
-export async function updateGewerkAusfuehrung(
-  id: string,
-  patch: { ausfuehrung: GewerkAusfuehrung; fachbetrieb_hinweis: string | null }
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const ausfuehrung = normalizeGewerkAusfuehrung(patch.ausfuehrung)
-  const hinweis =
-    ausfuehrung === 'eigen' ? null : patch.fachbetrieb_hinweis?.trim() || null
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('gewerke')
-    .update({ ausfuehrung, fachbetrieb_hinweis: hinweis })
-    .eq('id', id)
-  if (error) logDbError('app/einstellungen/gewerke/actions:gewerke', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateEinstellungenPath('/einstellungen/gewerke')
-  revalidateWizardContext()
-  return { ok: true }
-}
-
-export async function reorderGewerke(orderedIds: string[]): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await supabase
-      .from('gewerke')
-      .update({ sort_order: i * 10 })
-      .eq('id', orderedIds[i])
-    if (error) logDbError('app/einstellungen/gewerke/actions:gewerke', error)
-    if (error) return { ok: false, message: error.message }
-  }
-  revalidateEinstellungenPath('/einstellungen/gewerke')
-  revalidatePreislistenList()
-  revalidateWizardContext()
-  return { ok: true }
-}
-
-export async function deleteGewerkIfEmpty(
-  id: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { count, error: cErr } = await supabase
-    .from('preislisten')
-    .select('id', { count: 'exact', head: true })
-    .eq('gewerk_id', id)
-  if (cErr) logDbError('app/einstellungen/gewerke/actions:preislisten', cErr)
-  if (cErr) return { ok: false, message: cErr.message }
-  if ((count ?? 0) > 0) {
-    return { ok: false, message: 'Gewerk hat noch Leistungen in der Preisliste.' }
-  }
-  const { error: error2 } = await supabase.from('gewerke').delete().eq('id', id)
-  if (error2) logDbError('app/einstellungen/gewerke/actions:gewerke', error2)
-  if (error2) return { ok: false, message: error2.message }
-  revalidateEinstellungenPath('/einstellungen/gewerke')
-  revalidatePreislistenList()
-  revalidateWizardContext()
-  return { ok: true }
 }

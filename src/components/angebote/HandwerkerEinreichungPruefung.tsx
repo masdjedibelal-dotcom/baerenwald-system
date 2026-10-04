@@ -1,7 +1,7 @@
 'use client'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
@@ -13,8 +13,8 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { EmailPillsField } from '@/components/ui/EmailPillsField'
-import { cn, formatDatumZeit } from '@/lib/utils'
-import type { AngebotHandwerkerRow, AngebotPosition, AuftragPosition } from '@/lib/types'
+import { cn,formatDatumZeit } from '@/lib/utils'
+import type { AngebotHandwerkerRow,AngebotPosition,AuftragPosition } from '@/lib/types'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import {
   ablehneHandwerkerEinreichung,
@@ -33,7 +33,7 @@ import {
   parseHwAnhangStoragePaths,
   partnerHwDokumentListenName,
 } from '@/lib/partner/partner-hw-dokument-typen'
-import { parseHwKonditionen, hwKonditionForAuftragPosition } from '@/lib/partner/hw-konditionen'
+import { parseHwKonditionen,hwKonditionForAuftragPosition } from '@/lib/partner/hw-konditionen'
 import { HwKonditionenPruefungTable } from '@/components/angebote/HwKonditionenPruefungTable'
 import {
   handwerkerEinreichungAntwortBetreff,
@@ -82,7 +82,7 @@ export function HandwerkerEinreichungPruefung({
   /** Partner-Einholung: Bestätigen erst nach Kunden-Ja. */
   bestaetigenErstNachKundenJa?: boolean
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [pending, startTransition] = useLocalTransition()
   const [notizModal, setNotizModal] = useState<PartnerAngebotAntwortTyp | null>(null)
   const [crmNotiz, setCrmNotiz] = useState('')

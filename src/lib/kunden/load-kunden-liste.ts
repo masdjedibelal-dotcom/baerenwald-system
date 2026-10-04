@@ -1,4 +1,3 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import { istHvPortalRollenKunde } from '@/lib/kunde-stammdaten'
 import { berechneKundeGesamtumsatz } from '@/lib/kunden/kunde-umsatz'
 import { createClient } from '@/lib/supabase-server'

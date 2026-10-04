@@ -3,10 +3,10 @@
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect,useMemo,useState } from 'react'
+import { useRouter,useSearchParams } from 'next/navigation'
 import type { PublicProjektPayload } from '@/lib/projekt/load-public-projekt'
-import type { AuftragStatus, LeadStatus } from '@/lib/types'
+import type { AuftragStatus } from '@/lib/types'
 import { BrandLogo } from '@/components/brand/BrandLogo'
 import { TokenLinkInvalid } from '@/components/public/TokenLinkInvalid'
 import { IconText } from '@/components/ui/IconText'
@@ -14,7 +14,7 @@ import { RichTextContent } from '@/components/ui/RichTextContent'
 import { betragAnzeige } from '@/lib/angebot-einfach'
 import { formatDatum } from '@/lib/utils'
 import { aktuellePhaseIndexFromEntities } from '@/lib/auftraege/projekt-phasen'
-import { formatEuro, formatDatumZeit } from '@/lib/format/geld-datum'
+import { formatEuro,formatDatumZeit } from '@/lib/format/geld-datum'
 
 function statusProgress(status: AuftragStatus): number {
   switch (status) {

@@ -2,11 +2,10 @@
 
 import { revalidateKundeDetail } from '@/lib/crm-revalidate'
 import { createClient } from '@/lib/supabase-server'
-import { logDbError } from '@/lib/errors/log-db-error'
 import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
 import { normalizeOrgHttpUrl } from '@/lib/org/melde-legal-urls'
-import { isValidMeldeSlug, normalizeOrgSlug } from '@/lib/org/slug'
-import type { FreigabeModus, PortalModus } from '@/lib/types'
+import { isValidMeldeSlug,normalizeOrgSlug } from '@/lib/org/slug'
+import type { FreigabeModus,PortalModus } from '@/lib/types'
 
 export type SaveKundeOrganisationInput = {
   portal_modus: PortalModus

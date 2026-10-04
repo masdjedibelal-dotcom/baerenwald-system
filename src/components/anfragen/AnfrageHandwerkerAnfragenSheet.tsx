@@ -1,10 +1,10 @@
 'use client'
 import { MockBtn } from '@/components/mock-ui'
-import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockInput,MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
@@ -47,7 +47,7 @@ export function AnfrageHandwerkerAnfragenSheet({
   preislisten?: Preisliste[]
   onDone: () => void
 }) {
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [pending, startTransition] = useTransition()
   const [dirty, setDirty] = useState(false)
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())

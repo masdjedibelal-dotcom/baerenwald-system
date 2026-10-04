@@ -16,16 +16,6 @@ export const EINHEIT_VORSCHLAEGE = [
   'Stunden',
 ] as const
 
-/** @deprecated Nutze EINHEIT_CUSTOM */
-export const EINHEIT_SONSTIGES = EINHEIT_CUSTOM
-
-export function einheitSelectOptions(): { value: string; label: string }[] {
-  return [
-    ...EINHEIT_VORSCHLAEGE.map((e) => ({ value: e, label: e })),
-    { value: EINHEIT_CUSTOM, label: 'Eigene Einheit…' },
-  ]
-}
-
 export function resolveEinheitwahl(wahl: string, freitext: string): string {
   if (wahl === EINHEIT_CUSTOM) return freitext.trim()
   return wahl.trim()

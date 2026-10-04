@@ -4,7 +4,7 @@ import { DateInput } from '@/components/ui/DateInput'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockInput,MockSelect } from '@/components/mock-ui/MockForm'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import type { FormularFeld } from '@/lib/types'
 import { RichTextContent } from '@/components/ui/RichTextContent'
@@ -256,11 +256,5 @@ export function FormularFelderRenderer({
         )
       })}
     </div>
-  )
-}
-
-export function FormularFeldTypBadge({ typ }: { typ: FormularFeld['typ'] }) {
-  return (
-    <span className={cn('rounded-field bg-canvas px-2 py-0.5 text-xs font-medium text-ink')}>{typBadge(typ)}</span>
   )
 }

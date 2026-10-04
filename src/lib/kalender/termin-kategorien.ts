@@ -1,4 +1,3 @@
-import type { KalenderTermin } from '@/lib/types'
 
 /** UI-/DB-Kategorien für Kalender-Termine (typ ist freier Text in der DB). */
 export type TerminKategorie =
@@ -65,10 +64,6 @@ export function terminKategorieLabel(kat: TerminKategorie): string {
 
 export function terminKategorieFarbe(kat: TerminKategorie): TerminKatFarbe {
   return KAT_FARBE[kat]
-}
-
-export function terminTypFarbe(typ: KalenderTermin['typ'] | string): TerminKatFarbe {
-  return terminKategorieFarbe(terminTypToKategorie(typ))
 }
 
 export function formatTerminAdresse(parts: {

@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAuftragDetail, revalidateAuftragFinanzen, revalidateEinstellungenPath, revalidateKundeDetail, revalidateLeadDetail, revalidateRechnungDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAuftragDetail,revalidateAuftragFinanzen,revalidateEinstellungenPath,revalidateKundeDetail,revalidateLeadDetail,revalidateRechnungDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
@@ -18,7 +18,6 @@ import {
 } from '@/lib/kommunikation/email-log-list-filter'
 import { sendMail } from '@/lib/mail-service'
 import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
-import { leadKontaktAnzeigeName, leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import type { MailAnrede } from '@/lib/mail/anrede'
 import {
   freitextMailTyp,
@@ -298,16 +297,6 @@ export async function saveKommunikationMailVorlage(input: {
   return { ok: true, id: data.id as string }
 }
 
-export async function deleteKommunikationMailVorlage(
-  id: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const { error } = await supabaseAdmin.from('kommunikation_mail_vorlagen').delete().eq('id', id)
-  if (error) logDbError('app/kommunikation/actions:kommunikation_mail_vorlagen', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateEinstellungenPath('/einstellungen/kommunikation')
-  return { ok: true }
-}
-
 export async function getMailComposeDraft(
   ctx: MailComposeContext
 ): Promise<
@@ -436,193 +425,4 @@ export async function sendFreitextKundenMail(input: {
   })
 
   return { ok: true, emailLogId: r.emailLogId ?? emailLogId }
-}
-
-/** Kontext aus Anfrage laden */
-export async function mailComposeContextFromLead(
-  leadId: string
-): Promise<{ ok: true; ctx: MailComposeContext } | { ok: false; message: string }> {
-  const { data, error } = await supabaseAdmin
-    .from('leads')
-    .select(
-      'id, kontakt_email, kontakt_name, kunde_id, auftraggeber_kunde_id, kundentyp, kunden!kunde_id(id, name, email, typ), auftraggeber:kunden!auftraggeber_kunde_id(id, name, email, typ, org_anzeigename)'
-    )
-    .eq('id', leadId)
-    .maybeSingle()
-  if (error) logDbError('app/kommunikation/actions:leads', error)
-  if (error || !data) return { ok: false, message: 'Anfrage nicht gefunden' }
-
-  type KundeEmbed = {
-    id: string
-    name: string
-    email: string | null
-    typ: string | null
-    org_anzeigename?: string | null
-  }
-  const melderRaw = data.kunden as KundeEmbed | KundeEmbed[] | null
-  const melder = Array.isArray(melderRaw) ? melderRaw[0] : melderRaw
-  const agRaw = data.auftraggeber as KundeEmbed | KundeEmbed[] | null
-  const ag = Array.isArray(agRaw) ? agRaw[0] : agRaw
-
-  const kundeId = leadVertragsKundeId({
-    kunde_id: data.kunde_id,
-    auftraggeber_kunde_id: data.auftraggeber_kunde_id,
-    kunden: melder,
-    auftraggeber: ag,
-  })
-  if (!kundeId) return { ok: false, message: 'Kein Kunde verknüpft' }
-
-  const email = (ag?.email ?? melder?.email ?? data.kontakt_email ?? '').trim()
-  const name = leadKontaktAnzeigeName(
-    {
-      kontakt_name: data.kontakt_name,
-      kunden: melder,
-      auftraggeber: ag,
-      auftraggeber_kunde_id: data.auftraggeber_kunde_id,
-    },
-    'Kundin/Kunde'
-  )
-
-  return {
-    ok: true,
-    ctx: {
-      kontextTyp: 'anfrage',
-      kundeId,
-      kundeName: name,
-      kundeTyp: ag?.typ ?? melder?.typ ?? data.kundentyp,
-      leadId,
-      defaultTo: email,
-      defaultCc: [],
-    },
-  }
-}
-
-export async function mailComposeContextFromAngebot(
-  angebotId: string
-): Promise<{ ok: true; ctx: MailComposeContext } | { ok: false; message: string }> {
-  const { data, error } = await supabaseAdmin
-    .from('angebote')
-    .select('id, lead_id, kunde_id, kunden(id, name, email, typ)')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (error) logDbError('app/kommunikation/actions:angebote', error)
-  if (error || !data) return { ok: false, message: 'Angebot nicht gefunden' }
-
-  const kundenRaw = data.kunden as
-    | { id: string; name: string; email: string | null; typ: string | null }
-    | { id: string; name: string; email: string | null; typ: string | null }[]
-    | null
-  const kunden = Array.isArray(kundenRaw) ? kundenRaw[0] : kundenRaw
-  const kundeId = kunden?.id ?? data.kunde_id
-  if (!kundeId) return { ok: false, message: 'Kein Kunde verknüpft' }
-
-  return {
-    ok: true,
-    ctx: {
-      kontextTyp: 'angebot',
-      kundeId,
-      kundeName: (kunden?.name ?? 'Kundin/Kunde').trim(),
-      kundeTyp: kunden?.typ,
-      leadId: data.lead_id,
-      angebotId,
-      defaultTo: (kunden?.email ?? '').trim(),
-      defaultCc: [],
-    },
-  }
-}
-
-export async function mailComposeContextFromAuftrag(
-  auftragId: string
-): Promise<{ ok: true; ctx: MailComposeContext } | { ok: false; message: string }> {
-  const { data, error } = await supabaseAdmin
-    .from('auftraege')
-    .select('id, lead_id, kunde_id, kunden(id, name, email, typ)')
-    .eq('id', auftragId)
-    .maybeSingle()
-  if (error) logDbError('app/kommunikation/actions:auftraege', error)
-  if (error || !data) return { ok: false, message: 'Auftrag nicht gefunden' }
-
-  const kundenRaw = data.kunden as
-    | { id: string; name: string; email: string | null; typ: string | null }
-    | { id: string; name: string; email: string | null; typ: string | null }[]
-    | null
-  const kunden = Array.isArray(kundenRaw) ? kundenRaw[0] : kundenRaw
-  const kundeId = kunden?.id ?? data.kunde_id
-  if (!kundeId) return { ok: false, message: 'Kein Kunde verknüpft' }
-
-  return {
-    ok: true,
-    ctx: {
-      kontextTyp: 'auftrag',
-      kundeId,
-      kundeName: (kunden?.name ?? 'Kundin/Kunde').trim(),
-      kundeTyp: kunden?.typ,
-      leadId: data.lead_id,
-      auftragId,
-      defaultTo: (kunden?.email ?? '').trim(),
-      defaultCc: [],
-    },
-  }
-}
-
-export async function mailComposeContextFromRechnung(
-  rechnungId: string
-): Promise<{ ok: true; ctx: MailComposeContext } | { ok: false; message: string }> {
-  const { data, error } = await supabaseAdmin
-    .from('rechnungen')
-    .select('id, kunde_id, auftrag_id, kunden(id, name, email, typ), auftraege(lead_id)')
-    .eq('id', rechnungId)
-    .maybeSingle()
-  if (error) logDbError('app/kommunikation/actions:rechnungen', error)
-  if (error || !data) return { ok: false, message: 'Rechnung nicht gefunden' }
-
-  const kundenRaw = data.kunden as
-    | { id: string; name: string; email: string | null; typ: string | null }
-    | { id: string; name: string; email: string | null; typ: string | null }[]
-    | null
-  const kunden = Array.isArray(kundenRaw) ? kundenRaw[0] : kundenRaw
-  const kundeId = kunden?.id ?? data.kunde_id
-  if (!kundeId) return { ok: false, message: 'Kein Kunde verknüpft' }
-
-  const auftragRaw = data.auftraege as { lead_id?: string | null } | { lead_id?: string | null }[] | null
-  const auftrag = Array.isArray(auftragRaw) ? auftragRaw[0] : auftragRaw
-
-  return {
-    ok: true,
-    ctx: {
-      kontextTyp: 'rechnung',
-      kundeId,
-      kundeName: (kunden?.name ?? 'Kundin/Kunde').trim(),
-      kundeTyp: kunden?.typ,
-      leadId: auftrag?.lead_id ?? null,
-      auftragId: data.auftrag_id,
-      rechnungId,
-      defaultTo: (kunden?.email ?? '').trim(),
-      defaultCc: [],
-    },
-  }
-}
-
-export async function mailComposeContextFromKunde(
-  kundeId: string
-): Promise<{ ok: true; ctx: MailComposeContext } | { ok: false; message: string }> {
-  const { data, error } = await supabaseAdmin
-    .from('kunden')
-    .select('id, name, email, typ')
-    .eq('id', kundeId)
-    .maybeSingle()
-  if (error) logDbError('app/kommunikation/actions:kunden', error)
-  if (error || !data) return { ok: false, message: 'Kunde nicht gefunden' }
-
-  return {
-    ok: true,
-    ctx: {
-      kontextTyp: 'kunde',
-      kundeId,
-      kundeName: (data.name ?? 'Kundin/Kunde').trim(),
-      kundeTyp: data.typ,
-      defaultTo: (data.email ?? '').trim(),
-      defaultCc: [],
-    },
-  }
 }

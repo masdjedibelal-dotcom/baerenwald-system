@@ -3,15 +3,14 @@ import { safeAction } from '@/lib/actions/safe-action'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
-import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockInput,MockSelect } from '@/components/mock-ui/MockForm'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { logDbError } from '@/lib/errors/log-db-error'
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect,useMemo,useState,type FormEvent,type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
-import { createAnfrage, updateAnfrageAusNeuForm } from '@/app/(dashboard)/anfragen/actions'
-import type { LeadDetail, LeadKanal } from '@/lib/types'
+import { createAnfrage,updateAnfrageAusNeuForm } from '@/app/(dashboard)/anfragen/actions'
+import type { LeadDetail,LeadKanal } from '@/lib/types'
 import {
   SITUATIONEN,
   FACHDETAILS_CONFIG,
@@ -24,7 +23,7 @@ import {
   normalizeSituation,
   type SituationValue,
 } from '@/lib/vorab-formular-config'
-import { BEREICH_LABELS, KANAL_LABELS, cn } from '@/lib/utils'
+import { BEREICH_LABELS,KANAL_LABELS,cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
 import { meldeAnswersFromStaffFachdetails } from '@/lib/anfragen/staff-fachdetails-melde'
@@ -37,9 +36,8 @@ import {
 } from '@/lib/dokument-einheiten'
 import { coerceBereicheArray } from '@/lib/lead-gewerbe-storage'
 import { bereicheSuggerierenBauprojekt } from '@/lib/auftraege/ist-bauprojekt'
-import { namenAusFunnelDaten, splitDeutscherVollname } from '@/lib/kunde-namen'
+import { namenAusFunnelDaten,splitDeutscherVollname } from '@/lib/kunde-namen'
 import { istKundeHausverwaltungTyp } from '@/lib/kunde-stammdaten'
-import { VorgangArtWiederkehrField } from '@/components/vorgang/VorgangArtWiederkehrField'
 import {
   normalizeVorgangWiederkehr,
   type VorgangWiederkehr,

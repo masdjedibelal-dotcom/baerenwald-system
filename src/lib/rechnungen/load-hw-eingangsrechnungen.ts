@@ -40,10 +40,6 @@ export function hwRechnungStatusLabel(status: HwRechnungStatus): string {
   return 'Offen'
 }
 
-export function hwRechnungIstErledigt(status: HwRechnungStatus): boolean {
-  return status === 'bezahlt' || status === 'abgelehnt'
-}
-
 type RawZuweisung = {
   id: string
   angebot_id: string

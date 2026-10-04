@@ -2,12 +2,10 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect,useMemo,useState,type ReactNode } from 'react'
 import Link from 'next/link'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
-import { PortalLoginIconButton } from '@/components/portal/PortalLoginIconButton'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
 import { saveKunde } from '@/app/actions/kunden'
@@ -15,7 +13,6 @@ import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { splitStrasseHausnummer } from '@/lib/kunde-stammdaten'
 import type { Kunde } from '@/lib/types'
 import { toast } from '@/components/ui/app-toast'
-import { TOAST } from '@/lib/copy'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`

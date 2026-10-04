@@ -2,12 +2,12 @@ import { neuePositionsId } from '@/lib/angebot-positionen'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
 import { isMengeEinheitMengeMalEinheitspreis } from '@/lib/dokument-einheiten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
-import type { Gewerk, Lead, Preisliste } from '@/lib/types'
-import { BEREICH_LABELS, BEREICH_TO_GEWERK, FACHDETAIL_TO_LEISTUNG } from '@/lib/utils'
+import type { Gewerk,Lead,Preisliste } from '@/lib/types'
+import { BEREICH_LABELS,BEREICH_TO_GEWERK,FACHDETAIL_TO_LEISTUNG } from '@/lib/utils'
 import { preislisteEinzelpreis } from '@/lib/preisliste-preis'
 import type { WizardPosition } from '@/lib/angebote/angebot-wizard-types'
 import { funnelPositionToWizard } from '@/lib/lead-funnel-positionen'
-import { parseProjektWasZeilen, wasZeilenToFunnelPositionen } from '@/lib/lead-projekt-was'
+import { parseProjektWasZeilen,wasZeilenToFunnelPositionen } from '@/lib/lead-projekt-was'
 
 function normLeistung(s: string): string {
   return s
@@ -165,10 +165,4 @@ export function angebotWizardPositionenFromLead(
 
   const fallback = fallbackFromProjectText(projektLabel, gewerke, preislisten)
   return [...fromAnfrage, ...fallback]
-}
-
-/** Gewerke mit mindestens einer aktiven Preisliste — für Dropdown */
-export function gewerkeMitPreisliste(gewerke: Gewerk[], preislisten: Preisliste[]): Gewerk[] {
-  const ids = new Set(preislisten.filter((p) => p.aktiv).map((p) => p.gewerk_id))
-  return gewerke.filter((g) => g.aktiv && ids.has(g.id))
 }

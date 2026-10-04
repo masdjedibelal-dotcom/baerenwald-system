@@ -18,9 +18,7 @@ import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import {
   mergeTerminMailBodyText,
   parseTerminMailIntroFromEditor,
-  resolveTerminMailAnrede,
-  terminMailBodyForEditor,
-  terminMailIntroToHtml,
+  resolveTerminMailAnrede,terminMailIntroToHtml
 } from '@/lib/mail/termin-mail-editor'
 
 export type BesichtigungTerminMailInput = {

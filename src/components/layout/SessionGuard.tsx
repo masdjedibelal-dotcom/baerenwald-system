@@ -1,7 +1,7 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback,useEffect,useRef,useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase'
@@ -290,10 +290,4 @@ export function SessionGuard() {
     </div>,
     document.body
   )
-}
-
-/** Andere Stellen können Session-Ablauf zentral melden. */
-export function emitCrmSessionExpired() {
-  if (typeof window === 'undefined') return
-  window.dispatchEvent(new CustomEvent('crm-session-expired'))
 }

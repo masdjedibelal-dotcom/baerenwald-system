@@ -52,12 +52,6 @@ export function korrekturKetteRole(row: VorgangListeRow): KorrekturKetteRole | n
   return null
 }
 
-export function korrekturKetteRoleLabel(role: KorrekturKetteRole): string {
-  if (role === 'original') return 'Original'
-  if (role === 'gutschrift') return 'Storno'
-  return 'Korrektur'
-}
-
 const ROLE_ORDER: Record<KorrekturKetteRole, number> = {
   original: 0,
   gutschrift: 1,

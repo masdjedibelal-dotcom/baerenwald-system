@@ -1,70 +1,7 @@
 'use server'
 
-import { revalidateLeadDetail, revalidateVorgaengeListe } from '@/lib/crm-revalidate'
-import { logDbError } from '@/lib/errors/log-db-error'
-import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
-import { createClient } from '@/lib/supabase-server'
-
-export type VorgangEntityRef =
-  | { kind: 'lead'; id: string }
-  | { kind: 'angebot'; id: string }
-  | { kind: 'auftrag'; id: string }
-  | { kind: 'rechnung'; id: string }
-
-/** Lead-ID aus beliebiger Vorgangs-Entität auflösen. */
-export async function resolveLeadIdForVorgang(
-  ref: VorgangEntityRef
-): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
-  const supabase = createClient()
-
-  if (ref.kind === 'lead') {
-    const { data, error } = await supabase.from('leads').select('id').eq('id', ref.id).maybeSingle()
-    if (error) logDbError('app/vorgaenge/actions:leads', error)
-    if (!data?.id) return { ok: false, message: 'Anfrage nicht gefunden.' }
-    return { ok: true, leadId: data.id as string }
-  }
-
-  if (ref.kind === 'angebot') {
-    const { data, error } = await supabase.from('angebote').select('lead_id').eq('id', ref.id).maybeSingle()
-    if (error) logDbError('app/vorgaenge/actions:angebote', error)
-    const leadId = (data as { lead_id?: string | null } | null)?.lead_id?.trim()
-    if (!leadId) return { ok: false, message: 'Angebot ohne Anfrage-Verknüpfung.' }
-    return { ok: true, leadId }
-  }
-
-  if (ref.kind === 'auftrag') {
-    const { data, error } = await supabase.from('auftraege').select('lead_id').eq('id', ref.id).maybeSingle()
-    if (error) logDbError('app/vorgaenge/actions:auftraege', error)
-    const leadId = (data as { lead_id?: string | null } | null)?.lead_id?.trim()
-    if (!leadId) return { ok: false, message: 'Auftrag ohne Anfrage-Verknüpfung.' }
-    return { ok: true, leadId }
-  }
-
-  const { data: rechnung, error } = await supabase
-    .from('rechnungen')
-    .select('auftrag_id, angebote(lead_id), auftraege(lead_id)')
-    .eq('id', ref.id)
-    .maybeSingle()
-  if (error) logDbError('app/vorgaenge/actions:rechnungen', error)
-
-  if (!rechnung) return { ok: false, message: 'Rechnung nicht gefunden.' }
-
-  const row = rechnung as {
-    auftrag_id?: string | null
-    angebote?: { lead_id?: string | null } | { lead_id?: string | null }[] | null
-    auftraege?: { lead_id?: string | null } | { lead_id?: string | null }[] | null
-  }
-
-  const fromEmbed = (embed: typeof row.angebote) => {
-    if (!embed) return null
-    const first = Array.isArray(embed) ? embed[0] : embed
-    return first?.lead_id?.trim() || null
-  }
-
-  const leadId = fromEmbed(row.auftraege) ?? fromEmbed(row.angebote)
-  if (!leadId) return { ok: false, message: 'Rechnung ohne Anfrage-Verknüpfung.' }
-  return { ok: true, leadId }
-}
+import { revalidateLeadDetail,revalidateVorgaengeListe } from '@/lib/crm-revalidate';
+import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role';
 
 /**
  * Vorgang (Anfrage) soft-löschen — Portal blendet Soft-Deletes aus (Shared DB).

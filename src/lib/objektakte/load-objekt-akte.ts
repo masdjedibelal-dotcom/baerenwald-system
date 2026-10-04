@@ -1,6 +1,6 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
-import { listOrgHausmeister, loadHausmeisterForObjekt } from '@/lib/org/org-hausmeister'
+import { listOrgHausmeister,loadHausmeisterForObjekt } from '@/lib/org/org-hausmeister'
 import type {
   AktenNotiz,
   EinheitBewohner,
@@ -181,15 +181,6 @@ async function loadReadOnlyAkte(
     dokumente: (dokumenteRes.data ?? []) as ObjektDokument[],
     fremdVorgaenge: (fremdRes.data ?? []) as FremdVorgang[],
   }
-}
-
-export async function loadObjektAkteReadOnly(input: {
-  kundeId: string
-  objektId: string
-  leadId?: string | null
-}): Promise<ObjektAkteReadOnlyPayload> {
-  const supabase = createClient()
-  return loadReadOnlyAkte(supabase, input.kundeId.trim(), input.objektId.trim(), input.leadId)
 }
 
 export async function loadObjektAkteDetail(

@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { revalidateKalender,revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import type { KalenderTermin } from '@/lib/types'
@@ -195,38 +195,5 @@ export async function deleteKalenderTermin(
   revalidateKalender()
   const lid = row && typeof (row as { lead_id?: string }).lead_id === 'string' ? (row as { lead_id: string }).lead_id : null
   if (lid) revalidateLeadDetail(lid)
-  return { ok: true }
-}
-
-export async function setTerminErledigt(
-  id: string,
-  erledigt: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase.from('kalender_termine').update({ erledigt }).eq('id', id)
-  if (error) logDbError('app/kalender/actions:kalender_termine', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateKalender()
-  return { ok: true }
-}
-
-export async function moveKalenderTermin(
-  id: string,
-  datum: string,
-  uhrzeit_von: string | null,
-  uhrzeit_bis: string | null
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('kalender_termine')
-    .update({
-      datum,
-      uhrzeit_von,
-      uhrzeit_bis,
-    })
-    .eq('id', id)
-  if (error) logDbError('app/kalender/actions:kalender_termine', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateKalender()
   return { ok: true }
 }

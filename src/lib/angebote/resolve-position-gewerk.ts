@@ -1,11 +1,10 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   istFreitextPosition,
   istGesamtrabattPosition,
   istGewerkBeschreibungPosition,
 } from '@/lib/dokument-zeilen'
-import type { AngebotPosition, Gewerk } from '@/lib/types'
+import type { AngebotPosition,Gewerk } from '@/lib/types'
 
 function normName(s: string): string {
   return s.trim().toLowerCase()

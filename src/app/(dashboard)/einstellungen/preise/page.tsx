@@ -1,8 +1,7 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase-server'
 import { PreislistenClient } from '@/components/preislisten/PreislistenClient'
-import type { Gewerk, Preisliste } from '@/lib/types'
+import type { Gewerk,Preisliste } from '@/lib/types'
 import { sortPreislistenRows } from '@/lib/preislisten-sort'
 
 export const metadata: Metadata = {

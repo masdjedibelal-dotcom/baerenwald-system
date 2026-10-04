@@ -2,14 +2,14 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockField, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField,MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { hubSpotStatusToMockBadgeKind } from '@/lib/status/mock-badge-kind'
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { erneutOrgFreigabeAnfordernNachAblehnung } from '@/lib/org/hv-lead-actions'
-import type { OrgFreigabeLogRow, OrgFreigabeStatus } from '@/lib/types'
+import type { OrgFreigabeLogRow,OrgFreigabeStatus } from '@/lib/types'
 import { formatDatumZeit } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
 import { useFieldErrors } from '@/lib/validation/form-schema'
@@ -32,7 +32,7 @@ export function AngebotOrgFreigabeBanner({
   onDone?: () => void
 }) {
   const status = orgFreigabeStatus ?? 'nicht_noetig'
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { applyFieldErrors } = useFieldErrors()
   const [anpassung, setAnpassung] = useState('')
   const [busy, setBusy] = useState(false)
 

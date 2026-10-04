@@ -25,18 +25,6 @@ async function assertAuftragZugriff(auftragId: string): Promise<{ ok: true } | {
   return { ok: true }
 }
 
-export async function ensureKundenTokenAction(
-  auftragId: string
-): Promise<{ ok: true; token: string; url: string } | { ok: false; message: string }> {
-  const gate = await assertAuftragZugriff(auftragId)
-  if (!gate.ok) return gate
-  const { ensureKundenTokenForAuftrag } = await serverRuntime()
-  const token = await ensureKundenTokenForAuftrag(auftragId)
-  if (!token) return { ok: false, message: 'Token konnte nicht erzeugt werden' }
-  revalidateAuftragDetail(auftragId)
-  return { ok: true, token, url: projektUrlFromToken(token) }
-}
-
 export async function setTimelineKundenfreigabe(input: {
   auftragId: string
   timelineId: string
@@ -96,48 +84,5 @@ export async function setTimelineKundenfreigabe(input: {
   }
 
   revalidateAuftragDetail(input.auftragId)
-  return { ok: true }
-}
-
-export async function sendKundenProjektLinkEmail(auftragId: string): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await assertAuftragZugriff(auftragId)
-  if (!gate.ok) return gate
-
-  const { supabaseAdmin, sendMail, ensureKundenTokenForAuftrag } = await serverRuntime()
-
-  const token = await ensureKundenTokenForAuftrag(auftragId)
-  if (!token) return { ok: false, message: 'Kein Kunden-Link' }
-
-  const { data: auf, error } = await supabaseAdmin
-    .from('auftraege')
-    .select('kunde_id, kunden(name, email, typ)')
-    .eq('id', auftragId)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/kunden-status-actions:auftraege', error)
-  const kunden = auf?.kunden as { name?: string; email?: string | null; typ?: string | null } | null
-  const email = kunden?.email?.trim()
-  if (!email) return { ok: false, message: 'Keine Kunden-E-Mail' }
-
-  const link = projektUrlFromToken(token)
-  const branding = await getMailBranding(supabaseAdmin)
-  const tpl = mailUpdateHinweis(
-    {
-      name: (kunden?.name ?? 'Kundin/Kunde').trim(),
-      statusLink: link,
-      kundeTyp: kunden?.typ ?? null,
-    },
-    branding
-  )
-  const sent = await sendMail({
-    typ: 'update_hinweis',
-    an: email,
-    anName: kunden?.name ?? null,
-    betreff: tpl.betreff,
-    html: tpl.html,
-    kundeId: (auf?.kunde_id as string | null) ?? null,
-    auftragId,
-  })
-  if (!sent.success) return { ok: false, message: sent.error ?? 'Versand fehlgeschlagen' }
-  revalidateAuftragDetail(auftragId)
   return { ok: true }
 }

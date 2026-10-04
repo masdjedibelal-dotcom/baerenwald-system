@@ -5,13 +5,11 @@ import { formatEuro } from '@/lib/format/geld-datum'
  * gleiche Sprache wie Header-Badges (status-display / vorgang-labels).
  */
 import {
-  anfrageStatusDisplay,
   angebotStatusDisplay,
   auftragStatusDisplay,
-  rechnungStatusDisplay,
+  rechnungStatusDisplay
 } from '@/lib/status/status-display'
-import { nettoZuBrutto, resolveAngebotGesamtbetrag } from '@/lib/angebot-einfach'
-import { unterstatusLabel } from '@/lib/vorgang/vorgang-labels'
+import { nettoZuBrutto,resolveAngebotGesamtbetrag } from '@/lib/angebot-einfach'
 
 /** Angebotsnummer wie im Rest des CRM — ohne doppeltes „AG-“. */
 export function angebotNrAnzeige(
@@ -21,13 +19,6 @@ export function angebotNrAnzeige(
   const nr = angebotsnr?.trim()
   if (nr) return nr
   return `AG-${id.slice(0, 8).toUpperCase()}`
-}
-
-export function anfrageStatusKurz(
-  status: string,
-  orgFreigabeStatus?: string | null
-): string {
-  return anfrageStatusDisplay(status, { orgFreigabeStatus }).label
 }
 
 export function angebotStatusKurz(
@@ -50,36 +41,6 @@ export function rechnungStatusKurz(status: string): string {
   // Legacy-Alias aus Listen
   if (key === 'versendet') return rechnungStatusDisplay('gesendet').label
   return rechnungStatusDisplay(status).label
-}
-
-/** Fallback wenn Phase unbekannt — nie Roh-Keys wie „in_arbeit“ zeigen. */
-export function phaseStatusKurz(
-  phase: 'anfrage' | 'angebot' | 'auftrag' | 'rechnung',
-  status: string,
-  statusEinfach?: string | null,
-  orgFreigabeStatus?: string | null
-): string {
-  switch (phase) {
-    case 'anfrage':
-      return anfrageStatusKurz(status, orgFreigabeStatus)
-    case 'angebot':
-      return angebotStatusKurz(status, statusEinfach)
-    case 'auftrag':
-      return auftragStatusKurz(status)
-    case 'rechnung':
-      return rechnungStatusKurz(status)
-    default:
-      return unterstatusLabel('anfrage', status)
-  }
-}
-
-export function abnahmeMetaKurz(opts: {
-  anKundeGesendetAt?: string | null
-  pdfUrl?: string | null
-}): string {
-  if (opts.anKundeGesendetAt) return 'An Kunde gesendet'
-  if (opts.pdfUrl) return 'PDF bereit'
-  return 'Entwurf'
 }
 
 export function formatEurKurz(n: number | null | undefined): string {

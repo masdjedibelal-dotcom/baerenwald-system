@@ -1,13 +1,12 @@
 import 'server-only'
 
 import {
-  deleteTodo,
   listTodos,
   saveTodo,
   setTodoErledigt,
-  type TodoSaveInput,
+  type TodoSaveInput
 } from '@/app/(dashboard)/kalender/todo-actions'
-import type { CrmTodo, TodoPrioritaet } from '@/lib/types'
+import type { CrmTodo,TodoPrioritaet } from '@/lib/types'
 
 function daysUntil(ymd: string | null | undefined): number | null {
   if (!ymd?.trim()) return null
@@ -111,10 +110,4 @@ export async function setTodoErledigtCopilot(id: string, erledigt = true) {
   const res = await setTodoErledigt(id, erledigt)
   if (!res.ok) return { error: res.message }
   return { ok: true, id, erledigt }
-}
-
-export async function deleteTodoCopilot(id: string) {
-  const res = await deleteTodo(id)
-  if (!res.ok) return { error: res.message }
-  return { ok: true, geloescht: id }
 }

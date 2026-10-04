@@ -1,26 +1,25 @@
 'use server'
 
-import { revalidateAngebotDetail, revalidateAngebotNeu, revalidateKalender, revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateKalender,revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncInputsFromProjektWasZeilen } from '@/lib/preislisten/sync-neue-leistungen'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { createClient } from '@/lib/supabase-server'
-import type { KalenderTermin, LeadDetail, LeadKanal, LeadStatus } from '@/lib/types'
-import { STATUS_LABELS, VERLOREN_GRUND_LABELS } from '@/lib/utils'
+import type { KalenderTermin,LeadKanal,LeadStatus } from '@/lib/types'
+import { STATUS_LABELS,VERLOREN_GRUND_LABELS } from '@/lib/utils'
 import { VOR_ORT_TERMIN_TITEL } from '@/lib/kalender-styles'
 import {
   bereicheMitLegacyGewerbeSituation,
   leadHatGewerbeKontext,
   situationOhneGewerbe,
 } from '@/lib/lead-gewerbe-storage'
-import { TERMIN_NOTIZ_MAX_FOTOS, leadNotizFotoUrls } from '@/lib/anfragen/lead-notiz-fotos'
+import { TERMIN_NOTIZ_MAX_FOTOS } from '@/lib/anfragen/lead-notiz-fotos'
 import { syncTerminNotizSpiegel } from '@/lib/anfragen/termin-notiz-spiegel'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
-import type { LeadFunnelPosition } from '@/lib/lead-funnel-positionen'
-import { persistWasZeilenInFunnel, type ProjektWasZeile } from '@/lib/lead-projekt-was'
+import { persistWasZeilenInFunnel,type ProjektWasZeile } from '@/lib/lead-projekt-was'
 import { normalizeKundeNamen } from '@/lib/kunde-namen'
-import { istKundeHausverwaltungTyp, istKundeNurGewerbeTyp } from '@/lib/kunde-stammdaten'
+import { istKundeHausverwaltungTyp,istKundeNurGewerbeTyp } from '@/lib/kunde-stammdaten'
 import {
   anfrageAdresseAusPayload,
   formatAnfrageAdresseZeile,
@@ -136,26 +135,6 @@ export async function updateLeadNotizen(
   const { error } = await supabase
     .from('leads')
     .update({ notizen, updated_at: new Date().toISOString() })
-    .eq('id', leadId)
-  if (error) logDbError('app/anfragen/actions:leads', error)
-
-  if (error) return { ok: false, message: error.message }
-  revalidateLeadDetail(leadId)
-  return { ok: true }
-}
-
-/** Inline-Edit: Kundenbeschreibung / Nachricht auf der Anfrage. */
-export async function updateLeadBeschreibung(
-  leadId: string,
-  kontakt_nachricht: string | null
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({
-      kontakt_nachricht: kontakt_nachricht?.trim() || null,
-      updated_at: new Date().toISOString(),
-    })
     .eq('id', leadId)
   if (error) logDbError('app/anfragen/actions:leads', error)
 
@@ -925,111 +904,6 @@ export async function updateAnfrageAusNeuForm(
   return { ok: true }
 }
 
-export async function updateLeadPreisindikation(
-  leadId: string,
-  preis_min: number | null,
-  preis_max: number | null
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({
-      preis_min,
-      preis_max,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', leadId)
-  if (error) logDbError('app/anfragen/actions:leads', error)
-
-  if (error) return { ok: false, message: error.message }
-  revalidateLeadDetail(leadId)
-  revalidateAngebotNeu()
-  return { ok: true }
-}
-
-/**
- * Manuell „Als akut markieren“ / aufheben — für Direktbeauftragung ohne Angebot
- * (situation=notfall + freigabe_bypass_grund=akut).
- */
-export async function setLeadAlsAkut(
-  leadId: string,
-  akut: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const id = leadId?.trim()
-  if (!id) return { ok: false, message: 'Anfrage fehlt.' }
-
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return { ok: false, message: gate.message }
-  const supabase = gate.db
-
-  const { data: lead, error: fetchErr } = await supabase
-    .from('leads')
-    .select('id, situation, funnel_daten, freigabe_bypass_grund')
-    .eq('id', id)
-    .maybeSingle()
-  if (fetchErr) logDbError('app/anfragen/actions:leads', fetchErr)
-  if (fetchErr || !lead) return { ok: false, message: fetchErr?.message ?? 'Anfrage nicht gefunden.' }
-
-  const fdRaw =
-    lead.funnel_daten && typeof lead.funnel_daten === 'object' && !Array.isArray(lead.funnel_daten)
-      ? { ...(lead.funnel_daten as Record<string, unknown>) }
-      : {}
-
-  if (akut) {
-    if (!fdRaw._akut_prev_situation && lead.situation && lead.situation !== 'notfall') {
-      fdRaw._akut_prev_situation = lead.situation
-    }
-    fdRaw.melde_kategorie = 'notfall'
-    const { error } = await supabase
-      .from('leads')
-      .update({
-        situation: 'notfall',
-        freigabe_bypass_grund: 'akut',
-        funnel_daten: fdRaw,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-    if (error) logDbError('app/anfragen/actions:leads', error)
-    if (error) return { ok: false, message: error.message }
-  } else {
-    const prevSit =
-      typeof fdRaw._akut_prev_situation === 'string' && fdRaw._akut_prev_situation.trim()
-        ? String(fdRaw._akut_prev_situation).trim()
-        : 'kaputt'
-    delete fdRaw._akut_prev_situation
-    if (fdRaw.melde_kategorie === 'notfall') delete fdRaw.melde_kategorie
-    const patch: Record<string, unknown> = {
-      funnel_daten: fdRaw,
-      updated_at: new Date().toISOString(),
-    }
-    if (lead.situation === 'notfall' || (lead.freigabe_bypass_grund ?? '') === 'akut') {
-      patch.situation = prevSit
-    }
-    if ((lead.freigabe_bypass_grund ?? '') === 'akut') {
-      patch.freigabe_bypass_grund = null
-    }
-    const { error } = await supabase.from('leads').update(patch).eq('id', id)
-    if (error) logDbError('app/anfragen/actions:leads', error)
-    if (error) return { ok: false, message: error.message }
-  }
-
-  revalidateLeadDetail(id)
-  return { ok: true }
-}
-
-/** Leichtgewicht für Listen-⋯ / Split-over „Anfrage bearbeiten“. */
-export async function getAnfragePhaseEditLead(
-  leadId: string
-): Promise<{ ok: true; lead: LeadDetail } | { ok: false; message: string }> {
-  const id = leadId?.trim()
-  if (!id) return { ok: false, message: 'Anfrage fehlt.' }
-  const supabase = createClient()
-  const { loadAnfrageDetail } = await import('@/lib/anfragen/load-anfrage-detail')
-  const lead = await loadAnfrageDetail(supabase, id)
-  if (!lead) return { ok: false, message: 'Anfrage nicht gefunden oder keine Berechtigung.' }
-  return { ok: true, lead }
-}
-
 export async function updateLeadKontakt(
   leadId: string,
   data: {
@@ -1184,35 +1058,6 @@ export async function updateLeadMelderUndLeistungsort(
   return { ok: true }
 }
 
-export async function saveLeadFunnelPositionen(
-  leadId: string,
-  positionen: LeadFunnelPosition[]
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data: row, error: loadErr } = await supabase
-    .from('leads')
-    .select('funnel_daten')
-    .eq('id', leadId)
-    .maybeSingle()
-  if (loadErr) logDbError('app/anfragen/actions:leads', loadErr)
-
-  if (loadErr || !row) return { ok: false, message: 'Anfrage nicht gefunden.' }
-
-  const funnel = parseLeadFunnelDaten(row.funnel_daten)
-  const { error: error2 } = await supabase
-    .from('leads')
-    .update({
-      funnel_daten: { ...funnel, positionen },
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', leadId)
-  if (error2) logDbError('app/anfragen/actions:leads', error2)
-
-  if (error2) return { ok: false, message: error2.message }
-  revalidateLeadDetail(leadId)
-  return { ok: true }
-}
-
 export async function saveLeadProjektWasZeilen(
   leadId: string,
   zeilen: ProjektWasZeile[]
@@ -1287,22 +1132,6 @@ export async function updateLeadProjekt(
   if (data.zeitraum_bis !== undefined) patch.zeitraum_bis = data.zeitraum_bis
 
   const { error } = await supabase.from('leads').update(patch).eq('id', leadId)
-  if (error) logDbError('app/anfragen/actions:leads', error)
-
-  if (error) return { ok: false, message: error.message }
-  revalidateLeadDetail(leadId)
-  return { ok: true }
-}
-
-export async function updateLeadVorOrtNotizen(
-  leadId: string,
-  vor_ort_notizen: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({ vor_ort_notizen: vor_ort_notizen.trim() || null, updated_at: new Date().toISOString() })
-    .eq('id', leadId)
   if (error) logDbError('app/anfragen/actions:leads', error)
 
   if (error) return { ok: false, message: error.message }
@@ -1386,74 +1215,6 @@ export async function addLeadNotizRow(
 
   revalidateLeadDetail(leadId)
   return { ok: true, id: data.id as string }
-}
-
-export async function updateLeadNotizRow(
-  notizId: string,
-  leadId: string,
-  input: { titel: string; inhalt: string; datei_urls?: string[] | null }
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const titel = input.titel.trim()
-  const text = input.inhalt.trim()
-  const urls =
-    input.datei_urls === undefined
-      ? undefined
-      : (input.datei_urls ?? []).map((u) => u.trim()).filter(Boolean)
-  if (!titel) return { ok: false, message: 'Titel fehlt.' }
-  if (!text && (!urls || urls.length === 0)) {
-    return { ok: false, message: 'Beschreibung oder Foto erforderlich.' }
-  }
-  if (urls && urls.length > TERMIN_NOTIZ_MAX_FOTOS) {
-    return { ok: false, message: `Maximal ${TERMIN_NOTIZ_MAX_FOTOS} Fotos pro Termin-Notiz.` }
-  }
-
-  const patch: Record<string, unknown> = { titel, inhalt: text }
-  if (urls !== undefined) {
-    patch.datei_urls = urls.length ? urls : null
-    patch.datei_url = urls[0] ?? null
-  }
-
-  const supabase = createClient()
-  const { data: row, error } = await supabase
-    .from('lead_notizen')
-    .select('kalender_termin_id, datei_url, datei_urls')
-    .eq('id', notizId)
-    .eq('lead_id', leadId)
-    .maybeSingle()
-  if (error) logDbError('app/anfragen/actions:lead_notizen', error)
-
-  if (!row) return { ok: false, message: 'Notiz nicht gefunden.' }
-
-  const { error: error2 } = await supabase
-    .from('lead_notizen')
-    .update(patch)
-    .eq('id', notizId)
-    .eq('lead_id', leadId)
-  if (error2) logDbError('app/anfragen/actions:lead_notizen', error2)
-  if (error2) return { ok: false, message: error2.message }
-
-  const terminId = (row as { kalender_termin_id?: string | null }).kalender_termin_id?.trim()
-  if (terminId) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const fotoUrls =
-      urls !== undefined ? urls : leadNotizFotoUrls(row as { datei_url: string | null; datei_urls?: string[] | null })
-    const sync = await syncTerminNotizSpiegel(supabase, {
-      leadId,
-      terminNotizId: notizId,
-      terminId,
-      titel,
-      inhalt: text,
-      datei_url: fotoUrls[0] ?? null,
-      datei_urls: fotoUrls.length ? fotoUrls : null,
-      erstellt_von: user?.id ?? null,
-    })
-    if (!sync.ok) return { ok: false, message: sync.message }
-  }
-
-  revalidateLeadDetail(leadId)
-  return { ok: true }
 }
 
 export async function deleteLeadNotizRow(
@@ -1644,27 +1405,6 @@ export async function saveLeadTerminVereinbart(input: {
   return { ok: true }
 }
 
-export async function saveLeadRueckfrage(input: {
-  leadId: string
-  notiz: string
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const text = input.notiz.trim()
-  if (!text) return { ok: false, message: 'Notiz fehlt.' }
-
-  const notizRes = await addLeadNotizRow(input.leadId, `[Warte auf Antwort] ${text}`)
-  if (!notizRes.ok) return notizRes
-
-  await insertLeadTimelineEntry(input.leadId, 'rueckfrage', `Warte auf Antwort: ${text}`, null)
-
-  const markRes = await markLeadKontaktiertWennNeu(input.leadId)
-  if (!markRes.ok) return markRes
-
-  if (!markRes.geaendert) {
-    revalidateLeadDetail(input.leadId)
-  }
-  return { ok: true }
-}
-
 export async function saveLeadNichtErreichbar(input: {
   leadId: string
   kontaktName: string
@@ -1820,20 +1560,6 @@ export async function dismissDuplikatBand(
   return { ok: true }
 }
 
-export async function countNichtErreichbarVersuche(
-  leadId: string
-): Promise<number> {
-  const supabase = createClient()
-  const {count, error } = await supabase
-    .from('lead_timeline')
-    .select('id', { count: 'exact', head: true })
-    .eq('lead_id', leadId)
-    .eq('typ', 'kontakt')
-    .ilike('titel', 'Nicht erreichbar%')
-  if (error) logDbError('app/anfragen/actions:lead_timeline', error)
-  return typeof count === 'number' ? count : 0
-}
-
 export async function saveLeadAlsVerloren(input: {
   leadId: string
   grund: string
@@ -1849,78 +1575,4 @@ export async function ensureLeadVertriebsAnalyse(
   options?: { force?: boolean }
 ) {
   return ensureLeadVertriebsAnalyseAction(leadId, options)
-}
-
-/** Meldung-Lead als Projektanfrage weiterführen (gleiches Objekt / Auftraggeber). */
-export async function weiterfuehrenAlsProjekt(
-  quellLeadId: string
-): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: src, error } = await supabase
-    .from('leads')
-    .select(
-      `
-      id, kunde_id, auftraggeber_kunde_id, kunde_objekt_id, plz, strasse, hausnummer,
-      situation, bereiche, zeitraum, funnel_daten, notizen, kundentyp
-    `
-    )
-    .eq('id', quellLeadId.trim())
-    .maybeSingle()
-  if (error) logDbError('app/anfragen/actions:leads', error)
-
-  if (error || !src) return { ok: false, message: error?.message ?? 'Anfrage nicht gefunden.' }
-
-  const row = src as Record<string, unknown>
-  const kundeId =
-    (row.auftraggeber_kunde_id as string | null)?.trim() ||
-    (row.kunde_id as string | null)?.trim() ||
-    null
-
-  const { data: neu, error: insErr } = await supabase
-    .from('leads')
-    .insert({
-      kunde_id: kundeId,
-      auftraggeber_kunde_id: (row.auftraggeber_kunde_id as string | null) ?? null,
-      kunde_objekt_id: (row.kunde_objekt_id as string | null) ?? null,
-      kanal: 'sonstiges' as LeadKanal,
-      anlass: 'projekt',
-      erfassung_von: 'crm',
-      status: 'neu' as LeadStatus,
-      situation: (row.situation as string | null) ?? 'erneuern',
-      bereiche: (row.bereiche as string[] | null) ?? null,
-      plz: (row.plz as string | null) ?? null,
-      zeitraum: (row.zeitraum as string | null) ?? null,
-      kundentyp: (row.kundentyp as string | null) ?? null,
-      funnel_daten: row.funnel_daten ?? null,
-      notizen: [
-        (row.notizen as string | null)?.trim(),
-        `Weitergeführt aus Meldung ${quellLeadId.slice(0, 8).toUpperCase()}`,
-      ]
-        .filter(Boolean)
-        .join('\n\n'),
-      org_freigabe_status: 'nicht_noetig',
-      erstellt_von: user?.id ?? null,
-    })
-    .select('id')
-    .single()
-  if (insErr) logDbError('app/anfragen/actions:leads', insErr)
-
-  if (insErr || !neu) return { ok: false, message: insErr?.message ?? 'Projekt-Anfrage konnte nicht angelegt werden.' }
-
-  const newId = (neu as { id: string }).id
-  const { error: __dbErr5 } = await supabase.from('leads_status_history').insert({
-    lead_id: newId,
-    status_neu: 'neu',
-    user_id: user?.id ?? null,
-    notiz: `Aus Meldung ${quellLeadId} weitergeführt`,
-  })
-  if (__dbErr5) logDbError('app/anfragen/actions:leads_status_history', __dbErr5)
-
-  revalidateLeadDetail(quellLeadId)
-  revalidateLeadDetail(newId)
-  return { ok: true, id: newId }
 }

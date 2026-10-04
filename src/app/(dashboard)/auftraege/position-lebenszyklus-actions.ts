@@ -11,9 +11,7 @@ import {
   type AuftragTagesspanne,
   type EintragQuelle,
   type EintragTyp,
-  type PositionEintrag,
-  type PositionMaterial,
-  zeitMinutenFromStdMin,
+  type PositionEintrag,zeitMinutenFromStdMin
 } from '@/lib/auftraege/position-lebenszyklus'
 
 type ActionResult = { ok: true } | { ok: false; message: string }
@@ -281,34 +279,6 @@ export async function listAuftragTagesspannen(
     spanne_von: String(r.spanne_von),
     spanne_bis: String(r.spanne_bis),
     foto_count: Number(r.foto_count) || 0,
-  }))
-}
-
-export async function listPositionMaterial(
-  positionId: string
-): Promise<PositionMaterial[]> {
-  const auth = await crmAuth()
-  if (!auth.ok) return []
-
-  const { data, error } = await supabaseAdmin
-    .from('position_material')
-    .select('*')
-    .eq('position_id', positionId)
-    .order('created_at', { ascending: true })
-  if (error) logDbError('app/auftraege/position-lebenszyklus-actions:position_material', error)
-
-  if (error) {
-    if (/position_material|does not exist/i.test(error.message)) return []
-    return []
-  }
-  return (data ?? []).map((r) => ({
-    id: String(r.id),
-    position_id: String(r.position_id),
-    bezeichnung: String(r.bezeichnung),
-    menge: Number(r.menge) || 0,
-    einzelpreis: Number(r.einzelpreis) || 0,
-    beleg_foto_id: r.beleg_foto_id ? String(r.beleg_foto_id) : null,
-    created_at: r.created_at ?? null,
   }))
 }
 
@@ -909,56 +879,4 @@ export async function setWeitereArbeitAnerkennung(input: {
 
   revalidateAuftrag(String(pos.auftrag_id))
   return { ok: true }
-}
-
-export type ZeitenAbgleichZeile = {
-  tag: string
-  partnerMinuten: number
-  spanneMinuten: number
-  fotoCount: number
-  deltaMinuten: number
-}
-
-/** Partner-Zeit (Summe zeit_minuten je Tag) vs. Tagesspanne aus Direkt-Fotos. */
-export async function loadZeitenAbgleich(
-  auftragId: string
-): Promise<ZeitenAbgleichZeile[]> {
-  const [eintraege, spannen] = await Promise.all([
-    listAuftragPositionEintraege(auftragId),
-    listAuftragTagesspannen(auftragId),
-  ])
-
-  const partnerByTag = new Map<string, number>()
-  for (const e of eintraege) {
-    const t = (e.ereignis_zeit || e.created_at || '').slice(0, 10)
-    if (!t) continue
-    partnerByTag.set(t, (partnerByTag.get(t) ?? 0) + (Number(e.zeit_minuten) || 0))
-  }
-
-  const tags = new Set<string>([
-    ...Array.from(partnerByTag.keys()),
-    ...spannen.map((s) => String(s.tag).slice(0, 10)),
-  ])
-
-  const rows: ZeitenAbgleichZeile[] = []
-  for (const tag of Array.from(tags).sort()) {
-    const sp = spannen.find((s) => String(s.tag).slice(0, 10) === tag)
-    const spanneMinuten = sp
-      ? Math.max(
-          0,
-          Math.round(
-            (new Date(sp.spanne_bis).getTime() - new Date(sp.spanne_von).getTime()) / 60_000
-          )
-        )
-      : 0
-    const partnerMinuten = partnerByTag.get(tag) ?? 0
-    rows.push({
-      tag,
-      partnerMinuten,
-      spanneMinuten,
-      fotoCount: sp?.foto_count ?? 0,
-      deltaMinuten: partnerMinuten - spanneMinuten,
-    })
-  }
-  return rows
 }

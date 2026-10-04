@@ -1,7 +1,7 @@
-import type { Kunde, LeadKanal } from '@/lib/types'
-import { kundeDisplayName, type KundeListenNamePick } from '@/lib/kunde-stammdaten'
-import { funnelPositionenGesamt, parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
-import { formatAnfragePreisAnzeige, formatWebsiteLeadPreis, isCrmStaffFunnel } from '@/lib/utils'
+import type { Kunde,LeadKanal } from '@/lib/types'
+import { kundeDisplayName,type KundeListenNamePick } from '@/lib/kunde-stammdaten'
+import { funnelPositionenGesamt,parseFunnelPositionen } from '@/lib/lead-funnel-positionen'
+import { formatAnfragePreisAnzeige,formatWebsiteLeadPreis,isCrmStaffFunnel } from '@/lib/utils'
 
 /** Lesbare Labels & Freitext-Erkennung für Lead-/Funnel-Anzeige. */
 
@@ -12,14 +12,6 @@ const KUNDENTYP_MAP: Record<string, string> = {
   gewerbe: 'Gewerbe',
   privat: 'Privat',
   hausverwaltung: 'Hausverwaltung',
-}
-
-const PREIS_MODUS_MAP: Record<string, string> = {
-  standard: 'Standard',
-  komplex: 'Individuell / Komplex',
-  fix: 'Festpreis',
-  range: 'Preisrahmen',
-  budget: 'Ca.-Preisrahmen',
 }
 
 export function zeitraumLabel(v?: string | null): string {
@@ -60,27 +52,6 @@ export function resolveLeadKunde(
 export function kundentypLabel(v?: string | null): string {
   if (!v?.trim()) return '—'
   return KUNDENTYP_MAP[v] ?? v
-}
-
-export function preisModusLabel(v?: string | null): string | null {
-  if (!v?.trim()) return null
-  const key = v.toLowerCase()
-  return PREIS_MODUS_MAP[key] ?? v
-}
-
-/** Website: `{ badWas: "komplett" }` · CRM: `["komplett"]` → string[] */
-export function normalizeFachdetails(details: unknown): string[] {
-  if (details == null) return []
-  if (Array.isArray(details)) {
-    return details.filter((x): x is string => typeof x === 'string' && x.length > 0)
-  }
-  if (typeof details === 'object') {
-    return Object.values(details as Record<string, unknown>).filter(
-      (x): x is string => typeof x === 'string' && x.length > 0
-    )
-  }
-  if (typeof details === 'string' && details.trim()) return [details.trim()]
-  return []
 }
 
 /** Echter Freitext — kein JSON-/Debug-Dump, kein formattedSummary aus funnel_daten. */

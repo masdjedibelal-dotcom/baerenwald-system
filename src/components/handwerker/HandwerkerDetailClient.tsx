@@ -1,24 +1,22 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui'
 import {
   DetailShell,
   EntityDetailLayout,
   type DetailShellGroup,
 } from '@/components/layout/EntityDetailLayout'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockNotizComposer, MockNotizenCard } from '@/components/mock-ui/MockDetailCards'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockNotizComposer,MockNotizenCard } from '@/components/mock-ui/MockDetailCards'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBadge } from '@/components/mock-ui/MockPrimitives'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { openActionConfirm } from '@/components/ui/ConfirmPopup'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useLocalTransition } from '@/components/ui/action-busy'
 import { C } from '@/lib/tokens/colors'
 
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState,Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
@@ -38,8 +36,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
 import {
-  loadRahmenVertragBootstrap,
-  type RahmenVertragWizardBootstrap,
+  type RahmenVertragWizardBootstrap
 } from '@/app/(dashboard)/vertraege/wizard-actions'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import { toast } from '@/components/ui/app-toast'
@@ -51,8 +48,7 @@ import {
 } from '@/lib/handwerker/bewertung-kategorien'
 import {
   updateHandwerkerNotizen,
-  getPartnerPortalLoginHint,
-  setHandwerkerPortalGesperrt,
+  getPartnerPortalLoginHint
 } from '@/app/(dashboard)/handwerker/actions'
 import {
   handwerkerDisplayName,
@@ -68,7 +64,7 @@ import {
 } from '@/app/actions/mails'
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { buildPartnerDashboardLink } from '@/lib/portal-utils'
-import type { ComplianceDokumentTyp, Gewerk, Handwerker } from '@/lib/types'
+import type { ComplianceDokumentTyp,Gewerk,Handwerker } from '@/lib/types'
 import {
   FabVorgangStartModal,
   type FabVorgangArt,
@@ -166,9 +162,9 @@ export function HandwerkerDetailClient({
   const [rahmenWizardOpen, setRahmenWizardOpen] = useState(false)
   const [rahmenWizardBootstrap, setRahmenWizardBootstrap] =
     useState<RahmenVertragWizardBootstrap | null>(null)
-  const [rahmenWizardKey, setRahmenWizardKey] = useState(0)
-  const [pending, startTransition] = useLocalTransition()
-  const [err, setErr] = useState<string | null>(null)
+  const [rahmenWizardKey, ] = useState(0)
+  const [, ] = useLocalTransition()
+  const [, setErr] = useState<string | null>(null)
 
   const [portalModalOpen, setPortalModalOpen] = useState(false)
   const [portalSending, setPortalSending] = useState(false)
@@ -179,41 +175,12 @@ export function HandwerkerDetailClient({
   const [portalText, setPortalText] = useState('')
   const [portalHtml, setPortalHtml] = useState('')
   const [vorgangArt, setVorgangArt] = useState<FabVorgangArt | null>(null)
-  const [portalGesperrtPending, setPortalGesperrtPending] = useState(false)
+  const [, ] = useState(false)
   const [istPortalGesperrt, setIstPortalGesperrt] = useState(Boolean(hw.ist_portal_gesperrt))
 
   useEffect(() => {
     setIstPortalGesperrt(Boolean(hw.ist_portal_gesperrt))
   }, [hw.id, hw.ist_portal_gesperrt])
-
-  function togglePortalGesperrt() {
-    const next = !istPortalGesperrt
-    openActionConfirm({
-      title: next ? 'Vom Portal ausschließen?' : 'Portal-Ausschluss aufheben?',
-      body: next
-        ? 'Der Betrieb kann sich dann nicht mehr anmelden oder registrieren und sieht den Hinweis, sich an Bärenwald zu wenden.'
-        : 'Login und Registrierung sind danach wieder möglich.',
-      confirmLabel: next ? 'Ausschließen' : 'Aufheben',
-      cancelLabel: 'Abbrechen',
-      danger: next,
-      busyLabel: null,
-      onConfirm: async () => {
-        setPortalGesperrtPending(true)
-        try {
-          const r = await setHandwerkerPortalGesperrt(hw.id, next)
-          if (!r.ok) {
-            toast.systemError(r)
-            return
-          }
-          setIstPortalGesperrt(next)
-          toast.success(next ? 'Vom Portal ausgeschlossen' : 'Portal-Ausschluss aufgehoben')
-          afterServerActionRefresh()
-        } finally {
-          setPortalGesperrtPending(false)
-        }
-      },
-    })
-  }
 
   useEffect(() => {
     setNotizen(hw.notizen ?? '')
@@ -258,19 +225,6 @@ export function HandwerkerDetailClient({
   const bewertungGesamt = hw.bewertung_gesamt ?? null
   const bewertungAnzahl = hw.bewertung_anzahl ?? 0
   const kategorie = hw.subkategorie?.trim() || gewerkNamen[0] || 'Partner'
-
-  const openRahmenvertrag = useCallback(() => {
-    startTransition(async () => {
-      const res = await loadRahmenVertragBootstrap(hw.id, rahmenVertrag?.id ?? null)
-      if (!res.ok) {
-        toast.systemError(res)
-        return
-      }
-      setRahmenWizardBootstrap(res.bootstrap)
-      setRahmenWizardKey((k) => k + 1)
-      setRahmenWizardOpen(true)
-    })
-  }, [hw.id, rahmenVertrag?.id])
 
   async function openPortalModal() {
     const draft = await getPartnerPortalMailDraft(hw.id)

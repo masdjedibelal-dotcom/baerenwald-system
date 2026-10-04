@@ -1,10 +1,9 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BOTTOM_NAV_ITEMS, navItemIsActive } from '@/lib/nav-config'
+import { BOTTOM_NAV_ITEMS,navItemIsActive } from '@/lib/nav-config'
 import { cn } from '@/lib/utils'
 
 /**

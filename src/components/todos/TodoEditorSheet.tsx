@@ -2,9 +2,9 @@
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
+import { useEffect,useMemo,useState,useTransition,type ReactNode } from 'react'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { DateInput } from '@/components/ui/DateInput'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -20,8 +20,8 @@ import {
 } from '@/app/(dashboard)/kalender/todo-actions'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
-import type { CrmTodo, TodoPrioritaet } from '@/lib/types'
-import { cn, formatTagMonatLang } from '@/lib/utils'
+import type { CrmTodo,TodoPrioritaet } from '@/lib/types'
+import { cn,formatTagMonatLang } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
 
 const PRIO: { value: TodoPrioritaet; label: string }[] = [
@@ -375,25 +375,6 @@ export function TodoEditorSheet({
         </div>
       )}
     </EditorSheet>
-  )
-}
-
-export function TodoCheckButton({
-  erledigt,
-  busy,
-  onToggle,
-}: {
-  erledigt: boolean
-  busy?: boolean
-  onToggle: () => void
-}) {
-  return (
-    <MockBtn className={cn('todo-check', erledigt && 'todo-check--done')} type="button" aria-label={erledigt ? 'Als offen markieren' : 'Abhaken'} disabled={busy} onClick={(e) => {
-        e.stopPropagation()
-        onToggle()
-      }}>
-      {erledigt ? <MockIcon n="check" ctx="default" className="h-4 w-4" aria-hidden /> : <MockIcon n="circle" ctx="default" className="h-4 w-4" aria-hidden />}
-    </MockBtn>
   )
 }
 

@@ -1,4 +1,4 @@
-import type { AngebotStatus, AuftragStatus, LeadKanal, LeadStatus } from '@/lib/types'
+import type { AngebotStatus,AuftragStatus,LeadKanal,LeadStatus } from '@/lib/types'
 import {
   formatPreis,
   formatEuro,
@@ -8,7 +8,6 @@ import {
   formatDatumZeit,
   formatDatumZeitraum,
 } from '@/lib/format/geld-datum'
-import { C } from '@/lib/tokens/colors'
 import { statusLabel } from '@/lib/status/status-map'
 
 export {
@@ -82,19 +81,6 @@ export const VERLOREN_GRUND_LABELS: Record<string, string> = {
   sonstiges: 'Sonstiges',
 }
 
-/** WhatsApp Deep-Link für Lead-Kontakt */
-export function leadWhatsappUrl(
-  telefon: string,
-  name: string,
-  projektText?: string | null
-): string {
-  const digits = telefon.replace(/\D/g, '')
-  if (!digits) return ''
-  const projekt = projektText?.trim() || 'Ihre Anfrage'
-  const text = `Hallo ${name}, vielen Dank für Ihre Anfrage zu „${projekt}". `
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
-}
-
 export const KANAL_LABELS: Record<LeadKanal, string> = {
   website: 'Website',
   telefon: 'Telefon',
@@ -156,13 +142,6 @@ export const ANGEBOT_STATUS_LABELS: Record<AngebotStatus, string> = {
   gesendet_kunde: statusLabel('angebot', 'gesendet_kunde'),
   kunde_akzeptiert: statusLabel('angebot', 'kunde_akzeptiert'),
   abgelehnt: statusLabel('angebot', 'abgelehnt'),
-}
-
-export const KALENDER_TYP_BG: Record<string, string> = {
-  besichtigung: C.blueBg3,
-  beginn: C.successBg,
-  abnahme: C.amberBg3,
-  sonstiges: C.gray100,
 }
 
 export const BEREICH_LABELS: Record<string, string> = {
@@ -305,9 +284,6 @@ export const FACHDETAIL_TO_LEISTUNG: Record<string, string> = {
   'garten.hecke': 'Heckenschnitt',
 }
 
-/** Alias gemäß Design-Prompt (Bereiche / Gewerke) */
-export const BEREICHE_LABELS = BEREICH_LABELS
-
 /** Budget in Anfragen-Listen (keine Min–Max-Range als „X–Y“). */
 export function formatBudget(budget?: number | null, min?: number | null, max?: number | null): string {
   if (budget != null && budget > 0) {
@@ -406,11 +382,6 @@ export function formatAnfragePreisAnzeige(
   return formatBudget(budget_ca ?? undefined, preis_min ?? undefined, preis_max ?? undefined)
 }
 
-/** Tabellenkopf bei gemischten Kanälen. */
-export function anfragenPreisSpaltenLabel(): string {
-  return 'Preisrahmen'
-}
-
 /** Detail-Ansicht: Staff = Preiseinschätzung, sonst Preisrahmen. */
 export function anfragePreisDetailLabel(_kanal: LeadKanal, funnel?: unknown): string {
   return isCrmStaffFunnel(funnel) ? 'Preiseinschätzung' : 'Preisrahmen'
@@ -477,14 +448,6 @@ export function formatWochentagKurz(datum: string | Date): string {
   return WOCHENTAGE_KURZ[d.getDay()] ?? '—'
 }
 
-/** „März 2026“ / „März“. */
-export function formatMonatJahr(datum: string | Date, opts?: { withYear?: boolean }): string {
-  const d = parseDisplayDate(datum)
-  if (!d) return '—'
-  const monat = MONATE[d.getMonth()] ?? '—'
-  return opts?.withYear === false ? monat : `${monat} ${d.getFullYear()}`
-}
-
 /** „Mär 2026“ / „Mär“. */
 export function formatMonatKurzJahr(datum: string | Date, opts?: { withYear?: boolean }): string {
   const d = parseDisplayDate(datum)
@@ -520,14 +483,6 @@ export function formatWochentagDatumLang(
   const wt = WOCHENTAGE[d.getDay()] ?? '—'
   const tag = formatTagMonatLang(d, { withYear: opts?.withYear !== false })
   return `${wt}, ${tag}`
-}
-
-/** „19. Mär“. */
-export function formatTagMonatKurz(datum: string | Date): string {
-  const d = parseDisplayDate(datum)
-  if (!d) return '—'
-  const monat = MONATE_KURZ[d.getMonth()] ?? '—'
-  return `${d.getDate()}. ${monat}`
 }
 
 /** „DD.MM“. */

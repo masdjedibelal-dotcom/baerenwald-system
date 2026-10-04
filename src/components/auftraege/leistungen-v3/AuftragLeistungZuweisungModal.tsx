@@ -1,12 +1,12 @@
 'use client'
 import { DateInput } from '@/components/ui/DateInput'
 import { MockBtn } from '@/components/mock-ui'
-import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockInput,MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useTransition } from '@/components/ui/action-busy'
 import { C } from '@/lib/tokens/colors'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import {
@@ -21,7 +21,7 @@ import {
 import type { HandwerkerGewerkListeEintrag } from '@/app/(dashboard)/angebote/actions'
 import type { AuftragPosition } from '@/lib/types'
 import { richTextToPlain } from '@/lib/rich-text'
-import { BEREICH_LABELS, cn } from '@/lib/utils'
+import { BEREICH_LABELS,cn } from '@/lib/utils'
 import { handwerkerInitialen } from '@/components/auftraege/leistungen-v3/utils'
 import { HandwerkerSuchenSheet } from '@/components/auftraege/leistungen-v3/HandwerkerSuchenSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
@@ -83,7 +83,7 @@ auftragId?: string | null
   onDone: () => void
 }) {
   const isAngebotOnly = !auftragId?.trim() && Boolean(angebotId?.trim())
-  const { fieldErrors, applyFieldErrors, clearFieldErrors, clearField } = useFieldErrors()
+  const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [pending, startTransition] = useTransition()
   const [dirty, setDirty] = useState(false)
   const [selectedHwIds, setSelectedHwIds] = useState<Set<string>>(() => new Set())

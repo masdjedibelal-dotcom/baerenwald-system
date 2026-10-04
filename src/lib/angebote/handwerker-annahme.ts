@@ -32,11 +32,6 @@ export function normalizeHwZuweisungStatus(raw: string | null | undefined): stri
     .toLowerCase()
 }
 
-/** Schreibpfad: nur kanonisch „akzeptiert“. */
-export function isHwZuweisungAkzeptiert(status: string | null | undefined): boolean {
-  return normalizeHwZuweisungStatus(status) === HW_ZUWEISUNG_STATUS_AKZEPTIERT
-}
-
 /** Lesepfad während Migration: Legacy-Aliase tolerieren. */
 export function isHwZuweisungAkzeptiertLenient(status: string | null | undefined): boolean {
   return LEGACY_AKZEPTIERT.has(normalizeHwZuweisungStatus(status))

@@ -2,9 +2,9 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 import { saveKundeMeldeLegalUrls } from '@/app/actions/kunden-organisation'
 import {
   normalizeOrgHttpUrl,
@@ -12,7 +12,7 @@ import {
   ORG_MELDE_LEGAL_REQUIRED_HINT,
 } from '@/lib/org/melde-legal-urls'
 import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
-import { DOC, LIST } from '@/lib/crm-labels'
+import { LIST } from '@/lib/crm-labels'
 import { toast } from '@/components/ui/app-toast'
 import { C } from '@/lib/tokens/colors'
 import { TOAST } from '@/lib/copy'

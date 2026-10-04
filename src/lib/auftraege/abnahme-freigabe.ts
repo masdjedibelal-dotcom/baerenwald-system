@@ -8,13 +8,6 @@ export type AbnahmeFreigabeStatus =
   | 'freigegeben'
   | 'abgelehnt'
 
-export const ABNAHME_FREIGABE_LABELS: Record<AbnahmeFreigabeStatus, string> = {
-  entwurf: 'Entwurf',
-  zur_freigabe: 'Zur Freigabe',
-  freigegeben: 'Freigegeben',
-  abgelehnt: 'Abgelehnt',
-}
-
 export function normalizeAbnahmeFreigabeStatus(raw: unknown): AbnahmeFreigabeStatus {
   const s = String(raw ?? '')
     .trim()
@@ -63,13 +56,6 @@ export function abnahmeRelevanteZeilen(
       Boolean(z.abnahmeSigniertAm?.trim()) ||
       z.freigabeStatus != null
   )
-}
-
-/** Alle eingereichten Teilabnahmen sind freigegeben. */
-export function alleZugewiesenenHwFreigegeben(zeilen: AbnahmeHwFreigabeZeile[]): boolean {
-  const relevant = abnahmeRelevanteZeilen(zeilen)
-  if (!relevant.length) return true
-  return relevant.every((z) => z.freigabeStatus === 'freigegeben')
 }
 
 export function kannGesamtabnahmeErzeugen(zeilen: AbnahmeHwFreigabeZeile[]): {

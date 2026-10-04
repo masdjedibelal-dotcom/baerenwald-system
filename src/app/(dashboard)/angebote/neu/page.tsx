@@ -1,10 +1,9 @@
-import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { loadWizardContext } from '@/lib/wizard-context'
 import { AngebotNeuFromKundeClient } from '@/components/angebote/AngebotNeuFromKundeClient'
 import { AngebotNeuKundeGate } from '@/components/angebote/AngebotNeuKundeGate'
 import { redirect } from 'next/navigation'
-import type { Handwerker, Kunde } from '@/lib/types'
+import type { Handwerker,Kunde } from '@/lib/types'
 
 /**
  * FAB / Deep-Link „Neues Angebot“:

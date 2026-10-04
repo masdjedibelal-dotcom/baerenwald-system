@@ -304,35 +304,6 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
   }
 }
 
-/** Beim Löschen des Plans: Abschlag-/Schluss-Entwürfe stornieren. */
-export async function storniereAbschlagEntwuerfeForAuftrag(
-  auftragId: string
-): Promise<{ ok: true; count: number } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('rechnungen')
-    .select('id, status, rechnung_art, zahlungsplan_abschlag_id')
-    .eq('auftrag_id', auftragId)
-    .eq('status', 'entwurf')
-  if (error) logDbError('lib/rechnungen/ensure-abschlag-entwuerfe:rechnungen', error)
-
-  if (error) return { ok: false, message: error.message }
-
-  let count = 0
-  for (const r of data ?? []) {
-    const art = String(r.rechnung_art ?? '')
-      .trim()
-      .toLowerCase()
-    const zeileId = (r.zahlungsplan_abschlag_id as string | null)?.trim()
-    if ((art === 'abschlag' || art === 'schluss') && zeileId) {
-      const res = await updateRechnungStatus(String(r.id), 'storniert')
-      if (!res.ok) return res
-      count += 1
-    }
-  }
-  return { ok: true, count }
-}
-
 /**
  * Nach jeder Leistungsänderung am Auftrag (bearbeiten, weiteres Angebot, Regie):
  * offene Abschlags-/Schluss-Entwürfe neu rechnen — die Schlussrechnung ist immer der aktuelle Rest.

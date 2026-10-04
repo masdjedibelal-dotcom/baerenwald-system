@@ -1,9 +1,7 @@
-import type { AuftragStatus, LeadStatus } from '@/lib/types'
+import type { AuftragStatus,LeadStatus } from '@/lib/types'
 import { C } from '@/lib/tokens/colors'
 
 export const PROJEKT_PHASEN = ['Anfrage', 'Angebot', 'Auftrag', 'Abnahme', 'Fertig'] as const
-
-export type ProjektPhase = (typeof PROJEKT_PHASEN)[number]
 
 export type ProjektPhasenEntities = {
   /** true wenn mindestens ein Angebot zur Anfrage existiert */
@@ -47,16 +45,6 @@ export function aktuellePhaseIndexFromEntities(e: ProjektPhasenEntities): number
   return 0
 }
 
-/** @deprecated Prefer aktuellePhaseIndexFromEntities — Lead-status ist driftanfällig */
-export function aktuellePhaseIndex(leadStatus: LeadStatus | null, aufStatus: AuftragStatus): number {
-  return aktuellePhaseIndexFromEntities({
-    leadStatus,
-    aufStatus,
-    hasAuftrag: aufStatus === 'offen' || aufStatus === 'in_arbeit' || aufStatus === 'abnahme' || aufStatus === 'abgeschlossen',
-    hasAngebot: leadStatus === 'angebot' || leadStatus === 'auftrag' || leadStatus === 'abgeschlossen',
-  })
-}
-
 export function auftragStatusLabelDe(status: AuftragStatus): string {
   if (status === 'offen') return 'Offen'
   if (status === 'in_arbeit') return 'In Arbeit'
@@ -64,16 +52,6 @@ export function auftragStatusLabelDe(status: AuftragStatus): string {
   if (status === 'abgeschlossen') return 'Abgeschlossen'
   if (status === 'storniert') return 'Storniert'
   return status
-}
-
-/** Anzeige in der Fortschritts-Card (Mockup: „Ausführung“). */
-export function aktuelleAuftragPhaseLabel(status: AuftragStatus): string {
-  if (status === 'offen') return 'Vorbereitung'
-  if (status === 'in_arbeit') return 'Ausführung'
-  if (status === 'abnahme') return 'Abnahme'
-  if (status === 'abgeschlossen') return 'Fertigstellung'
-  if (status === 'storniert') return 'Storniert'
-  return auftragStatusLabelDe(status)
 }
 
 /** HTML für E-Mail: 5 Phasen als Step-Leiste (schlicht, table-safe) */

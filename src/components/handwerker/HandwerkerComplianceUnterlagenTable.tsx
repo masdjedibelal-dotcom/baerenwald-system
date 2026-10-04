@@ -3,8 +3,7 @@
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
-import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useMemo,useState } from 'react'
 import {
   istEigeneUnterlageTyp,
   standardDokumente,
@@ -14,7 +13,7 @@ import {
   partnerDokumentIstGeloescht,
   partnerDokumentStatusLabel,
 } from '@/lib/handwerker/partner-dokument-status'
-import type { ComplianceDokumentTyp, PartnerDokument } from '@/lib/types'
+import type { ComplianceDokumentTyp,PartnerDokument } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { PartnerDokumentEditorSheet } from '@/components/handwerker/PartnerDokumentEditorSheet'
 
@@ -44,7 +43,6 @@ export function HandwerkerComplianceUnterlagenTable({
   dokumente: PartnerDokument[]
   typen: ComplianceDokumentTyp[]
 }) {
-  const router = useRouter()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editDoc, setEditDoc] = useState<PartnerDokument | null>(null)
 
