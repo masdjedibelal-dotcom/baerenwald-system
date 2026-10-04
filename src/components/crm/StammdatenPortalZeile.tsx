@@ -119,8 +119,8 @@ export function StammdatenPortalZeile({
         : 'd'
 
   const showInvite = !gesperrt && registered === false
-  // Entlastung 01.10.2026: „Als Kunde/Partner einloggen“ entfällt
-  const showLogin = false && !hideLogin && !gesperrt && registered === true && isCrmAdmin
+  // Absprung ins Portal (als Kunde/Partner ansehen) bleibt in den Stammdaten (04.10.2026)
+  const showLogin = !hideLogin && !gesperrt && registered === true && isCrmAdmin
 
   return (
     <>
@@ -140,8 +140,8 @@ export function StammdatenPortalZeile({
         {showLogin ? (
           <span className="a">
             <MockBtn className="vgid-portal__login" type="button" onClick={() => void openLogin()} disabled={loginBusy} aria-label={hid ? 'Partner-Portal Login' : 'Kundenportal Login'} title={hid ? 'Als Partner im Portal anmelden' : 'Als Kunde im Portal anmelden'}>
-              <MockIcon ctx="btn" n="log-in" size={15} />
-              <span>Login</span>
+              <MockIcon ctx="btn" n="external-link" size={15} />
+              <span>Portal öffnen</span>
             </MockBtn>
           </span>
         ) : null}

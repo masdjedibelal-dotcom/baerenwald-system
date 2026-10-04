@@ -286,7 +286,7 @@ export function EntityKundenStammdatenCard({
             <PropRow label="Quelle" value={draft.quelleLabel.trim()} />
           ) : null}
           {kundeId?.trim() ? (
-            <StammdatenPortalZeile kundeId={kundeId} fallbackEmail={draft.email} hideLogin />
+            <StammdatenPortalZeile kundeId={kundeId} fallbackEmail={draft.email} />
           ) : null}
           {showKundeLink ? (
             <PropRow

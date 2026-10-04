@@ -16,7 +16,6 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
-import { KundeWirtschaftlicheUebersicht } from '@/components/kunden/KundeWirtschaftlicheUebersicht'
 import { Suspense,useEffect,useMemo,useRef,useState } from 'react'
 import { useRouter,useSearchParams } from 'next/navigation'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
@@ -423,7 +422,6 @@ export function KundeDetailClient({
         />
       ) : null}
       {zusatzfelderCard}
-      <KundeWirtschaftlicheUebersicht kunde={kunde} />
     </div>
   )
 

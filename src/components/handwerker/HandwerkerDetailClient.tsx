@@ -23,13 +23,10 @@ import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { EntityHandwerkerStammdatenCard } from '@/components/crm/EntityHandwerkerStammdatenCard'
 import { EntityHandwerkerBankCard } from '@/components/crm/EntityHandwerkerBankCard'
 import { HandwerkerAkteDokumente } from '@/components/handwerker/HandwerkerAkteDokumente'
-import { HandwerkerComplianceUnterlagenTable } from '@/components/handwerker/HandwerkerComplianceUnterlagenTable'
 import {
   filterStandardComplianceTypen,
   istEigeneUnterlageTyp,
-  standardDokumente,
 } from '@/lib/handwerker/compliance-katalog'
-import { HandwerkerWirtschaftlicheUebersicht } from '@/components/handwerker/HandwerkerWirtschaftlicheUebersicht'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -316,8 +313,6 @@ export function HandwerkerDetailClient({
 
       <EntityHandwerkerBankCard handwerker={hw} gewerkeOptionen={gewerkeOptionen} />
 
-      <HandwerkerWirtschaftlicheUebersicht payload={payload} />
-
       <MockCard title="Bewertungen von Kunden" icon="star">
         <div className="mb-4 flex flex-wrap items-baseline gap-3">
           <div
@@ -429,14 +424,7 @@ export function HandwerkerDetailClient({
       handwerkerId={hw.id}
       dokumente={payload.dokumente}
       auftraege={payload.auftraege}
-    />
-  )
-
-  const complianceInhalt = (
-    <HandwerkerComplianceUnterlagenTable
-      handwerkerId={hw.id}
-      dokumente={payload.dokumente}
-      typen={complianceTypenStandard}
+      handwerkskarteTyp={complianceTypenStandard[0] ?? null}
     />
   )
 
@@ -449,14 +437,10 @@ export function HandwerkerDetailClient({
     [vorgaengeRows, hw.id]
   )
 
-  const complianceAnzahl = useMemo(
-    () => standardDokumente(payload.dokumente).filter((d) => d.typ === 'handwerkskarte').length,
-    [payload.dokumente]
-  )
   const akteDocsAnzahl = useMemo(
     () =>
       payload.dokumente.filter(
-        (d) => d.datei_url?.trim() && istEigeneUnterlageTyp(d.typ)
+        (d) => d.datei_url?.trim() && (istEigeneUnterlageTyp(d.typ) || d.typ === 'handwerkskarte')
       ).length,
     [payload.dokumente]
   )
@@ -475,13 +459,6 @@ export function HandwerkerDetailClient({
       icon: 'folders',
       count: vorgaengeCount || undefined,
       render: () => vorgaengeInhalt,
-    },
-    {
-      id: 'compliance',
-      label: 'Handwerkskarte',
-      icon: 'shield-check',
-      count: complianceAnzahl || undefined,
-      render: () => complianceInhalt,
     },
     {
       id: 'akte',

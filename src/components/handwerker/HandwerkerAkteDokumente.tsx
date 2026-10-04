@@ -1,7 +1,7 @@
 'use client'
 
-import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { Card } from '@/components/ui/Card'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { useMemo,useState } from 'react'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
@@ -29,6 +29,18 @@ const AKTE_UPLOAD_TYP: ComplianceDokumentTyp = {
   mehrfach_erlaubt: true,
 }
 
+/** Handwerkskarte als fester Typ (auch ohne Eintrag in den Stammdaten-Typen) */
+const HANDWERKSKARTE_TYP: ComplianceDokumentTyp = {
+  id: 'handwerkskarte',
+  slug: 'handwerkskarte',
+  bezeichnung: 'Handwerkskarte',
+  beschreibung: null,
+  pflicht_fuer_fachbetriebe: false,
+  erneuerung_monate: null,
+  sort_order: 1,
+  mehrfach_erlaubt: false,
+}
+
 const ALLGEMEIN_KEY = 'allgemein'
 const ALLGEMEIN_TITLE = 'Allgemein'
 
@@ -54,9 +66,12 @@ export function HandwerkerAkteDokumente({
   handwerkerId,
   dokumente,
   auftraege = [],
+  handwerkskarteTyp: handwerkskarteTypProp = null,
 }: {
   handwerkerId: string
   dokumente: PartnerDokument[]
+  /** Handwerkskarte liegt mit in der Akte (kein eigener Tab mehr) */
+  handwerkskarteTyp?: ComplianceDokumentTyp | null
   auftraege?: {
     id: string
     titel: string | null
@@ -65,6 +80,7 @@ export function HandwerkerAkteDokumente({
   }[]
 }) {
   const isMobile = useIsMobile()
+  const handwerkskarteTyp = handwerkskarteTypProp ?? HANDWERKSKARTE_TYP
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editDoc, setEditDoc] = useState<PartnerDokument | null>(null)
 
@@ -88,7 +104,9 @@ export function HandwerkerAkteDokumente({
 
   const rows = useMemo((): AkteDocRow[] => {
     return dokumente
-      .filter((d) => d.datei_url?.trim() && istEigeneUnterlageTyp(d.typ))
+      .filter(
+        (d) => d.datei_url?.trim() && (istEigeneUnterlageTyp(d.typ) || d.typ === 'handwerkskarte')
+      )
       .map((d) => {
         const aid = d.auftrag_id?.trim()
         if (aid) {
@@ -121,19 +139,24 @@ export function HandwerkerAkteDokumente({
 
   const sheetTyp: ComplianceDokumentTyp =
     editDoc != null
-      ? {
-          ...AKTE_UPLOAD_TYP,
-          slug: editDoc.typ,
-          bezeichnung: editDoc.bezeichnung || 'Dokument',
-        }
-      : AKTE_UPLOAD_TYP
+      ? editDoc.typ === 'handwerkskarte'
+        ? handwerkskarteTyp
+        : {
+            ...AKTE_UPLOAD_TYP,
+            slug: editDoc.typ,
+            bezeichnung: editDoc.bezeichnung || 'Dokument',
+          }
+      : handwerkskarteTyp
+  const uploadTypen = [handwerkskarteTyp, AKTE_UPLOAD_TYP]
 
   function rowMeta(doc: PartnerDokument) {
-    const title = doc.bezeichnung?.trim() || 'Dokument'
-    const meta = doc.hochgeladen_am
-      ? `Hochgeladen ${formatDate(doc.hochgeladen_am)}`
-      : null
-    return { title, meta }
+    const istKarte = doc.typ === 'handwerkskarte'
+    const title = istKarte ? 'Handwerkskarte' : doc.bezeichnung?.trim() || 'Dokument'
+    const teile = [
+      doc.hochgeladen_am ? `Hochgeladen ${formatDate(doc.hochgeladen_am)}` : null,
+      istKarte && doc.gueltig_bis ? `gültig bis ${formatDate(doc.gueltig_bis)}` : null,
+    ].filter(Boolean)
+    return { title, meta: teile.length ? teile.join(' · ') : null }
   }
 
   function renderItems(items: AkteDocRow[]) {
@@ -190,35 +213,32 @@ export function HandwerkerAkteDokumente({
     )
   }
 
+  // Gleiches Bild wie die Dokumente im Vorgang — auch wenn noch leer
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="m-0 text-[length:var(--fs-text)] font-semibold text-[var(--text)]">
-            Dokumente
-          </h2>
-        </div>
-        {rows.length > 0 ? (
-          <MockBtn type="button" kind="primary" sm onClick={openAdd}>
-            <MockIcon ctx="btn" n="upload" size={14} />
-            Upload
-          </MockBtn>
+    <div className="auftrag-dok-panel pb-4">
+      <Card className="dshell-framed" collapsible={false} title={`Dokumente · ${rows.length}`} icon="files">
+        {!isMobile ? (
+          <div
+            className="dok-upload-zone"
+            onClick={openAdd}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') openAdd()
+            }}
+          >
+            <MockIcon ctx="btn" n="cloud-upload" size={18} />
+            Handwerkskarte oder Dokument hochladen
+          </div>
         ) : null}
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-6 text-center">
-          <p className="m-0 text-[length:var(--fs-meta)] text-bw-text-muted">
-            Noch keine Dokumente.
+        {rows.length === 0 ? (
+          <p className="py-6 text-center text-[length:var(--fs-text)] text-bw-text-muted">
+            {isMobile ? 'Noch keine Dokumente. Über „Dokument“ oben hochladen.' : 'Noch keine Dokumente.'}
           </p>
-          <MockBtn type="button" kind="primary" onClick={openAdd}>
-            <MockIcon ctx="btn" n="upload" size={16} />
-            Dokument oder Foto hochladen
-          </MockBtn>
-        </div>
-      ) : (
-        <DokumenteVorgangAccordions groups={groups} renderItems={renderItems} />
-      )}
+        ) : (
+          <DokumenteVorgangAccordions groups={groups} renderItems={renderItems} />
+        )}
+      </Card>
 
       <PartnerDokumentEditorSheet
         open={sheetOpen}
@@ -228,7 +248,8 @@ export function HandwerkerAkteDokumente({
         }}
         handwerkerId={handwerkerId}
         typ={sheetTyp}
-        allowTypPick={false}
+        typen={editDoc ? undefined : uploadTypen}
+        allowTypPick={!editDoc && uploadTypen.length > 1}
         existing={editDoc}
         onSaved={() => {
           setSheetOpen(false)
