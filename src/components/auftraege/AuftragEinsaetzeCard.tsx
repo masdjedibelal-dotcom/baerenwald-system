@@ -14,11 +14,13 @@ import {
   regieEntscheiden,
   zurueckziehenEinsatz,
   type EinsatzMitteilung,
+  type EinsatzGewerkOption,
   type EinsatzPartnerOption,
   type EinsatzStatus,
   type EinsatzZeile,
 } from '@/app/(dashboard)/auftraege/einsatz-actions'
 import { MockBadge, MockBtn, MockCard, MockSegment } from '@/components/mock-ui'
+import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
@@ -144,6 +146,9 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [partner, setPartner] = useState<EinsatzPartnerOption[]>([])
+  const [gewerkOptionen, setGewerkOptionen] = useState<EinsatzGewerkOption[]>([])
+  /** Filter-Chip: ohne Gewerk keine Partner-Auswahl (zu viele, falsche Treffer) */
+  const [gewerkFilter, setGewerkFilter] = useState<string | null>(null)
   const [form, setForm] = useState<Form | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   // Updates, die in dieser Sitzung geöffnet wurden: zählen in der Zeile nicht mehr als neu.
@@ -184,6 +189,8 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       return
     }
     setPartner(res.partner)
+    setGewerkOptionen(res.gewerke)
+    setGewerkFilter(res.gewerkVorschlag)
     setForm({
       handwerkerId: '',
       titel: res.vorbelegung.titel,
@@ -543,9 +550,27 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         {form ? (
           <>
             <MockField label="Partner" required>
-              <MockSelect value={form.handwerkerId} onChange={(ev) => setF({ handwerkerId: ev.target.value })}>
-                <option value="">Partner wählen</option>
-                {partner.map((p) => (
+              <div className="einsatz-gewerk-chips">
+                {gewerkOptionen.map((g) => (
+                  <MockChip
+                    key={g.slug}
+                    active={gewerkFilter === g.slug}
+                    onClick={() => {
+                      setGewerkFilter(gewerkFilter === g.slug ? null : g.slug)
+                      setF({ handwerkerId: '' })
+                    }}
+                  >
+                    {g.name}
+                  </MockChip>
+                ))}
+              </div>
+              <MockSelect
+                value={form.handwerkerId}
+                disabled={!gewerkFilter}
+                onChange={(ev) => setF({ handwerkerId: ev.target.value })}
+              >
+                <option value="">{gewerkFilter ? 'Partner wählen' : 'Zuerst Gewerk wählen'}</option>
+                {partner.filter((p) => gewerkFilter && p.gewerke.includes(gewerkFilter)).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.label}
                     {p.email ? '' : ' (keine E-Mail)'}

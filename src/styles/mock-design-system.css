@@ -22348,3 +22348,6 @@ display: flex;
 
 /* Dokumente am Vorgang: Art vor dem Hochladen wählen */
 .dok-art-wahl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+
+/* Einsatz anlegen: Partner erst nach Gewerk-Wahl */
+.einsatz-gewerk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }

@@ -19,10 +19,12 @@ const loadActiveGewerkeCached = unstable_cache(
       .from('gewerke')
       .select('id, name, slug, aktiv, ausfuehrung, fachbetrieb_hinweis')
       .eq('aktiv', true)
+      // Obergewerke in fester Reihenfolge (04.10.2026), nicht alphabetisch
+      .order('sort_order')
       .order('name')
     return (data ?? []) as Gewerk[]
   },
-  ['stammdaten-gewerke-v1'],
+  ['stammdaten-gewerke-v2'],
   { revalidate: STAMMDATEN_TTL_SEC, tags: [STAMMDATEN_GEWERKE_TAG] }
 )
 

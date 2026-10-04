@@ -75,7 +75,8 @@ export type EinsatzMitteilung = {
   erfasst_von: 'partner' | 'bw' | null
 }
 
-export type EinsatzPartnerOption = { id: string; label: string; email: string | null }
+export type EinsatzPartnerOption = { id: string; label: string; email: string | null; gewerke: string[] }
+export type EinsatzGewerkOption = { slug: string; name: string }
 
 export type EinsatzVorbelegung = {
   titel: string
@@ -235,20 +236,38 @@ export async function einsatzUpdatesGesehen(
 
 /** Partner-Auswahl und Vorbelegung (Ort, Kontakt, Termin) für „Einsatz anlegen“. */
 export async function loadEinsatzFormular(auftragId: string): Promise<
-  | { ok: true; partner: EinsatzPartnerOption[]; vorbelegung: EinsatzVorbelegung }
+  | {
+      ok: true
+      partner: EinsatzPartnerOption[]
+      gewerke: EinsatzGewerkOption[]
+      /** Gewerk der meisten Auftragspositionen — Vorauswahl der Filter-Chips */
+      gewerkVorschlag: string | null
+      vorbelegung: EinsatzVorbelegung
+    }
   | { ok: false; message: string }
 > {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
-  const [hwRes, aufRes] = await Promise.all([
-    gate.db.from('handwerker').select('id, name, firma, email, aktiv').order('firma', { ascending: true }),
+  const [hwRes, aufRes, gwRes, posRes] = await Promise.all([
+    gate.db.from('handwerker').select('id, name, firma, email, aktiv, gewerke').order('firma', { ascending: true }),
     gate.db
       .from('auftraege')
       .select('titel, start_datum, end_datum, leads(strasse, hausnummer, plz, kontakt_name, kontakt_telefon)')
       .eq('id', auftragId)
       .maybeSingle(),
+    gate.db.from('gewerke').select('slug, name, sort_order').eq('aktiv', true).order('sort_order'),
+    gate.db.from('auftrag_positionen').select('gewerk_slug').eq('auftrag_id', auftragId),
   ])
   if (hwRes.error) logDbError('app/auftraege/einsatz-actions:handwerker', hwRes.error)
+  if (gwRes.error) logDbError('app/auftraege/einsatz-actions:gewerke', gwRes.error)
+  if (posRes.error) logDbError('app/auftraege/einsatz-actions:positionen', posRes.error)
+  const gewerke = (gwRes.data ?? []).map((g) => ({ slug: String(g.slug), name: String(g.name) }))
+  const zaehler = new Map<string, number>()
+  for (const p of posRes.data ?? []) {
+    const slug = String(p.gewerk_slug ?? '').trim()
+    if (slug && gewerke.some((g) => g.slug === slug)) zaehler.set(slug, (zaehler.get(slug) ?? 0) + 1)
+  }
+  const gewerkVorschlag = Array.from(zaehler.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
   if (aufRes.error) logDbError('app/auftraege/einsatz-actions:auftrag', aufRes.error)
   if (!aufRes.data) return { ok: false, message: 'Auftrag nicht gefunden.' }
 
@@ -258,6 +277,7 @@ export async function loadEinsatzFormular(auftragId: string): Promise<
       id: String(h.id),
       label: partnerLabel(h as { name?: string | null; firma?: string | null }),
       email: ((h as { email?: string | null }).email ?? '').trim() || null,
+      gewerke: Array.isArray((h as { gewerke?: unknown }).gewerke) ? ((h as { gewerke: string[] }).gewerke) : [],
     }))
   const leadRaw = (aufRes.data as { leads?: unknown }).leads
   const lead = (Array.isArray(leadRaw) ? leadRaw[0] : leadRaw) as
@@ -278,6 +298,8 @@ export async function loadEinsatzFormular(auftragId: string): Promise<
   return {
     ok: true,
     partner,
+    gewerke,
+    gewerkVorschlag,
     vorbelegung: {
       titel: String(a.titel ?? '').trim(),
       termin_von: a.start_datum ? String(a.start_datum).slice(0, 10) : null,

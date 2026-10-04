@@ -62,9 +62,6 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'gewerke', label: 'Gewerke' },
 ]
 
-/** Schnellfilter: bekannte Slugs, Labels aus DB (Variante B-Namen). */
-const LISTE_FILTER_GEWERK_SLUGS = ['bad', 'elektrik', 'fliesen', 'maler', 'boden'] as const
-
 const HW_COLS: ResizableColDef[] = [
   { id: 'check', defaultWidth: 36, minWidth: 36, maxWidth: 36, fixed: true },
   { id: 'name', defaultWidth: 200, minWidth: 130, maxWidth: 400 },
@@ -156,9 +153,9 @@ export function HandwerkerListeClient({
     const opts: { label: string; value: string; count?: number }[] = [
       { label: 'Alle Gewerke', value: 'alle', count: rows.length },
     ]
-    for (const slug of LISTE_FILTER_GEWERK_SLUGS) {
-      const g = gewerkeOptionen.find((o) => o.slug === slug)
-      opts.push({ label: g?.name ?? slug, value: slug })
+    // Alle (Ober-)Gewerke als Chips — seit 04.10.2026 nur noch ~11 Stück
+    for (const g of gewerkeOptionen) {
+      opts.push({ label: g.name, value: g.slug })
     }
     return opts
   }, [gewerkeOptionen, rows.length])
