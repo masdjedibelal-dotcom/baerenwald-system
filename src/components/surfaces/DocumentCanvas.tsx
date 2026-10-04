@@ -313,8 +313,10 @@ export function DocumentCanvas({
       window.removeEventListener('popstate', onPop)
       if (historyPushed.current) {
         historyPushed.current = false
-        // Nicht backen solange Sheets offen — sonst schließt deren History den Canvas
-        if (editorSheetStackDepth() === 0) {
+        // Nicht backen solange Sheets offen — sonst schließt deren History den Canvas.
+        // Nur zurück, wenn der aktuelle Eintrag wirklich unserer ist — sonst verlässt man die Seite.
+        const st = window.history.state as { documentCanvas?: boolean } | null
+        if (editorSheetStackDepth() === 0 && st?.documentCanvas) {
           window.history.back()
         }
       }

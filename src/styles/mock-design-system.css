@@ -22332,3 +22332,6 @@ display: flex;
   gap: 8px;
   margin-top: 12px;
 }
+
+/* Korrektur eines Abschlags: Betrag änderbar */
+.abschlag-korrektur-betrag { display: grid; gap: 8px; margin-top: 10px; }

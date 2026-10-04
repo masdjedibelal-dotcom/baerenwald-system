@@ -404,13 +404,14 @@ function berechneZahlungsplanMitIst(
   plan: Zahlungsplan,
   gesamtNetto: number,
   rechnungen: import('@/lib/rechnungen/zahlungsplan').RechnungAbschlagLink[],
-  mwstSatz = 19
+  mwstSatz = 19,
+  korrekturEntwurfId?: string | null
 ) {
   return berechneZahlungsplan(
     plan,
     gesamtNetto,
     mwstSatz,
-    zahlplanAbgerechnetAusLinks(rechnungen)
+    zahlplanAbgerechnetAusLinks(rechnungen, korrekturEntwurfId)
   )
 }
 
@@ -1283,7 +1284,14 @@ async function saveRechnungWizardDraftInner(
     } catch {
       /* Wizard-Positionen / Summe behalten */
     }
-    const kontext = berechneZahlungsplanMitIst(input.zahlungsplan, gesamtNetto, links)
+    // Korrektur eines Abschlags: neuer Planbetrag gilt (alte Rechnung wird storniert)
+    const kontext = berechneZahlungsplanMitIst(
+      input.zahlungsplan,
+      gesamtNetto,
+      links,
+      19,
+      input.rechnungId ?? null
+    )
     const zeile = kontext.zeilen.find((z) => z.id === abschlagZeileId) ?? null
     if (zeile && abschlagBereitsAbgerechnet(zeile.id, links, input.rechnungId ?? null)) {
       return {

@@ -670,8 +670,7 @@ function briefMetaHtml(props: AngebotHtmlInput): string {
       ${bezug ? zeile('Bezug Rechnung:', bezug) : ''}
       ${zeile('Kundennr.:', props.kundennr)}
       ${zeile('Rechnungsdatum:', props.datum)}
-      ${zeile('Leistungsdatum:', ld)}
-      ${zeile('Leistungszeitraum:', lz)}
+      ${/* Ein Datum ODER ein Zeitraum — nicht beides */ lz.includes('–') ? zeile('Leistungszeitraum:', lz) : zeile('Leistungsdatum:', lz !== '—' ? lz : ld)}
       ${zeile('Fällig am:', props.gueltig_bis)}
     </div>`
   }

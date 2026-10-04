@@ -8,6 +8,7 @@ import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField, MockSelect } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockSegment } from '@/components/mock-ui/MockSegment'
+import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { buildSubject } from '@/lib/mail/build-subject'
 import { openActionConfirm } from '@/components/ui/ConfirmPopup'
@@ -542,9 +543,19 @@ export function RechnungWizard({
         plan,
         vkNettoPlan,
         defaultMwst,
-        zahlplanAbgerechnetAusLinks(bootstrap.rechnungenAbschlag ?? [])
+        zahlplanAbgerechnetAusLinks(
+          bootstrap.rechnungenAbschlag ?? [],
+          korrekturKontext ? rechnungId : null
+        )
       ),
-    [plan, vkNettoPlan, defaultMwst, bootstrap.rechnungenAbschlag]
+    [plan, vkNettoPlan, defaultMwst, bootstrap.rechnungenAbschlag, korrekturKontext, rechnungId]
+  )
+  /** Korrektur eines gestellten Abschlags: Betrag (%/€) darf geändert werden → Storno + neue RE. */
+  const abschlagBetragAenderbar = Boolean(korrekturKontext && hasPlan && aktivRate)
+  const planZeileBeiStart = useMemo(
+    () => bootstrap.zahlungsplan?.zeilen?.find((z) => z.id === aktivRate) ?? null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [aktivRate]
   )
 
   const einzelFaellig = faelligAmFromZahlfrist(zahlfrist, zahlfristDatum)
@@ -1093,12 +1104,20 @@ export function RechnungWizard({
         return
       }
 
+      const planNachKorrekturSpeichern = async () => {
+        if (!abschlagBetragAenderbar || !selRate || !planZeileBeiStart || !bootstrap.auftragId) return
+        if (selRate.typ === planZeileBeiStart.typ && Number(selRate.wert) === Number(planZeileBeiStart.wert)) return
+        const r = await saveAuftragZahlungsplan(bootstrap.auftragId, plan, { force: true })
+        if (!r?.ok) toast.systemError(r, 'ui', 'Abschlagsplan anpassen fehlgeschlagen.')
+      }
+
       if (!sendMail) {
         const res = await finalizeRechnungWizardWithoutMail(id)
         if (!res?.ok) {
           toast.systemError(res, 'ui', 'Speichern fehlgeschlagen.')
           return
         }
+        await planNachKorrekturSpeichern()
         toast.success(
           `Entwurf gespeichert${res.rechnungsnummer?.trim() ? ` · ${res.rechnungsnummer.trim()}` : ''} · ${formatEurBetrag(rBrutto)} brutto`
         )
@@ -1122,6 +1141,7 @@ export function RechnungWizard({
         toast.systemError(res, 'ui', 'Versand fehlgeschlagen.')
         return
       }
+      await planNachKorrekturSpeichern()
       toast.success(
         istKorrekturVersand
           ? `Korrektur ${nrLabel()} versendet · ${formatEurBetrag(rBrutto)} brutto`
@@ -1864,6 +1884,30 @@ export function RechnungWizard({
                   <div style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)', marginTop: 2 }}>
                     {formatEurBetrag(selBerechnet.brutto)} brutto
                   </div>
+                  {abschlagBetragAenderbar && selRate && !selBerechnet.istSchluss ? (
+                    <div className="abschlag-korrektur-betrag">
+                      <MockSegment
+                        value={selRate.typ === 'betrag' ? 'betrag' : 'prozent'}
+                        onChange={(v) =>
+                          patchPlanZeile(selRate.id, { typ: v === 'betrag' ? 'betrag' : 'prozent' })
+                        }
+                        options={[
+                          { value: 'prozent', label: '%' },
+                          { value: 'betrag', label: '€ netto' },
+                        ]}
+                        aria-label="Art des Abschlags"
+                      />
+                      <ClearableNumberInput
+                        value={Number(selRate.wert) || 0}
+                        onValueChange={(n) => patchPlanZeile(selRate.id, { wert: n })}
+                        aria-label={selRate.typ === 'betrag' ? 'Betrag netto' : 'Anteil in %'}
+                      />
+                      <p className="text-muted" style={{ fontSize: 'var(--fs-meta)', margin: 0 }}>
+                        Beim Senden wird die alte Rechnung storniert und neu gestellt. Die Schlussrechnung
+                        bleibt der Rest.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <>

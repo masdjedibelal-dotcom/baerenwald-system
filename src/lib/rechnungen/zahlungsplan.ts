@@ -349,11 +349,14 @@ export function zahlplanZeileVorherigeRechnungGeloescht(
  * Schlussrechnungen und Entwürfe fließen nicht ein (Brutto oft = volle Leistungssumme).
  * Pro Planzeile nur der aktuelle offizielle Beleg (Korrektur-Original auslassen). */
 export function zahlplanAbgerechnetAusLinks(
-  rechnungen: RechnungAbschlagLink[]
+  rechnungen: RechnungAbschlagLink[],
+  /** Korrektur-Entwurf: die Rechnung, die er ersetzt, zählt nicht mehr als „abgerechnet“ (Betrag änderbar). */
+  korrekturEntwurfId?: string | null
 ): Array<{ zeileId: string; brutto: number }> {
   const byZeile = new Map<string, number>()
   for (const r of rechnungen) {
     if (String(r.status) === 'storniert' || String(r.status) === 'entwurf') continue
+    if (rechnungErsetztDurchKorrekturEntwurf(r, rechnungen, korrekturEntwurfId)) continue
     if (String(r.beleg_typ ?? '') === 'gutschrift') continue
     if (String(r.rechnung_art ?? '') === 'schluss') continue
     if (!istRechnungGestelltOderBezahlt(r.status)) continue
@@ -1182,7 +1185,7 @@ export function buildAbschlagPauschalPosition(input: {
           ? ` · bereits abgerechnet ${formatEuro(bereitsGestelltBrutto)} brutto`
           : ''
       } · Rest ${formatEuro(zeile.netto)} netto`
-    : `${prozentTeil}, ${auftragsReferenz}`
+    : [prozentTeil, auftragsReferenz?.trim()].filter(Boolean).join(', ')
 
   return {
     id: neueZahlungsplanId(),
@@ -1315,15 +1318,19 @@ export function planMitNeuemAbschlag(
   const zeilen = plan?.zeilen ?? []
   const rest = zeilen.filter((z) => z.typ === 'rest')
   const raten = zeilen.filter((z) => z.typ !== 'rest')
+  const neuFaellig = plusDaysIso(14)
   const neu = neueZahlungsplanZeile({
     titel: `${raten.length + 1}. Abschlag`,
     typ: abschlag.typ,
     wert: abschlag.wert,
-    faellig_am: plusDaysIso(14),
+    faellig_am: neuFaellig,
   })
+  // Schlussrechnung ist nie vor einem Abschlag fällig
   const schluss = rest.length
-    ? rest
-    : [neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0, faellig_am: null })]
+    ? rest.map((z) =>
+        z.faellig_am && z.faellig_am.slice(0, 10) > neuFaellig ? z : { ...z, faellig_am: plusDaysIso(28) }
+      )
+    : [neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0, faellig_am: plusDaysIso(28) })]
   return { modus: 'abschlagsplan', zeilen: [...raten, neu, ...schluss] }
 }
 

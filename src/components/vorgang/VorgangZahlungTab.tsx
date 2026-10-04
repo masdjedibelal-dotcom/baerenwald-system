@@ -319,7 +319,23 @@ export function VorgangZahlungTab({
           sub:
             [
               pct != null ? `${pct} % der Auftragssumme` : z.istSchluss && plan.zeilen.length > 1 ? 'Restbetrag nach Abschlägen' : null,
-              related.length === 1 ? r?.rechnungsnummer?.trim() || null : null,
+              related.length === 1
+                ? r?.rechnungsnummer?.trim() || null
+                : (() => {
+                    // Korrektur: aktuelle Nummer + „ersetzt …“ statt drei Belegzeilen
+                    const nr = r?.rechnungsnummer?.trim()
+                    const alt = related
+                      .filter(
+                        (x) =>
+                          x.id !== r?.id &&
+                          String(x.status) === 'storniert' &&
+                          String(x.beleg_typ ?? 'rechnung') !== 'gutschrift'
+                      )
+                      .map((x) => x.rechnungsnummer?.trim())
+                      .filter(Boolean)
+                    if (!nr) return null
+                    return alt.length ? `${nr} · ersetzt ${alt.join(', ')}` : nr
+                  })(),
               badge.hint ?? null,
             ]
               .filter(Boolean)
