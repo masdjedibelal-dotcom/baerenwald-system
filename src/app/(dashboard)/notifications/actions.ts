@@ -182,7 +182,7 @@ function typHint(typ: CrmNotificationTyp): string {
     case 'handwerker_einreichung':
       return 'Der Partner hat ein Angebot / Konditionen im Portal eingereicht — bitte prüfen.'
     case 'hw_rechnung_eingegangen':
-      return 'Der Partner hat eine Eingangsrechnung hochgeladen — unter Vorgänge → Rechnung → Eingehend prüfen.'
+      return 'Der Partner hat eine Rechnung hochgeladen — in den Dokumenten des Vorgangs als bezahlt markieren.'
     case 'hw_auftrag_erledigt':
       return 'Der Partner meldet den Auftrag als erledigt. Machen Sie die Abnahme oder schließen Sie den Auftrag ab.'
     case 'vorgang_angenommen':
@@ -678,53 +678,8 @@ async function collectCrmNotificationItems(opts?: {
     }
   }
 
-  // ── HW-Eingangsrechnung ──────────────────────────────────────
-  if (!hwRechnungRes.error) {
-    for (const row of hwRechnungRes.data ?? []) {
-      const hw = one(
-        row.handwerker as
-          | { name?: string | null; firma?: string | null }
-          | { name?: string | null; firma?: string | null }[]
-          | null
-      )
-      const gw = one(
-        row.gewerke as { name?: string | null } | { name?: string | null }[] | null
-      )
-      const ang = one(
-        row.angebote as
-          | { id?: string; lead_id?: string | null; angebotsnr?: string | null }
-          | { id?: string; lead_id?: string | null; angebotsnr?: string | null }[]
-          | null
-      )
-      const hwName =
-        hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
-      const nr = ang?.angebotsnr?.trim()
-      const subtitle = [gw?.name?.trim(), nr ? `Angebot ${nr}` : null]
-        .filter(Boolean)
-        .join(' · ')
-
-      let href = `/vorgaenge?tab=rechnung&richtung=eingehend&hw=${encodeURIComponent(String(row.id))}`
-      try {
-        const { ensurePartnerEingangsRechnungVorgang } = await import(
-          '@/lib/rechnungen/ensure-partner-eingangsrechnung-vorgang'
-        )
-        const ensured = await ensurePartnerEingangsRechnungVorgang(String(row.id))
-        if (ensured.ok) href = `/rechnungen/${ensured.rechnungId}`
-      } catch {
-        /* Liste bleibt nutzbar auch ohne Vorgang-Ensure */
-      }
-
-      items.push({
-        sourceKey: `hw_rechnung_eingegangen:${row.id}`,
-        typ: 'hw_rechnung_eingegangen',
-        title: `${hwName}: Rechnung eingegangen`,
-        subtitle: subtitle || null,
-        href,
-        createdAt: String(row.hw_rechnung_eingereicht_at),
-        gelesen: false,
-      })
-    }
-  }
+  // HW-Eingangsrechnung (alt, angebot_handwerker) entfällt — Partner-Rechnungen kommen über Einsätze.
+  void hwRechnungRes
 
   // ── Leistungs-Updates (Partner-App) ─────────────────────────
   if (!peRes.error) {
@@ -1271,7 +1226,18 @@ async function collectEinsatzItems(
     push('angenommen', 'handwerker_angenommen', `${name}: Einsatz angenommen`, titel, row.angenommen_at)
     push('abgelehnt', 'handwerker_abgelehnt', `${name}: Einsatz abgelehnt`, String(row.ablehnung_grund ?? '') || titel, row.abgelehnt_at)
     push('fertig', 'hw_auftrag_erledigt', `${name}: Einsatz fertig gemeldet`, titel, row.fertig_at)
-    push('rechnung', 'hw_rechnung_eingegangen', `${name}: Rechnung zum Einsatz`, titel, row.rechnung_eingereicht_at)
+    // Rechnung hochgeladen → direkt in die Dokumente des Vorgangs (dort Offen/Bezahlt)
+    if (row.rechnung_eingereicht_at && String(row.rechnung_eingereicht_at) >= since) {
+      items.push({
+        sourceKey: `einsatz_rechnung:${String(row.id)}`,
+        typ: 'hw_rechnung_eingegangen',
+        title: `${name} hat eine Rechnung hochgeladen`,
+        subtitle: titel,
+        href: `${href}?tab=akte`,
+        createdAt: String(row.rechnung_eingereicht_at),
+        gelesen: false,
+      })
+    }
   }
   for (const row of (mRes.data ?? []) as Record<string, unknown>[]) {
     const hw = one(row.handwerker as { name?: string | null; firma?: string | null } | null)
@@ -1280,7 +1246,11 @@ async function collectEinsatzItems(
     items.push({
       sourceKey: `einsatz_mitteilung:${String(row.id)}`,
       typ: 'partner_positions_meldung',
-      title: regie ? `${name}: Regie ${row.stunden ?? ''} Std gemeldet` : `${name}: Behinderung gemeldet`,
+      title: regie
+        ? `${name}: Regie ${row.stunden ?? ''} Std gemeldet`
+        : row.typ === 'behinderung'
+          ? `${name}: Behinderung gemeldet`
+          : `${name}: Update zum Einsatz`,
       subtitle: String(row.text ?? '').slice(0, 120),
       href: `/auftraege/${String(row.auftrag_id)}`,
       createdAt: String(row.created_at ?? since),

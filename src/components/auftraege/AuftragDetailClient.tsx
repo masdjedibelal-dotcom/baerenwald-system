@@ -100,6 +100,7 @@ import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { entityDetailTabLabel } from '@/lib/entity-detail/entity-detail-tabs'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
+import { EinsatzRechnungenAkte } from '@/components/auftraege/EinsatzRechnungenAkte'
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
 import {
@@ -1176,6 +1177,7 @@ export function AuftragDetailClient({
     <VorgangAkteTab
       dateien={
         <div className="space-y-4">
+          <EinsatzRechnungenAkte auftragId={detail.id} />
           <AuftragDokumenteTab
             detail={detail}
             rechnungen={rechnungenListe}

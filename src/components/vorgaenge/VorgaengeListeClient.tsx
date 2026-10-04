@@ -379,8 +379,8 @@ export function VorgaengeListeClient({
     const phase: (typeof VORGANG_FILTERS)[number] = isVorgangFilter(tab) ? tab : 'alle'
     setFilter(phase)
     const r = searchParams.get('richtung')
-    if (phase === 'rechnung' && r === 'eingehend') setRechnungRichtung('eingehend')
-    else setRechnungRichtung('ausgehend')
+    void r
+    setRechnungRichtung('ausgehend')
     const lc = searchParams.get('lifecycle')
     // Erledigt-Toggle nur unter „Alle“ und „Rechnung“
     if (phase === 'alle' || phase === 'rechnung') {
@@ -393,24 +393,6 @@ export function VorgaengeListeClient({
     const qParam = searchParams.get('q')
     if (qParam !== null) setQuery(qParam)
   }, [embedded, searchParams])
-
-  // Deep-Link alte Notification ?hw=<zuweisungId> → Rechnungs-Vorgang
-  useEffect(() => {
-    if (embedded) return
-    const hwZuweisung = searchParams.get('hw')?.trim()
-    if (!hwZuweisung) return
-    let cancelled = false
-    void import('@/app/(dashboard)/rechnungen/sync-eingang-actions').then(
-      ({ ensurePartnerEingangsRechnungVorgangAction }) =>
-        ensurePartnerEingangsRechnungVorgangAction(hwZuweisung).then((res) => {
-          if (cancelled || !res.ok) return
-          router.replace(`/rechnungen/${res.rechnungId}`)
-        })
-    )
-    return () => {
-      cancelled = true
-    }
-  }, [embedded, searchParams, router])
 
   const rowKey = (row: VorgangListeRow) => `${row.phase}:${row.entityId}`
 
@@ -1073,29 +1055,7 @@ export function VorgaengeListeClient({
                 Erledigt
               </MockChip>
             ) : null}
-            {filter === 'rechnung' ? (
-              <>
-                <span className="listbar-chips-sep" aria-hidden />
-                <MockChip
-                  active={rechnungRichtung === 'ausgehend'}
-                  count={lifecycle === 'erledigt' ? undefined : counts.rechnung}
-                  onClick={() => setRechnungRichtungFilter('ausgehend')}
-                >
-                  Ausgehend
-                </MockChip>
-                <MockChip
-                  active={rechnungRichtung === 'eingehend'}
-                  count={
-                    lifecycle === 'erledigt'
-                      ? eingehendLifecycleCounts.erledigt
-                      : eingehendLifecycleCounts.offen
-                  }
-                  onClick={() => setRechnungRichtungFilter('eingehend')}
-                >
-                  Eingehend
-                </MockChip>
-              </>
-            ) : null}
+            {/* Rechnungseingang (Eingehend) entfällt — Partner-Rechnungen liegen in den Vorgangs-Dokumenten */}
           </div>
           )}
           <MockListbarChrome

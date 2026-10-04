@@ -114,7 +114,7 @@ function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
     liste.push({
       key: 'rechnung',
       at: e.rechnung_eingereicht_at,
-      art: `Rechnung${e.rechnung_betrag != null ? ` ${formatEuro(e.rechnung_betrag)}` : ''}${vonBw(e.rechnung_von)}`,
+      art: `Rechnung hochgeladen${e.rechnung_bezahlt_at ? ' · bezahlt' : ''}${vonBw(e.rechnung_von)}`,
       text: '',
       dateien: e.rechnung_pdf_url ? [{ name: 'PDF öffnen', url: e.rechnung_pdf_url }] : [],
       neu: false,
@@ -153,7 +153,6 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const [eText, setEText] = useState('')
   const [eFotos, setEFotos] = useState<File[]>([])
   const [ePdf, setEPdf] = useState<File | null>(null)
-  const [eBetrag, setEBetrag] = useState(0)
   const detail = einsaetze?.find((e) => e.id === detailId) ?? null
   const setDetail = (e: EinsatzZeile | null) => setDetailId(e?.id ?? null)
 
@@ -254,7 +253,6 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
     setEText('')
     setEFotos([])
     setEPdf(null)
-    setEBetrag(0)
     setErfassen(art)
   }
 
@@ -279,7 +277,6 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       fd.set('text', eText)
       for (const f of eFotos) fd.append('dateien', f)
       if (ePdf) fd.set('rechnungPdf', ePdf)
-      if (eBetrag > 0) fd.set('rechnungBetrag', String(eBetrag))
       res = await safeAction(
         erfassen === 'update'
           ? einsatzUpdateErfassen(fd)
@@ -303,7 +300,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       : erfassen === 'update'
         ? Boolean(eText.trim() || eFotos.length)
         : erfassen === 'rechnung'
-          ? Boolean(ePdf || eBetrag > 0)
+          ? Boolean(ePdf)
           : true
 
   const setF = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f))
@@ -417,11 +414,16 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                   <MockBtn sm kind="secondary" icon="plus" onClick={() => erfassenOeffnen('update')}>
                     Update erfassen
                   </MockBtn>
+                  {!detail.rechnung_eingereicht_at ? (
+                    <MockBtn sm kind="secondary" icon="file-invoice" onClick={() => erfassenOeffnen('rechnung')}>
+                      Rechnung hochladen
+                    </MockBtn>
+                  ) : null}
                 </div>
               ) : detail.status === 'fertig' && !detail.rechnung_eingereicht_at ? (
                 <div className="einsatz-aktionen">
                   <MockBtn sm kind="primary" icon="file-invoice" onClick={() => erfassenOeffnen('rechnung')}>
-                    Rechnung erfassen
+                    Rechnung hochladen
                   </MockBtn>
                 </div>
               ) : null}
@@ -475,7 +477,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
               ? 'Update erfassen'
               : erfassen === 'fertig'
                 ? 'Fertig gemeldet'
-                : 'Rechnung erfassen'
+                : 'Rechnung hochladen'
         }
         crumb={detail?.partner_name}
         primary={{
@@ -513,15 +515,9 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 onFiles={(files) => setEPdf(files[0] ?? null)}
               />
             </MockField>
-            <MockField label="oder Betrag (€)">
-              <ClearableNumberInput
-                className="txt"
-                min={0}
-                value={eBetrag}
-                onValueChange={(v) => setEBetrag(Number(v) || 0)}
-                style={{ textAlign: 'right' }}
-              />
-            </MockField>
+            <p className="text-muted" style={{ fontSize: 'var(--fs-meta)', margin: 0 }}>
+              Die Rechnung landet in den Dokumenten des Vorgangs. Dort markieren Sie sie als bezahlt.
+            </p>
           </>
         ) : null}
       </EditorSheet>

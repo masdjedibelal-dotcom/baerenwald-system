@@ -53,6 +53,8 @@ export type EinsatzZeile = {
   rechnung_pdf_url: string | null
   rechnung_betrag: number | null
   rechnung_eingereicht_at: string | null
+  /** Partner-Rechnung im CRM als bezahlt markiert */
+  rechnung_bezahlt_at: string | null
   mitteilungen: EinsatzMitteilung[]
 }
 
@@ -84,7 +86,7 @@ export type EinsatzVorbelegung = {
 }
 
 const SELECT =
-  'id, auftrag_id, handwerker_id, titel, anweisung, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, gesendet_at, angenommen_at, angenommen_von, fertig_von, rechnung_von, ablehnung_grund, fertig_at, fertig_text, fertig_dateien, rechnung_pdf_url, rechnung_betrag, rechnung_eingereicht_at, handwerker(name, firma)'
+  'id, auftrag_id, handwerker_id, titel, anweisung, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, gesendet_at, angenommen_at, angenommen_von, fertig_von, rechnung_von, ablehnung_grund, fertig_at, fertig_text, fertig_dateien, rechnung_pdf_url, rechnung_betrag, rechnung_eingereicht_at, rechnung_bezahlt_at, handwerker(name, firma)'
 
 function partnerLabel(hw: { name?: string | null; firma?: string | null } | null | undefined): string {
   return hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
@@ -124,6 +126,7 @@ function mapZeile(r: Record<string, unknown>): EinsatzZeile {
     rechnung_pdf_url: (r.rechnung_pdf_url as string | null) ?? null,
     rechnung_betrag: r.rechnung_betrag == null ? null : Number(r.rechnung_betrag),
     rechnung_eingereicht_at: (r.rechnung_eingereicht_at as string | null) ?? null,
+    rechnung_bezahlt_at: (r.rechnung_bezahlt_at as string | null) ?? null,
     mitteilungen: [],
   }
 }
@@ -469,11 +472,6 @@ function dateienAus(formData: FormData, feld: string): File[] {
   return formData.getAll(feld).filter((f): f is File => f instanceof File && f.size > 0)
 }
 
-function betragAus(formData: FormData): number | null {
-  const n = Number(String(formData.get('rechnungBetrag') ?? '').replace(',', '.'))
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null
-}
-
 /** Partner hat zugesagt bzw. abgesagt (z. B. am Telefon). */
 export async function einsatzRueckmeldungErfassen(
   einsatzId: string,
@@ -533,34 +531,30 @@ export async function einsatzUpdateErfassen(formData: FormData): Promise<Erfasse
   return { ok: true }
 }
 
-/** Rechnungsfelder aus Formular (PDF oder Betrag) — gemeinsam für „Fertig“ und „Rechnung nachreichen“. */
+/** Rechnung = nur PDF-Upload (wie im Partner-Portal) — gemeinsam für „Fertig“ und „Rechnung hochladen“. */
 async function rechnungPatch(
   db: SupabaseClient,
   e: { id: string; handwerker_id: string },
   formData: FormData
 ): Promise<{ ok: true; patch: Record<string, unknown> | null } | { ok: false; message: string }> {
   const pdf = dateienAus(formData, 'rechnungPdf')[0]
-  const betrag = betragAus(formData)
-  if (!pdf && !betrag) return { ok: true, patch: null }
-  let pfad: string | null = null
-  if (pdf) {
-    const up = await ladeDateienHoch(db, e.handwerker_id, e.id, [pdf], 'rechnung')
-    if (!up.ok) return up
-    pfad = up.dateien[0]?.path ?? null
-  }
+  if (!pdf) return { ok: true, patch: null }
+  const up = await ladeDateienHoch(db, e.handwerker_id, e.id, [pdf], 'rechnung')
+  if (!up.ok) return up
   return {
     ok: true,
     patch: {
-      rechnung_pdf_url: pfad,
-      rechnung_betrag: betrag,
-      rechnung_positionen: betrag ? [{ text: 'Rechnung', betrag }] : null,
+      rechnung_pdf_url: up.dateien[0]?.path ?? null,
+      rechnung_betrag: null,
+      rechnung_positionen: null,
       rechnung_eingereicht_at: new Date().toISOString(),
+      rechnung_bezahlt_at: null,
       rechnung_von: 'bw',
     },
   }
 }
 
-/** Partner ist fertig — optional gleich mit Rechnung (PDF oder Betrag). */
+/** Partner ist fertig — optional gleich mit Rechnung (PDF). */
 export async function einsatzFertigErfassen(formData: FormData): Promise<ErfassenResult> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
@@ -590,18 +584,19 @@ export async function einsatzFertigErfassen(formData: FormData): Promise<Erfasse
   return { ok: true }
 }
 
-/** Rechnung des Partners nachreichen (PDF oder Betrag). */
+/** Rechnung des Partners hochladen (PDF) — sobald der Einsatz läuft oder fertig ist. */
 export async function einsatzRechnungErfassen(formData: FormData): Promise<ErfassenResult> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
   const einsatzId = String(formData.get('einsatzId') ?? '').trim()
   const e = await ladeEinsatzKurz(gate.db, einsatzId)
   if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
-  if (e.status !== 'fertig') return { ok: false, message: 'Die Rechnung ist nach der Fertigmeldung möglich.' }
-  if (e.rechnung_eingereicht_at) return { ok: false, message: 'Die Rechnung ist bereits erfasst.' }
+  if (e.status !== 'fertig' && e.status !== 'angenommen') {
+    return { ok: false, message: 'Die Rechnung ist möglich, sobald der Partner angenommen hat.' }
+  }
   const re = await rechnungPatch(gate.db, e, formData)
   if (!re.ok) return re
-  if (!re.patch) return { ok: false, message: 'Bitte ein PDF hochladen oder den Betrag angeben.' }
+  if (!re.patch) return { ok: false, message: 'Bitte die Rechnung als PDF hochladen.' }
   const { error } = await gate.db
     .from('einsaetze')
     .update({ ...re.patch, updated_at: new Date().toISOString() })
@@ -609,6 +604,29 @@ export async function einsatzRechnungErfassen(formData: FormData): Promise<Erfas
   if (error) {
     logDbError('app/auftraege/einsatz-actions:rechnung-erfassen', error)
     return { ok: false, message: 'Rechnung konnte nicht gespeichert werden.' }
+  }
+  revalidatePath(`/auftraege/${e.auftrag_id}`)
+  return { ok: true }
+}
+
+/** Partner-Rechnung in den Vorgangs-Dokumenten als bezahlt / offen markieren. */
+export async function einsatzRechnungBezahlt(
+  einsatzId: string,
+  bezahlt: boolean
+): Promise<ErfassenResult> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const e = await ladeEinsatzKurz(gate.db, einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  if (!e.rechnung_eingereicht_at) return { ok: false, message: 'Es liegt noch keine Rechnung vor.' }
+  const now = new Date().toISOString()
+  const { error } = await gate.db
+    .from('einsaetze')
+    .update({ rechnung_bezahlt_at: bezahlt ? now : null, updated_at: now })
+    .eq('id', einsatzId)
+  if (error) {
+    logDbError('app/auftraege/einsatz-actions:rechnung-bezahlt', error)
+    return { ok: false, message: 'Konnte nicht gespeichert werden.' }
   }
   revalidatePath(`/auftraege/${e.auftrag_id}`)
   return { ok: true }

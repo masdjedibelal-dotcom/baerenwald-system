@@ -22335,3 +22335,13 @@ display: flex;
 
 /* Korrektur eines Abschlags: Betrag änderbar */
 .abschlag-korrektur-betrag { display: grid; gap: 8px; margin-top: 10px; }
+
+/* Partner-Rechnungen in den Vorgangs-Dokumenten */
+.einsatz-rechnungen { display: flex; flex-direction: column; }
+.einsatz-rechnung-zeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.einsatz-rechnung-zeile:first-child { border-top: 0; }
+.einsatz-rechnung-zeile__text { display: flex; flex-direction: column; min-width: 0; }
+.einsatz-rechnung-zeile__name { font-weight: 600; font-size: var(--fs-text); }
+.einsatz-rechnung-zeile__meta { color: var(--text-3); font-size: var(--fs-meta); }
+.einsatz-rechnung-zeile__aktionen { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.einsatz-rechnung-zeile__pdf { color: var(--green); font-size: var(--fs-meta); font-weight: 500; }
