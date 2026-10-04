@@ -214,11 +214,12 @@ type AuftragLeadSnapshot = Pick<
   | 'created_at'
 >
 
-type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'zahlung' | 'akte'
+type AuftragDetailTab = 'uebersicht' | 'leistungen' | 'tagebuch' | 'zahlung' | 'akte'
 
 const AUFTRAG_DETAIL_TAB_IDS = new Set<AuftragDetailTab>([
   'uebersicht',
   'leistungen',
+  'tagebuch',
   'zahlung',
   'akte',
 ])
@@ -291,6 +292,7 @@ function resolveAuftragDetailTabFromQuery(
   ) {
     return 'akte'
   }
+  if (tab === 'tagebuch' || vorOrtAbschnittFromQuery(tab) === 'bautagebuch') return 'tagebuch'
   if (
     tab === 'leistungen' ||
     tab === 'leistung' ||
@@ -876,11 +878,7 @@ export function AuftragDetailClient({
       }
       vertragNachtragVerfuegbar={hauptvertraegeFuerNachtrag.length > 0}
       onVertragNachtragErstellen={openNachtragErstellen}
-      initialLeistungenView={
-        vorOrtAbschnittFromQuery(searchParams.get('tab')) === 'bautagebuch'
-          ? 'bautagebuch'
-          : 'leistungen'
-      }
+      initialLeistungenView="leistungen"
     />
   )
 
@@ -1128,6 +1126,17 @@ export function AuftragDetailClient({
 
   /** Phase 6: nur LeistungenTab — kein Tagebuch-Segment / Vor-Ort-Umschalter */
   const leistungenTabInhalt = <div className="space-y-6">{leistungInhalt}</div>
+  // Tagebuch als eigener Menüpunkt nach „Leistungen“
+  const tagebuchTabInhalt = (
+    <AuftragLeistungenTab
+      detail={detail}
+      lead={lead}
+      editable={detail.status !== 'storniert'}
+      mwstSatz={leistungenMwstSatz}
+      onSaved={() => refresh()}
+      initialLeistungenView="bautagebuch"
+    />
+  )
 
   const zahlungTabInhalt = <div className="space-y-6">{finanzenInhalt}</div>
 
@@ -1150,7 +1159,7 @@ export function AuftragDetailClient({
     />
   )
 
-  /** Spec §4: Übersicht · Leistungen · Zahlung · Akte */
+  /** Übersicht · Leistungen · Tagebuch · Zahlung · Akte */
   const detailShellGroups: DetailShellGroup[] = [
     {
       id: 'uebersicht',
@@ -1164,6 +1173,12 @@ export function AuftragDetailClient({
       icon: 'tool',
       count: posCount || undefined,
       render: () => leistungenTabInhalt,
+    },
+    {
+      id: 'tagebuch',
+      label: 'Tagebuch',
+      icon: 'book',
+      render: () => tagebuchTabInhalt,
     },
     {
       id: 'zahlung',

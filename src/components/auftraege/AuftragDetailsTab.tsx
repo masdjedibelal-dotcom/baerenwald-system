@@ -1,6 +1,5 @@
 'use client'
 
-import { MockTabs } from '@/components/mock-ui'
 import { useEffect,useMemo,useRef,useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
@@ -17,7 +16,6 @@ import {
   AuftragBautagebuchSection,
   type BautagebuchListenEintrag,
 } from '@/components/auftraege/AuftragBautagebuchSection'
-import { updateAuftragPositionLeistungStatus } from '@/app/(dashboard)/auftraege/positionen-steuerung-actions'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { decideWeitereArbeitMitNotify } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
 import {
@@ -159,7 +157,7 @@ export function AuftragLeistungenTab({
   dokumentActionLabel?: string
   vertragNachtragVerfuegbar?: boolean
   onVertragNachtragErstellen?: () => void
-  /** Deep-Link z. B. ?tab=bautagebuch */
+  /** Welche Ansicht: Leistungen oder Tagebuch (eigener Tab im Auftrag) */
   initialLeistungenView?: 'leistungen' | 'bautagebuch'
 }) {
   const [pendingNachtrag, setPendingNachtrag] = useState(false)
@@ -298,26 +296,6 @@ export function AuftragLeistungenTab({
     onSaved?.()
   }
 
-  function markErledigt(ids: string[], clearSelection?: () => void) {
-    if (disabled || !ids.length) return
-    void actionBusy.run('Leistungen werden aktualisiert…', async () => {
-      for (const positionId of ids) {
-        const r = await updateAuftragPositionLeistungStatus({
-          auftragId: detail.id,
-          positionId,
-          status: 'erledigt',
-        })
-        if (!r.ok) {
-          toast.systemError(r)
-          throw new Error(r.message)
-        }
-      }
-      toast.success(ids.length === 1 ? 'Als erledigt markiert.' : `${ids.length} Leistungen erledigt.`)
-      clearSelection?.()
-      onSaved?.()
-    })
-  }
-
   function decideNachtrag(positionId: string, status: 'anerkannt' | 'abgelehnt') {
     if (disabled || pendingNachtrag) return
     setPendingNachtrag(true)
@@ -339,35 +317,6 @@ export function AuftragLeistungenTab({
 
   return (
     <div className="space-y-4">
-      <MockTabs
-        items={[
-          { id: 'leistungen', label: 'Leistungen' },
-          {
-            id: 'bautagebuch',
-            label: (() => {
-              const n = bautagebuchEintraege.filter((e) => {
-                if (String(e.typ).toLowerCase() === 'weitere_arbeit') return false
-                const von = String(e.erfasst_von ?? '')
-                if (von.includes('partner') || von.includes('eigenbetrieb')) return false
-                return true
-              }).length
-              return (
-                <>
-                  Tagebuch
-                  {n > 0 ? <span className="lt-view-seg__count">{n}</span> : null}
-                </>
-              )
-            })(),
-          },
-        ]}
-        value={leistungenView}
-        onChange={(id) => setLeistungenView(id as 'leistungen' | 'bautagebuch')}
-        aria-label="Ansicht"
-        className="lt-view-seg"
-        tabClassName=""
-        activeClassName="on"
-        showIcons={false}
-      />
 
       {leistungenView === 'leistungen' ? (
         <>
@@ -424,17 +373,6 @@ export function AuftragLeistungenTab({
               detail.angebot_id
                 ? 'Noch keine Leistungen am Auftrag. Sie entstehen mit dem angenommenen Angebot.'
                 : 'Noch keine Leistungen — über „Leistungen bearbeiten“ anlegen.'
-            }
-            bulkActions={
-              disabled
-                ? undefined
-                : [
-                    {
-                      id: 'erledigt',
-                      label: 'Erledigt',
-                      onClick: (ids, clearSelection) => markErledigt(ids, clearSelection),
-                    },
-                  ]
             }
             onNachtragEntscheiden={disabled ? undefined : decideNachtrag}
             nachtragDecidePending={pendingNachtrag}

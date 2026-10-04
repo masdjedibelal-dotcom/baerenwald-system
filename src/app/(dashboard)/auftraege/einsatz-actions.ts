@@ -69,6 +69,8 @@ export type EinsatzMitteilung = {
   typ: 'update' | 'regie' | 'behinderung'
   text: string
   stunden: number | null
+  /** Nur bei Regie, von Bärenwald eingetragen */
+  stundensatz: number | null
   status: 'offen' | 'uebernommen' | 'erledigt'
   dateien: { name: string; url: string }[]
   created_at: string
@@ -173,7 +175,7 @@ export async function listEinsaetze(
   if (einsaetze.length) {
     const { data: mitt, error: mErr } = await gate.db
       .from('einsatz_mitteilungen')
-      .select('id, einsatz_id, typ, text, stunden, status, dateien, created_at, erfasst_von')
+      .select('id, einsatz_id, typ, text, stunden, stundensatz, status, dateien, created_at, erfasst_von')
       .eq('auftrag_id', auftragId)
       .order('created_at', { ascending: true })
     if (mErr) logDbError('app/auftraege/einsatz-actions:mitteilungen', mErr)
@@ -185,6 +187,7 @@ export async function listEinsaetze(
         typ: m.typ === 'behinderung' || m.typ === 'regie' ? m.typ : 'update',
         text: String(m.text ?? ''),
         stunden: m.stunden == null ? null : Number(m.stunden),
+        stundensatz: m.stundensatz == null ? null : Number(m.stundensatz),
         status: (String(m.status) as EinsatzMitteilung['status']) || 'offen',
         dateien: await signiereDateien(m.dateien),
         created_at: String(m.created_at ?? ''),
@@ -321,7 +324,7 @@ export async function createEinsatz(input: {
   kontaktVorOrt?: string | null
   ekBetrag?: number | null
   ekArt: 'netto' | 'brutto'
-  /** Telefonisch vergeben: keine Mail, Einsatz gilt als angenommen (von Bärenwald eingetragen). */
+  /** Nur eintragen: keine Mail — Partner nimmt im Portal an, oder Bärenwald trägt „Hat angenommen“ ein. */
   ohneMail?: boolean
 }): Promise<{ ok: true; einsatz: EinsatzZeile; mailGesendet: boolean } | { ok: false; message: string }> {
   const gate = await requireStaffAndServiceRole()
@@ -343,8 +346,8 @@ export async function createEinsatz(input: {
       kontakt_vor_ort: input.kontaktVorOrt?.trim() || null,
       ek_betrag: input.ekBetrag != null && input.ekBetrag > 0 ? Math.round(input.ekBetrag * 100) / 100 : null,
       ek_art: input.ekArt === 'brutto' ? 'brutto' : 'netto',
-      status: input.ohneMail ? 'angenommen' : 'gesendet',
-      ...(input.ohneMail ? { angenommen_at: new Date().toISOString(), angenommen_von: 'bw' } : {}),
+      // Nie automatisch angenommen — auch nicht bei „Nur eintragen“
+      status: 'gesendet',
       erstellt_von: gate.user.id,
     })
     .select(SELECT)
@@ -356,12 +359,6 @@ export async function createEinsatz(input: {
   const einsatz = mapZeile(data as Record<string, unknown>)
 
   if (input.ohneMail) {
-    // Wie „Partner hat angenommen“: Auftrag läuft
-    await gate.db
-      .from('auftraege')
-      .update(planAuftragStatusWrite('in_arbeit'))
-      .eq('id', input.auftragId)
-      .eq('status', 'offen')
     revalidatePath(`/auftraege/${input.auftragId}`)
     return { ok: true, einsatz, mailGesendet: false }
   }
@@ -516,6 +513,54 @@ export async function einsatzRueckmeldungErfassen(
         : { abgelehnt_at: now, ablehnung_grund: grund!.trim() },
   })
   if (!w.ok) return { ok: false, message: w.error }
+  if (antwort === 'angenommen') {
+    // Partner hat angenommen: Auftrag läuft
+    await gate.db
+      .from('auftraege')
+      .update(planAuftragStatusWrite('in_arbeit'))
+      .eq('id', e.auftrag_id)
+      .eq('status', 'offen')
+  }
+  revalidatePath(`/auftraege/${e.auftrag_id}`)
+  return { ok: true }
+}
+
+/** Regie für den Partner eintragen (z. B. am Telefon abgestimmt): Beschreibung, Stunden, Stundensatz. */
+export async function einsatzRegieErfassen(input: {
+  einsatzId: string
+  text: string
+  stunden: number
+  stundensatz: number | null
+}): Promise<ErfassenResult> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const text = input.text.trim()
+  const stunden = Number(input.stunden) || 0
+  if (!text) return { ok: false, message: 'Bitte beschreiben, was gemacht wurde.' }
+  if (stunden <= 0) return { ok: false, message: 'Bitte die Stunden angeben.' }
+  const e = await ladeEinsatzKurz(gate.db, input.einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  if (e.status !== 'angenommen' && e.status !== 'fertig') {
+    return { ok: false, message: 'Regie ist möglich, sobald der Einsatz angenommen ist.' }
+  }
+  const satz = input.stundensatz != null && input.stundensatz > 0 ? Math.round(input.stundensatz * 100) / 100 : null
+  const { error } = await gate.db.from('einsatz_mitteilungen').insert({
+    einsatz_id: e.id,
+    auftrag_id: e.auftrag_id,
+    handwerker_id: e.handwerker_id,
+    typ: 'regie',
+    text,
+    stunden: Math.round(stunden * 100) / 100,
+    stundensatz: satz,
+    // Von Bärenwald eingetragen = schon abgestimmt
+    status: 'uebernommen',
+    erledigt_at: new Date().toISOString(),
+    erfasst_von: 'bw',
+  })
+  if (error) {
+    logDbError('app/auftraege/einsatz-actions:regie-erfassen', error)
+    return { ok: false, message: 'Regie konnte nicht gespeichert werden.' }
+  }
   revalidatePath(`/auftraege/${e.auftrag_id}`)
   return { ok: true }
 }

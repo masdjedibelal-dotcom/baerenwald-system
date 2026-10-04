@@ -6,6 +6,7 @@ import {
   createEinsatz,
   einsatzFertigErfassen,
   einsatzRechnungErfassen,
+  einsatzRegieErfassen,
   einsatzRueckmeldungErfassen,
   einsatzUpdateErfassen,
   einsatzUpdatesGesehen,
@@ -21,7 +22,7 @@ import {
 } from '@/app/(dashboard)/auftraege/einsatz-actions'
 import { MockBadge, MockBtn, MockCard, MockSegment } from '@/components/mock-ui'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
-import { MockField, MockInput, MockSelect, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField, MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { openConfirmPopup } from '@/components/ui/ConfirmPopup'
@@ -31,11 +32,12 @@ import { safeAction } from '@/lib/actions/safe-action'
 import { formatDatum, formatEuro } from '@/lib/format/geld-datum'
 import { toast } from '@/components/ui/app-toast'
 
+// Farben: gesendet blau · in Auftrag gelb · fertig grün · abgelehnt/entzogen rot
 const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
-  gesendet: { label: 'Gesendet', kind: 'warten' },
-  angenommen: { label: 'In Bearbeitung', kind: 'aktiv' },
+  gesendet: { label: 'Gesendet', kind: 'neu' },
+  angenommen: { label: 'In Auftrag', kind: 'warten' },
   abgelehnt: { label: 'Abgelehnt', kind: 'storniert' },
-  fertig: { label: 'Fertig', kind: 'fertig' },
+  fertig: { label: 'Fertig', kind: 'aktiv' },
 }
 
 /** Grund, den „Partner entziehen“ setzt — Anzeige „Entzogen“ statt „Abgelehnt“. */
@@ -64,6 +66,12 @@ function datum(iso: string | null): string {
   return iso ? formatDatum(iso) : ''
 }
 
+/** Ein Tag oder Zeitraum — gleicher Tag nur einmal. */
+function termin(von: string | null, bis: string | null): string {
+  if (von && bis && von.slice(0, 10) !== bis.slice(0, 10)) return `${datum(von)} bis ${datum(bis)}`
+  return datum(von || bis)
+}
+
 type VerlaufEintrag = {
   key: string
   at: string
@@ -77,22 +85,17 @@ type VerlaufEintrag = {
 /** Alles, was zu einem Einsatz passiert ist, neueste Meldung oben. */
 function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
   const vonBw = (v: 'partner' | 'bw' | null | undefined) => (v === 'bw' ? ' · von Bärenwald eingetragen' : '')
-  // Telefonisch vergeben: angelegt und im selben Moment als angenommen eingetragen
-  const telefonisch =
-    e.angenommen_von === 'bw' &&
-    Boolean(e.angenommen_at) &&
-    Math.abs(Date.parse(e.angenommen_at ?? '') - Date.parse(e.gesendet_at)) < 60_000
   const liste: VerlaufEintrag[] = [
     {
       key: 'gesendet',
       at: e.gesendet_at,
-      art: telefonisch ? 'Vergeben und angenommen · von Bärenwald eingetragen' : 'An Partner gesendet',
+      art: 'An Partner gesendet',
       text: '',
       dateien: [],
       neu: false,
     },
   ]
-  if (e.angenommen_at && !telefonisch) {
+  if (e.angenommen_at) {
     liste.push({ key: 'angenommen', at: e.angenommen_at, art: `Angenommen${vonBw(e.angenommen_von)}`, text: '', dateien: [], neu: false })
   }
   if (e.status === 'abgelehnt') {
@@ -105,7 +108,9 @@ function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
   for (const m of e.mitteilungen) {
     const art =
       m.typ === 'regie'
-        ? `Regie${m.stunden ? `, ${String(m.stunden).replace('.', ',')} Std` : ''}${REGIE_STAND[m.status]}`
+        ? `Regie${m.stunden ? `, ${String(m.stunden).replace('.', ',')} Std` : ''}${
+            m.stundensatz ? ` à ${formatEuro(m.stundensatz)}` : ''
+          }${m.erfasst_von === 'bw' ? '' : REGIE_STAND[m.status]}`
         : MELDUNG_LABEL[m.typ]
     liste.push({ key: m.id, at: m.created_at, art: `${art}${vonBw(m.erfasst_von)}`, text: m.text, dateien: m.dateien, neu: m.status === 'offen', m })
   }
@@ -129,6 +134,8 @@ type Form = {
   handwerkerId: string
   titel: string
   anweisung: string
+  /** Ein Tag oder Zeitraum */
+  terminArt: 'tag' | 'zeitraum'
   terminVon: string
   terminBis: string
   ort: string
@@ -154,7 +161,9 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   // Updates, die in dieser Sitzung geöffnet wurden: zählen in der Zeile nicht mehr als neu.
   const [gesehen, setGesehen] = useState<Set<string>>(new Set())
   /** „Für den Partner eintragen“: welches Formular gerade offen ist */
-  const [erfassen, setErfassen] = useState<null | 'abgelehnt' | 'update' | 'fertig' | 'rechnung'>(null)
+  const [erfassen, setErfassen] = useState<null | 'abgelehnt' | 'update' | 'fertig' | 'rechnung' | 'regie'>(null)
+  const [rStunden, setRStunden] = useState(0)
+  const [rSatz, setRSatz] = useState(0)
   const [eText, setEText] = useState('')
   const [eFotos, setEFotos] = useState<File[]>([])
   const [ePdf, setEPdf] = useState<File | null>(null)
@@ -195,6 +204,10 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       handwerkerId: '',
       titel: res.vorbelegung.titel,
       anweisung: '',
+      terminArt:
+        res.vorbelegung.termin_bis && res.vorbelegung.termin_bis !== res.vorbelegung.termin_von
+          ? 'zeitraum'
+          : 'tag',
       terminVon: res.vorbelegung.termin_von ?? '',
       terminBis: res.vorbelegung.termin_bis ?? '',
       ort: res.vorbelegung.ort,
@@ -214,7 +227,9 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         titel: form.titel,
         anweisung: form.anweisung,
         terminVon: form.terminVon || null,
-        terminBis: form.terminBis || null,
+        // Ein Tag: Ende = Beginn
+        terminBis: (form.terminArt === 'tag' ? form.terminVon : form.terminBis) || null,
+        // Ort und Kontakt kommen aus den Stammdaten des Vorgangs (keine eigenen Felder mehr)
         ort: form.ort,
         kontaktVorOrt: form.kontaktVorOrt,
         ekBetrag: form.ekBetrag || null,
@@ -257,6 +272,8 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   }
 
   function erfassenOeffnen(art: NonNullable<typeof erfassen>) {
+    setRStunden(0)
+    setRSatz(0)
     setEText('')
     setEFotos([])
     setEPdf(null)
@@ -278,6 +295,10 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
     let res: { ok: true } | { ok: false; message: string }
     if (erfassen === 'abgelehnt') {
       res = await safeAction(einsatzRueckmeldungErfassen(detail.id, 'abgelehnt', eText))
+    } else if (erfassen === 'regie') {
+      res = await safeAction(
+        einsatzRegieErfassen({ einsatzId: detail.id, text: eText, stunden: rStunden, stundensatz: rSatz || null })
+      )
     } else {
       const fd = new FormData()
       fd.set('einsatzId', detail.id)
@@ -304,6 +325,8 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const erfassenOk =
     erfassen === 'abgelehnt'
       ? Boolean(eText.trim())
+      : erfassen === 'regie'
+        ? Boolean(eText.trim() && rStunden > 0)
       : erfassen === 'update'
         ? Boolean(eText.trim() || eFotos.length)
         : erfassen === 'rechnung'
@@ -337,7 +360,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
               const meta = letzte
                 ? `${MELDUNG_LABEL[letzte.typ]} vom ${datum(letzte.created_at)}`
                 : [
-                    [datum(e.termin_von), datum(e.termin_bis)].filter(Boolean).join(' bis '),
+                    termin(e.termin_von, e.termin_bis),
                     e.ek_betrag != null ? `EK ${formatEuro(e.ek_betrag)} ${e.ek_art}` : '',
                   ]
                     .filter(Boolean)
@@ -384,6 +407,11 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 }
               : null
         }
+        primary={
+          detail && detail.status === 'angenommen'
+            ? { label: 'Fertig gemeldet', icon: 'check', onClick: () => erfassenOeffnen('fertig') }
+            : null
+        }
       >
         {detail ? (
           <div className="einsatz-blatt">
@@ -394,7 +422,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 </MockBadge>
                 <span className="einsatz-kopf__meta">
                   {[
-                    [datum(detail.termin_von), datum(detail.termin_bis)].filter(Boolean).join(' bis '),
+                    termin(detail.termin_von, detail.termin_bis),
                     detail.ort ?? '',
                     detail.ek_betrag != null ? `EK ${formatEuro(detail.ek_betrag)} ${detail.ek_art}` : '',
                   ]
@@ -413,25 +441,22 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                     Hat abgelehnt
                   </MockBtn>
                 </div>
-              ) : detail.status === 'angenommen' ? (
+              ) : detail.status === 'angenommen' || detail.status === 'fertig' ? (
+                // „Fertig gemeldet“ steht als Hauptknopf unten im Blatt
                 <div className="einsatz-aktionen">
-                  <MockBtn sm kind="primary" icon="check" onClick={() => erfassenOeffnen('fertig')}>
-                    Fertig gemeldet
+                  <MockBtn sm kind="secondary" icon="clock" onClick={() => erfassenOeffnen('regie')}>
+                    Regie melden
                   </MockBtn>
-                  <MockBtn sm kind="secondary" icon="plus" onClick={() => erfassenOeffnen('update')}>
-                    Update erfassen
-                  </MockBtn>
+                  {detail.status === 'angenommen' ? (
+                    <MockBtn sm kind="secondary" icon="plus" onClick={() => erfassenOeffnen('update')}>
+                      Update erfassen
+                    </MockBtn>
+                  ) : null}
                   {!detail.rechnung_eingereicht_at ? (
                     <MockBtn sm kind="secondary" icon="file-invoice" onClick={() => erfassenOeffnen('rechnung')}>
                       Rechnung hochladen
                     </MockBtn>
                   ) : null}
-                </div>
-              ) : detail.status === 'fertig' && !detail.rechnung_eingereicht_at ? (
-                <div className="einsatz-aktionen">
-                  <MockBtn sm kind="primary" icon="file-invoice" onClick={() => erfassenOeffnen('rechnung')}>
-                    Rechnung hochladen
-                  </MockBtn>
                 </div>
               ) : null}
             </div>
@@ -480,7 +505,9 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         title={
           erfassen === 'abgelehnt'
             ? 'Hat abgelehnt'
-            : erfassen === 'update'
+            : erfassen === 'regie'
+              ? 'Regie melden'
+              : erfassen === 'update'
               ? 'Update erfassen'
               : erfassen === 'fertig'
                 ? 'Fertig gemeldet'
@@ -498,6 +525,29 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
           <MockField label="Grund" required>
             <MockTextarea rows={3} value={eText} onChange={(ev) => setEText(ev.target.value)} />
           </MockField>
+        ) : null}
+        {erfassen === 'regie' ? (
+          <>
+            <MockField label="Beschreibung" required>
+              <MockTextarea rows={3} value={eText} onChange={(ev) => setEText(ev.target.value)} />
+            </MockField>
+            <MockField label="Stunden" required>
+              <ClearableNumberInput
+                className="txt"
+                min={0}
+                value={rStunden}
+                onValueChange={(v) => setRStunden(Number(v) || 0)}
+              />
+            </MockField>
+            <MockField label="Stundensatz (€/h)">
+              <ClearableNumberInput
+                className="txt"
+                min={0}
+                value={rSatz}
+                onValueChange={(v) => setRSatz(Number(v) || 0)}
+              />
+            </MockField>
+          </>
         ) : null}
         {erfassen === 'update' || erfassen === 'fertig' ? (
           <>
@@ -534,7 +584,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         onClose={() => setOpen(false)}
         title="Einsatz anlegen"
         secondary={{
-          // Telefonisch vergeben: ohne Mail, gilt als angenommen
+          // Ohne Mail — bleibt „Gesendet“, bis der Partner (oder wir für ihn) annimmt
           label: 'Nur eintragen',
           disabled: !ok || saving,
           onClick: () => { senden(true) },
@@ -549,7 +599,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       >
         {form ? (
           <>
-            <MockField label="Partner" required>
+            <MockField label="Gewerk">
               <div className="einsatz-gewerk-chips">
                 {gewerkOptionen.map((g) => (
                   <MockChip
@@ -564,19 +614,36 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                   </MockChip>
                 ))}
               </div>
-              <MockSelect
-                value={form.handwerkerId}
-                disabled={!gewerkFilter}
-                onChange={(ev) => setF({ handwerkerId: ev.target.value })}
-              >
-                <option value="">{gewerkFilter ? 'Partner wählen' : 'Zuerst Gewerk wählen'}</option>
-                {partner.filter((p) => gewerkFilter && p.gewerke.includes(gewerkFilter)).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                    {p.email ? '' : ' (keine E-Mail)'}
-                  </option>
-                ))}
-              </MockSelect>
+            </MockField>
+            <MockField label="Partner" required>
+              {/* Sichtbare Liste statt Auswahlfeld */}
+              {!gewerkFilter ? (
+                <p className="einsatz-partner-leer">Zuerst ein Gewerk wählen.</p>
+              ) : (() => {
+                const liste = partner.filter((p) => p.gewerke.includes(gewerkFilter))
+                if (!liste.length) return <p className="einsatz-partner-leer">Kein Partner für dieses Gewerk.</p>
+                return (
+                  <div className="einsatz-partner-liste" role="radiogroup" aria-label="Partner">
+                    {liste.map((p) => {
+                      const on = form.handwerkerId === p.id
+                      return (
+                        <MockBtn
+                          key={p.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          className={`einsatz-partner${on ? ' is-on' : ''}`}
+                          onClick={() => setF({ handwerkerId: p.id })}
+                        >
+                          <span className="einsatz-partner__dot" aria-hidden />
+                          <span className="einsatz-partner__name">{p.label}</span>
+                          {p.email ? null : <span className="einsatz-partner__hint">keine E-Mail</span>}
+                        </MockBtn>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </MockField>
             <MockField label="Titel" required>
               <MockInput value={form.titel} onChange={(ev) => setF({ titel: ev.target.value })} />
@@ -588,18 +655,31 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 onChange={(ev) => setF({ anweisung: ev.target.value })}
               />
             </MockField>
-            <MockField label="Termin von">
-              <DateInput value={form.terminVon} onChange={(ev) => setF({ terminVon: ev.target.value })} />
+            <MockField label="Termin">
+              <MockSegment
+                value={form.terminArt}
+                onChange={(next) => setF({ terminArt: next })}
+                options={[
+                  { value: 'tag', label: 'Ein Tag' },
+                  { value: 'zeitraum', label: 'Zeitraum' },
+                ]}
+                aria-label="Ein Tag oder Zeitraum"
+              />
             </MockField>
-            <MockField label="Termin bis">
-              <DateInput value={form.terminBis} onChange={(ev) => setF({ terminBis: ev.target.value })} />
-            </MockField>
-            <MockField label="Ort">
-              <MockInput value={form.ort} onChange={(ev) => setF({ ort: ev.target.value })} />
-            </MockField>
-            <MockField label="Kontakt vor Ort">
-              <MockInput value={form.kontaktVorOrt} onChange={(ev) => setF({ kontaktVorOrt: ev.target.value })} />
-            </MockField>
+            {form.terminArt === 'tag' ? (
+              <MockField label="Tag">
+                <DateInput value={form.terminVon} onChange={(ev) => setF({ terminVon: ev.target.value })} />
+              </MockField>
+            ) : (
+              <>
+                <MockField label="Von">
+                  <DateInput value={form.terminVon} onChange={(ev) => setF({ terminVon: ev.target.value })} />
+                </MockField>
+                <MockField label="Bis">
+                  <DateInput value={form.terminBis} onChange={(ev) => setF({ terminBis: ev.target.value })} />
+                </MockField>
+              </>
+            )}
             <MockField label="EK" hint="So, wie der Partner abrechnet: netto bei §13b, sonst brutto.">
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <ClearableNumberInput

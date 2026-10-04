@@ -1,9 +1,8 @@
 'use client'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
@@ -16,7 +15,6 @@ import {
 import { optimizeImageForUpload } from '@/lib/media/optimize-image-for-upload'
 import { splitTagebuchBeschreibung } from '@/lib/auftraege/tagebuch-text'
 import type { AuftragPosition } from '@/lib/types'
-import { cn } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
 
 const MAX_FOTOS = 12
@@ -33,15 +31,15 @@ export function CrmPositionEintragModal({
   open,
   onClose,
   auftragId,
-  positionen,
-  initialPositionId = null,
   editEintrag = null,
   onSaved,
 }: {
   open: boolean
   onClose: () => void
   auftragId: string
-  positionen: AuftragPosition[]
+  /** @deprecated Tagebuch ohne Leistungsbezug */
+  positionen?: AuftragPosition[]
+  /** @deprecated Tagebuch ohne Leistungsbezug */
   initialPositionId?: string | null
   /** Vorhandener Eintrag — öffnet im Bearbeiten-Modus */
   editEintrag?: CrmTagebuchEditSeed | null
@@ -49,70 +47,29 @@ export function CrmPositionEintragModal({
 }) {
   const [pending, setPending] = useState(false)
   const [uploading, setUploading] = useState(false)
+  // Tagebuch: nur Titel, Text, Fotos — keine Leistungs-Verknüpfung mehr (bestehende bleiben erhalten)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [erledigtIds, setErledigtIds] = useState<string[]>([])
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [fotoPaths, setFotoPaths] = useState<string[]>([])
 
   const isEdit = Boolean(editEintrag?.id)
 
-  const sortedPos = useMemo(
-    () =>
-      [...positionen]
-        .filter((p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt')
-        .sort(
-          (a, b) =>
-            (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
-            (a.leistung_name ?? '').localeCompare(b.leistung_name ?? '', 'de')
-        ),
-    [positionen]
-  )
-
   useEffect(() => {
     if (!open) return
     if (editEintrag?.id) {
       const split = splitTagebuchBeschreibung(editEintrag.beschreibungRaw)
       setSelectedIds(editEintrag.positionIds.filter(Boolean))
-      setErledigtIds([])
       setTitel(split.titel)
       setBeschreibung(split.beschreibung)
       setFotoPaths(editEintrag.fotoPaths.filter(Boolean))
       return
     }
-    const initial = initialPositionId?.trim()
-    setSelectedIds(initial ? [initial] : [])
-    setErledigtIds([])
+    setSelectedIds([])
     setTitel('')
     setBeschreibung('')
     setFotoPaths([])
-  }, [open, initialPositionId, editEintrag])
-
-  function toggleLeistung(id: string) {
-    setSelectedIds((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-      setErledigtIds((er) => er.filter((x) => next.includes(x)))
-      return next
-    })
-  }
-
-  function selectKeineLeistung() {
-    setSelectedIds([])
-    setErledigtIds([])
-  }
-
-  function selectAlleLeistungen() {
-    const all = sortedPos.map((p) => p.id)
-    setSelectedIds(all)
-    setErledigtIds((er) => er.filter((x) => all.includes(x)))
-  }
-
-  function toggleErledigt(id: string) {
-    if (!selectedIds.includes(id)) return
-    setErledigtIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
-  }
+  }, [open, editEintrag])
 
   async function uploadFotos(files: File[]) {
     if (!files.length || uploading) return
@@ -200,7 +157,7 @@ export function CrmPositionEintragModal({
           const payload = {
             auftragId,
             positionIds: selectedIds,
-            erledigtPositionIds: isEdit ? [] : erledigtIds,
+            erledigtPositionIds: [],
             titel: titel.trim() || null,
             beschreibung: beschreibung.trim() || null,
             quelle: 'vor_ort' as const,
@@ -225,9 +182,7 @@ export function CrmPositionEintragModal({
   const dirty = Boolean(
     beschreibung.trim() ||
       titel.trim() ||
-      fotoPaths.length ||
-      selectedIds.length ||
-      erledigtIds.length
+      fotoPaths.length
   )
 
   return (
@@ -241,79 +196,6 @@ export function CrmPositionEintragModal({
       primary={{ label: 'Speichern', busy: pending, onClick: speichern }}
     >
       <div className="space-y-4">
-        <div>
-          <span className="lt-field-lbl">Leistungen</span>
-          <p className="sheet-editable-field__hint" style={{ marginTop: 0 }}>
-            Optional — keine, eine oder mehrere anhaken.
-          </p>
-          {sortedPos.length === 0 ? (
-            <p className="mt-2 text-sm text-muted">
-              Keine Leistungen am Auftrag — Speichern als freier Eintrag.
-            </p>
-          ) : (
-            <>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <MockBtn kind="primary" sm className={cn(
-                    selectedIds.length === 0 ? '' : ''
-                  )} type="button" disabled={busy} onClick={selectKeineLeistung}>
-                  Keine Leistung
-                </MockBtn>
-                <MockBtn kind="secondary" sm type="button" disabled={busy || selectedIds.length === sortedPos.length} onClick={selectAlleLeistungen}>
-                  Alle auswählen
-                </MockBtn>
-                <span className="text-xs text-muted">
-                  {selectedIds.length === 0
-                    ? 'Freier Tageseintrag ohne Leistungsbezug'
-                    : `${selectedIds.length} von ${sortedPos.length} ausgewählt`}
-                </span>
-              </div>
-              <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto pr-0.5">
-                {sortedPos.map((p) => {
-                  const checked = selectedIds.includes(p.id)
-                  const erledigt = erledigtIds.includes(p.id)
-                  const alreadyDone = String(p.leistung_status ?? '') === 'erledigt'
-                  return (
-                    <li
-                      key={p.id}
-                      className={cn(
-                        'rounded-card border px-3 py-2',
-                        checked ? 'border-accent bg-accent/5' : 'border-border'
-                      )}
-                    >
-                      <label className="flex cursor-pointer items-start gap-2.5">
-                        <MockCheckbox
-                          className="mt-1"
-                          checked={checked}
-                          disabled={busy}
-                          onChange={() => toggleLeistung(p.id)}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-medium">
-                            {p.leistung_name?.trim() || 'Leistung'}
-                          </span>
-                          {alreadyDone ? (
-                            <span className="text-xs text-muted">bereits erledigt</span>
-                          ) : null}
-                        </span>
-                      </label>
-                      {checked && !alreadyDone && !isEdit ? (
-                        <label className="mt-1.5 ml-6 flex cursor-pointer items-center gap-2 text-xs">
-                          <MockCheckbox
-                            checked={erledigt}
-                            disabled={busy}
-                            onChange={() => toggleErledigt(p.id)}
-                          />
-                          Als erledigt markieren
-                        </label>
-                      ) : null}
-                    </li>
-                  )
-                })}
-              </ul>
-            </>
-          )}
-        </div>
-
         <SheetEditableField
           label="Titel"
           value={titel}
