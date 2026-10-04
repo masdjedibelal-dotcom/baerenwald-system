@@ -40,6 +40,25 @@ export default async function AuftragAbnahmeErstellenPage({
     (angebot as { positionen?: unknown } | null)?.positionen
   )
   const defaults = buildDefaultAbnahmeMetaFromAuftrag(detail, firm)
+  // Übergabeort = Leistungsadresse des Vorgangs (Straße, Ort) — sonst Kundenadresse
+  if (detail.lead_id) {
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('strasse, hausnummer, plz')
+      .eq('id', detail.lead_id)
+      .maybeSingle()
+    const l = lead as { strasse?: string | null; hausnummer?: string | null; plz?: string | null } | null
+    const strasse = [l?.strasse?.trim(), l?.hausnummer?.trim()].filter(Boolean).join(' ')
+    // Leads haben nur die PLZ — Ortsname vom Kunden, wenn die PLZ passt
+    const plz = l?.plz?.trim() || ''
+    const kundeOrt = detail.kunden?.plz?.trim() === plz ? detail.kunden?.ort?.trim() || '' : ''
+    const ort = [plz, kundeOrt].filter(Boolean).join(' ')
+    const leistungsadresse = [strasse, ort].filter(Boolean).join(', ')
+    if (leistungsadresse) {
+      defaults.uebergabe_ort = leistungsadresse
+      defaults.projektadresse = leistungsadresse
+    }
+  }
   const kundeName =
     detail.kunden?.name?.trim() ||
     [detail.kunden?.vorname, detail.kunden?.nachname].filter(Boolean).join(' ').trim() ||

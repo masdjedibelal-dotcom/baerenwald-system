@@ -41,26 +41,6 @@ function leistungAggregateStatus(punkte: AbnahmePunkt[]): AbnahmePunktStatus {
   return 'offen'
 }
 
-/** Nur erledigt ↔ nicht erledigt — kein Mangel-Zyklus. */
-function toggleErledigt(current: AbnahmePunktStatus): AbnahmePunktStatus {
-  return current === 'ok' ? 'offen' : 'ok'
-}
-
-function setLeistungStatus(
-  alle: AbnahmePunkt[],
-  leistungId: string,
-  status: AbnahmePunktStatus
-): AbnahmePunkt[] {
-  return alle.map((p) => {
-    if (leistungKey(p) !== leistungId) return p
-    return {
-      ...p,
-      status,
-      mangel_frist: status === 'mangel' ? p.mangel_frist ?? null : null,
-    }
-  })
-}
-
 function removeLeistung(alle: AbnahmePunkt[], leistungId: string): AbnahmePunkt[] {
   return alle.filter((p) => leistungKey(p) !== leistungId)
 }
@@ -100,23 +80,18 @@ export function countAbgenommeneLeistungen(punkte: AbnahmePunkt[]): {
 
 function BegehItem({
   leistung,
-  onToggle,
   onEdit,
   onRemove,
 }: {
   leistung: AbnahmeLeistungGruppe
-  onToggle: () => void
   onEdit: () => void
   onRemove: () => void
 }) {
-  const status = leistungAggregateStatus(leistung.punkte)
   const notiz = leistungNotiz(leistung)
 
+  // Eingetragene Leistungen gelten als abgenommen — kein Abhaken
   return (
-    <li className={cn('abnahme-inline__item', status === 'ok' && 'is-done')}>
-      <MockBtn className={cn('abnahme-inline__check', status === 'ok' && 'is-ok')} type="button" aria-label={status === 'ok' ? 'Erledigt — tippen für offen' : 'Offen — tippen für erledigt'} aria-pressed={status === 'ok'} onClick={onToggle}>
-        {status === 'ok' ? <MockIcon n="check" ctx="default" className="h-3.5 w-3.5" aria-hidden /> : null}
-      </MockBtn>
+    <li className="abnahme-inline__item">
       <div className="abnahme-inline__item-body">
         <p className="abnahme-inline__item-title">{leistungTitel(leistung)}</p>
         {notiz ? <p className="abnahme-inline__item-sub">{notiz}</p> : null}
@@ -137,12 +112,22 @@ function BegehItem({
 export function AbnahmeBegehListe({
   punkte,
   onChange,
+  katalogPositionen = [],
 }: {
   punkte: AbnahmePunkt[]
   onChange: (next: AbnahmePunkt[]) => void
-  /** Auftragspositionen zur Auswahl (optional). */
+  /** Auftragspositionen zur Auswahl (Titel + Beschreibung übernehmen). */
   katalogPositionen?: AuftragPosition[]
 }) {
+  const positionsAuswahl = useMemo(
+    () =>
+      katalogPositionen
+        .filter((p) => (p.aenderung_typ ?? '').toLowerCase() !== 'entfernt' && p.leistung_name?.trim())
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    [katalogPositionen]
+  )
+  const [addArt, setAddArt] = useState<'positionen' | 'frei'>('positionen')
+  const [draftGewerk, setDraftGewerk] = useState<string | null>(null)
   const blocks = useMemo(() => gruppiereAbnahmePunkte(punkte), [punkte])
   const flatLeistungen = useMemo(
     () => blocks.flatMap((b) => b.leistungen.map((l) => ({ gewerk: b.gewerk, leistung: l }))),
@@ -160,12 +145,27 @@ export function AbnahmeBegehListe({
   function openAdd() {
     setDraftTitel('')
     setDraftNotiz('')
+    setDraftGewerk(null)
+    setAddArt(positionsAuswahl.length ? 'positionen' : 'frei')
     setAddOpen(true)
   }
 
   function confirmAdd() {
     if (!draftTitel.trim()) return
-    onChange([...punkte, abnahmePunktErbrachteLeistung(draftTitel, draftNotiz)])
+    onChange([...punkte, abnahmePunktErbrachteLeistung(draftTitel, draftNotiz, draftGewerk)])
+    setAddOpen(false)
+  }
+
+  /** Position wählen → Titel, Beschreibung (und Gewerk) übernehmen und gleich hinzufügen. */
+  function pickPosition(p: AuftragPosition) {
+    onChange([
+      ...punkte,
+      abnahmePunktErbrachteLeistung(
+        p.leistung_name,
+        richTextToPlain(p.beschreibung ?? ''),
+        p.gewerk_name?.trim() || null
+      ),
+    ])
     setAddOpen(false)
   }
 
@@ -187,14 +187,10 @@ export function AbnahmeBegehListe({
         <MockEmpty icon="clipboard-list" title="Noch keine Leistungen" />
       ) : (
         <ul className="abnahme-inline__items">
-          {flatLeistungen.map(({ gewerk, leistung }) => (
+          {flatLeistungen.map(({ leistung }) => (
             <BegehItem
               key={leistung.leistung_id}
               leistung={leistung}
-              onToggle={() => {
-                const cur = leistungAggregateStatus(leistung.punkte)
-                onChange(setLeistungStatus(punkte, leistung.leistung_id, toggleErledigt(cur)))
-              }}
               onEdit={() => openEdit(leistung)}
               onRemove={() => onChange(removeLeistung(punkte, leistung.leistung_id))}
             />
@@ -208,21 +204,54 @@ export function AbnahmeBegehListe({
       </MockBtn>
 
       <EditorSheet
-        primary={{ label: 'Hinzufügen', onClick: confirmAdd, disabled: !draftTitel.trim() }}
+        primary={
+          addArt === 'frei'
+            ? { label: 'Hinzufügen', onClick: confirmAdd, disabled: !draftTitel.trim() }
+            : null
+        }
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="Leistung hinzufügen"
         context="canvas"
         size="md"
       >
-        <div className="form-grid form-grid--sheet">
-          <MockField label="Leistung" required>
-            <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder="z. B. Heizkörper getauscht" autoFocus />
-          </MockField>
-          <MockField label="Beschreibung">
-            <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} rows={4} className="resize-y py-2" />
-          </MockField>
-        </div>
+        {positionsAuswahl.length ? (
+          <div className="picker-sheet__chips" role="group" aria-label="Art">
+            <MockBtn className={cn('picker-sheet__chip', addArt === 'positionen' && 'is-active')} type="button" onClick={() => setAddArt('positionen')}>
+              Aus Positionen
+            </MockBtn>
+            <MockBtn className={cn('picker-sheet__chip', addArt === 'frei' && 'is-active')} type="button" onClick={() => setAddArt('frei')}>
+              Frei
+            </MockBtn>
+          </div>
+        ) : null}
+        {addArt === 'positionen' && positionsAuswahl.length ? (
+          <ul className="abnahme-inline__items abnahme-pos-pick">
+            {positionsAuswahl.map((p) => {
+              const besch = richTextToPlain(p.beschreibung ?? '').trim()
+              return (
+                <li key={p.id}>
+                  <MockBtn className="abnahme-inline__item abnahme-pos-pick__item" type="button" onClick={() => pickPosition(p)}>
+                    <span className="abnahme-inline__item-body">
+                      <span className="abnahme-inline__item-title">{p.leistung_name}</span>
+                      {besch ? <span className="abnahme-inline__item-sub">{besch}</span> : null}
+                    </span>
+                    <MockIcon ctx="btn" n="plus" size={16} />
+                  </MockBtn>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <div className="form-grid form-grid--sheet">
+            <MockField label="Leistung" required>
+              <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder="z. B. Heizkörper getauscht" autoFocus />
+            </MockField>
+            <MockField label="Beschreibung">
+              <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} rows={4} className="resize-y py-2" />
+            </MockField>
+          </div>
+        )}
       </EditorSheet>
 
       <EditorSheet
@@ -389,10 +418,7 @@ export function AbnahmeMaengelCheckliste({
           {items.map((item, i) => {
             const fotos = (item.foto_urls ?? []).filter(Boolean)
             return (
-              <li key={item.id} className="abnahme-inline__item abnahme-inline__item--mangel">
-                <span className="abnahme-inline__check is-mangel" aria-hidden>
-                  <span className="text-fs-caption font-bold text-status-contact-text">!</span>
-                </span>
+              <li key={item.id} className="abnahme-inline__item">
                 <div className="abnahme-inline__item-body">
                   <p className="abnahme-inline__item-title">{item.titel.trim() || 'Mangel'}</p>
                   {item.notiz.trim() ? (
@@ -453,11 +479,9 @@ export function AbnahmeMaengelCheckliste({
           <MockField label="Mangel" required>
             <MockInput value={draftTitel} onChange={(e) => setDraftTitel(e.target.value)} placeholder="z. B. Silikonfuge an der Wanne nacharbeiten" autoFocus />
           </MockField>
-          {draftNotiz.trim() ? (
-            <MockField label="Beschreibung">
-              <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} rows={3} className="resize-y py-2" />
-            </MockField>
-          ) : null}
+          <MockField label="Beschreibung">
+            <MockTextarea value={draftNotiz} onChange={(e) => setDraftNotiz(e.target.value)} rows={3} className="resize-y py-2" />
+          </MockField>
           <div>
             <span className="lt-field-lbl">Fotos</span>
             {draftFotos.length < MAX_MANGEL_FOTOS ? (

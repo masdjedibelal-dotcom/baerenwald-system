@@ -22398,3 +22398,12 @@ button.einsatz-partner.is-on { border-color: var(--green); background: color-mix
 button.einsatz-partner.is-on .einsatz-partner__dot { border: 5px solid var(--green); }
 .einsatz-partner__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .einsatz-partner__hint { font-size: var(--fs-meta); font-weight: 400; color: var(--text-3); }
+
+/* Abnahme: Leistung aus Positionen wählen */
+.abnahme-pos-pick { list-style: none; margin: 12px 0 0; padding: 0; }
+.abnahme-pos-pick li { list-style: none; }
+button.abnahme-pos-pick__item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  text-align: left; box-shadow: none; color: var(--text);
+}
+button.abnahme-pos-pick__item:hover { background: var(--bg-soft); }

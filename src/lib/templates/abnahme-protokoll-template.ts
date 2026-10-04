@@ -5,11 +5,7 @@
 
 import type { AbnahmeGewerkBlock, AbnahmeMangel, AbnahmePunkt } from '@/lib/auftraege/abnahme-protokoll-types'
 import { notizenFuerLeistung } from '@/lib/auftraege/abnahme-protokoll-types'
-import {
-  ABNAHME_ERGEBNIS_LABEL,
-  type AbnahmeErgebnis,
-  type AbnahmeProtokollMeta,
-} from '@/lib/auftraege/abnahme-protokoll-meta'
+import { type AbnahmeProtokollMeta } from '@/lib/auftraege/abnahme-protokoll-meta'
 import {
   buildAngebotPdfFooterTemplate,
   type AngebotHtmlInput,
@@ -28,8 +24,6 @@ const TEXT = C.gray900
 const MUTED = C.gray500
 const BORDER = C.gray300
 const SOFT = C.gray100
-const GREEN_SOFT = C.greenTint2
-const WARN_SOFT = C.amberBg2
 
 export type AbnahmeProtokollHtmlInput = {
   firmen_logo_url?: string | null
@@ -158,18 +152,17 @@ function fotosHtml(urls: string[], captions: string[] = []): string {
 }
 
 function partiesRowHtml(p: AbnahmeProtokollHtmlInput): string {
-  const an = partyBox('Auftragnehmer', [
+  const an = partyBox('Bärenwald', [
     { label: 'Firma', value: p.firmenname },
     { label: 'Adresse', value: p.firmen_adresse.replace(/\n/g, ', ') },
-    { label: 'Partner vor Ort', value: p.meta.vertreter_an },
+    { label: 'Vor Ort', value: p.meta.vertreter_an },
     { label: 'Telefon', value: p.firmen_telefon ?? '' },
     { label: 'E-Mail', value: p.firmen_email ?? '' },
   ])
-  const ag = partyBox('Auftraggeber / Kunde', [
+  const ag = partyBox('Kunde', [
     { label: 'Name', value: p.kunde_name },
     { label: 'Adresse', value: p.kunde_adresse.replace(/\n/g, ', ') },
-    { label: 'Kunde vor Ort', value: p.meta.ansprechpartner_kunde },
-    { label: 'Anwesend bei Übergabe', value: p.meta.anwesend_uebergabe },
+    { label: 'Vor Ort', value: p.meta.ansprechpartner_kunde },
   ])
   const fotos = fotosHtml(p.meta.uebergabe_foto_urls, p.meta.uebergabe_foto_captions)
   return `<div style="display:flex;gap:10px;margin:0 0 14px;">
@@ -187,10 +180,10 @@ function bauvorhabenHtml(p: AbnahmeProtokollHtmlInput): string {
       <td style="padding:3px 10px 3px 0;font-size:8.5pt;color:${MUTED};vertical-align:top;width:28%;">${esc(l)}</td>
       <td style="padding:3px 0;font-size:9pt;color:${TEXT};vertical-align:top;white-space:pre-wrap;">${esc(v)}</td>
     </tr>`
-  return `${sectionHeading('1', 'Bauvorhaben')}
+  return `${sectionHeading('1', 'Vorhaben')}
     <table style="width:100%;border-collapse:collapse;margin:0 0 4px;">
-      ${row('Projektbezeichnung', bez)}
-      ${row('Projektadresse', adr)}
+      ${row('Vorhaben', bez)}
+      ${row('Adresse', adr)}
       ${row('Leistungsumfang', umfang)}
       ${row('Auftrag', p.auftragsNr)}
     </table>`
@@ -226,7 +219,12 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
   if (!gewerke.length) {
     return `${sectionHeading('2', 'Ausgeführte Leistungen')}<p style="font-size:9pt;color:${MUTED};">Keine Leistungen ausgewählt.</p>`
   }
-  const blocks = gewerke
+  // Freie Leistungen (ohne Gewerk) zuerst, damit sie nicht unter einer Gewerk-Überschrift stehen
+  const sortiert = [
+    ...gewerke.filter((g) => !g.gewerk.trim() || g.gewerk === 'Ohne Gewerk'),
+    ...gewerke.filter((g) => g.gewerk.trim() && g.gewerk !== 'Ohne Gewerk'),
+  ]
+  const blocks = sortiert
     .map((g) => {
       const items = g.leistungen
         .map((l) => {
@@ -258,7 +256,7 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
             </li>`
         })
         .join('')
-      const showGewerk = g.gewerk.trim() && g.gewerk !== 'Ohne Gewerk'
+      const showGewerk = g.gewerk.trim() && g.gewerk !== 'Ohne Gewerk' && g.gewerk !== 'Allgemein'
       return `<div style="margin:0 0 10px;">
         ${
           showGewerk
@@ -274,20 +272,6 @@ function leistungenHtml(gewerke: AbnahmeGewerkBlock[]): string {
     ${blocks}`
 }
 
-function ergebnisHtml(ergebnis: AbnahmeErgebnis, datum: string): string {
-  const label = ABNAHME_ERGEBNIS_LABEL[ergebnis]
-  const bg = ergebnis === 'verweigert' ? '${C.redBg}' : ergebnis === 'mit_vorbehalt' ? WARN_SOFT : GREEN_SOFT
-  const border = ergebnis === 'verweigert' ? '${C.redTx4}' : ACCENT
-  return `${sectionHeading('3', 'Abnahmeergebnis')}
-    <p style="margin:0 0 10px;font-size:9pt;line-height:1.5;color:${TEXT};">
-      Die Leistungen wurden am ${esc(datum)} gemeinsam vor Ort besichtigt und geprüft.
-    </p>
-    <div style="display:flex;align-items:center;gap:12px;background:${bg};border:1.5px solid ${border};border-radius:6px;padding:12px 14px;page-break-inside:avoid;">
-      <span style="display:inline-block;width:22px;height:22px;line-height:0;flex-shrink:0;" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6.2" fill="none" stroke="${border}" stroke-width="1.4"/><path d="M3.9 7.15l2.05 2.05L10.2 4.9" fill="none" stroke="${border}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <span style="font-size:11pt;font-weight:700;color:${ACCENT};">${esc(label)}</span>
-    </div>`
-}
-
 function isMangelOffenPdf(m: AbnahmeMangel): boolean {
   const s = m.status ?? 'offen'
   return s === 'offen' || s === 'in_bearbeitung'
@@ -300,12 +284,12 @@ function mangelFotosHtml(urls: string[] | undefined): string {
     .filter((u): u is string => Boolean(u))
     .slice(0, 4)
   if (!list.length) return ''
-  const cols = list.length === 1 ? '1fr' : 'repeat(2, 1fr)'
-  return `<div style="display:grid;grid-template-columns:${cols};gap:6px;margin:8px 0 0;max-width:70%;page-break-inside:avoid;break-inside:avoid;">
+  // Gut erkennbar, aber im Maß des restlichen Protokolls (bis zu drei nebeneinander)
+  return `<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin:8px 0 0;page-break-inside:avoid;break-inside:avoid;">
     ${list
       .map(
         (src) =>
-          `<div style="margin:0;aspect-ratio:1/1;max-width:110px;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:${C.gray50};page-break-inside:avoid;break-inside:avoid;">
+          `<div style="margin:0;aspect-ratio:4/3;border:1px solid ${BORDER};border-radius:4px;overflow:hidden;background:${C.gray50};page-break-inside:avoid;break-inside:avoid;">
             <img src="${src}" alt="" style="display:block;width:100%;height:100%;object-fit:contain;object-position:center;" />
           </div>`
       )
@@ -359,7 +343,7 @@ function hinweiseHtml(p: AbnahmeProtokollHtmlInput): string {
       body += `<p style="margin:8px 0 0;font-size:8.5pt;color:${MUTED};white-space:pre-wrap;">${esc(notiz)}</p>`
     }
   }
-  return `${sectionHeading('4', 'Festgestellte Hinweise')}
+  return `${sectionHeading('3', 'Festgestellte Mängel')}
     <div style="border:1px solid ${BORDER};border-radius:4px;padding:10px 12px;page-break-inside:avoid;">${body}</div>`
 }
 
@@ -371,7 +355,7 @@ function rechtHtml(text: string): string {
   const lis = lines
     .map((l) => `<li style="margin:0 0 4px;">${esc(l)}</li>`)
     .join('')
-  return `${sectionHeading('5', 'Weitere Hinweise')}
+  return `${sectionHeading('4', 'Weitere Hinweise')}
     <ul style="margin:0;padding-left:18px;font-size:8.5pt;line-height:1.45;color:${TEXT};">${lis}</ul>`
 }
 
@@ -418,27 +402,21 @@ function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
     </div>`
   }
 
-  return `${sectionHeading('6', 'Unterschriften')}
+  return `${sectionHeading('5', 'Unterschriften')}
     <div style="display:flex;gap:16px;margin-top:8px;">
       ${block(
-        'Auftragnehmer',
+        'Bärenwald',
         hwName,
         formatOrtDatumZeile(p.meta.unterschrift_ort_datum_an),
         hwSig,
         Boolean(p.meta.ohne_unterschrift_hw)
       )}
       ${block(
-        'Auftraggeber',
+        'Kunde',
         kundeName,
         formatOrtDatumZeile(p.meta.unterschrift_ort_datum_ag),
         kundeSig,
         Boolean(p.meta.ohne_unterschrift_kunde)
-      )}
-      ${block(
-        'Anwesend bei Übergabe',
-        p.meta.anwesend_uebergabe,
-        formatOrtDatumZeile(p.meta.unterschrift_ort_datum_anwesend),
-        null
       )}
     </div>`
 }
@@ -459,7 +437,6 @@ export function buildAbnahmeProtokollHtml(p: AbnahmeProtokollHtmlInput): string 
     ${partiesRowHtml(p)}
     ${bauvorhabenHtml(p)}
     ${leistungenHtml(p.gewerke)}
-    ${ergebnisHtml(p.meta.abnahme_ergebnis, p.abnahmeDatum)}
     ${hinweiseHtml(p)}
     ${rechtHtml(p.meta.rechtshinweise)}
     ${unterschriftenHtml(p)}

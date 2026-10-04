@@ -4,13 +4,12 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 
 import { useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import {
   AbnahmeBegehListe,
   AbnahmeMaengelCheckliste,
-  AbnahmeProgressBar,
-  countAbgenommeneLeistungen,
 } from '@/components/auftraege/AbnahmeBegehListe'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
@@ -26,19 +25,17 @@ import {
   downloadAbnahmeprotokollPdf,
   getAbnahmeprotokollMailDefaults,
   saveAbnahmeAndAbschliessen,
+  saveAbnahmeprotokollDraft,
   saveAbnahmeprotokollPdfOnly,
   saveAndSendAbnahmeprotokoll,
 } from '@/app/(dashboard)/auftraege/abnahmeprotokoll-actions'
 import { updateAuftragStatusFromUi } from '@/app/(dashboard)/auftraege/actions'
 import type { AuftragStatus } from '@/lib/types'
 import {
-  ABNAHME_ERGEBNIS_LABEL,
   emptyAbnahmeProtokollMeta,
-  type AbnahmeErgebnis,
   type AbnahmeProtokollMeta,
 } from '@/lib/auftraege/abnahme-protokoll-meta'
 import {
-  buildAbnahmePunkteInitial,
   filterAbnahmePunkteFuerDokument,
   maengelAusPunkten,
   maengelFromCheckItems,
@@ -53,15 +50,9 @@ import { heuteYmd } from '@/lib/angebot-einfach'
 import { CONFIRM,COPY_BUTTON,TOAST } from '@/lib/copy'
 import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
 
-const ABNAHME_ERGEBNIS_UI: Record<AbnahmeErgebnis, { label: string; cls: string }> = {
-  abgenommen: { label: 'Abgenommen', cls: 'abnahme-erg-abgenommen' },
-  mit_vorbehalt: { label: 'Mit Vorbehalt', cls: 'abnahme-erg-vorbehalt' },
-  verweigert: { label: 'Verweigert', cls: 'abnahme-erg-verweigert' },
-}
-
 /** Spec §8 / Mock: drei Schritte im Abnahme-Canvas */
 const SECTIONS = [
-  { id: 'checkliste', label: 'Checkliste & Ergebnis' },
+  { id: 'checkliste', label: 'Leistungen & Mängel' },
   { id: 'angaben', label: 'Angaben' },
   { id: 'pruefen', label: 'Prüfen & PDF' },
 ] as const
@@ -77,10 +68,12 @@ type AbnahmeDraft = {
   activeSection: SectionId
 }
 
-/** Standard „Ort, Datum“ aus Übergabe-Feldern. */
+/** Standard „Ort, Datum“ aus Übergabe-Feldern — aus der Adresse nur der Ort. */
 function defaultUnterschriftOrtDatum(ort: string, datum: string): string {
-  const o = ort.trim()
-  const d = datum.trim().slice(0, 10)
+  const letzter = ort.split(',').pop() ?? ''
+  const o = letzter.replace(/^\s*\d{4,5}\s+/, '').trim()
+  const ymd = datum.trim().slice(0, 10)
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd.split('-').reverse().join('.') : ymd
   if (o && d) return `${o}, ${d}`
   return o || d
 }
@@ -129,15 +122,8 @@ export function AbnahmeprotokollCreateWizard({
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
-  const [punkte, setPunkteState] = useState<AbnahmePunkt[]>(() => {
-    if (initialPunkte?.length) return initialPunkte
-    // CRM-Neu: alle Leistungen vorausgewählt → landen im PDF
-    return buildAbnahmePunkteInitial({
-      positionen,
-      angebotPositionen,
-      gewerke,
-    }).map((p) => ({ ...p, status: 'ok' as const }))
-  })
+  // Leer anfangen — Leistungen kommen über „Leistung hinzufügen“ (aus Positionen oder frei)
+  const [punkte, setPunkteState] = useState<AbnahmePunkt[]>(() => initialPunkte ?? [])
   const [maengelItems, setMaengelItemsState] = useState<AbnahmeMangelCheckItem[]>(() =>
     initialMaengelItems.length ? initialMaengelItems : []
   )
@@ -149,6 +135,8 @@ export function AbnahmeprotokollCreateWizard({
   const [draftDirty, setDraftDirty] = useState(false)
   const [abnahmeGaps, setAbnahmeGaps] = useState<{ id: string; label: string }[]>([])
   const [sigTab, setSigTab] = useState<'an' | 'kunde'>('an')
+  // Unterschreiben nur am Handy — am Desktop folgen die Unterschriften
+  const isMobile = useIsMobile()
 
   /* FORM_ZWISCHENSTAND: abnahme */
   const storageKey = useMemo(
@@ -210,10 +198,6 @@ export function AbnahmeprotokollCreateWizard({
     setDraftDirty(true)
     setAbnahmeDatumState(next)
   }
-  const setNotizen = (next: string) => {
-    setDraftDirty(true)
-    setNotizenState(next)
-  }
 
   const freigabeBadgeLabel =
     (initialFreigabeStatus ?? '').trim() || (isEdit ? 'Entwurf' : 'Offen')
@@ -230,8 +214,6 @@ export function AbnahmeprotokollCreateWizard({
     () => filterAbnahmePunkteFuerDokument(punkte).length,
     [punkte]
   )
-
-  const progress = useMemo(() => countAbgenommeneLeistungen(punkte), [punkte])
 
   const maengelListe = useMemo(() => {
     const fromPunkte = maengelAusPunkten(punkte)
@@ -262,8 +244,21 @@ export function AbnahmeprotokollCreateWizard({
     const kundeOk =
       Boolean(meta.ohne_unterschrift_kunde) ||
       (sigOk(meta.signature_kunde_url) && kundeNameOk)
+    // Desktop: keine Unterschrift möglich — gilt als „folgt“
+    if (!isMobile) return true
     return hwOk && kundeOk
   })()
+
+  /** Desktop: fehlende Unterschriften als „folgt“ markieren. */
+  function mitUnterschriftFolgt(m: AbnahmeProtokollMeta): AbnahmeProtokollMeta {
+    if (isMobile) return m
+    return {
+      ...m,
+      ohne_unterschrift_hw: m.signature_hw_url ? m.ohne_unterschrift_hw : true,
+      ohne_unterschrift_kunde: m.signature_kunde_url ? m.ohne_unterschrift_kunde : true,
+      ohne_unterschrift: !m.signature_hw_url || !m.signature_kunde_url || m.ohne_unterschrift,
+    }
+  }
 
   useEffect(() => {
     if (abnahmeGaps.length === 0) return
@@ -313,9 +308,7 @@ export function AbnahmeprotokollCreateWizard({
   function validateAngaben(): string | null {
     if (!abnahmeDatum.trim()) return 'Bitte Übergabedatum angeben.'
     if (!meta.uebergabe_ort.trim()) return 'Bitte Übergabeort angeben.'
-    if (!meta.vertreter_an.trim()) return 'Bitte Handwerker vor Ort angeben.'
-    if (!meta.projektbezeichnung.trim()) return 'Bitte Projektbezeichnung angeben.'
-    if (ausgewaehlt === 0) return 'Mindestens eine Leistung für die Abnahme auswählen (OK).'
+    if (ausgewaehlt === 0) return 'Bitte mindestens eine Leistung eintragen.'
     return null
   }
 
@@ -326,7 +319,7 @@ export function AbnahmeprotokollCreateWizard({
   function goSection(id: SectionId) {
     if (id === 'pruefen' || id === 'angaben') {
       if (ausgewaehlt === 0) {
-        toast.error(TOAST.mindestens_eine_leistung_fuer_die_abnahme_auswae)
+        toast.error('Bitte mindestens eine Leistung eintragen.')
         return
       }
     }
@@ -398,8 +391,7 @@ export function AbnahmeprotokollCreateWizard({
       toast.error(err)
       return
     }
-    const metaReady = ensureUnterschriftOrtDatum(meta)
-    setMeta(metaReady)
+    const metaReady = mitUnterschriftFolgt(ensureUnterschriftOrtDatum(meta))
     setPreviewBusy(true)
     try {
       const r = await downloadAbnahmeprotokollPdf({
@@ -433,17 +425,45 @@ export function AbnahmeprotokollCreateWizard({
     })
   }
 
+  /** Grüner Haken: als Entwurf speichern (ohne PDF/Download) — vor Ort weitermachen. */
+  function entwurfSpeichern() {
+    if (ausgewaehlt === 0 && !maengelListe.length) {
+      toast.error('Bitte mindestens eine Leistung eintragen.')
+      return
+    }
+    startTransition(async () => {
+      const r = await saveAbnahmeprotokollDraft({
+        auftragId,
+        abnahmeDatum,
+        punkte,
+        maengel: buildSaveMaengel(),
+        notizen: notizen.trim() || null,
+        meta,
+        protokollId,
+      })
+      if (!r.ok) {
+        toast.systemError(r)
+        return
+      }
+      zwischen.clear()
+      setDraftDirty(false)
+      setLastSavedAt(Date.now())
+      toast.success('Abnahme als Entwurf gespeichert')
+      router.push(`/auftraege/${auftragId}?tab=leistungen`)
+      router.refresh()
+    })
+  }
+
   function erstellen(opts?: { abschliessen?: boolean; send?: boolean }) {
     const err = validateBeforeSave()
     if (err) {
       toast.error(err)
       return
     }
-    const metaReady = ensureUnterschriftOrtDatum(meta)
+    const metaReady = mitUnterschriftFolgt(ensureUnterschriftOrtDatum(meta))
     const maengel = buildSaveMaengel()
-    if (maengel.length > 0 && metaReady.abnahme_ergebnis === 'abgenommen') {
-      metaReady.abnahme_ergebnis = 'mit_vorbehalt'
-    }
+    // Kein Ergebnis-Feld mehr: mit Mängeln = unter Vorbehalt, sonst abgenommen
+    metaReady.abnahme_ergebnis = maengel.length > 0 ? 'mit_vorbehalt' : 'abgenommen'
     setMeta(metaReady)
     const abschliessen = Boolean(opts?.abschliessen ?? hasSignatur)
     const send = Boolean(opts?.send)
@@ -467,7 +487,6 @@ export function AbnahmeprotokollCreateWizard({
           return
         }
         zwischen.clear()
-        downloadPdfFromBase64(r.pdfBase64, r.filename)
         const prev = r.previousStatus
         if (r.sendWarning) {
           toast.error(
@@ -555,61 +574,6 @@ export function AbnahmeprotokollCreateWizard({
   const subtitle = [auftragsLabel, kundeName].filter(Boolean).join(' · ')
   const activeIndex = SECTIONS.findIndex((s) => s.id === activeSection)
 
-  const ergebnisForm = (
-    <div className="space-y-3">
-      <fieldset>
-        <legend className="mb-2 text-[length:var(--fs-text)] font-medium">Ergebnis</legend>
-        <div
-          className="pos-segmented abnahme-ergebnis-segmented"
-          role="radiogroup"
-          aria-label="Abnahmeergebnis"
-        >
-          {(Object.keys(ABNAHME_ERGEBNIS_LABEL) as AbnahmeErgebnis[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="radio"
-              aria-checked={meta.abnahme_ergebnis === key}
-              aria-label={ABNAHME_ERGEBNIS_LABEL[key]}
-              className={cn(
-                'pos-segmented__btn abnahme-ergebnis-segmented__btn',
-                ABNAHME_ERGEBNIS_UI[key].cls,
-                meta.abnahme_ergebnis === key && 'pos-segmented__btn--active'
-              )}
-              onClick={() => patchMeta({ abnahme_ergebnis: key })}
-            >
-              {ABNAHME_ERGEBNIS_UI[key].label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[length:var(--fs-meta)] leading-snug text-bw-text-muted">
-          {ABNAHME_ERGEBNIS_LABEL[meta.abnahme_ergebnis]}
-        </p>
-      </fieldset>
-      <SheetEditableField
-        label="Hinweis"
-        value={meta.hinweis_sonstiges}
-        onSave={(hinweis_sonstiges) => patchMeta({ hinweis_sonstiges })}
-        multiline
-        rows={3}
-      />
-      <MockField label="Mängel beseitigen bis">
-        <MockInput
-        value={meta.maengel_beseitigung_spaetestens}
-        onChange={(e) => patchMeta({ maengel_beseitigung_spaetestens: e.target.value })}
-        placeholder="z. B. spätestens am 15.08.2026"
-      />
-      </MockField>
-      <SheetEditableField
-        label="Interne Notiz"
-        value={notizen}
-        onSave={setNotizen}
-        multiline
-        rows={3}
-      />
-    </div>
-  )
-
   const phaseCheckliste = (
     <div
       id="abnahme-sec-checkliste"
@@ -625,210 +589,20 @@ export function AbnahmeprotokollCreateWizard({
         katalogPositionen={positionen}
       />
 
-      <FieldCard title="Mängel">
-        <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} auftragId={auftragId} />
-      </FieldCard>
-
-      {maengelListe.length > 0 ? (
-        <FieldCard title="Festgestellte Mängel">
-          <ul className="space-y-3">
-            {maengelListe.map((m) => {
-              const punkt = punkte.find((p) => p.id === m.punkt_id)
-              return (
-                <li key={m.punkt_id} className="abnahme-mangel-row space-y-2">
-                  <p className="text-[length:var(--fs-text)] font-medium text-bw-text">
-                    {m.beschreibung}
-                  </p>
-                  {punkt ? (
-                    <>
-                      <SheetEditableField
-                        label="Mangel-Beschreibung (PDF)"
-                        value={punkt.notiz ?? ''}
-                        onSave={(notiz) =>
-                          setPunkte((prev) =>
-                            prev.map((p) => (p.id === punkt.id ? { ...p, notiz } : p))
-                          )
-                        }
-                        kiExtraHint="Mangel-Text im Abnahmeprotokoll (kundensichtbar)."
-                        placeholder={punkt.beschreibung || 'Was ist mangelhaft?'}
-                      />
-                      <MockField label="Beseitigung bis">
-        <DateInput
-        value={punkt.mangel_frist?.slice(0, 10) ?? ''}
-        onChange={(e) =>
-        setPunkte((prev) =>
-        prev.map((p) =>
-        p.id === punkt.id
-        ? { ...p, mangel_frist: e.target.value.trim() || null }
-        : p
-        )
-        )
-        }
-      />
-      </MockField>
-                    </>
-                  ) : null}
-                </li>
-              )
-            })}
-          </ul>
-        </FieldCard>
+      {/* Mängel im gleichen Look wie Leistungen — ohne Karte drumherum */}
+      <p className="section-h" style={{ marginBottom: 4 }}>
+        Mängel
+      </p>
+      <AbnahmeMaengelCheckliste items={maengelItems} onChange={setMaengelItems} auftragId={auftragId} />
+      {maengelItems.length > 0 ? (
+        <MockField label="Mängel beseitigen bis">
+          <MockInput
+            value={meta.maengel_beseitigung_spaetestens}
+            onChange={(e) => patchMeta({ maengel_beseitigung_spaetestens: e.target.value })}
+            placeholder="z. B. spätestens am 15.08.2026"
+          />
+        </MockField>
       ) : null}
-
-      <FieldCard title="Ergebnis">
-        <MobileEditableBlock
-          sheetContext="canvas"
-          sheetTitle="Ergebnis bearbeiten"
-          overview={
-            <dl className="space-y-2.5">
-              <MobileOverviewField
-                label="Ergebnis"
-                value={ABNAHME_ERGEBNIS_LABEL[meta.abnahme_ergebnis]}
-              />
-              <MobileOverviewField
-                label="Hinweis"
-                value={meta.hinweis_sonstiges.trim() || '—'}
-              />
-            </dl>
-          }
-        >
-          {ergebnisForm}
-        </MobileEditableBlock>
-      </FieldCard>
-    </div>
-  )
-
-  const phaseAngaben = (
-    <div
-      id="abnahme-sec-angaben"
-      data-doc-section="angaben"
-      className="document-canvas-sec space-y-5"
-    >
-      <FieldCard title="Übergabe">
-        <MobileEditableBlock
-          sheetContext="canvas"
-          sheetTitle="Übergabe bearbeiten"
-          overview={
-            <dl className="space-y-2.5">
-              <MobileOverviewField label="Datum" value={abnahmeDatum || '—'} />
-              <MobileOverviewField
-                label="Uhrzeit"
-                value={meta.uebergabe_uhrzeit ? `${meta.uebergabe_uhrzeit} Uhr` : '—'}
-              />
-              <MobileOverviewField label="Ort" value={meta.uebergabe_ort.trim() || '—'} />
-            </dl>
-          }
-        >
-          <div className="space-y-3">
-            <MockField label="Übergabedatum">
-        <DateInput
-        value={abnahmeDatum}
-        onChange={(e) => setAbnahmeDatum(e.target.value)}
-      />
-      </MockField>
-            <MockField label="Uhrzeit">
-        <MockInput
-        type="time"
-        value={meta.uebergabe_uhrzeit}
-        onChange={(e) => patchMeta({ uebergabe_uhrzeit: e.target.value })}
-      />
-      </MockField>
-            <MockField label="Übergabeort">
-        <MockInput
-        value={meta.uebergabe_ort}
-        onChange={(e) => patchMeta({ uebergabe_ort: e.target.value })}
-        placeholder="PLZ Ort / Stadtteil"
-      />
-      </MockField>
-          </div>
-        </MobileEditableBlock>
-      </FieldCard>
-
-      <FieldCard title="Personen">
-        <MobileEditableBlock
-          sheetContext="canvas"
-          sheetTitle="Personen bearbeiten"
-          overview={
-            <dl className="space-y-2.5">
-              <MobileOverviewField label="Handwerker vor Ort" value={meta.vertreter_an.trim() || '—'} />
-              <MobileOverviewField
-                label="Kunde vor Ort"
-                value={meta.ansprechpartner_kunde.trim() || '—'}
-              />
-              <MobileOverviewField
-                label="Anwesend"
-                value={meta.anwesend_uebergabe.trim() || '—'}
-              />
-            </dl>
-          }
-        >
-          <div className="space-y-3">
-            <MockField label="Handwerker vor Ort">
-        <MockInput
-        value={meta.vertreter_an}
-        onChange={(e) => patchMeta({ vertreter_an: e.target.value })}
-        placeholder="Name"
-      />
-      </MockField>
-            <MockField label="Kunde vor Ort">
-        <MockInput
-        value={meta.ansprechpartner_kunde}
-        onChange={(e) => patchMeta({ ansprechpartner_kunde: e.target.value })}
-      />
-      </MockField>
-            <MockField label="Anwesend bei Übergabe">
-        <MockInput
-        value={meta.anwesend_uebergabe}
-        onChange={(e) => patchMeta({ anwesend_uebergabe: e.target.value })}
-        placeholder="Optional, dritte Unterschrift"
-      />
-      </MockField>
-          </div>
-        </MobileEditableBlock>
-      </FieldCard>
-
-      <FieldCard title="Bauvorhaben">
-        <MobileEditableBlock
-          sheetContext="canvas"
-          sheetTitle="Bauvorhaben bearbeiten"
-          overview={
-            <dl className="space-y-2.5">
-              <MobileOverviewField
-                label="Bezeichnung"
-                value={meta.projektbezeichnung.trim() || '—'}
-              />
-              <MobileOverviewField label="Adresse" value={meta.projektadresse.trim() || '—'} />
-              <MobileOverviewField
-                label="Umfang"
-                value={meta.leistungsumfang_kurz.trim() || '—'}
-              />
-            </dl>
-          }
-        >
-          <div className="space-y-3">
-            <MockField label="Projektbezeichnung">
-        <MockInput
-        value={meta.projektbezeichnung}
-        onChange={(e) => patchMeta({ projektbezeichnung: e.target.value })}
-      />
-      </MockField>
-            <MockField label="Projektadresse">
-        <MockInput
-        value={meta.projektadresse}
-        onChange={(e) => patchMeta({ projektadresse: e.target.value })}
-      />
-      </MockField>
-            <SheetEditableField
-              label="Leistungsumfang"
-              value={meta.leistungsumfang_kurz}
-              onSave={(leistungsumfang_kurz) => patchMeta({ leistungsumfang_kurz })}
-              multiline
-              rows={3}
-              sheetContext="canvas"
-            />
-          </div>
-        </MobileEditableBlock>
-      </FieldCard>
 
       <FieldCard title="Übergabe-Fotos">
         <input
@@ -889,6 +663,89 @@ export function AbnahmeprotokollCreateWizard({
         )}
       </FieldCard>
 
+    </div>
+  )
+
+  const phaseAngaben = (
+    <div
+      id="abnahme-sec-angaben"
+      data-doc-section="angaben"
+      className="document-canvas-sec space-y-5"
+    >
+      <FieldCard title="Übergabe">
+        <MobileEditableBlock
+          sheetContext="canvas"
+          sheetTitle="Übergabe bearbeiten"
+          overview={
+            <dl className="space-y-2.5">
+              <MobileOverviewField label="Datum" value={abnahmeDatum || '—'} />
+              <MobileOverviewField
+                label="Uhrzeit"
+                value={meta.uebergabe_uhrzeit ? `${meta.uebergabe_uhrzeit} Uhr` : '—'}
+              />
+              <MobileOverviewField label="Ort" value={meta.uebergabe_ort.trim() || '—'} />
+            </dl>
+          }
+        >
+          <div className="space-y-3">
+            <MockField label="Übergabedatum">
+        <DateInput
+        value={abnahmeDatum}
+        onChange={(e) => setAbnahmeDatum(e.target.value)}
+      />
+      </MockField>
+            <MockField label="Uhrzeit">
+        <MockInput
+        type="time"
+        value={meta.uebergabe_uhrzeit}
+        onChange={(e) => patchMeta({ uebergabe_uhrzeit: e.target.value })}
+      />
+      </MockField>
+            <MockField label="Übergabeort">
+        <MockInput
+        value={meta.uebergabe_ort}
+        onChange={(e) => patchMeta({ uebergabe_ort: e.target.value })}
+        placeholder="PLZ Ort / Stadtteil"
+      />
+      </MockField>
+          </div>
+        </MobileEditableBlock>
+      </FieldCard>
+
+      <FieldCard title="Personen">
+        <MobileEditableBlock
+          sheetContext="canvas"
+          sheetTitle="Personen bearbeiten"
+          overview={
+            <dl className="space-y-2.5">
+              <MobileOverviewField label="Bärenwald vor Ort" value={meta.vertreter_an.trim() || '—'} />
+              <MobileOverviewField
+                label="Kunde vor Ort"
+                value={meta.ansprechpartner_kunde.trim() || '—'}
+              />
+            </dl>
+          }
+        >
+          <div className="space-y-3">
+            <MockField label="Bärenwald vor Ort">
+              <MockInput
+                value={meta.vertreter_an}
+                onChange={(e) => patchMeta({ vertreter_an: e.target.value })}
+                placeholder="Name"
+              />
+            </MockField>
+            <MockField label="Kunde vor Ort">
+              <MockInput
+                value={meta.ansprechpartner_kunde}
+                onChange={(e) => patchMeta({ ansprechpartner_kunde: e.target.value })}
+              />
+            </MockField>
+          </div>
+        </MobileEditableBlock>
+      </FieldCard>
+
+      {/* Unterschreiben nur am Handy — am Desktop folgen die Unterschriften */}
+      {isMobile ? (
       <FieldCard title="Unterschriften">
         <MobileEditableBlock
           sheetContext="canvas"
@@ -896,7 +753,7 @@ export function AbnahmeprotokollCreateWizard({
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
-                label="Auftragnehmer"
+                label="Bärenwald"
                 value={
                   meta.ohne_unterschrift_hw
                     ? 'Nicht vor Ort — Unterschrift folgt'
@@ -908,7 +765,7 @@ export function AbnahmeprotokollCreateWizard({
                 }
               />
               <MobileOverviewField
-                label="Auftraggeber"
+                label="Kunde"
                 value={
                   meta.ohne_unterschrift_kunde
                     ? 'Nicht vor Ort — Unterschrift folgt'
@@ -942,8 +799,8 @@ export function AbnahmeprotokollCreateWizard({
                   value: 'an',
                   label:
                     meta.ohne_unterschrift_hw || meta.signature_hw_url
-                      ? 'Auftragnehmer · ✓'
-                      : 'Auftragnehmer',
+                      ? 'Bärenwald · ✓'
+                      : 'Bärenwald',
                 },
                 {
                   value: 'kunde',
@@ -956,8 +813,8 @@ export function AbnahmeprotokollCreateWizard({
             />
 
             <p className="m-0 text-[length:var(--fs-text)] text-bw-text-muted">
-              Name und Unterschrift wie vor Ort — erscheint im PDF. Ort/Datum leer = aus
-              Übergabe. Wenn jemand nicht signieren kann: Checkbox setzen.
+              Name und Unterschrift vor Ort — erscheint im PDF. Wenn jemand nicht
+              signieren kann: Checkbox setzen.
             </p>
 
             {sigTab === 'an' ? (
@@ -1081,19 +938,6 @@ export function AbnahmeprotokollCreateWizard({
               </div>
             )}
 
-            <MockField label="Anwesend — Ort, Datum (optional)">
-              <MockInput
-                value={meta.unterschrift_ort_datum_anwesend}
-                onChange={(e) =>
-                  patchMeta({ unterschrift_ort_datum_anwesend: e.target.value })
-                }
-                placeholder={
-                  defaultUnterschriftOrtDatum(meta.uebergabe_ort, abnahmeDatum) ||
-                  'Ort, Datum'
-                }
-              />
-            </MockField>
-
             <MockBtn
               type="button"
               kind="ghost"
@@ -1115,6 +959,7 @@ export function AbnahmeprotokollCreateWizard({
           </div>
         </MobileEditableBlock>
       </FieldCard>
+      ) : null}
     </div>
   )
 
@@ -1169,7 +1014,8 @@ export function AbnahmeprotokollCreateWizard({
                 return
               }
               setAbnahmeGaps([])
-              erstellen({ abschliessen: true })
+              // Abnehmen: Auftrag abschließen und Protokoll an den Kunden senden
+              erstellen({ abschliessen: true, send: true })
             }}
           >
             Abnehmen
@@ -1187,24 +1033,18 @@ export function AbnahmeprotokollCreateWizard({
     >
       <p className="text-[length:var(--fs-text)] text-bw-text-muted">
         {hasSignatur
-          ? meta.ohne_unterschrift_hw || meta.ohne_unterschrift_kunde
-            ? 'Vorschau prüfen — fehlende Vor-Ort-Unterschrift: PDF kann an den Kunden zum Nachreichen gehen.'
-            : 'Vorschau prüfen — Speichern schließt den Auftrag ab. „Speichern und senden“ schickt das PDF zusätzlich an den Kunden.'
+          ? '„Abnehmen“ schließt den Auftrag ab und sendet das Protokoll an den Kunden.'
           : 'Beide Seiten: Unterschrift zeichnen oder „Kann hier nicht unterschreiben“ setzen.'}
       </p>
       <FieldCard title="Zusammenfassung">
         <dl className="space-y-2.5">
           <MobileOverviewField
             label="Übergabe"
-            value={`${abnahmeDatum}${meta.uebergabe_uhrzeit ? ` · ${meta.uebergabe_uhrzeit} Uhr` : ''} · ${meta.uebergabe_ort || '—'}`}
+            value={`${abnahmeDatum.slice(0, 10).split('-').reverse().join('.')}${meta.uebergabe_uhrzeit ? ` · ${meta.uebergabe_uhrzeit} Uhr` : ''} · ${meta.uebergabe_ort || '—'}`}
           />
-          <MobileOverviewField label="Handwerker vor Ort" value={meta.vertreter_an || '—'} />
-          <MobileOverviewField label="Projekt" value={meta.projektbezeichnung || '—'} />
-          <MobileOverviewField label="Leistungen im PDF" value={`${ausgewaehlt} Punkte`} />
-          <MobileOverviewField
-            label="Ergebnis"
-            value={ABNAHME_ERGEBNIS_LABEL[meta.abnahme_ergebnis]}
-          />
+          <MobileOverviewField label="Bärenwald vor Ort" value={meta.vertreter_an || '—'} />
+          <MobileOverviewField label="Vorhaben" value={meta.projektbezeichnung || '—'} />
+          <MobileOverviewField label="Leistungen" value={String(ausgewaehlt)} />
           <MobileOverviewField label="Fotos" value={String(meta.uebergabe_foto_urls.length)} />
           <MobileOverviewField
             label="Mängel"
@@ -1217,7 +1057,9 @@ export function AbnahmeprotokollCreateWizard({
           <MobileOverviewField
             label="Unterschriften"
             value={
-              hasSignatur
+              !isMobile
+                ? 'Folgen (Unterschrift am Handy)'
+                : hasSignatur
                 ? [
                     meta.ohne_unterschrift_hw
                       ? 'AN folgt'
@@ -1274,7 +1116,7 @@ export function AbnahmeprotokollCreateWizard({
         className="editor-sheet__confirm"
         type="button"
         disabled={pending || previewBusy}
-        onClick={() => erstellen({ abschliessen: false })}
+        onClick={entwurfSpeichern}
         aria-label={COPY_BUTTON.entwurfSpeichern}
         title={COPY_BUTTON.entwurfSpeichern}
       >
@@ -1291,7 +1133,7 @@ export function AbnahmeprotokollCreateWizard({
       title="Abnahme"
       subtitle={subtitle || undefined}
       onClose={onClose}
-      onSaveDraftClose={() => erstellen({ abschliessen: false })}
+      onSaveDraftClose={entwurfSpeichern}
       draftDirty={draftDirty}
       lastSavedAt={lastSavedAt}
       headerEnd={headerActions}
@@ -1349,8 +1191,6 @@ export function AbnahmeprotokollCreateWizard({
             )
           })}
         </nav>
-
-        <AbnahmeProgressBar done={progress.done} total={progress.total} />
 
         {pending || uploading || previewBusy ? (
           <p className="abnahme-canvas-busy">

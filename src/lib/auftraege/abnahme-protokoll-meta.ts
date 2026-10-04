@@ -48,7 +48,7 @@ export type AbnahmeProtokollMeta = {
 
 export const DEFAULT_ABNAHME_RECHTSHINWEISE = [
   'Die Übergabe erfolgte gemeinsam vor Ort.',
-  'Die Leistungen wurden besichtigt; Beanstandungen sind unter „Festgestellte Hinweise“ vermerkt.',
+  'Die Leistungen wurden besichtigt; Beanstandungen sind unter „Festgestellte Mängel“ vermerkt.',
   'Mit der Abnahme geht die Gefahr gemäß § 640 BGB auf den Auftraggeber über.',
   'Es gelten die gesetzlichen Gewährleistungsfristen ab Abnahme.',
   'Für Leistungen Dritter oder ausdrücklich ausgeschlossene Bereiche wird keine Gewähr übernommen.',

@@ -249,13 +249,14 @@ export function setTitelUndNotizFuerLeistung(
 }
 
 /** Freie erbrachte Leistung ohne Katalog-Bezug (sofort für PDF ausgewählt). */
-export function abnahmePunktErbrachteLeistung(titel = '', notiz = ''): AbnahmePunkt {
+export function abnahmePunktErbrachteLeistung(titel = '', notiz = '', gewerk?: string | null): AbnahmePunkt {
   const id = neuePositionsId()
   const name = bereinigeAbnahmeLeistungName(titel) || 'Erbrachte Leistung'
   const note = notiz.trim()
   return {
     id,
-    gewerk: ABNAHME_GEWERK_OHNE,
+    // Gewerk nur, wenn die Leistung aus einer Position gewählt wurde
+    gewerk: gewerk?.trim() || ABNAHME_GEWERK_OHNE,
     leistung_id: id,
     leistung_name: name,
     beschreibung: name,
