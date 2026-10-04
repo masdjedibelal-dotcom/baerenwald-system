@@ -29,7 +29,7 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
   {
     id: 'preise',
     href: '/einstellungen/preise',
-    label: 'Preislisten',
+    label: 'Preisliste',
     mockIcon: 'list',
     matchPrefixes: [
       '/einstellungen/preise',

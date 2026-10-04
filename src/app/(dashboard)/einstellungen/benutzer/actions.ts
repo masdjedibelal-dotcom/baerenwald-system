@@ -5,7 +5,7 @@ import { logDbError } from '@/lib/errors/log-db-error'
 import type { User } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { crmRoleFromUser } from '@/lib/auth/crm-access'
-import { getPublicAppUrl } from '@/lib/utils'
+import { requireCrmAdmin } from '@/lib/auth/crm-access-server'
 
 export type BenutzerZeile = {
   id: string
@@ -123,94 +123,60 @@ export async function loadBenutzerListe(): Promise<BenutzerZeile[]> {
   }
 }
 
-export async function inviteBenutzer(
-  email: string,
-  name: string,
+/** Mitarbeiter direkt anlegen (Name, E-Mail, Passwort) — keine Einladungs-Mail. Nur Admins. */
+export async function createBenutzer(input: {
+  email: string
+  name: string
+  passwort: string
   rolle: 'admin' | 'manager'
-): Promise<{ ok: true; message?: string } | { ok: false; message: string }> {
-  const trimmed = email.trim().toLowerCase()
-  if (!trimmed || !trimmed.includes('@')) return { ok: false, message: 'Gültige E-Mail nötig' }
-  const displayName = name.trim() || trimmed
-  const base = getPublicAppUrl()
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await requireCrmAdmin()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const email = input.email.trim().toLowerCase()
+  const name = input.name.trim()
+  if (!name) return { ok: false, message: 'Bitte einen Namen angeben.' }
+  if (!email || !email.includes('@')) return { ok: false, message: 'Gültige E-Mail nötig' }
+  if (input.passwort.length < 8) return { ok: false, message: 'Passwort mindestens 8 Zeichen.' }
 
   const { data: existing, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
   if (error) logDbError('app/einstellungen/benutzer/actions:query', error)
-  const found = (existing?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === trimmed)
-
+  const found = (existing?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === email)
   if (found) {
-    const isStaff = crmRoleFromUser(found) != null
-    if (!isStaff) {
-      const portal = await portalKontoFuerEmail(trimmed, found.id)
-      return {
-        ok: false,
-        message: portal
-          ? portalFehler(portal)
-          : 'Diese E-Mail ist bereits registriert, aber kein CRM-Mitarbeiter. Bitte eine andere E-Mail verwenden.',
-      }
+    if (crmRoleFromUser(found) != null) return { ok: false, message: 'Diese E-Mail ist schon im Team.' }
+    const portal = await portalKontoFuerEmail(email, found.id)
+    return {
+      ok: false,
+      message: portal ? portalFehler(portal) : 'Diese E-Mail ist bereits registriert. Bitte eine andere verwenden.',
     }
-
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(found.id, {
-      user_metadata: {
-        ...(found.user_metadata ?? {}),
-        name: displayName,
-        role: rolle,
-      },
-      app_metadata: {
-        ...(found.app_metadata ?? {}),
-        crm_role: rolle,
-        is_crm_admin: rolle === 'admin',
-      },
-    })
-    if (error) logDbError('app/einstellungen/benutzer/actions:query', error)
-    if (error) return { ok: false, message: error.message }
-
-    await upsertCrmMitarbeiterProfil({
-      authUserId: found.id,
-      email: trimmed,
-      name: displayName,
-    })
-    revalidateEinstellungenPath('/einstellungen/benutzer')
-    return { ok: true, message: 'Mitarbeiter aktualisiert' }
   }
+  const portal = await portalKontoFuerEmail(email)
+  if (portal) return { ok: false, message: portalFehler(portal) }
 
-  const portalMail = await portalKontoFuerEmail(trimmed)
-  if (portalMail) {
-    return { ok: false, message: portalFehler(portalMail) }
-  }
-
-  const { error: error2 } = await supabaseAdmin.auth.admin.inviteUserByEmail(trimmed, {
-    data: { name: displayName, role: rolle },
-    redirectTo: `${base}/auth/callback`,
+  const { data: created, error: cErr } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password: input.passwort,
+    email_confirm: true,
+    user_metadata: { name, role: input.rolle },
+    app_metadata: { crm_role: input.rolle, is_crm_admin: input.rolle === 'admin' },
   })
-  if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
-  if (error2) return { ok: false, message: error2.message }
+  if (cErr) logDbError('app/einstellungen/benutzer/actions:create', cErr)
+  if (cErr || !created?.user) return { ok: false, message: cErr?.message ?? 'Benutzer konnte nicht angelegt werden.' }
 
-  const { data: invited } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 })
-  if (error2) logDbError('app/einstellungen/benutzer/actions:query', error2)
-  const neu = (invited?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === trimmed)
-  if (neu) {
-    await supabaseAdmin.auth.admin.updateUserById(neu.id, {
-      app_metadata: {
-        ...(neu.app_metadata ?? {}),
-        crm_role: rolle,
-        is_crm_admin: rolle === 'admin',
-      },
-    })
-    await upsertCrmMitarbeiterProfil({
-      authUserId: neu.id,
-      email: trimmed,
-      name: displayName,
-    })
-  }
-
+  await upsertCrmMitarbeiterProfil({ authUserId: created.user.id, email, name })
   revalidateEinstellungenPath('/einstellungen/benutzer')
-  return { ok: true, message: 'Einladung an Mitarbeiter versendet' }
+  return { ok: true }
 }
 
 export async function updateBenutzerProfil(
   id: string,
-  patch: { name: string; rolle: 'admin' | 'manager'; telefon?: string; email?: string }
+  patch: { name: string; rolle: 'admin' | 'manager'; email?: string; passwort?: string }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await requireCrmAdmin()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const neuesPasswort = patch.passwort ?? ''
+  if (neuesPasswort && neuesPasswort.length < 8) {
+    return { ok: false, message: 'Passwort mindestens 8 Zeichen.' }
+  }
   const { data: user, error: gErr } = await supabaseAdmin.auth.admin.getUserById(id)
   if (gErr) logDbError('app/einstellungen/benutzer/actions:query', gErr)
   if (gErr || !user?.user) return { ok: false, message: gErr?.message ?? 'Nutzer nicht gefunden' }
@@ -239,14 +205,13 @@ export async function updateBenutzerProfil(
   }
 
   const prev = (user.user.user_metadata ?? {}) as Record<string, unknown>
-  const telefon = patch.telefon?.trim() ?? ''
   const { error: error2 } = await supabaseAdmin.auth.admin.updateUserById(id, {
     ...(nextEmail !== currentEmail ? { email: nextEmail, email_confirm: true } : {}),
+    ...(neuesPasswort ? { password: neuesPasswort } : {}),
     user_metadata: {
       ...prev,
       name: patch.name.trim(),
       role: patch.rolle,
-      telefon: telefon || undefined,
     },
     app_metadata: {
       ...(user.user.app_metadata ?? {}),
@@ -261,7 +226,7 @@ export async function updateBenutzerProfil(
     authUserId: id,
     email: nextEmail,
     name: patch.name.trim(),
-    telefon,
+    telefon: (prev.telefon as string | undefined) ?? null,
   })
 
   revalidateEinstellungenPath('/einstellungen/benutzer')

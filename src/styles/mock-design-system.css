@@ -22429,3 +22429,18 @@ button.abschlagsplan-zeile__del {
 }
 button.abschlagsplan-zeile__del:hover { background: var(--red-bg); color: var(--red-tx); }
 .abschlagsplan-zeile__del-platz { width: 32px; flex-shrink: 0; }
+
+/* Einstellungen → Preisliste: eine Liste aller gespeicherten Positionen */
+.preisliste-alle { display: flex; flex-direction: column; gap: 12px; }
+.preisliste-alle__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.preisliste-alle__leer { margin: 0; padding: 16px 0; font-size: var(--fs-text); color: var(--text-3); text-align: center; }
+.preisliste-alle__liste { list-style: none; margin: 0; padding: 0; }
+.preisliste-alle__zeile {
+  display: flex; align-items: center; gap: 12px; padding: 10px 2px;
+  border-bottom: 0.5px solid var(--border);
+}
+.preisliste-alle__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.preisliste-alle__titel { font-size: var(--fs-text); font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preisliste-alle__sub { font-size: var(--fs-meta); color: var(--text-3); }
+.preisliste-alle__preis { font-size: var(--fs-text); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
+.preisliste-alle__einheit { font-weight: 400; color: var(--text-3); font-size: var(--fs-meta); }

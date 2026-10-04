@@ -1,45 +1,37 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase-server'
-import { PreislistenClient } from '@/components/preislisten/PreislistenClient'
-import type { Gewerk,Preisliste } from '@/lib/types'
-import { sortPreislistenRows } from '@/lib/preislisten-sort'
+import { listKatalogPositionen, listVerwendetePositionen } from '@/app/(dashboard)/katalog/actions'
+import {
+  AllePositionenClient,
+  type PreislistenZeile,
+} from '@/components/preislisten/AllePositionenClient'
 
 export const metadata: Metadata = {
-  title: 'Preislisten',
+  title: 'Preisliste',
 }
 
-function normalizePreislistenRow(r: Record<string, unknown>): Preisliste {
-  const base = r as unknown as Preisliste
-  return {
-    ...base,
-    kategorie: typeof base.kategorie === 'string' ? base.kategorie : '',
-  }
-}
-
-/** Einstellungen → Preise: Preisliste (Gewerk-Chips + Leistungen). */
+/** Einstellungen → Preisliste: alle gespeicherten Positionen — dieselbe Quelle wie die Positionsauswahl. */
 export default async function EinstellungenPreisePage() {
-  const supabase = createClient()
-  const [{ data: rows, error }, { data: gewerke }] = await Promise.all([
-    supabase
-      .from('preislisten')
-      .select('*, gewerke(id, name, slug, aktiv)')
-      .eq('aktiv', true)
-      .order('leistung', { ascending: true }),
-    supabase.from('gewerke').select('id, name, slug, aktiv').order('sort_order', { ascending: true }).order('name', { ascending: true }),
-  ])
-  const gw = (gewerke ?? []) as Gewerk[]
+  const [katalog, verwendet] = await Promise.all([listKatalogPositionen(), listVerwendetePositionen()])
+  const zeilen: PreislistenZeile[] = [
+    ...katalog.flatMap((p) =>
+      p.varianten.map((v) => ({
+        id: v.id,
+        titel: v.variante?.trim() ? `${p.titel} · ${v.variante.trim()}` : p.titel,
+        gewerk: p.gewerk_name?.trim() || 'Allgemein',
+        einheit: v.einheit,
+        preis: Number(v.preis) || 0,
+        quelle: 'katalog' as const,
+      }))
+    ),
+    ...verwendet.map((p) => ({
+      id: p.id,
+      titel: p.titel,
+      gewerk: p.gewerk_name?.trim() || 'Allgemein',
+      einheit: p.varianten[0]?.einheit || 'Stück',
+      preis: Number(p.varianten[0]?.preis) || 0,
+      quelle: 'verwendet' as const,
+    })),
+  ].sort((a, b) => a.titel.localeCompare(b.titel, 'de'))
 
-  if (error) {
-    return (
-      <div className="rounded-card border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
-        <p className="font-medium">Preislisten konnten nicht geladen werden.</p>
-        <p className="mt-1 opacity-90">{error.message}</p>
-      </div>
-    )
-  }
-
-  const normalized = (rows ?? []).map((r) => normalizePreislistenRow(r as Record<string, unknown>))
-  const sorted = sortPreislistenRows(normalized)
-
-  return <PreislistenClient initialRows={sorted} gewerkeAlle={gw} />
+  return <AllePositionenClient zeilen={zeilen} />
 }

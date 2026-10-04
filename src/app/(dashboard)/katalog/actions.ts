@@ -4,6 +4,9 @@ import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { KatalogPosition,KatalogVariante } from '@/lib/katalog/katalog-types'
+import type { Preisliste } from '@/lib/types'
+import { obergewerkFuer } from '@/lib/gewerke/obergewerk'
+import { preislisteEinheitspreisNetto } from '@/lib/angebote/angebot-positionen-from-lead'
 
 function mapVariante(r: Record<string, unknown>): KatalogVariante {
   return {
@@ -23,16 +26,16 @@ function mapVariante(r: Record<string, unknown>): KatalogVariante {
 const VERLAUF_ID_PREFIX = 'verlauf:'
 
 /**
- * Alle bisher in Angeboten und Aufträgen verwendeten Positionen (04.10.2026), je Name die zuletzt
- * benutzte Variante mit Einzelpreis — erscheinen in der Auswahl unter „Bisher verwendet“.
+ * Alle gespeicherten Positionen (04.10.2026): aus Angeboten, Aufträgen und der alten Preisliste —
+ * je Name die zuletzt benutzte mit Einzelpreis. Eine Quelle für Auswahl und Einstellungen → Preisliste.
  * Schreibt nichts in Katalog/Preisliste (kein Wildwuchs).
  */
 export async function listVerwendetePositionen(): Promise<KatalogPosition[]> {
   const supabase = createClient()
-  const [aufRes, angRes, katRes] = await Promise.all([
+  const [aufRes, angRes, katRes, plRes, gwRes] = await Promise.all([
     supabase
       .from('auftrag_positionen')
-      .select('leistung_name, einheit, menge, preis_fix, gewerk_name, typ, created_at')
+      .select('leistung_name, einheit, menge, preis_fix, gewerk_slug, gewerk_name, typ, created_at')
       .order('created_at', { ascending: false })
       .limit(3000),
     supabase
@@ -41,7 +44,20 @@ export async function listVerwendetePositionen(): Promise<KatalogPosition[]> {
       .order('created_at', { ascending: false })
       .limit(400),
     supabase.from('katalog_positionen').select('titel').eq('aktiv', true),
+    // Alte Preisliste gehört mit in die eine Liste
+    supabase.from('preislisten').select('*, gewerke(name)').eq('aktiv', true),
+    supabase.from('gewerke').select('id, slug, name').eq('aktiv', true),
   ])
+  // Gewerk über ID/Slug auflösen — Verweise zeigen seit der Zusammenlegung auf die 11 Obergewerke
+  const gewerkName = new Map<string, string>()
+  for (const g of gwRes.data ?? []) {
+    const name = String(g.name ?? '').trim()
+    gewerkName.set(String(g.id), name)
+    if (g.slug) gewerkName.set(String(g.slug), name)
+  }
+  const gewerkVon = (key: unknown, fallback: unknown) =>
+    gewerkName.get(String(key ?? '')) || obergewerkFuer(String(fallback ?? '') || String(key ?? ''))
+  if (plRes.error) logDbError('app/katalog/actions:verlauf-preisliste', plRes.error)
   if (aufRes.error) logDbError('app/katalog/actions:verlauf-auftrag', aufRes.error)
   if (angRes.error) logDbError('app/katalog/actions:verlauf-angebote', angRes.error)
 
@@ -55,7 +71,7 @@ export async function listVerwendetePositionen(): Promise<KatalogPosition[]> {
       name,
       einheit: String(r.einheit ?? '').trim() || 'Stück',
       preis: Math.round(((Number(r.preis_fix) || 0) / menge) * 100) / 100,
-      gewerk: String(r.gewerk_name ?? '').trim() || 'Allgemein',
+      gewerk: gewerkVon(r.gewerk_slug, r.gewerk_name),
       at: String(r.created_at ?? ''),
     })
   }
@@ -69,10 +85,23 @@ export async function listVerwendetePositionen(): Promise<KatalogPosition[]> {
         name,
         einheit: String(p.einheit ?? '').trim() || 'Stück',
         preis: Math.round((Number(p.vk_netto) || 0) * 100) / 100,
-        gewerk: String(p.gewerk_name ?? '').trim() || 'Allgemein',
+        gewerk: gewerkVon(p.gewerk_id || p.gewerk_slug, p.gewerk_name),
         at: String(a.created_at ?? ''),
       })
     }
+  }
+  for (const r of plRes.data ?? []) {
+    const pl = r as unknown as Preisliste & { gewerke?: { name?: string | null } | null; updated_at?: string | null; created_at?: string | null }
+    const name = String(pl.leistung ?? '').trim()
+    if (!name) continue
+    kandidaten.push({
+      name,
+      einheit: String(pl.einheit ?? '').trim() || 'Stück',
+      preis: Math.round(preislisteEinheitspreisNetto(pl) * 100) / 100,
+      gewerk: gewerkVon(pl.gewerk_id, pl.gewerke?.name),
+      // Ohne Datum gilt ein Preislisten-Eintrag als älter als jede echte Verwendung
+      at: String(pl.updated_at ?? pl.created_at ?? ''),
+    })
   }
   const imKatalog = new Set((katRes.data ?? []).map((k) => String(k.titel ?? '').trim().toLowerCase()))
   const neueste = new Map<string, Treffer>()

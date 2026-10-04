@@ -11,13 +11,13 @@ import { toast } from '@/components/ui/app-toast'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
 import type { BenutzerZeile } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import {
-  inviteBenutzer,
+  createBenutzer,
   loadBenutzerListe,
   updateBenutzerProfil,
 } from '@/app/(dashboard)/einstellungen/benutzer/actions'
 import { TOAST } from '@/lib/copy'
 
-const COLS = '1.4fr 1.6fr 1.1fr 0.9fr'
+const COLS = '1.4fr 1.8fr 0.9fr'
 
 function rolleLabel(rolle: BenutzerZeile['rolle']): string {
   return rolle === 'admin' ? 'Administrator' : 'Mitarbeiter'
@@ -30,10 +30,11 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteName, setInviteName] = useState('')
   const [inviteRolle, setInviteRolle] = useState<'admin' | 'manager'>('manager')
+  const [invitePasswort, setInvitePasswort] = useState('')
+  const [editPasswort, setEditPasswort] = useState('')
   const [edit, setEdit] = useState<BenutzerZeile | null>(null)
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
-  const [editTelefon, setEditTelefon] = useState('')
   const [editRolle, setEditRolle] = useState<'admin' | 'manager'>('manager')
   const [pending, startTransition] = useTransition()
 
@@ -46,21 +47,27 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     setEdit(u)
     setEditName(u.name)
     setEditEmail(u.email)
-    setEditTelefon(u.telefon)
+    setEditPasswort('')
     setEditRolle(u.rolle)
   }
 
-  function sendInvite() {
+  function anlegen() {
     startTransition(async () => {
-      const r = await inviteBenutzer(inviteEmail, inviteName, inviteRolle)
+      const r = await createBenutzer({
+        email: inviteEmail,
+        name: inviteName,
+        passwort: invitePasswort,
+        rolle: inviteRolle,
+      })
       if (!r.ok) {
         toast.systemError(r)
         return
       }
-      toast.success(r.message ?? 'Einladung versendet')
+      toast.success('Benutzer angelegt')
       setInviteOpen(false)
       setInviteEmail('')
       setInviteName('')
+      setInvitePasswort('')
       await refresh()
     })
   }
@@ -72,7 +79,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         name: editName,
         email: editEmail,
         rolle: editRolle,
-        telefon: editTelefon,
+        passwort: editPasswort || undefined,
       })
       if (!r.ok) {
         toast.systemError(r)
@@ -86,7 +93,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
 
   const inviteBtn = (
     <MockBtn sm icon="plus" kind="primary" onClick={() => setInviteOpen(true)}>
-      Einladen
+      Benutzer anlegen
     </MockBtn>
   )
 
@@ -102,7 +109,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
     ) : (
       <div className="dok-mobiles">
         {rows.map((u) => {
-          const tel = u.telefon?.trim() || ''
           const mail = u.email?.trim() || ''
           return (
             <div
@@ -151,18 +157,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
                 >
                   {mail || '—'}
                 </span>
-                <span
-                  style={{
-                    fontSize: 'var(--fs-meta)',
-                    color: 'var(--text-4)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                  title={tel || undefined}
-                >
-                  {tel || '—'}
-                </span>
               </div>
             </div>
           )
@@ -178,7 +172,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         <div className="list-row head" style={{ gridTemplateColumns: COLS }}>
           <div>Name</div>
           <div>E-Mail</div>
-          <div>Telefon</div>
           <div>Rolle</div>
         </div>
         {rows.map((u) => (
@@ -228,18 +221,6 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
             >
               {u.email || '—'}
             </div>
-            <div
-              style={{
-                fontSize: 'var(--fs-meta)',
-                color: 'var(--text-3)',
-                minWidth: 0,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {u.telefon?.trim() || '—'}
-            </div>
             <div>
               <MockBadge kind="plain">{rolleLabel(u.rolle)}</MockBadge>
             </div>
@@ -267,14 +248,16 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
       <EditorSheet
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        title="Benutzer einladen"
+        title="Benutzer anlegen"
         context="detail"
         confirmBusy={pending}
-        onConfirm={() => sendInvite()}
+        confirmLabel="Anlegen"
+        onConfirm={() => anlegen()}
       >
         <div className="space-y-3">
+          <MockField label="Name" required><MockInput value={inviteName} onChange={(e) => setInviteName(e.target.value)} /></MockField>
           <MockField label="E-Mail" required><MockInput type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} /></MockField>
-          <MockField label="Name"><MockInput value={inviteName} onChange={(e) => setInviteName(e.target.value)} /></MockField>
+          <MockField label="Passwort" required hint="Mindestens 8 Zeichen"><MockInput type="password" autoComplete="new-password" value={invitePasswort} onChange={(e) => setInvitePasswort(e.target.value)} /></MockField>
           <div>
             <label className="input-label" htmlFor="invite-rolle">
               Rolle
@@ -298,7 +281,7 @@ export function BenutzerEinstellungenClient({ initial }: { initial: BenutzerZeil
         <div className="space-y-3">
           <MockField label="Name"><MockInput value={editName} onChange={(e) => setEditName(e.target.value)} /></MockField>
           <MockField label="E-Mail" required><MockInput type="email" required value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></MockField>
-          <MockField label="Handy / Direktwahl"><MockInput type="tel" value={editTelefon} onChange={(e) => setEditTelefon(e.target.value)} placeholder="+49 …" /></MockField>
+          <MockField label="Neues Passwort" hint="Leer lassen, um es nicht zu ändern"><MockInput type="password" autoComplete="new-password" value={editPasswort} onChange={(e) => setEditPasswort(e.target.value)} /></MockField>
           <div>
             <label className="input-label" htmlFor="edit-rolle">
               Rolle
