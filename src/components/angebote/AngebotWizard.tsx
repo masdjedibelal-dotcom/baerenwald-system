@@ -12,13 +12,13 @@ import { AngebotWizardMailPreview } from '@/components/angebote/AngebotWizardMai
 import { AngebotWizardPdfPreview } from '@/components/angebote/AngebotWizardPdfPreview'
 import { AngebotWizardRechtlicheHinweiseCard } from '@/components/angebote/AngebotWizardRechtlicheHinweiseCard'
 import {
-  buildGewerkHandwerkerZuweisungen,
-  gewerkHandwerkerZuweisungenToMaps,
-  type GewerkHandwerkerZuweisung,
+buildGewerkHandwerkerZuweisungen,
+gewerkHandwerkerZuweisungenToMaps,
+type GewerkHandwerkerZuweisung,
 } from '@/components/angebote/AngebotWizardHandwerkerStep'
 import {
-  MetaCrowButton,
-  TotBand,
+MetaCrowButton,
+TotBand,
 } from '@/components/angebote/AngebotWizardCanvasMeta'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -28,13 +28,13 @@ import { EmailPillsField } from '@/components/ui/EmailPillsField'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import {
-  draftFromLeadMelder,
-  MelderLeistungsortFields,
-  type MelderLeistungsortDraft,
+draftFromLeadMelder,
+MelderLeistungsortFields,
+type MelderLeistungsortDraft,
 } from '@/components/crm/MelderLeistungsortFields'
 import {
-  KundenVersandEmailField,
-  versandFolgtKontakt,
+KundenVersandEmailField,
+versandFolgtKontakt,
 } from '@/components/crm/KundenVersandEmailField'
 import { DateInput } from '@/components/ui/DateInput'
 import { PosBoard } from '@/components/posboard/PosBoard'
@@ -46,95 +46,95 @@ import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
 import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { normalizeKundeNamen,splitDeutscherVollname } from '@/lib/kunde-namen'
 import {
-  normalizeVorgangWiederkehr,
-  WIEDERKEHR_TURNUS_LABELS,
-  WIEDERKEHR_TURNUS_VALUES,
-  type VorgangWiederkehr,
-  type WiederkehrTurnus,
+normalizeVorgangWiederkehr,
+WIEDERKEHR_TURNUS_LABELS,
+WIEDERKEHR_TURNUS_VALUES,
+type VorgangWiederkehr,
+type WiederkehrTurnus,
 } from '@/lib/vorgang/wiederkehrend'
 import {
-  saveAngebotWizardDraft,
-  sendAngebotWizard,
+saveAngebotWizardDraft,
+sendAngebotWizard,
 } from '@/app/(dashboard)/angebote/wizard-actions'
 import { createAnfrageFuerKunde,discardOrphanDirektAngebotLead } from '@/app/(dashboard)/neu/fab-neu-actions'
 import { updateLeadMelderUndLeistungsort } from '@/app/(dashboard)/anfragen/actions'
 import { angebotWizardPositionenFromLead } from '@/lib/angebote/angebot-positionen-from-lead'
 import {
-  angebotMetaPatchFromZahlfrist,
-  angebotZahlfristText,
-  zahlfristSegFromAngebotMeta,
+angebotMetaPatchFromZahlfrist,
+angebotZahlfristText,
+zahlfristSegFromAngebotMeta,
 } from '@/lib/angebote/angebot-zahlfrist'
 import {
-  defaultProjektBeschreibungText,
-  defaultWizardMeta,
-  initialDokumentTypFromLead,
-  resolveAngebotKundeTyp,
-  syncProjektTitelInBeschreibung,
-  wizardPositionenAlsFestpreis,
-  type AngebotDokumentTyp,
-  type AngebotVariantenPersistJson,
-  type AngebotWizardBootstrap,
-  type AngebotWizardMeta,
-  type WizardPosition,
+defaultProjektBeschreibungText,
+defaultWizardMeta,
+initialDokumentTypFromLead,
+resolveAngebotKundeTyp,
+syncProjektTitelInBeschreibung,
+wizardPositionenAlsFestpreis,
+type AngebotDokumentTyp,
+type AngebotVariantenPersistJson,
+type AngebotWizardBootstrap,
+type AngebotWizardMeta,
+type WizardPosition,
 } from '@/lib/angebote/angebot-wizard-types'
 import {
-  summenAusPositionen,
-  summenKostenaufstellungAusPositionen,
+summenAusPositionen,
+summenKostenaufstellungAusPositionen,
 } from '@/lib/angebot-positionen'
 import { parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import { findAnfahrtZeilen } from '@/lib/anfahrt-angebot'
 import {
-  dokumentArtikelToWizardPosition,
-  dokumentZeilenToAngebotPositionen,
-  formatEurBetrag,wizardPositionToDokumentZeile,
-  type DokumentArtikelZeile,
-  type DokumentZeile
+dokumentArtikelToWizardPosition,
+dokumentZeilenToAngebotPositionen,
+formatEurBetrag,wizardPositionToDokumentZeile,
+type DokumentArtikelZeile,
+type DokumentZeile
 } from '@/lib/dokument-zeilen'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { defaultFirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { isValidEmail } from '@/lib/email-recipients'
 import {
-  kundentypLabel,
-  leadKontaktAnzeigeName,
-  leadVertragsKundeId,
-  resolveLeadKunde,
-  resolveLeadPreisAnzeige,
+kundentypLabel,
+leadKontaktAnzeigeName,
+leadVertragsKundeId,
+resolveLeadKunde,
+resolveLeadPreisAnzeige,
 } from '@/lib/lead-display-helpers'
 import {
-  istKundeFirmaPflichtTyp,
-  istKundeHausverwaltungTyp,
-  kundeStrasseHausnummerZeile,
+istKundeFirmaPflichtTyp,
+istKundeHausverwaltungTyp,
+kundeStrasseHausnummerZeile,
 } from '@/lib/kunde-stammdaten'
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { leadSituationDisplay } from '@/lib/lead-funnel-daten'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
-  dokumentZeilenToPosBoardLines,
-  posBoardLinesToDokumentZeilen,
-  type PosBoardLine,
+dokumentZeilenToPosBoardLines,
+posBoardLinesToDokumentZeilen,
+type PosBoardLine,
 } from '@/lib/posboard/pos-board-line'
 import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import {
-  ANGEBOT_MAIL_BOX_MARKER,
-  angebotMailFullTextForEditor,
-  defaultAngebotEinleitungText,
-  isDefaultAngebotEinleitung,
-  parseAngebotMailFullTextFromEditor,
+ANGEBOT_MAIL_BOX_MARKER,
+angebotMailFullTextForEditor,
+defaultAngebotEinleitungText,
+isDefaultAngebotEinleitung,
+parseAngebotMailFullTextFromEditor,
 } from '@/lib/templates/angebot-mail'
 import { buildSubject } from '@/lib/mail/build-subject'
 import type { KundeAnredeKontext } from '@/lib/kunde-rechnungsempfaenger'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
 import type {
-  AngebotPosition,
-  Gewerk,
-  Handwerker,
-  Kunde,
-  KundeAnsprechpartner,
-  KundenObjekt,
-  LeadDetail,
-  Preisliste,
+AngebotPosition,
+Gewerk,
+Handwerker,
+Kunde,
+KundeAnsprechpartner,
+KundenObjekt,
+LeadDetail,
+Preisliste,
 } from '@/lib/types'
 import { BEREICH_LABELS,formatDatum } from '@/lib/utils'
 import { ZAHLFRIST_SEG_OPTIONS,type ZahlfristSeg } from '@/lib/zahlfrist'
@@ -314,7 +314,6 @@ export function AngebotWizard({
   const istAuftragKorrektur = Boolean(bootstrap?.auftragKorrektur?.auftragId)
   const hatGestellteAbschlaege =
     (bootstrap?.auftragKorrektur?.gestellteAbschlaege ?? 0) > 0
-  const istNachtrag = Boolean(bootstrap?.nachtragZu?.auftragId)
   /**
    * Neu: zuerst Art (Einmalig/Wiederkehrend), bei Einmalig dann Layout (Einfach/Komplex).
    * Wiederkehrend (Wartung/Winterdienst) → immer Einfach, ohne Komplex-Schritt.
@@ -403,7 +402,7 @@ export function AngebotWizard({
   const [zahlungsplan] = useState<Zahlungsplan | null>(() => bootstrap?.zahlungsplan ?? null)
   const [angebotId, setAngebotId] = useState<string | null>(bootstrap?.angebotId ?? null)
   const auftragKorrekturId = bootstrap?.auftragKorrektur?.auftragId ?? null
-  const wizardTitel = istNachtrag ? 'Nachtrag' : direktAuftrag ? 'Auftrag' : 'Angebot'
+  const wizardTitel = direktAuftrag ? 'Auftrag' : 'Angebot'
   const [saving, setSaving] = useState(false)
   const [draftDirty, setDraftDirty] = useState(() => !bootstrap?.angebotId)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
@@ -896,7 +895,6 @@ export function AngebotWizard({
               ? zahlungsplan
               : null,
           auftragKorrekturId: istAuftragKorrektur ? auftragKorrekturId : null,
-          nachtragZuAuftragId: istNachtrag ? bootstrap?.nachtragZu?.auftragId ?? null : null,
           ist_wiederkehrend: wiederkehr.ist_wiederkehrend,
           wiederkehr_turnus: wiederkehr.wiederkehr_turnus,
         })
@@ -955,13 +953,11 @@ export function AngebotWizard({
         if (opts?.notify) {
           const bereitsGesendet = Boolean(bootstrap?.bereitsGesendet)
           toast.success(
-            istNachtrag
-              ? 'Nachtrag gespeichert'
-              : istAuftragKorrektur
-                ? hatGestellteAbschlaege
-                  ? 'Korrektur gespeichert — Abschläge unverändert. Zum Kunden: Versenden.'
-                  : 'Korrektur gespeichert — noch nicht an den Kunden gesendet. Zum Verschicken: Versenden.'
-                : bereitsGesendet
+            istAuftragKorrektur
+              ? hatGestellteAbschlaege
+                ? 'Korrektur gespeichert — Abschläge unverändert. Zum Kunden: Versenden.'
+                : 'Korrektur gespeichert — noch nicht an den Kunden gesendet. Zum Verschicken: Versenden.'
+              : bereitsGesendet
                   ? 'Gespeichert — Portal bleibt bei der letzten Fassung. Zum Aktualisieren und Benachrichtigen: Versenden.'
                   : res.angebotsnr?.trim()
                     ? `Entwurf gespeichert (${res.angebotsnr.trim()})`
@@ -1015,8 +1011,6 @@ export function AngebotWizard({
       zahlfristDatum,
       wiederkehr,
       hwZuweisungen,
-      istNachtrag,
-      bootstrap?.nachtragZu?.auftragId,
       isHv,
       melderDraft,
     ]
@@ -1175,13 +1169,11 @@ export function AngebotWizard({
         return
       }
       toast.success(
-        istNachtrag
-          ? 'Nachtrag versendet'
-          : istAuftragKorrektur
-            ? hatGestellteAbschlaege
-              ? 'Korrektur versendet — Abschläge unverändert'
-              : 'Korrektur versendet'
-            : `Angebot versendet · ${formatEurBetrag(mailSummen.bruttoMin)}`
+        istAuftragKorrektur
+          ? hatGestellteAbschlaege
+            ? 'Korrektur versendet — Abschläge unverändert'
+            : 'Korrektur versendet'
+          : `Angebot versendet · ${formatEurBetrag(mailSummen.bruttoMin)}`
       )
       setSheet(null)
       setKundeEditOpen(false)
@@ -1236,11 +1228,7 @@ export function AngebotWizard({
 
   const versandCrowValue = mailTo[0]?.trim() || sheetEmail?.trim() || 'Empfänger ergänzen'
 
-  const wizardSubtitle = istNachtrag
-    ? [name?.trim() && name !== '—' ? name.trim() : null, 'Auftrag bleibt bis zur Annahme unverändert']
-        .filter(Boolean)
-        .join(' · ') || 'Auftrag bleibt bis zur Annahme unverändert'
-    : istAuftragKorrektur
+  const wizardSubtitle = istAuftragKorrektur
       ? [name?.trim() && name !== '—' ? name.trim() : null, 'Korrektur am angenommenen Angebot']
           .filter(Boolean)
           .join(' · ')

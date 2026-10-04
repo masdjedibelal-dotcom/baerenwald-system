@@ -8,35 +8,28 @@ import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadComplianceTypen } from '@/app/(dashboard)/einstellungen/compliance/actions'
 import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import {
-  filterLeistungComplianceTypen,
-  gewerkSlugsAusPositionen,
-  istPflichtFuerProjekt,
+filterLeistungComplianceTypen,
+gewerkSlugsAusPositionen,
+istPflichtFuerProjekt,
 } from '@/lib/handwerker/compliance-partner-profile'
 import { notifyPartnerUnified,partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
 import { syncProjektvertragStilleFireAndForget } from '@/lib/vertraege/sync-projektvertrag-stille'
 import {
-  bauvorhabenAusAuftrag,
-  formatVertragDatumDe,
-  leistungsumfangAusPositionen,
-  leistungsumfangNachtragAusPositionen,
-  nachtragPositionenAusAuftrag,
-  verguetungAusPositionen,
-  verguetungNachtragAusPositionen,
+bauvorhabenAusAuftrag,
+formatVertragDatumDe,
+leistungsumfangAusPositionen,verguetungAusPositionen
 } from '@/lib/vertraege/build-vertrag-texte'
 import { nextVertragsnummer } from '@/lib/vertraege/next-vertragsnummer'
 import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
-import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
 import { auftragIstBauprojekt,type GewerkBauprojektHinweis } from '@/lib/auftraege/ist-bauprojekt'
 import { syncRahmenvertragComplianceDoc } from '@/lib/vertraege/sync-vertrag-compliance'
 import type {
-  CompliancePoolItem,
-  HandwerkerVertragRow,
-  NachtragPositionDraft,
-  NachtragWizardContext,
-  ProjektVertragWizardBootstrap,
-  ProjektVertragWizardMeta,
-  RahmenVertragWizardBootstrap,
-  VertragHandwerkerSnapshot,
+CompliancePoolItem,
+HandwerkerVertragRow,
+NachtragPositionDraft,ProjektVertragWizardBootstrap,
+ProjektVertragWizardMeta,
+RahmenVertragWizardBootstrap,
+VertragHandwerkerSnapshot
 } from '@/lib/vertraege/types'
 import type { AuftragPosition } from '@/lib/types'
 
@@ -615,118 +608,6 @@ function parentVertragDatum(row: HandwerkerVertragRow): string | null {
     formatVertragDatumDe(row.signiert_am) ||
     formatVertragDatumDe(row.created_at)
   )
-}
-
-export async function loadNachtragBootstrap(input: {
-  auftragId: string
-  parentVertragId: string
-  vertragId?: string | null
-}): Promise<{ ok: true; bootstrap: ProjektVertragWizardBootstrap } | { ok: false; message: string }> {
-  const auftragId = input.auftragId.trim()
-  const parentVertragId = input.parentVertragId.trim()
-  if (!auftragId || !parentVertragId) {
-    return { ok: false, message: 'Auftrag oder Ursprungsvertrag fehlt.' }
-  }
-
-  const supabase = createClient()
-  const { data: parent, error: parentErr } = await supabase
-    .from('handwerker_vertraege')
-    .select('*')
-    .eq('id', parentVertragId)
-    .eq('auftrag_id', auftragId)
-    .maybeSingle()
-  if (parentErr) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', parentErr)
-
-  if (parentErr || !parent) {
-    return { ok: false, message: parentErr?.message ?? 'Ursprungsvertrag nicht gefunden.' }
-  }
-
-  const parentRow = parent as HandwerkerVertragRow
-  if (!istHauptvertragFuerNachtrag(parentRow)) {
-    return { ok: false, message: 'Nur abgeschlossene Hauptverträge können ergänzt werden.' }
-  }
-
-  const base = await loadProjektVertragBootstrap(auftragId, input.vertragId ?? null)
-  if (!base.ok) return base
-
-  const pos = positionenFuerHandwerkerGewerk(
-    base.bootstrap.positionen,
-    parentRow.handwerker_id,
-    parentRow.gewerk_name ?? ''
-  )
-
-  let nachtragPositionen: NachtragPositionDraft[] = nachtragPositionenAusAuftrag(pos)
-
-  if (input.vertragId) {
-    const { data: draft, error } = await supabase
-      .from('handwerker_vertraege')
-      .select('nachtrag_positionen')
-      .eq('id', input.vertragId)
-      .maybeSingle()
-    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
-    const saved = (draft as { nachtrag_positionen?: NachtragPositionDraft[] | null } | null)
-      ?.nachtrag_positionen
-    if (saved?.length) nachtragPositionen = saved
-  }
-
-  const parentVertragVom = parentVertragDatum(parentRow)
-  const nachtragCtx: NachtragWizardContext = {
-    parent_vertrag_id: parentRow.id,
-    parent_vertrags_nr: parentRow.vertrags_nr,
-    parent_vertrag_vom: parentVertragVom,
-    parent_leistungsumfang: parentRow.leistungsumfang?.trim() || '',
-    parent_verguetung_text: parentRow.verguetung_text?.trim() || '',
-  }
-
-  const bauvorhaben =
-    parentRow.bauvorhaben?.trim() ||
-    base.bootstrap.meta.bauvorhaben ||
-    base.bootstrap.auftrag_titel
-
-  const meta: ProjektVertragWizardMeta = {
-    handwerker_id: parentRow.handwerker_id,
-    gewerk_id: parentRow.gewerk_id,
-    gewerk_name: parentRow.gewerk_name ?? '',
-    bauvorhaben: `${bauvorhaben} (gleiches Bauvorhaben)`,
-    leistungsumfang: leistungsumfangNachtragAusPositionen(nachtragPositionen, bauvorhaben),
-    verguetung_text: verguetungNachtragAusPositionen({
-      bezug_vertrag_vom: parentVertragVom,
-      parent_verguetung_text: nachtragCtx.parent_verguetung_text,
-      positionen: nachtragPositionen,
-    }),
-    regiesatz_netto: parentRow.regiesatz_netto,
-    einbehalt_prozent: parentRow.einbehalt_prozent,
-    zahlungsziel_tage: parentRow.zahlungsziel_tage,
-    aufmass_rhythmus_tage: parentRow.aufmass_rhythmus_tage,
-    notizen: '',
-    nachtrag_positionen: nachtragPositionen,
-  }
-
-  if (input.vertragId) {
-    const { data: existing, error } = await supabase
-      .from('handwerker_vertraege')
-      .select('*')
-      .eq('id', input.vertragId)
-      .maybeSingle()
-    if (error) logDbError('app/vertraege/wizard-actions:handwerker_vertraege', error)
-    if (existing) {
-      const row = existing as HandwerkerVertragRow
-      meta.leistungsumfang = row.leistungsumfang ?? meta.leistungsumfang
-      meta.verguetung_text = row.verguetung_text ?? meta.verguetung_text
-      meta.notizen = row.notizen ?? ''
-    }
-  }
-
-  return {
-    ok: true,
-    bootstrap: {
-      ...base.bootstrap,
-      vertrag_id: input.vertragId ?? null,
-      vertrags_nr: input.vertragId ? base.bootstrap.vertrags_nr : null,
-      meta,
-      nachtrag_mode: nachtragCtx,
-    },
-  }
 }
 
 async function syncNachtragPositionenToAuftrag(

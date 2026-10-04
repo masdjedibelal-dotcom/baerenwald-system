@@ -6,21 +6,21 @@ import { actionBusy } from '@/components/ui/action-busy'
 import { AuftragDetailTopCards } from '@/components/auftraege/AuftragDetailTopCards'
 import { EntityProjektUebersichtCard } from '@/components/crm/EntityProjektUebersichtCard'
 import {
-  LeistungenTab,
-  leistungenFromAuftragPositionen,
+LeistungenTab,
+leistungenFromAuftragPositionen,
 } from '@/components/leistungen'
 import { AuftragLeistungZuweisungModal } from '@/components/auftraege/leistungen-v3/AuftragLeistungZuweisungModal'
 import { PartnerAufgabeBearbeitenSheet } from '@/components/auftraege/PartnerAufgabeBearbeitenSheet'
 import { CrmPositionEintragModal,type CrmTagebuchEditSeed } from '@/components/auftraege/CrmPositionEintragModal'
 import {
-  AuftragBautagebuchSection,
-  type BautagebuchListenEintrag,
+AuftragBautagebuchSection,
+type BautagebuchListenEintrag,
 } from '@/components/auftraege/AuftragBautagebuchSection'
 import { listAuftragPositionEintraege } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { decideWeitereArbeitMitNotify } from '@/app/(dashboard)/auftraege/partner-positions-anfrage-actions'
 import {
-  updateAuftragNotizen,
-  updateAuftragProjektFelder,
+updateAuftragNotizen,
+updateAuftragProjektFelder,
 } from '@/app/(dashboard)/auftraege/actions'
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { auftragFortschritt } from '@/lib/auftraege/auftrag-liste-helpers'
@@ -141,8 +141,6 @@ export function AuftragLeistungenTab({
   onSaved,
   onOpenDokument,
   dokumentActionLabel,
-  vertragNachtragVerfuegbar: _vertragNachtragVerfuegbar = false,
-  onVertragNachtragErstellen: _onVertragNachtragErstellen,
   initialLeistungenView = 'leistungen',
 }: {
   detail: AuftragDetail
@@ -155,8 +153,6 @@ export function AuftragLeistungenTab({
   onSaved?: () => void
   onOpenDokument?: () => void
   dokumentActionLabel?: string
-  vertragNachtragVerfuegbar?: boolean
-  onVertragNachtragErstellen?: () => void
   /** Welche Ansicht: Leistungen oder Tagebuch (eigener Tab im Auftrag) */
   initialLeistungenView?: 'leistungen' | 'bautagebuch'
 }) {

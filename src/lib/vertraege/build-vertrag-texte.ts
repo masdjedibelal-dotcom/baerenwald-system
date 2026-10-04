@@ -1,8 +1,8 @@
 import { formatDatum } from '@/lib/utils'
 import type { AuftragPosition } from '@/lib/types'
 import type { NachtragPositionDraft } from '@/lib/vertraege/types'
-import { handwerkerDisplayName, handwerkerGfName } from '@/lib/handwerker-stammdaten'
-import { formatEuro, formatNumber } from '@/lib/format/geld-datum'
+import { handwerkerDisplayName,handwerkerGfName } from '@/lib/handwerker-stammdaten'
+import { formatEuro,formatNumber } from '@/lib/format/geld-datum'
 
 export function bauvorhabenAusAuftrag(input: {
   titel?: string | null
@@ -85,18 +85,6 @@ export function formatVertragDatumDe(iso: string | null | undefined): string | n
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
   return formatDatum(d.toISOString())
-}
-
-export function nachtragPositionenAusAuftrag(positionen: AuftragPosition[]): NachtragPositionDraft[] {
-  return positionen.map((p) => ({
-    id: p.id,
-    quelle: 'bestehend' as const,
-    leistung_name: p.leistung_name?.trim() || 'Leistung',
-    einheit: p.einheit,
-    menge: p.menge,
-    preis_partner: p.preis_partner ?? p.preis_fix,
-    gewerk_name: p.gewerk_name?.trim() || '',
-  }))
 }
 
 export function auftragPositionenAusNachtragDrafts(drafts: NachtragPositionDraft[]): AuftragPosition[] {

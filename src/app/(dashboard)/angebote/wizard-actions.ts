@@ -7,49 +7,48 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AngebotPosition } from '@/lib/types'
 import {
-  createAngebot,
-  persistPdfForAngebot,
-  sendAngebotToKunde,
-  updateAngebot,
+createAngebot,
+persistPdfForAngebot,
+sendAngebotToKunde,
+updateAngebot,
 } from '@/app/(dashboard)/angebote/actions'
 import type {
-  AngebotDokumentTyp,
-  AngebotWizardMeta,
+AngebotDokumentTyp,
+AngebotWizardMeta,
 } from '@/lib/angebote/angebot-wizard-types'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
 import {
-  defaultWizardMeta,
-  metaToNotizen,
-  parseAngebotWizardMetaFromNotizen,
-  resolveAngebotKundeTyp,
-  angebotTitelFuerKopie,
-  type AngebotWizardBootstrap,
-  type AngebotVariantenPersistJson,
-  angebotStatusErlaubtImWizard,
-  angebotWizardBearbeitenSperrgrund,
+defaultWizardMeta,
+metaToNotizen,
+parseAngebotWizardMetaFromNotizen,
+resolveAngebotKundeTyp,
+angebotTitelFuerKopie,
+type AngebotWizardBootstrap,
+type AngebotVariantenPersistJson,
+angebotStatusErlaubtImWizard,
+angebotWizardBearbeitenSperrgrund,
 } from '@/lib/angebote/angebot-wizard-types'
 import {
-  loadAuftragKorrekturKontext,
-  auftragKorrekturSperrgrund,
-  type AuftragKorrekturKontext,
+loadAuftragKorrekturKontext,
+auftragKorrekturSperrgrund,
+type AuftragKorrekturKontext,
 } from '@/lib/angebote/auftrag-korrektur'
 import { parseZahlungsplan,zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zahlungsplan'
 import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import {
-  mergeHandwerkerQueuesIntoPositionen,
-  normalizeAngebotPositionen,
-  repairAngebotPositionen,
-  summenAusPositionen,
+mergeHandwerkerQueuesIntoPositionen,
+normalizeAngebotPositionen,
+repairAngebotPositionen,
+summenAusPositionen,
 } from '@/lib/angebot-positionen'
 import { rebindLooseAnfahrtPositionen } from '@/lib/anfahrt-angebot'
 import { parseAngebotAnrede } from '@/lib/templates/angebot-mail'
 import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/actions'
 import { syncAuftragAusAngebotKorrektur } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
-import { upsertNachtragEntwurfFromAngebotWizard } from '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
 import {
-  syncInputsFromAngebotPositionen,
-  syncInputsFromDokumentArtikel,
-  type NeueLeistungSyncInput,
+syncInputsFromAngebotPositionen,
+syncInputsFromDokumentArtikel,
+type NeueLeistungSyncInput,
 } from '@/lib/preislisten/sync-neue-leistungen'
 import type { DokumentArtikelZeile } from '@/lib/dokument-zeilen'
 
@@ -77,8 +76,6 @@ export type SaveAngebotWizardDraftPayload = {
   zahlungsplan?: import('@/lib/rechnungen/zahlungsplan').Zahlungsplan | null
   /** Nach Speichern: Auftragspositionen aus Angebot übernehmen */
   auftragKorrekturId?: string | null
-  /** Phase 10/N3: Nachtrags-Angebot → nachtraege[] am Auftrag schreiben */
-  nachtragZuAuftragId?: string | null
   ist_wiederkehrend?: boolean
   wiederkehr_turnus?: string | null
 }
@@ -238,9 +235,9 @@ async function saveAngebotWizardDraftInner(
 
   // P10 (Entscheidung 29.09.2026): Ein Angebot, das beim Kunden war, wird nicht überschrieben.
   // Bearbeiten erzeugt eine neue Version mit neuer Nummer; die alte gilt als „ersetzt“.
-  // Ausnahmen: Auftrags-Korrektur und Nachtrag (eigene Wege).
+  // Ausnahme: Auftrags-Korrektur (eigener Weg).
   let ersetztAngebotId: string | null = null
-  if (input.angebotId && !input.auftragKorrekturId?.trim() && !input.nachtragZuAuftragId?.trim()) {
+  if (input.angebotId && !input.auftragKorrekturId?.trim()) {
     const db0 = opts?.asSystem ? supabaseAdmin : createClient()
     const { data: alt, error: altErr } = await db0
       .from('angebote')
@@ -307,16 +304,6 @@ async function saveAngebotWizardDraftInner(
       })
       if (!sync.ok) return sync
     }
-    if (input.nachtragZuAuftragId?.trim()) {
-      const n = await upsertNachtragEntwurfFromAngebotWizard({
-        auftragId: input.nachtragZuAuftragId.trim(),
-        angebotId: input.angebotId,
-        grund: input.meta.titel?.trim() || input.meta.leistungsumfang?.trim() || 'Nachtrag',
-        beschreibung: input.meta.leistungsumfang?.trim() || null,
-        positionen,
-      })
-      if (!n.ok) return n
-    }
     return { ok: true, angebotId: input.angebotId, angebotsnr: nrRow?.angebotsnr ?? null }
   }
 
@@ -367,16 +354,6 @@ async function saveAngebotWizardDraftInner(
     .maybeSingle()
   if (error) logDbError('app/angebote/wizard-actions:angebote', error)
   await persistAngebotPdfNachEntwurfSpeichern(created.id, input.lead_id, opts)
-  if (input.nachtragZuAuftragId?.trim()) {
-    const n = await upsertNachtragEntwurfFromAngebotWizard({
-      auftragId: input.nachtragZuAuftragId.trim(),
-      angebotId: created.id,
-      grund: input.meta.titel?.trim() || input.meta.leistungsumfang?.trim() || 'Nachtrag',
-      beschreibung: input.meta.leistungsumfang?.trim() || null,
-      positionen,
-    })
-    if (!n.ok) return n
-  }
   return { ok: true, angebotId: created.id, angebotsnr: nrRow?.angebotsnr ?? null }
 }
 

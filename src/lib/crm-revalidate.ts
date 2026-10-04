@@ -90,12 +90,6 @@ export function revalidateEinstellungenPath(subPath: string): void {
   revalidatePath(p.startsWith('/einstellungen') ? p : `/einstellungen${p}`)
 }
 
-export function revalidateAuftragFinanzen(auftragId: string): void {
-  const id = auftragId?.trim()
-  if (!id) return
-  revalidatePath(`/auftraege/${id}/finanzen`)
-}
-
 export function revalidateKundeObjekt(kundeId: string, objektId: string): void {
   const kid = kundeId?.trim()
   const oid = objektId?.trim()

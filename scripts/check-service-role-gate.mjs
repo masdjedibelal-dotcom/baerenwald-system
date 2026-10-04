@@ -25,7 +25,6 @@ const ALLOWLIST = new Set([
   'src/app/actions/mails.ts',
   'src/lib/org/hv-auftrag-actions.ts',
   'src/app/api/webhooks/resend/route.ts',
-  'src/app/api/cron/einbehalte/route.ts',
   'src/app/api/internal/partner-rahmenvertrag-accept/route.ts',
 ])
 

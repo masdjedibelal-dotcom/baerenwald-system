@@ -11,28 +11,28 @@ import { FilterRangeRow } from '@/components/ui/FilterRangeRow'
 import { TimeInput } from '@/components/ui/TimeInput'
 import { toast } from '@/components/ui/app-toast'
 import {
-  deleteKalenderTermin,
-  loadTerminLinkAdresse,
-  saveKalenderTermin,
+deleteKalenderTermin,
+loadTerminLinkAdresse,
+saveKalenderTermin,
 } from '@/app/(dashboard)/kalender/actions'
 import { searchVorgaengeFuerTodo } from '@/app/(dashboard)/kalender/todo-actions'
 import { listKundenFuerCombobox } from '@/app/(dashboard)/kunden/kunde-combobox-actions'
 import { kalenderTypLabel } from '@/lib/kalender-styles'
 import {
-  formatTerminAdresse,
-  parseTerminAdresse,
-  TERMIN_KATEGORIE_OPTIONS,
-  terminKategorieFarbe,
-  terminKategorieLabel,
-  terminTypToKategorie,
-  type TerminKategorie,
-  type TerminKatFarbe,
+formatTerminAdresse,
+parseTerminAdresse,
+TERMIN_KATEGORIE_OPTIONS,
+terminKategorieFarbe,
+terminKategorieLabel,
+terminTypToKategorie,
+type TerminKategorie,
+type TerminKatFarbe,
 } from '@/lib/kalender/termin-kategorien'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import type { KalenderTermin,Kunde } from '@/lib/types'
 import { formatWochentagDatumLang } from '@/lib/utils'
 import {
-  kalenderTerminEndeVergangen,
+kalenderTerminEndeVergangen,
 } from '@/lib/kalender/termin-no-show-hint'
 import { C } from '@/lib/tokens/colors'
 import { TOAST } from '@/lib/copy'
@@ -43,13 +43,6 @@ export type MockKat = TerminKatFarbe
 /** @deprecated — nutze terminTypToKategorie / terminKategorieFarbe */
 export function typToKat(typ: KalenderTermin['typ'] | string): MockKat {
   return terminKategorieFarbe(terminTypToKategorie(typ))
-}
-
-/** @deprecated — nutze terminKategorieLabel */
-export function katLabel(kat: MockKat): string {
-  if (kat === 'green') return 'Vor-Ort Termin'
-  if (kat === 'yellow') return 'Abnahme'
-  return 'Allgemein'
 }
 
 function ymd(d: Date): string {

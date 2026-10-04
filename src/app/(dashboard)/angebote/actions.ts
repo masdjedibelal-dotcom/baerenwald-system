@@ -2708,14 +2708,6 @@ export async function createAuftragFromAngebot(
     return { ok: true, auftragId: String(existingForAngebot.id) }
   }
 
-  const { findNachtragRowByAngebotId, applyNachtragsAngebotAnAuftrag } = await import(
-    '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
-  )
-  const nachtragLink = await findNachtragRowByAngebotId(angebotId)
-  if (nachtragLink) {
-    return applyNachtragsAngebotAnAuftrag(angebotId)
-  }
-
   if (angebot.lead_id) {
     const { data: leadAuftraege, error } = await supabaseAdmin
       .from('auftraege')

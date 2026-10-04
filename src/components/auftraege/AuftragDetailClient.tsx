@@ -6,9 +6,9 @@ import { posBoardLinesFromAngebotPositionen } from '@/lib/posboard/pos-board-lin
 import { MockBtn } from '@/components/mock-ui'
 import { AuftragEinsaetzeCard } from '@/components/auftraege/AuftragEinsaetzeCard'
 import {
-  DetailShell,
-  EntityDetailLayout,
-  type DetailShellGroup,
+DetailShell,
+EntityDetailLayout,
+type DetailShellGroup,
 } from '@/components/layout/EntityDetailLayout'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockTextarea } from '@/components/mock-ui/MockForm'
@@ -31,12 +31,12 @@ import { HandwerkerBewertungModal } from '@/components/auftraege/HandwerkerBewer
 import { handwerkerAusAuftrag } from '@/lib/handwerker/handwerker-aus-auftrag'
 import { auftragHatGestellteKundenrechnung } from '@/lib/angebote/auftrag-korrektur-gate'
 import {
-  normalizeLeistungStatus
+normalizeLeistungStatus
 } from '@/lib/auftraege/auftrag-fortschritt-preis'
 import { formatEurKurz } from '@/lib/vorgang/projekt-kontext-labels'
 import {
-  VorgangZahlungTab,
-  type RechnungErstellenOpts,
+VorgangZahlungTab,
+type RechnungErstellenOpts,
 } from '@/components/vorgang/VorgangZahlungTab'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { AuftragDokumenteTab } from '@/components/auftraege/AuftragDokumenteTab'
@@ -47,12 +47,12 @@ import { angebotTitelOderSituationBereich } from '@/lib/vorgang/vorgang-anzeige-
 import { leadKontaktAnzeigeName } from '@/lib/lead-display-helpers'
 import type { CrmTeamMitglied } from '@/lib/crm-team'
 import type {
-  AngebotDetail,
-  AuftragDetail,
-  Gewerk,
-  Lead,
-  LeadDetail,
-  Preisliste,
+AngebotDetail,
+AuftragDetail,
+Gewerk,
+Lead,
+LeadDetail,
+Preisliste,
 } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { toast } from '@/components/ui/app-toast'
@@ -60,34 +60,31 @@ import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RechnungAuswahlModal } from '@/components/rechnungen/RechnungAuswahlModal'
 import { RechnungWizard } from '@/components/rechnungen/RechnungWizard'
 import { ProjektVertragWizard } from '@/components/vertraege/ProjektVertragWizard'
-import { VertragNachtragPickerModal } from '@/components/vertraege/VertragNachtragPickerModal'
 import {
-  loadRechnungWizardBootstrapFromAuftrag,
-  type RechnungWizardBootstrap,
+loadRechnungWizardBootstrapFromAuftrag,
+type RechnungWizardBootstrap,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import {
-  loadNachtragBootstrap,
-  type ProjektVertragWizardBootstrap,
+type ProjektVertragWizardBootstrap
 } from '@/app/(dashboard)/vertraege/wizard-actions'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import { istHauptvertragFuerNachtrag } from '@/lib/vertraege/vertrag-nachtrag-helpers'
 import { normalizeAngebotPositionen } from '@/lib/angebot-positionen'
 import { auftragPositionenToAngebotPositionen } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { auftragPositionenFuerSumme } from '@/lib/auftraege/auftrag-position-aktiv'
 import {
-  auftragHatZahlungOffen,
-  auftragSummenAusPositionen,
-  berechneZahlungsplan,
-  hatAktivenAbschlagsplan,
-  naechsteAuftragRechnungAktion,
-  parseZahlungsplan,
-  zahlplanAbgerechnetAusLinks,
+auftragHatZahlungOffen,
+auftragSummenAusPositionen,
+berechneZahlungsplan,
+hatAktivenAbschlagsplan,
+naechsteAuftragRechnungAktion,
+parseZahlungsplan,
+zahlplanAbgerechnetAusLinks,
 } from '@/lib/rechnungen/zahlungsplan'
 import { sendRechnung,updateRechnungStatus,korrigiereRechnung } from '@/app/(dashboard)/rechnungen/actions'
 import { rechnungKorrekturModus } from '@/lib/rechnungen/rechnung-korrektur'
 import {
-  defaultZahlungszielTage,
-  type RechnungAuswahlZeile,
+defaultZahlungszielTage,
+type RechnungAuswahlZeile,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
@@ -99,7 +96,7 @@ import { EinsatzRechnungenAkte } from '@/components/auftraege/EinsatzRechnungenA
 import type { AngebotWizardBootstrap } from '@/lib/angebote/angebot-wizard-types'
 import { updateAuftragNotizen } from '@/app/(dashboard)/auftraege/actions'
 import {
-  loadAngebotKorrekturWizardBootstrap
+loadAngebotKorrekturWizardBootstrap
 } from '@/app/(dashboard)/auftraege/angebot-korrektur-actions'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { COPY_BUTTON,TOAST } from '@/lib/copy'
@@ -426,8 +423,7 @@ export function AuftragDetailClient({
   const [vertragWizardOpen, setVertragWizardOpen] = useState(false)
   const [vertragWizardBootstrap, setVertragWizardBootstrap] =
     useState<ProjektVertragWizardBootstrap | null>(null)
-  const [vertragWizardKey, setVertragWizardKey] = useState(0)
-  const [nachtragPickerOpen, setNachtragPickerOpen] = useState(false)
+  const [vertragWizardKey, ] = useState(0)
   const [bewertungOpen, setBewertungOpen] = useState(false)
   const [abschliessenOpen, setAbschliessenOpen] = useState(false)
   const [angebotKorrekturOpen, setAngebotKorrekturOpen] = useState(false)
@@ -465,11 +461,6 @@ export function AuftragDetailClient({
     setLeistungenOhneAngebotOpen(true)
   }, [])
 
-  const hauptvertraegeFuerNachtrag = useMemo(
-    () => vertraegeListe.filter(istHauptvertragFuerNachtrag),
-    [vertraegeListe]
-  )
-
   const zahlungszielTage = useMemo(
     () =>
       Math.max(
@@ -505,42 +496,6 @@ export function AuftragDetailClient({
     window.addEventListener('crm-open-auftrag-abschliessen', onOpen)
     return () => window.removeEventListener('crm-open-auftrag-abschliessen', onOpen)
   }, [detail.id])
-
-  const openVertragWizard = useCallback((bootstrap: ProjektVertragWizardBootstrap) => {
-    setVertragWizardBootstrap(bootstrap)
-    setVertragWizardKey((k) => k + 1)
-    setVertragWizardOpen(true)
-  }, [])
-
-  const startNachtragWizard = useCallback(
-    (parentVertragId: string) => {
-      setNachtragPickerOpen(false)
-      startTransition(async () => {
-        const res = await loadNachtragBootstrap({
-          auftragId: detail.id,
-          parentVertragId,
-        })
-        if (!res.ok) {
-          toast.systemError(res)
-          return
-        }
-        openVertragWizard(res.bootstrap)
-      })
-    },
-    [detail.id, openVertragWizard]
-  )
-
-  const openNachtragErstellen = useCallback(() => {
-    if (!hauptvertraegeFuerNachtrag.length) {
-      toast.error(TOAST.zuerst_einen_nachunternehmervertrag_mit_pdf_anle)
-      return
-    }
-    if (hauptvertraegeFuerNachtrag.length === 1) {
-      startNachtragWizard(hauptvertraegeFuerNachtrag[0]!.id)
-      return
-    }
-    setNachtragPickerOpen(true)
-  }, [hauptvertraegeFuerNachtrag, startNachtragWizard])
 
   const openRechnungErstellen = useCallback(
     (opts?: RechnungErstellenOpts) => {
@@ -876,8 +831,6 @@ export function AuftragDetailClient({
           ? COPY_BUTTON.leistungenBearbeiten
           : COPY_BUTTON.auftragBearbeiten
       }
-      vertragNachtragVerfuegbar={hauptvertraegeFuerNachtrag.length > 0}
-      onVertragNachtragErstellen={openNachtragErstellen}
       initialLeistungenView="leistungen"
     />
   )
@@ -1469,13 +1422,6 @@ export function AuftragDetailClient({
           />
         </ClientOnly>
       ) : null}
-
-      <VertragNachtragPickerModal
-        open={nachtragPickerOpen}
-        vertraege={hauptvertraegeFuerNachtrag}
-        onClose={() => setNachtragPickerOpen(false)}
-        onSelect={startNachtragWizard}
-      />
 
       <HandwerkerBewertungModal
         open={bewertungOpen}

@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { isStagingSupabase } from '@/lib/auth/staging-admin'
-import { splitTelegramChunks,TELEGRAM_MAX_MESSAGE_CHARS } from '@/lib/copilot/message-limits'
+import { TELEGRAM_MAX_MESSAGE_CHARS } from '@/lib/copilot/message-limits'
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN ?? ''}`
 
@@ -70,27 +70,4 @@ export async function sendTelegram(text: string, parseMode: 'HTML' | 'Markdown' 
     const plain = escapeTelegramPlain(stripHtmlTags(text))
     await sendTelegramOnce(plain)
   }
-}
-
-/** Lange Claude-Antworten in mehrere Telegram-Nachrichten aufteilen. */
-export async function sendTelegramLong(text: string, parseMode: 'HTML' | 'Markdown' = 'HTML'): Promise<void> {
-  const chunks = splitTelegramChunks(text, TELEGRAM_MAX_MESSAGE_CHARS)
-  for (const chunk of chunks) {
-    await sendTelegram(chunk, parseMode)
-  }
-}
-
-export async function sendTelegramTyping(): Promise<void> {
-  if (!process.env.TELEGRAM_BOT_TOKEN?.trim() || !process.env.TELEGRAM_CHAT_ID?.trim()) return
-  await fetch(`${TELEGRAM_API}/sendChatAction`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: process.env.TELEGRAM_CHAT_ID,
-      action: 'typing',
-    }),
-  }).catch((err) => {
-    console.error('[copilot/telegram] sendChatAction', err)
-    return undefined
-  })
 }

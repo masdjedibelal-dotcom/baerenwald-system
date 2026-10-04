@@ -1,5 +1,4 @@
 import type { AuftragStatus,LeadStatus } from '@/lib/types'
-import { C } from '@/lib/tokens/colors'
 
 export const PROJEKT_PHASEN = ['Anfrage', 'Angebot', 'Auftrag', 'Abnahme', 'Fertig'] as const
 
@@ -43,30 +42,4 @@ export function aktuellePhaseIndexFromEntities(e: ProjektPhasenEntities): number
 
   if (leadStatus === 'neu' || leadStatus === 'kontaktiert' || leadStatus === 'termin') return 0
   return 0
-}
-
-export function auftragStatusLabelDe(status: AuftragStatus): string {
-  if (status === 'offen') return 'Offen'
-  if (status === 'in_arbeit') return 'In Arbeit'
-  if (status === 'abnahme') return 'Abnahme'
-  if (status === 'abgeschlossen') return 'Abgeschlossen'
-  if (status === 'storniert') return 'Storniert'
-  return status
-}
-
-/** HTML für E-Mail: 5 Phasen als Step-Leiste (schlicht, table-safe) */
-export function mailPhasenStepsHtml(phaseIdx: number): string {
-  const cells = PROJEKT_PHASEN.map((label, i) => {
-    const done = i < phaseIdx
-    const active = i === phaseIdx && phaseIdx < PROJEKT_PHASEN.length
-    const color = done || active ? C.green : C.gray300
-    const textColor = active ? C.greenDark : done ? C.green : C.gray400
-    const weight = active ? '700' : '500'
-    const dot = done ? '✓' : active ? '●' : '○'
-    return `<td align="center" style="padding:4px 2px;font-size:10px;color:${textColor};font-weight:${weight};">
-<span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;border:2px solid ${color};color:${color};font-size:11px;">${dot}</span>
-      <br/>${label}
-    </td>`
-  }).join('')
-  return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:16px 0 20px;border-collapse:collapse;"><tr>${cells}</tr></table>`
 }

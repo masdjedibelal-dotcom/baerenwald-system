@@ -1,30 +1,30 @@
 'use server'
 
-import { revalidateAngebotDetail,revalidateAuftragDetail,revalidateAuftragFinanzen,revalidateEinstellungenPath,revalidateKundeDetail,revalidateLeadDetail,revalidateRechnungDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAuftragDetail,revalidateEinstellungenPath,revalidateKundeDetail,revalidateLeadDetail,revalidateRechnungDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { randomUUID } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
-  buildFreitextKundenMailHtml,
-  defaultFreitextMailBody,
+buildFreitextKundenMailHtml,
+defaultFreitextMailBody,
 } from '@/lib/mail/freitext-kunden-mail'
 import { logLeadEmailTimelineEvent } from '@/lib/kommunikation/log-lead-email-timeline'
 import {
-  applyEmailLogOrFilter,
-  emailLogEqFilter,
-  emailLogInFilter,
+applyEmailLogOrFilter,
+emailLogEqFilter,
+emailLogInFilter,
 } from '@/lib/kommunikation/email-log-list-filter'
 import { sendMail } from '@/lib/mail-service'
 import { projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import type { MailAnrede } from '@/lib/mail/anrede'
 import {
-  freitextMailTyp,
-  type KommunikationKontextTyp,
-  type KommunikationListeZeile,
-  type KommunikationMailVorlageKontext,
-  type MailComposeContext,
+freitextMailTyp,
+type KommunikationKontextTyp,
+type KommunikationListeZeile,
+type KommunikationMailVorlageKontext,
+type MailComposeContext,
 } from '@/lib/kommunikation/types'
 import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 import { KUNDE_MAIL_BCC } from '@/lib/mail-constants'
@@ -107,7 +107,6 @@ function revalidateKommunikationPaths(f: KommunikationFilter) {
   if (f.angebotId) revalidateAngebotDetail(f.angebotId)
   if (f.auftragId) {
     revalidateAuftragDetail(f.auftragId)
-    revalidateAuftragFinanzen(f.auftragId)
   }
   if (f.rechnungId) revalidateRechnungDetail(f.rechnungId)
 }

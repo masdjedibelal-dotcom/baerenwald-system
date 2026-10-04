@@ -9,12 +9,12 @@ import { createAuftragFromAngebot,sendAngebotNachfassManuell,markLeadAngeboteAbg
 import { erledigeInterneNachfassTodos } from '@/lib/kalender-auto-termine'
 import { isKundeAblehnungGrund,KUNDE_ABLEHNUNG_GRUND_LABELS } from '@/lib/angebote/ablehnung-labels'
 import {
-  angebotDarfDirektAuftragOhneHvFreigabe,
-  resolveAnfrageFreigabeRegeln,
+angebotDarfDirektAuftragOhneHvFreigabe,
+resolveAnfrageFreigabeRegeln,
 } from '@/lib/anfragen/anfrage-akut-schwelle'
 import { writeLeadStatus } from '@/lib/status/write-lead-status'
 import {
-  writeAngebotStatus
+writeAngebotStatus
 } from '@/lib/status/write-angebot-status'
 
 async function insertAngebotTimeline(
@@ -221,14 +221,9 @@ export async function acceptAngebotAndCreateAuftrag(
   if (acceptErr) logDbError('app/angebote/angebot-flow-actions:angebote', acceptErr)
   if (acceptErr) return { ok: false, message: acceptErr.message }
 
-  const { findNachtragRowByAngebotId } = await import(
-    '@/app/(dashboard)/auftraege/nachtrag-baustopp-actions'
-  )
-  const nachtragLink = await findNachtragRowByAngebotId(id)
-
   const leadId = (ang.lead_id as string | null) ?? null
   if (leadId) {
-    // Nachtrag oder Erweiterung eines bestehenden Auftrags: frühere (angenommene) Angebote bleiben stehen
+    // Erweiterung eines bestehenden Auftrags: frühere (angenommene) Angebote bleiben stehen
     const { data: bestehend } = await supabaseAdmin
       .from('auftraege')
       .select('id, angebot_id')
@@ -236,7 +231,7 @@ export async function acceptAngebotAndCreateAuftrag(
       .neq('status', 'storniert')
       .limit(5)
     const erweitertAuftrag = (bestehend ?? []).some((a) => String(a.angebot_id ?? '') !== id)
-    if (!nachtragLink && !erweitertAuftrag) {
+    if (!erweitertAuftrag) {
       await markLeadAngeboteAbgelehnt(supabaseAdmin, leadId, id)
     }
     if (direktOhneHv) {
@@ -280,11 +275,9 @@ export async function acceptAngebotAndCreateAuftrag(
 
   if (ang.lead_id) {
     await erledigeInterneNachfassTodos(ang.lead_id)
-    const timelineTitel = nachtragLink
-      ? 'Nachtrags-Angebot angenommen — Auftrag erweitert'
-      : direktOhneHv
-        ? 'Direkt Auftrag (unter Schwelle) — ohne Kundenmail / ohne HV-Freigabe'
-        : 'Angebot angenommen — Auftrag erstellt'
+    const timelineTitel = direktOhneHv
+      ? 'Direkt Auftrag (unter Schwelle) — ohne Kundenmail / ohne HV-Freigabe'
+      : 'Angebot angenommen — Auftrag erstellt'
     if (opts?.asSystem) {
       const { error: __dbErr5 } = await supabaseAdmin.from('lead_timeline').insert({
         lead_id: ang.lead_id,

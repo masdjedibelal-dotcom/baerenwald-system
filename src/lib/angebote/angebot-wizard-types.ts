@@ -1,18 +1,18 @@
 import { splitNettoStueck,type KostenartZeile } from '@/lib/angebot-kosten-split'
 import { defaultAngebotRechtshinweise } from '@/lib/angebote/angebot-rechtshinweise'
 import {
-  auftragDarfKorrektur,
-  type AuftragKorrekturKontext,
+auftragDarfKorrektur,
+type AuftragKorrekturKontext,
 } from '@/lib/angebote/auftrag-korrektur-gate'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
-  defaultAngebotEinleitungText,
-  defaultAngebotSchlussText,
+defaultAngebotEinleitungText,
+defaultAngebotSchlussText,
 } from '@/lib/templates/angebot-mail'
 import { GEWERK_SLUG_ANFAHRT } from '@/lib/anfahrt-angebot'
 import {
-  defaultFirmenEinstellungen,
-  type FirmenEinstellungen,
+defaultFirmenEinstellungen,
+type FirmenEinstellungen,
 } from '@/lib/einstellungen-keys'
 import type { AngebotProjektFoto } from '@/lib/angebote/angebot-projekt-fotos'
 import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
@@ -152,8 +152,6 @@ export type AngebotWizardBootstrap = {
   bereitsGesendet?: boolean
   /** Korrektur aus laufendem Auftrag — kein erneutes Annehmen, Auftrag wird mitgespeichert. */
   auftragKorrektur?: { auftragId: string; gestellteAbschlaege?: number }
-  /** Phase 10: Nachtrag — erweitert Auftrag, ersetzt ihn nicht. */
-  nachtragZu?: { auftragId: string }
   zahlungsplan?: Zahlungsplan | null
   /** Bestand: wiederkehrende Leistung */
   ist_wiederkehrend?: boolean

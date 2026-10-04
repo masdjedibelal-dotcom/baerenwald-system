@@ -4,18 +4,7 @@ import { invokeCrmCron } from '../../lib/netlify/invoke-crm-cron.mjs'
 const JOBS = [
   /** 00:00 UTC ≈ 02:00 Europe/Berlin (Sommer); 01:00 im Winter (MEZ) */
   { id: 'rechnungen', path: '/api/cron/rechnungen', hour: 0, minute: 0, dom: null, dow: null, mailRisk: true },
-  {
-    id: 'copilot-briefing',
-    path: '/api/cron/copilot-briefing',
-    hour: 7,
-    minute: 30,
-    dom: null,
-    dow: [1, 2, 3, 4, 5, 6],
-    mailRisk: true,
-  },
-  { id: 'einbehalte', path: '/api/cron/einbehalte', hour: 7, minute: 30, dom: null, dow: null, mailRisk: true },
   { id: 'angebot-nachfass', path: '/api/cron/angebot-nachfass', hour: 9, minute: 0, dom: null, dow: null, mailRisk: true },
-  { id: 'datenschutz', path: '/api/cron/datenschutz', hour: 8, minute: 0, dom: 1, dow: null, mailRisk: true },
 ]
 
 function isStagingCronHost() {
