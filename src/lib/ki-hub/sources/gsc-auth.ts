@@ -1,13 +1,11 @@
 import 'server-only'
 
 import { logDbError } from '@/lib/errors/log-db-error'
-import { createSign,randomBytes } from 'crypto'
-import { getPublicAppUrl } from '@/lib/utils'
+import { createSign } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const GSC_OAUTH_REFRESH_TOKEN_KEY = 'gsc_oauth_refresh_token'
 export const GSC_OAUTH_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly'
-export const GSC_OAUTH_STATE_COOKIE = 'gsc_oauth_state'
 
 type ServiceAccount = {
   client_email: string
@@ -26,35 +24,11 @@ function base64url(input: Buffer | string): string {
   return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
 }
 
-export function getGscOAuthRedirectUri(): string {
-  return `${getPublicAppUrl()}/api/ki-hub/gsc/oauth/callback`
-}
-
 export function getGscOAuthClientConfig(): OAuthClientConfig | null {
   const clientId = process.env.GSC_OAUTH_CLIENT_ID?.trim()
   const clientSecret = process.env.GSC_OAUTH_CLIENT_SECRET?.trim()
   if (!clientId || !clientSecret) return null
   return { clientId, clientSecret }
-}
-
-export function createGscOAuthState(): string {
-  return randomBytes(24).toString('hex')
-}
-
-export function buildGscOAuthConsentUrl(state: string): string {
-  const config = getGscOAuthClientConfig()
-  if (!config) throw new Error('GSC_OAUTH_CLIENT_ID / GSC_OAUTH_CLIENT_SECRET fehlen')
-
-  const params = new URLSearchParams({
-    client_id: config.clientId,
-    redirect_uri: getGscOAuthRedirectUri(),
-    response_type: 'code',
-    scope: GSC_OAUTH_SCOPE,
-    access_type: 'offline',
-    prompt: 'consent',
-    state,
-  })
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
 }
 
 function parseServiceAccount(): ServiceAccount | null {
@@ -84,19 +58,6 @@ export async function resolveGscRefreshToken(): Promise<string | null> {
   if (error) return null
   const value = data?.value?.trim()
   return value || null
-}
-
-export async function saveGscOAuthRefreshToken(token: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('einstellungen').upsert(
-    {
-      key: GSC_OAUTH_REFRESH_TOKEN_KEY,
-      value: token,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'key' }
-  )
-  if (error) logDbError('lib/ki-hub/sources/gsc-auth:einstellungen', error)
-  if (error) throw new Error(error.message)
 }
 
 async function refreshOAuthAccessToken(
@@ -156,37 +117,6 @@ async function getServiceAccountAccessToken(sa: ServiceAccount): Promise<string>
     throw new Error(json.error_description ?? 'Google Service-Account Token fehlgeschlagen')
   }
   return json.access_token
-}
-
-export async function exchangeGscOAuthCode(code: string): Promise<{
-  access_token: string
-  refresh_token?: string
-}> {
-  const config = getGscOAuthClientConfig()
-  if (!config) throw new Error('GSC_OAUTH_CLIENT_ID / GSC_OAUTH_CLIENT_SECRET fehlen')
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code,
-      client_id: config.clientId,
-      client_secret: config.clientSecret,
-      redirect_uri: getGscOAuthRedirectUri(),
-      grant_type: 'authorization_code',
-    }),
-    next: { revalidate: 0 },
-  })
-
-  const json = (await res.json()) as {
-    access_token?: string
-    refresh_token?: string
-    error_description?: string
-  }
-  if (!json.access_token) {
-    throw new Error(json.error_description ?? 'GSC OAuth Code-Austausch fehlgeschlagen')
-  }
-  return { access_token: json.access_token, refresh_token: json.refresh_token }
 }
 
 export async function fetchGscAccessToken(): Promise<{

@@ -2,15 +2,13 @@
 
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
-  BAUTAGESBERICHT_MAX_FOTOS,parseBautagesberichtFotos,
-  parseStringList,
-  type AuftragBautagesbericht,
-  type BautagesberichtFoto
+parseBautagesberichtFotos,
+parseStringList,
+type AuftragBautagesbericht,
+type BautagesberichtFoto
 } from '@/lib/auftraege/bautagesbericht-types'
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
-import type { Kunde } from '@/lib/types'
 
 function mapBericht(row: Record<string, unknown>): AuftragBautagesbericht {
   const hwRaw = row.handwerker
@@ -49,19 +47,6 @@ function mapBericht(row: Record<string, unknown>): AuftragBautagesbericht {
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   }
-}
-
-async function resolveFotoUrlsForPdf(fotos: BautagesberichtFoto[]): Promise<BautagesberichtFoto[]> {
-  const out: BautagesberichtFoto[] = []
-  for (const f of fotos.slice(0, BAUTAGESBERICHT_MAX_FOTOS)) {
-    if (/^https?:\/\//i.test(f.url)) {
-      out.push(f)
-      continue
-    }
-    const signed = await signedHandwerkerUploadUrl(f.url, 3600)
-    if (signed) out.push({ ...f, url: signed })
-  }
-  return out
 }
 
 async function resolveFotosForCrm(fotos: BautagesberichtFoto[]): Promise<BautagesberichtFoto[]> {
@@ -104,49 +89,4 @@ export async function listAuftragBautagesberichte(auftragId: string): Promise<Au
     })
   )
   return rows
-}
-
-export async function loadBautagesberichtFuerPdf(
-  berichtId: string,
-  auftragId: string
-): Promise<
-  | {
-      ok: true
-      bericht: AuftragBautagesbericht
-      kunde: Kunde | null
-      auftragTitel: string
-      fotoUrls: BautagesberichtFoto[]
-    }
-  | { ok: false; message: string }
-> {
-  const { data: row, error } = await supabaseAdmin
-    .from('auftrag_bautagesberichte')
-    .select(BERICHT_SELECT)
-    .eq('id', berichtId)
-    .eq('auftrag_id', auftragId)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/bautagesbericht-actions:auftrag_bautagesberichte', error)
-
-  if (error || !row) return { ok: false, message: 'Bautagesbericht nicht gefunden' }
-
-  const { data: auftrag, error: error2 } = await supabaseAdmin
-    .from('auftraege')
-    .select('titel, created_at, kunden(*)')
-    .eq('id', auftragId)
-    .maybeSingle()
-  if (error2) logDbError('app/auftraege/bautagesbericht-actions:auftraege', error2)
-
-  const bericht = mapBericht(row as Record<string, unknown>)
-  const fotoUrls = await resolveFotoUrlsForPdf(bericht.fotos)
-  const kundenRaw = (auftrag as { kunden?: Kunde | Kunde[] | null; titel?: string | null; created_at?: string } | null)?.kunden
-  const kunde = Array.isArray(kundenRaw) ? kundenRaw[0] ?? null : kundenRaw ?? null
-  const titelRaw = (auftrag as { titel?: string | null; created_at?: string } | null)?.titel
-
-  return {
-    ok: true,
-    bericht,
-    kunde,
-    auftragTitel: titelRaw?.trim() || kunde?.name?.trim() || 'Bauprojekt',
-    fotoUrls,
-  }
 }

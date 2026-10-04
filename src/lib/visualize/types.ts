@@ -23,19 +23,6 @@ export type VizBrief = {
   nutzer_antworten?: Record<string, string>
 }
 
-export type VizPrepareOption = {
-  id: string
-  label: string
-  hint?: string
-}
-
-export type VizPrepareQuestion = {
-  id: string
-  question: string
-  hint?: string
-  options: VizPrepareOption[]
-}
-
 export type VizRaumAnalyse = {
   raum_typ: string
   raum_label: string

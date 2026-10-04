@@ -24,14 +24,6 @@ export function offeneErgaenzungFuerPortal(
   return row ?? null
 }
 
-export function hatOffeneErgaenzungFuerPortal(
-  vertraege: HandwerkerVertragRow[],
-  auftragId: string,
-  handwerkerId: string
-): boolean {
-  return offeneErgaenzungFuerPortal(vertraege, auftragId, handwerkerId) != null
-}
-
 export function letzterHauptvertrag(
   vertraege: HandwerkerVertragRow[],
   auftragId: string,

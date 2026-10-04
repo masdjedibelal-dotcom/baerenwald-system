@@ -195,7 +195,7 @@ export const CRM_WISSEN: CrmWissenThema[] = [
     id: 'kalender',
     aliases: ['kalender', 'termin', 'termine', 'besichtigung'],
     titel: 'Kalender',
-    route: '/kalender',
+    route: '/',
     kurz: 'Termine: Besichtigung, Beginn, Abnahme, intern.',
     soFunktioniertEs: [
       'Termine an Lead/Auftrag hängen möglich.',

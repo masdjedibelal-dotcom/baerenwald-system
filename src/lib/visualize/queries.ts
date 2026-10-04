@@ -3,11 +3,11 @@ import 'server-only'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type {
-  KiVizPromptHistoryEntry,
-  KiVisualisierung,
-  VizBauErklaerung,
-  VizBrief,
-  VizRaumAnalyse,
+KiVizPromptHistoryEntry,
+KiVisualisierung,
+VizBauErklaerung,
+VizBrief,
+VizRaumAnalyse,
 } from '@/lib/visualize/types'
 
 function parseHistory(raw: unknown): KiVizPromptHistoryEntry[] {
@@ -42,17 +42,6 @@ function rowToViz(row: Record<string, unknown>): KiVisualisierung {
   }
 }
 
-export async function loadKiVisualisierung(id: string): Promise<KiVisualisierung | null> {
-  const { data, error } = await supabaseAdmin
-    .from('ki_visualisierungen')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
-  if (error) logDbError('lib/visualize/queries:ki_visualisierungen', error)
-  if (error || !data) return null
-  return rowToViz(data as Record<string, unknown>)
-}
-
 export async function loadKiVisualisierungenForAngebot(angebotId: string): Promise<KiVisualisierung[]> {
   const { data, error } = await supabaseAdmin
     .from('ki_visualisierungen')
@@ -62,72 +51,4 @@ export async function loadKiVisualisierungenForAngebot(angebotId: string): Promi
   if (error) logDbError('lib/visualize/queries:ki_visualisierungen', error)
   if (error) return []
   return (data ?? []).map((r) => rowToViz(r as Record<string, unknown>))
-}
-
-export async function createKiVisualisierung(angebotId: string): Promise<KiVisualisierung> {
-  const now = new Date().toISOString()
-  const { data, error } = await supabaseAdmin
-    .from('ki_visualisierungen')
-    .insert({
-      angebot_id: angebotId,
-      status: 'neu',
-      created_at: now,
-      updated_at: now,
-    })
-    .select('*')
-    .single()
-  if (error) logDbError('lib/visualize/queries:ki_visualisierungen', error)
-  if (error || !data) throw new Error(error?.message ?? 'Session anlegen fehlgeschlagen')
-  return rowToViz(data as Record<string, unknown>)
-}
-
-export async function updateKiVisualisierung(
-  id: string,
-  patch: Record<string, unknown>
-): Promise<KiVisualisierung | null> {
-  const { data, error } = await supabaseAdmin
-    .from('ki_visualisierungen')
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select('*')
-    .single()
-  if (error) logDbError('lib/visualize/queries:ki_visualisierungen', error)
-  if (error || !data) return null
-  return rowToViz(data as Record<string, unknown>)
-}
-
-export async function appendPromptHistory(
-  id: string,
-  entry: KiVizPromptHistoryEntry
-): Promise<KiVisualisierung | null> {
-  const current = await loadKiVisualisierung(id)
-  if (!current) return null
-  const history = [...current.prompt_history, entry]
-  return updateKiVisualisierung(id, {
-    prompt_history: history,
-    status: 'fertig',
-  })
-}
-
-export async function linkVisualisierungToAngebot(
-  angebotId: string,
-  visualisierungId: string
-): Promise<void> {
-  const { data: angebot, error } = await supabaseAdmin
-    .from('angebote')
-    .select('visualisierung_ids')
-    .eq('id', angebotId)
-    .maybeSingle()
-  if (error) logDbError('lib/visualize/queries:angebote', error)
-
-  const existing = Array.isArray(angebot?.visualisierung_ids)
-    ? (angebot!.visualisierung_ids as string[])
-    : []
-  if (existing.includes(visualisierungId)) return
-
-  const { error: __dbErr1 } = await supabaseAdmin
-    .from('angebote')
-    .update({ visualisierung_ids: [...existing, visualisierungId] })
-    .eq('id', angebotId)
-  if (__dbErr1) logDbError('lib/visualize/queries:angebote', __dbErr1)
 }

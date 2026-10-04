@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AppSearchHit, SearchGroupId } from '@/lib/search/app-search-types'
+import { useCallback,useEffect,useMemo,useState } from 'react'
+import type { AppSearchHit,SearchGroupId } from '@/lib/search/app-search-types'
 import { SEARCH_GROUP_LABELS } from '@/lib/search/app-search-types'
 
 const RECENT_KEY = 'bw-crm-recent-search'
@@ -47,14 +47,6 @@ const DEFAULT_NAV: AppSearchHit[] = [
     label: 'Partner',
     sub: 'Navigation',
     href: '/handwerker',
-  },
-  {
-    id: 'nav-kal',
-    group: 'navigation',
-    icon: 'calendar',
-    label: 'Kalender',
-    sub: 'Navigation',
-    href: '/kalender',
   },
   {
     id: 'nav-set',

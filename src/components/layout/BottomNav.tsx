@@ -17,9 +17,7 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
   const mehrActive =
     pathname === '/mehr' ||
     pathname.startsWith('/mehr/') ||
-    pathname.startsWith('/kalender') ||
     pathname.startsWith('/handwerker') ||
-    pathname.startsWith('/ki-analytics') ||
     pathname.startsWith('/einstellungen')
 
   return (

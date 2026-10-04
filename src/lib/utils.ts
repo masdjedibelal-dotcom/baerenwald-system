@@ -1,12 +1,12 @@
-import type { AngebotStatus,AuftragStatus,LeadKanal,LeadStatus } from '@/lib/types'
+import type { AuftragStatus,LeadKanal,LeadStatus } from '@/lib/types'
 import {
-  formatPreis,
-  formatEuro,
-  formatEuroSpanne,
-  formatNumber,
-  formatDatum,
-  formatDatumZeit,
-  formatDatumZeitraum,
+formatPreis,
+formatEuro,
+formatEuroSpanne,
+formatNumber,
+formatDatum,
+formatDatumZeit,
+formatDatumZeitraum,
 } from '@/lib/format/geld-datum'
 import { statusLabel } from '@/lib/status/status-map'
 
@@ -128,22 +128,6 @@ export const AUFTRAG_STATUS_LABELS: Record<AuftragStatus, string> = {
   abnahme: statusLabel('auftrag', 'abnahme'),
   abgeschlossen: statusLabel('auftrag', 'abgeschlossen'),
   storniert: statusLabel('auftrag', 'storniert'),
-}
-
-export const FORMULAR_PHASE_LABELS: Record<string, string> = {
-  vorab: 'Vorab',
-  update: 'Update',
-  abnahme: 'Abnahme',
-}
-
-/** Aus status-map abgeleitet (eine Quelle). */
-export const ANGEBOT_STATUS_LABELS: Record<AngebotStatus, string> = {
-  entwurf: statusLabel('angebot', 'entwurf'),
-  gesendet_handwerker: statusLabel('angebot', 'gesendet_handwerker'),
-  handwerker_akzeptiert: statusLabel('angebot', 'handwerker_akzeptiert'),
-  gesendet_kunde: statusLabel('angebot', 'gesendet_kunde'),
-  kunde_akzeptiert: statusLabel('angebot', 'kunde_akzeptiert'),
-  abgelehnt: statusLabel('angebot', 'abgelehnt'),
 }
 
 export const BEREICH_LABELS: Record<string, string> = {

@@ -23,10 +23,6 @@ function rechnungBetragNetto(r: KundeUmsatzRechnung): number {
   return 0
 }
 
-function rechnungDatum(r: KundeUmsatzRechnung): string | null {
-  return r.bezahlt_at?.trim() || r.rechnungsdatum?.trim() || null
-}
-
 /**
  * Kundenumsatz ohne Doppelzählung:
  * - Nicht stornierte Aufträge → Auftragssumme (Netto)
@@ -47,28 +43,4 @@ export function berechneKundeGesamtumsatz(
     summe += rechnungBetragNetto(r)
   }
   return Math.round(summe * 100) / 100
-}
-
-/** Umsatz-Zeitpunkte für Verlauf / Zeitraum-KPIs (gleiche Regeln wie Gesamtumsatz). */
-export function kundeUmsatzEvents(
-  auftraege: KundeUmsatzAuftrag[],
-  rechnungen: KundeUmsatzRechnung[]
-): Array<{ at: string; betrag: number }> {
-  const events: Array<{ at: string; betrag: number }> = []
-
-  for (const a of auftraege) {
-    if (String(a.status ?? '').toLowerCase() === 'storniert') continue
-    const betrag = auftragNetto(a)
-    if (betrag > 0 && a.created_at) events.push({ at: a.created_at, betrag })
-  }
-
-  for (const r of rechnungen) {
-    if (String(r.status ?? '').toLowerCase() !== 'bezahlt') continue
-    if ((r.auftrag_id ?? '').trim()) continue
-    const at = rechnungDatum(r)
-    const betrag = rechnungBetragNetto(r)
-    if (at && betrag > 0) events.push({ at, betrag })
-  }
-
-  return events
 }

@@ -1,6 +1,5 @@
-import { formatDatum } from '@/lib/utils'
 import { istFachbetriebGewerk } from '@/lib/gewerke-ausfuehrung'
-import type { ComplianceDokumentTyp, Gewerk } from '@/lib/types'
+import type { ComplianceDokumentTyp,Gewerk } from '@/lib/types'
 
 export type ComplianceEbene = 'allgemein' | 'meister' | 'leistung'
 
@@ -111,15 +110,6 @@ export function typGiltFuerProjekt(
   return typPasstZuGewerken(typ, relevantSlugs)
 }
 
-export function istPflichtFuerPartner(
-  typ: ComplianceDokumentTyp,
-  handwerkerGewerke: string[] | null | undefined,
-  alleGewerke: Gewerk[]
-): boolean {
-  if (!typGiltFuerPartner(typ, handwerkerGewerke, alleGewerke)) return false
-  return typ.pflicht_fuer_fachbetriebe === true
-}
-
 export function istPflichtFuerProjekt(
   typ: ComplianceDokumentTyp,
   projektGewerkSlugs: string[],
@@ -163,25 +153,4 @@ export function filterLeistungComplianceTypen(
         typGiltFuerProjekt(t, projektGewerkSlugs, handwerkerGewerke, alleGewerke, istBauprojekt)
     )
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-}
-
-/** Hinweis für Portal: Ablauf / Neu-Upload. */
-export function complianceAblaufHinweis(
-  status: 'fehlend' | 'ok' | 'warnung' | 'abgelaufen' | 'in_pruefung' | 'abgelehnt',
-  gueltigBis: string | null | undefined
-): string | null {
-  if (status === 'fehlend') return 'Bitte hochladen'
-  if (status === 'abgelehnt') return 'Abgelehnt — bitte neu hochladen'
-  if (status === 'in_pruefung') return 'Wird geprüft'
-  if (status === 'abgelaufen') return 'Abgelaufen — bitte neu hochladen'
-  if (status === 'warnung' && gueltigBis) {
-    try {
-      const d = new Date(gueltigBis)
-      return `Läuft ab am ${formatDatum(d.toISOString())} — bitte rechtzeitig neu hochladen`
-    } catch {
-      return 'Läuft bald ab — bitte neu hochladen'
-    }
-  }
-  if (status === 'warnung') return 'Läuft bald ab — bitte neu hochladen'
-  return null
 }

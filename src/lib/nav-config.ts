@@ -1,8 +1,8 @@
 import {
-  CREATE_ENTRY_LABELS,
-  createAnfrageHref,
-  createAngebotHref,
-  createRechnungHref,
+CREATE_ENTRY_LABELS,
+createAnfrageHref,
+createAngebotHref,
+createRechnungHref,
 } from '@/lib/crm/create-entry'
 import { COPY_ROLE } from '@/lib/copy'
 
@@ -113,14 +113,12 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
   },
   '/handwerker': { title: COPY_ROLE.partner },
   '/kunden': { title: 'Kunden' },
-  '/kalender': { title: 'Kalender' },
   '/angebote': {
     title: 'Angebote',
     cta: { label: CREATE_ENTRY_LABELS.angebot, href: createAngebotHref() },
   },
   '/einstellungen': { title: 'Einstellungen' },
   '/mehr': { title: 'Mehr' },
-  '/ki-analytics': { title: 'KI Analytics' },
 }
 
 export const SECTION_LABELS: Record<string, string> = {
@@ -130,11 +128,9 @@ export const SECTION_LABELS: Record<string, string> = {
   rechnungen: 'Rechnungen',
   handwerker: COPY_ROLE.partner,
   kunden: 'Kunden',
-  kalender: 'Kalender',
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',
   mehr: 'Mehr',
-  'ki-analytics': 'KI Analytics',
 }
 
 export const SUB_LABELS: Record<string, Record<string, string>> = {

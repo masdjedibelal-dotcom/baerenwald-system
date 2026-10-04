@@ -25,15 +25,3 @@ export async function resolveBautagebuchFotosForCrm(
   )
   return resolved.filter((u): u is string => Boolean(u))
 }
-
-export function mergeBautagebuchFotoUrls(existing: string[], added: string[]): string[] {
-  const seen = new Set<string>()
-  const out: string[] = []
-  for (const url of [...existing, ...added]) {
-    if (!url || seen.has(url)) continue
-    seen.add(url)
-    out.push(url)
-    if (out.length >= BAUTAGEBUCH_MAX_FOTOS) break
-  }
-  return out
-}

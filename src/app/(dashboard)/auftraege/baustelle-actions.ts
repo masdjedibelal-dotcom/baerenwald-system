@@ -4,12 +4,12 @@ import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import {
-  parseStringListJson,
-  type AuftragBaustellenDokument,
-  type AuftragBaustelleTeam,
-  type AuftragRegiearbeit,
-  type AuftragWochenbericht,
-  type BaustellenDokumentTyp,
+parseStringListJson,
+type AuftragBaustellenDokument,
+type AuftragBaustelleTeam,
+type AuftragRegiearbeit,
+type AuftragWochenbericht,
+type BaustellenDokumentTyp,
 } from '@/lib/auftraege/baustelle-types'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import type { Kunde } from '@/lib/types'
@@ -263,66 +263,5 @@ export async function loadWochenberichtPdfDaten(
     auftragTitel: titel,
     kunde,
     auftraggeberName: auftraggeber,
-  }
-}
-
-export async function loadRegieSammelPdfDaten(
-  auftragId: string,
-  vonDatum: string,
-  bisDatum: string,
-  kalenderwoche: number,
-  jahr: number
-): Promise<
-  | {
-      ok: true
-      regiearbeiten: AuftragRegiearbeit[]
-      team: AuftragBaustelleTeam
-      auftragTitel: string
-      kunde: Kunde | null
-      auftraggeberName: string
-      kalenderwoche: number
-      jahr: number
-      vonDatum: string
-      bisDatum: string
-    }
-  | { ok: false; message: string }
-> {
-  const supabase = createClient()
-  const [{ data: regie }, team, { data: auf }, { data: tages }] = await Promise.all([
-    supabase
-      .from('auftrag_regiearbeiten')
-      .select('*')
-      .eq('auftrag_id', auftragId)
-      .gte('datum', vonDatum)
-      .lte('datum', bisDatum)
-      .order('datum', { ascending: true }),
-    loadAuftragBaustelleTeam(auftragId),
-    supabase.from('auftraege').select('titel, kunden(*)').eq('id', auftragId).maybeSingle(),
-    supabase
-      .from('auftrag_bautagesberichte')
-      .select('auftraggeber_name')
-      .eq('auftrag_id', auftragId)
-      .limit(1)
-      .maybeSingle(),
-  ])
-  const kundenRaw = (auf as { kunden?: Kunde | Kunde[] | null; titel?: string | null } | null)?.kunden
-  const kunde = Array.isArray(kundenRaw) ? kundenRaw[0] ?? null : kundenRaw ?? null
-  const titel = (auf as { titel?: string | null } | null)?.titel?.trim() || kunde?.name?.trim() || 'Bauprojekt'
-  const auftraggeber =
-    (tages as { auftraggeber_name?: string | null } | null)?.auftraggeber_name?.trim() ||
-    kunde?.name?.trim() ||
-    '—'
-
-  return {
-    ok: true,
-    regiearbeiten: (regie ?? []).map((r) => mapRegie(r as Record<string, unknown>)),
-    team,
-    auftragTitel: titel,
-    kunde,
-    auftraggeberName: auftraggeber,
-    kalenderwoche,
-    jahr,
-    vonDatum,
-    bisDatum,
   }
 }

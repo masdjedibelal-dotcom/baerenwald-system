@@ -26,10 +26,6 @@ export function revalidateAngebotList(): void {
   revalidatePath('/angebote')
 }
 
-export function revalidateAngebotNeu(): void {
-  revalidatePath('/angebote/neu')
-}
-
 export function revalidateAuftragDetail(auftragId: string): void {
   const id = auftragId?.trim()
   if (!id) return
@@ -83,14 +79,6 @@ export function revalidateKalender(): void {
   revalidatePath('/kalender')
 }
 
-export function revalidateFormulareList(): void {
-  revalidatePath('/formulare')
-}
-
-export function revalidateFormulareEinstellungen(): void {
-  revalidatePath('/einstellungen/formulare')
-}
-
 /** Nur wenn die Vorgangsliste selbst betroffen ist (Delete/Bulk). */
 export function revalidateVorgaengeListe(): void {
   revalidatePath('/vorgaenge')
@@ -113,10 +101,4 @@ export function revalidateKundeObjekt(kundeId: string, objektId: string): void {
   const oid = objektId?.trim()
   if (!kid || !oid) return
   revalidatePath(`/kunden/${kid}/objekte/${oid}`)
-}
-
-export function revalidateFormularBearbeiten(templateId: string): void {
-  const id = templateId?.trim()
-  if (!id) return
-  revalidatePath(`/formulare/${id}/bearbeiten`)
 }

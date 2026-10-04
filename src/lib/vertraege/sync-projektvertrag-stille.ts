@@ -3,9 +3,9 @@ import 'server-only'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
-  bauvorhabenAusAuftrag,
-  leistungsumfangAusPositionen,
-  verguetungAusPositionen,
+bauvorhabenAusAuftrag,
+leistungsumfangAusPositionen,
+verguetungAusPositionen,
 } from '@/lib/vertraege/build-vertrag-texte'
 import { persistPdfForVertrag } from '@/lib/vertraege/persist-vertrag-pdf'
 import { letzterHauptvertrag } from '@/lib/vertraege/portal-vertrag-helpers'
@@ -228,17 +228,4 @@ export async function syncProjektvertragStilleFuerAuftrag(
   }
 
   return { ok: true, handwerker: hwIds.size }
-}
-
-const VERTRAG_RELEVANTE_POSITION_PATCH_KEYS = new Set([
-  'leistung_name',
-  'preis_partner',
-  'preis_fix',
-  'einheit',
-  'menge',
-  'handwerker_id',
-])
-
-export function positionPatchBenoetigtVertragSync(patch: Record<string, unknown>): boolean {
-  return Object.keys(patch).some((k) => VERTRAG_RELEVANTE_POSITION_PATCH_KEYS.has(k))
 }

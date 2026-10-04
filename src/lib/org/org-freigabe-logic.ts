@@ -15,12 +15,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
-  mailOrgFreigabeAngefordert,
+mailOrgFreigabeAngefordert,
 } from '@/lib/email/meldung-mail-templates'
 import { sendMail } from '@/lib/mail-service'
 import { buildPortalLoginLink } from '@/lib/portal-utils'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
-import type { Kunde, Lead, LeadAnlass, LeadErfassungVon, OrgFreigabeStatus } from '@/lib/types'
+import type { Kunde,Lead,LeadAnlass,LeadErfassungVon,OrgFreigabeStatus } from '@/lib/types'
 
 /** Await + ehrliches Ergebnis — kein void/Fire-and-forget (F-179). */
 async function awaitOrgFreigabeMail(opts: {
@@ -507,60 +507,6 @@ export async function syncOrgFreigabeNachAngebot(input: {
     mailOk: false,
     mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
   }
-}
-
-/** Org-Freigabe nach Partner-Nachtrag wenn Summe Schwelle überschreitet. */
-export async function syncOrgFreigabeNachNachtrag(input: {
-  leadId: string
-  nachtragBetragEur: number
-}): Promise<{ ok: true; status: OrgFreigabeStatus } | { ok: false; message: string }> {
-  const leadId = input.leadId?.trim()
-  if (!leadId) return { ok: false, message: 'Lead fehlt.' }
-
-  const { data: leadRaw, error: leadErr } = await supabaseAdmin
-    .from('leads')
-    .select(
-      'id, auftraggeber_kunde_id, kunde_id, situation, funnel_daten, org_freigabe_status, kunde_objekt_id, erfassung_von, anlass'
-    )
-    .eq('id', leadId)
-    .maybeSingle()
-  if (leadErr) logDbError('lib/org/org-freigabe-logic:leads', leadErr)
-
-  if (leadErr || !leadRaw) return { ok: false, message: leadErr?.message ?? 'Lead nicht gefunden.' }
-  const lead = leadRaw as LeadPick
-
-  const orgKundeId = resolveOrgKundeIdFuerLead(lead)
-  if (!orgKundeId) return { ok: true, status: (lead.org_freigabe_status ?? 'nicht_noetig') as OrgFreigabeStatus }
-
-  const org = await loadOrgKunde(supabaseAdmin, orgKundeId)
-  const objekt = await loadObjektFreigabe(supabaseAdmin, lead.kunde_objekt_id)
-  const erforderlich = orgFreigabeErforderlich(org, lead, input.nachtragBetragEur, {
-    folgearbeit: true,
-    objekt,
-  })
-  if (!erforderlich) return { ok: true, status: (lead.org_freigabe_status ?? 'nicht_noetig') as OrgFreigabeStatus }
-
-  const aktuell = (lead.org_freigabe_status ?? 'nicht_noetig') as OrgFreigabeStatus
-  if (aktuell === 'abgelehnt') {
-    return { ok: true, status: aktuell }
-  }
-
-  const now = new Date().toISOString()
-  await supabaseAdmin
-    .from('leads')
-    .update({ org_freigabe_status: 'ausstehend', updated_at: now })
-    .eq('id', leadId)
-
-  const { error: __dbErr5 } = await supabaseAdmin.from('org_freigabe_log').insert({
-    lead_id: leadId,
-    auftraggeber_kunde_id: orgKundeId,
-    aktion: 'nachtrag_angefordert',
-    betrag_eur: input.nachtragBetragEur,
-    erstellt_von: 'partner',
-  })
-  if (__dbErr5) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr5)
-
-  return { ok: true, status: 'ausstehend' }
 }
 
 /**

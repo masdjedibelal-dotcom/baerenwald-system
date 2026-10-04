@@ -12,7 +12,6 @@ const ALLOWED_LIST_PREFIXES = [
   '/kunden',
   '/handwerker',
   '/partner',
-  '/kalender',
   '/objektakte',
 ] as const
 

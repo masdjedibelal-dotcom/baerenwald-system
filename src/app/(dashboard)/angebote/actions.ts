@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidateAngebotDetail,revalidateAngebotList,revalidateAngebotNeu,revalidateAuftragDetail,revalidateEinstellungenPath,revalidateKalender,revalidateLeadDetail } from '@/lib/crm-revalidate'
+import { revalidateAngebotDetail,revalidateAngebotList,revalidateAuftragDetail,revalidateKalender,revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { randomBytes } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -15,36 +15,36 @@ import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for
 import { sendMail } from '@/lib/mail-service'
 import { getMailBranding } from '@/lib/get-mail-branding'
 import {
-  mailAngebot,mailHandwerkerAnfrage
+mailAngebot,mailHandwerkerAnfrage
 } from '@/lib/mail-templates'
 import {
-  angebotMailBetreff,
-  buildAngebotMail,
-  parseWizardMetaFromNotizen,
-  parseAngebotAnrede,
+angebotMailBetreff,
+buildAngebotMail,
+parseWizardMetaFromNotizen,
+parseAngebotAnrede,
 } from '@/lib/templates/angebot-mail'
 import { formatDatumDeFromIso,projektOderStatusLink } from '@/lib/mail/versand-helpers'
 import { projektUrlFromToken } from '@/lib/projekt/projekt-url'
 import {
-  angebotDarfImWizardBearbeitetWerden,
-  angebotStatusErlaubtImWizard,
-  angebotWizardBearbeitenSperrgrund,
-  defaultAngebotZahlungsbedingungen,
-  resolveAngebotKundeTyp,
+angebotDarfImWizardBearbeitetWerden,
+angebotStatusErlaubtImWizard,
+angebotWizardBearbeitenSperrgrund,
+defaultAngebotZahlungsbedingungen,
+resolveAngebotKundeTyp,
 } from '@/lib/angebote/angebot-wizard-types'
 import {
-  loadAuftragKorrekturKontext,
-  auftragKorrekturSperrgrund,
-  type AuftragKorrekturKontext,
+loadAuftragKorrekturKontext,
+auftragKorrekturSperrgrund,
+type AuftragKorrekturKontext,
 } from '@/lib/angebote/auftrag-korrektur'
 import { formatDatum } from '@/lib/utils'
 import { isKundeAblehnungGrund } from '@/lib/angebote/ablehnung-labels'
 import { sendHandwerkerAnfrageFuerZuweisung } from '@/lib/angebote/send-handwerker-anfrage'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import {
-  loescheAngebotHandwerkerAusserPartnerLv,
-  partnerLvHandwerkerIdsFuerLead,
-  reparentPartnerEinholungenZuKundenangebot,
+loescheAngebotHandwerkerAusserPartnerLv,
+partnerLvHandwerkerIdsFuerLead,
+reparentPartnerEinholungenZuKundenangebot,
 } from '@/lib/angebote/partner-einholung-server'
 import { auftragErfordertProjektvertrag } from '@/lib/auftraege/auftrag-erfordert-projektvertrag'
 import { updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
@@ -53,24 +53,24 @@ import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/ac
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { buildPartnerLoginLink,buildPortalLoginLink,portalAudienceFromKunde } from '@/lib/portal-utils'
 import {
-  buildGewerkEkMap,
-  ekNettoFromHwEinreichung,
-  hasHwEinreichung,
+buildGewerkEkMap,
+ekNettoFromHwEinreichung,
+hasHwEinreichung,
 } from '@/lib/partner/handwerker-einreichung'
 import {
-  angebotPositionenFromRaw,
-  applyLegacyGewerkZeileToAngebotPositionen,
-  applyVereinbarteKonditionenToAngebotPositionen,
-  parseHwKonditionen,
-  resolveAuftragPositionId,
-  zeileNettoAusEinkaufspreis,
+angebotPositionenFromRaw,
+applyLegacyGewerkZeileToAngebotPositionen,
+applyVereinbarteKonditionenToAngebotPositionen,
+parseHwKonditionen,
+resolveAuftragPositionId,
+zeileNettoAusEinkaufspreis,
 } from '@/lib/partner/hw-konditionen'
 import { signedHandwerkerUploadUrl } from '@/lib/partner/handwerker-uploads'
 import { parseHwAnhangStoragePaths } from '@/lib/partner/partner-hw-dokument-typen'
 import {
-  darfAngebotAnKundeSenden,
-  handwerkerSendenBlockierHinweis,
-  orgFreigabeKundenversandOptsFromLead,
+darfAngebotAnKundeSenden,
+handwerkerSendenBlockierHinweis,
+orgFreigabeKundenversandOptsFromLead,
 } from '@/lib/angebote/angebot-handwerker-flow'
 import { notifyPartnerHandwerkerAngebotBestaetigt } from '@/lib/partner/notify-partner-angebot-bestaetigt'
 import { notifyPartnerHandwerkerAngebotAntwort } from '@/lib/partner/notify-partner-angebot-antwort'
@@ -78,11 +78,11 @@ import { parseZahlungsplan,zahlungsplanVorlage50_50 } from '@/lib/rechnungen/zah
 import { loadHandwerkerAcceptWizardBootstrap } from '@/app/(dashboard)/vertraege/wizard-actions'
 import { loadKiVizMailPreviewUrl } from '@/lib/visualize/pdf-data'
 import {
-  parseHwPreisEuro,
-  uploadHwAngebotPdfFromCrm,
+parseHwPreisEuro,
+uploadHwAngebotPdfFromCrm,
 } from '@/lib/partner/upload-hw-angebot-pdf'
 import {
-  kundeRechnungsempfaengerAusStammdaten
+kundeRechnungsempfaengerAusStammdaten
 } from '@/lib/kunde-rechnungsempfaenger'
 import { resolveAngebotDokumentEmpfaenger } from '@/lib/angebote/angebot-html-payload'
 import { LEAD_STATUS_VOR_ANGEBOT,leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
@@ -94,19 +94,19 @@ import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kund
 import { leadVertragsKundeId } from '@/lib/lead-display-helpers'
 import type { LeadStatus } from '@/lib/types'
 import type {
-  AngebotDetail,
-  AngebotHandwerkerZuweisungInput,
-  AngebotPosition,
-  AngebotStatus,
-  AngebotVorlage,
-  Kunde,
-  PreisTyp,
+AngebotDetail,
+AngebotHandwerkerZuweisungInput,
+AngebotPosition,
+AngebotStatus,
+AngebotVorlage,
+Kunde,
+PreisTyp,
 } from '@/lib/types'
 import {
-  handwerkerZuweisungenFromPositionen,
-  normalizeAngebotPositionen,
-  summenAusPositionen,
-  summenKostenaufstellungAusPositionen,
+handwerkerZuweisungenFromPositionen,
+normalizeAngebotPositionen,
+summenAusPositionen,
+summenKostenaufstellungAusPositionen,
 } from '@/lib/angebot-positionen'
 import { angebotPositionenToAuftragRows } from '@/lib/auftrag-positionen-map'
 import { insertKalenderAutoTermine } from '@/lib/kalender-auto-termine'
@@ -120,9 +120,9 @@ import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { planHvFreigabeWrite,writeLeadStatus } from '@/lib/status/write-lead-status'
 import {
-  planAngebotStatusWrite,
-  writeAngebotStatus,
-  writeAngebotStatusEinfach,
+planAngebotStatusWrite,
+writeAngebotStatus,
+writeAngebotStatusEinfach,
 } from '@/lib/status/write-angebot-status'
 import { writeAngebotHandwerkerStatus } from '@/lib/status/write-angebot-handwerker-status'
 import { formatEuro } from '@/lib/format/geld-datum'
@@ -3291,30 +3291,6 @@ export async function listAngebotVorlagen(): Promise<AngebotVorlage[]> {
   }))
 }
 
-function prepareVorlagePositionenForDb(
-  positionen: AngebotPosition[],
-  mitPreisen: boolean
-): AngebotPosition[] {
-  let pos = normalizeAngebotPositionen(positionen).map((p) => {
-    const { handwerker_id, handwerker_name, ...rest } = p
-    void handwerker_id
-    void handwerker_name
-    return rest
-  })
-  if (!mitPreisen) {
-    pos = pos.map((p) => ({
-      ...p,
-      preis_typ: 'fix' as const,
-      lohn_netto: 0,
-      material_netto: 0,
-      gesamt_min: 0,
-      gesamt_max: 0,
-      einkaufspreis: undefined,
-    }))
-  }
-  return pos
-}
-
 export async function listAngebotVorlagenEinstellungen(): Promise<AngebotVorlage[]> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -3330,69 +3306,6 @@ export async function listAngebotVorlagenEinstellungen(): Promise<AngebotVorlage
     ...(row as AngebotVorlage),
     positionen: normalizeAngebotPositionen((row as { positionen: unknown }).positionen),
   }))
-}
-
-export async function saveAngebotVorlage(
-  name: string,
-  beschreibung: string | null,
-  positionen: AngebotPosition[],
-  mitPreisen: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  const pos = prepareVorlagePositionenForDb(positionen, mitPreisen)
-  const summen = summenAusPositionen(pos, 19)
-  const fix =
-    Math.abs(summen.nettoMin - summen.nettoMax) < 0.01 ? summen.nettoMin : null
-  const { error } = await supabase.from('angebot_vorlagen').insert({
-    name: name.trim(),
-    beschreibung: beschreibung?.trim() || null,
-    positionen: pos,
-    gesamt_min: summen.nettoMin,
-    gesamt_max: summen.nettoMax,
-    gesamt_fix: fix,
-    aktiv: true,
-    erstellt_von: user?.id ?? null,
-    updated_at: new Date().toISOString(),
-  })
-  if (error) logDbError('app/angebote/actions:angebot_vorlagen', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAngebotNeu()
-  revalidateEinstellungenPath('/einstellungen/vorlagen')
-  return { ok: true }
-}
-
-export async function updateAngebotVorlage(
-  id: string,
-  name: string,
-  beschreibung: string | null,
-  positionen: AngebotPosition[],
-  mitPreisen: boolean
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const supabase = createClient()
-  const pos = prepareVorlagePositionenForDb(positionen, mitPreisen)
-  const summen = summenAusPositionen(pos, 19)
-  const fix =
-    Math.abs(summen.nettoMin - summen.nettoMax) < 0.01 ? summen.nettoMin : null
-  const { error } = await supabase
-    .from('angebot_vorlagen')
-    .update({
-      name: name.trim(),
-      beschreibung: beschreibung?.trim() || null,
-      positionen: pos,
-      gesamt_min: summen.nettoMin,
-      gesamt_max: summen.nettoMax,
-      gesamt_fix: fix,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-  if (error) logDbError('app/angebote/actions:angebot_vorlagen', error)
-  if (error) return { ok: false, message: error.message }
-  revalidateAngebotNeu()
-  revalidateEinstellungenPath('/einstellungen/vorlagen')
-  return { ok: true }
 }
 
 export async function deleteAngebot(

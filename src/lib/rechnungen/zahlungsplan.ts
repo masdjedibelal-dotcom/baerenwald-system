@@ -1101,34 +1101,6 @@ export function rechnungBerechnungFuerAbschlagZeile(
   return leereRechnungBerechnung(voll)
 }
 
-/**
- * P09 (Entscheidung 29.09.2026): Abschlag ohne vorher angelegten Zahlungsplan.
- * Hängt einen Abschlag an (vor die Schlusszeile) und stellt sicher, dass es eine Schlusszeile gibt.
- * Der Plan bleibt internes Werkzeug; die Schlussrechnung zieht gestellte Abschläge ab.
- */
-export function planMitNeuemAbschlag(
-  plan: Zahlungsplan | null | undefined,
-  abschlag: { typ: 'prozent' | 'betrag'; wert: number }
-): Zahlungsplan {
-  const zeilen = plan?.zeilen ?? []
-  const rest = zeilen.filter((z) => z.typ === 'rest')
-  const raten = zeilen.filter((z) => z.typ !== 'rest')
-  const neuFaellig = plusDaysIso(14)
-  const neu = neueZahlungsplanZeile({
-    titel: `${raten.length + 1}. Abschlag`,
-    typ: abschlag.typ,
-    wert: abschlag.wert,
-    faellig_am: neuFaellig,
-  })
-  // Schlussrechnung ist nie vor einem Abschlag fällig
-  const schluss = rest.length
-    ? rest.map((z) =>
-        z.faellig_am && z.faellig_am.slice(0, 10) > neuFaellig ? z : { ...z, faellig_am: plusDaysIso(28) }
-      )
-    : [neueZahlungsplanZeile({ titel: 'Schlussrechnung', typ: 'rest', wert: 0, faellig_am: plusDaysIso(28) })]
-  return { modus: 'abschlagsplan', zeilen: [...raten, neu, ...schluss] }
-}
-
 /** P09: Schlussrechnung = Restzeile (Gesamt minus gestellte Abschläge). */
 export function planMitSchlussrechnung(plan: Zahlungsplan | null | undefined): Zahlungsplan {
   const zeilen = plan?.zeilen ?? []

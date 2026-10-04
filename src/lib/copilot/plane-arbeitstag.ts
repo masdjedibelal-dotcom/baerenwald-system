@@ -1,11 +1,11 @@
 import 'server-only'
 
 import {
-  getAuftragStatus,
-  getHeutigeTermine,
-  getNeueAnfragen,
-  getOffeneAngebote,
-  getOffeneRechnungen,
+getAuftragStatus,
+getHeutigeTermine,
+getNeueAnfragen,
+getOffeneAngebote,
+getOffeneRechnungen,
 } from '@/lib/copilot/tools'
 import { listTodosCopilot } from '@/lib/copilot/todo-copilot'
 import { istUeberfaelligYmd } from '@/lib/dates/werktag'
@@ -60,7 +60,7 @@ export async function planeArbeitstag() {
   }
   for (const t of todoList.slice(0, 3) as Array<{ id: string; titel: string; ueberfaellig?: boolean }>) {
     links.push({
-      href: `/kalender`,
+      href: `/`,
       label: `To-do · ${t.titel}`,
       hint: t.ueberfaellig ? 'Überfällig' : 'Wichtig',
     })

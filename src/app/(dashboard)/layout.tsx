@@ -6,7 +6,6 @@ import { isRedirectError } from 'next/dist/client/components/redirect'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { ensureUnifiedTeamAccount } from '@/lib/auth/unified-team-account'
-import { ensureStandardTemplatesCached } from '@/lib/standard-templates'
 import { isDevAuthSkipEnabled } from '@/lib/dev-auth'
 import { DashboardProviders } from '@/components/layout/DashboardProviders'
 import { DashboardShell } from '@/components/layout/DashboardShell'
@@ -81,8 +80,6 @@ export default async function DashboardLayout({
     if (!crmProfile) {
       redirect('/login?error=portal_only')
     }
-
-    await ensureStandardTemplatesCached()
 
     return (
       <DashboardProviders>

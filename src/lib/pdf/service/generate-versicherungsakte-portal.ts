@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument,StandardFonts,rgb,type PDFFont,type PDFPage } from "pdf-lib";
 
 import { formatDatum } from "@/lib/format/geld-datum";
 
@@ -423,36 +423,4 @@ export async function generateVersicherungsTeilPdf(
 
   drawFooter(ctx);
   return pdf.save();
-}
-
-/** @deprecated Alias — alte Mega-Akte; nutzt Phase Meldung + leere Ursache-Felder. */
-export async function generateVersicherungsaktePdf(input: {
-  orgName: string;
-  objektTitel: string;
-  objektAdresse?: string;
-  versicherungsNr?: string | null;
-  schadenNr?: string | null;
-  schadendatum?: string | null;
-  hergang?: string | null;
-  chronologie?: Array<{ datum: string; text: string }>;
-  befundZeilen?: Array<{
-    datum: string;
-    titel: string;
-    text: string;
-    fotoCount: number;
-  }>;
-  kostentraegerLabel?: string | null;
-  abnahmeHinweis?: string | null;
-  rechnungHinweis?: string | null;
-}): Promise<Uint8Array> {
-  return generateVersicherungsTeilPdf({
-    phase: "meldung",
-    absender: { name: input.orgName },
-    objektTitel: input.objektTitel,
-    objektAdresse: input.objektAdresse,
-    versicherungsNr: input.versicherungsNr,
-    schadenNr: input.schadenNr,
-    schadendatum: input.schadendatum,
-    hergang: input.hergang,
-  });
 }

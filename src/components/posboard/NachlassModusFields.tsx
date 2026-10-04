@@ -4,12 +4,12 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockSelect } from '@/components/mock-ui/MockForm'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import {
-  formatEurBetrag,
-  gesamtrabattAbzugFromModus,
-  gesamtrabattArt,
-  gesamtrabattIstBrutto,
-  gesamtrabattModusAus,
-  type GesamtrabattModus,
+formatEurBetrag,
+gesamtrabattAbzugFromModus,
+gesamtrabattArt,
+gesamtrabattIstBrutto,
+gesamtrabattModusAus,
+type GesamtrabattModus,
 } from '@/lib/dokument-zeilen'
 
 function Field({
@@ -30,10 +30,6 @@ function Field({
       {hint ? <div className="field-hint">{hint}</div> : null}
     </div>
   )
-}
-
-export function nachlassSelectValue(modus: GesamtrabattModus): 'prozent' | 'betrag' | 'ziel' {
-  return gesamtrabattArt(modus)
 }
 
 export function NachlassModusFields({

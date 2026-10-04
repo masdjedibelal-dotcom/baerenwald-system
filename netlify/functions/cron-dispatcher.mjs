@@ -4,16 +4,6 @@ import { invokeCrmCron } from '../../lib/netlify/invoke-crm-cron.mjs'
 const JOBS = [
   /** 00:00 UTC ≈ 02:00 Europe/Berlin (Sommer); 01:00 im Winter (MEZ) */
   { id: 'rechnungen', path: '/api/cron/rechnungen', hour: 0, minute: 0, dom: null, dow: null, mailRisk: true },
-  { id: 'ki-hub-metrics', path: '/api/cron/ki-hub-metrics', hour: 6, minute: 30, dom: null, dow: null, mailRisk: false },
-  {
-    id: 'ki-hub-analyze',
-    path: '/api/cron/ki-hub-analyze',
-    hour: 7,
-    minute: 0,
-    dom: null,
-    dow: [1, 2, 3, 4, 5, 6],
-    mailRisk: false,
-  },
   {
     id: 'copilot-briefing',
     path: '/api/cron/copilot-briefing',

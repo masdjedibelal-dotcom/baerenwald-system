@@ -116,13 +116,3 @@ export function metaBeimSendenAnHandwerker(
     ...(current.aenderung_typ ? {} : { aenderung_typ: 'neu' }),
   }
 }
-
-/** Handwerker entfernt — Metadaten zurücksetzen. */
-export function metaHandwerkerEntfernt(): Record<string, unknown> {
-  return {
-    handwerker_status: null,
-    aenderung_typ: null,
-    preis_alt: null,
-    preis_partner: null,
-  }
-}

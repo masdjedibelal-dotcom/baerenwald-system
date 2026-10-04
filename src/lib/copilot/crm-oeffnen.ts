@@ -1,9 +1,9 @@
 import {
-  createAngebotHref,
-  createAnfrageHref,
-  createKundeHref,
-  createRechnungHref,
-  createPartnerHref,
+createAngebotHref,
+createAnfrageHref,
+createKundeHref,
+createRechnungHref,
+createPartnerHref,
 } from '@/lib/crm/create-entry'
 
 export type CrmOeffnenZiel =
@@ -152,7 +152,8 @@ export function buildCrmOeffnenLink(input: {
         label: 'Neue Anfrage',
       }
     case 'kalender':
-      return { ok: true, href: '/kalender', label: 'Kalender' }
+      // Kalender-Seite entfällt (01.10.2026) — Termine stehen am Vorgang
+      return { ok: true, href: '/', label: 'Dashboard' }
     case 'vorgaenge':
       return {
         ok: true,

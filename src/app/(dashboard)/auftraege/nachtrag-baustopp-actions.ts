@@ -2,107 +2,15 @@
 
 import { revalidateAngebotDetail,revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { normalizeAngebotPositionen,summenAusPositionen } from '@/lib/angebot-positionen'
-import { sendEmailHtml } from '@/lib/auftraege/emails'
-import type { AngebotPosition,Kunde } from '@/lib/types'
+import type { AngebotPosition } from '@/lib/types'
 import { angebotNachtragMarker } from '@/lib/auftraege/nachtrag-utils'
 import { planNachtragStatusWrite } from '@/lib/status/write-nachtrag-status'
-import { formatEuroSpanne,formatDatumZeit } from '@/lib/format/geld-datum'
 
 const DEFAULT_MWST = 19
-
-function clientIpFromHeaders(): string {
-  const h = headers()
-  const fwd = h.get('x-forwarded-for')
-  if (fwd) return fwd.split(',')[0]?.trim() || 'unbekannt'
-  return h.get('x-real-ip')?.trim() || 'unbekannt'
-}
-
-export type NachtragPublicPayload = {
-  nachtrag: {
-    id: string
-    token: string
-    grund: string
-    beschreibung: string | null
-    positionen: unknown
-    gesamt_min: number | null
-    gesamt_max: number | null
-    status: string
-    kunde_bestaetigt_at: string | null
-    handwercher_bestaetigt: boolean
-    handwercher_bestaetigt_at: string | null
-    gesendet_at: string | null
-  }
-  kunde: Pick<Kunde, 'name' | 'adresse' | 'plz' | 'ort' | 'telefon'>
-  auftragId: string
-  handwercherName: string | null
-}
-
-export async function loadNachtragPublicByToken(token: string): Promise<NachtragPublicPayload | null> {
-  const { data: n, error } = await supabaseAdmin
-    .from('nachtraege')
-    .select(
-      `
-      id, token, grund, beschreibung, positionen, gesamt_min, gesamt_max, status,
-      kunde_bestaetigt_at, handwercher_bestaetigt, handwercher_bestaetigt_at,
-      gesendet_at,
-      auftraege(
-        id,
-        kunden(name, adresse, plz, ort, telefon),
-        auftrag_handwerker(
-          handwerker(name)
-        )
-      )
-    `
-    )
-    .eq('token', token)
-    .maybeSingle()
-  if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', error)
-
-  if (error || !n) return null
-
-  const row = n as Record<string, unknown>
-  const auf = row.auftraege as Record<string, unknown> | Record<string, unknown>[] | null
-  const auftrag = Array.isArray(auf) ? auf[0] : auf
-  if (!auftrag) return null
-  const kRaw = auftrag.kunden as Record<string, unknown> | Record<string, unknown>[] | null
-  const kundeObj = Array.isArray(kRaw) ? kRaw[0] : kRaw
-  if (!kundeObj) return null
-
-  const hwRows = (auftrag.auftrag_handwerker ?? []) as Record<string, unknown>[]
-  const firstHw = hwRows[0]?.handwerker as { name?: string } | { name?: string }[] | undefined
-  const hwName = Array.isArray(firstHw) ? firstHw[0]?.name : firstHw?.name
-
-  return {
-    nachtrag: {
-      id: row.id as string,
-      token: row.token as string,
-      grund: row.grund as string,
-      beschreibung: (row.beschreibung as string | null) ?? null,
-      positionen: row.positionen,
-      gesamt_min: row.gesamt_min != null ? Number(row.gesamt_min) : null,
-      gesamt_max: row.gesamt_max != null ? Number(row.gesamt_max) : null,
-      status: row.status as string,
-      kunde_bestaetigt_at: (row.kunde_bestaetigt_at as string | null) ?? null,
-      handwercher_bestaetigt: Boolean(row.handwercher_bestaetigt),
-      handwercher_bestaetigt_at: (row.handwercher_bestaetigt_at as string | null) ?? null,
-      gesendet_at: (row.gesendet_at as string | null) ?? null,
-    },
-    kunde: {
-      name: String(kundeObj.name ?? ''),
-      adresse: (kundeObj.adresse as string | null) ?? null,
-      plz: (kundeObj.plz as string | null) ?? null,
-      ort: (kundeObj.ort as string | null) ?? null,
-      telefon: (kundeObj.telefon as string | null) ?? null,
-    },
-    auftragId: auftrag.id as string,
-    handwercherName: hwName ?? null,
-  }
-}
 
 async function mergeNachtragIntoAngebot(auftragId: string, positionenNachtrag: unknown): Promise<void> {
   const { data: auf, error } = await supabaseAdmin.from('auftraege').select('angebot_id').eq('id', auftragId).maybeSingle()
@@ -129,87 +37,6 @@ async function mergeNachtragIntoAngebot(auftragId: string, positionenNachtrag: u
     })
     .eq('id', angebotId)
   if (__dbErr1) logDbError('app/auftraege/nachtrag-baustopp-actions:angebote', __dbErr1)
-}
-
-export async function acceptNachtragByToken(token: string): Promise<{ ok: true } | { ok: false; message: string }> {
-  const ip = clientIpFromHeaders()
-  const payload = await loadNachtragPublicByToken(token)
-  if (!payload) return { ok: false, message: 'Dieser Link ist nicht mehr gültig.' }
-
-  const n = payload.nachtrag
-  if (n.kunde_bestaetigt_at) {
-    return { ok: false, message: 'Bereits bestätigt.' }
-  }
-  if (n.status === 'abgelehnt') {
-    return { ok: false, message: 'Dieser Nachtrag wurde abgelehnt.' }
-  }
-
-  const now = new Date().toISOString()
-
-  const { error: upErr } = await supabaseAdmin
-    .from('nachtraege')
-    .update(
-      planNachtragStatusWrite('akzeptiert', {
-        akzeptiert_at: now,
-        kunde_bestaetigt_at: now,
-        kunde_ip: ip,
-      })
-    )
-    .eq('id', n.id)
-    .eq('token', token)
-  if (upErr) logDbError('app/auftraege/nachtrag-baustopp-actions:nachtraege', upErr)
-
-  if (upErr) return { ok: false, message: upErr.message }
-
-  await mergeNachtragIntoAngebot(payload.auftragId, n.positionen)
-
-  const summeTxt =
-    n.gesamt_min != null && n.gesamt_max != null
-      ? `${formatEuroSpanne(n.gesamt_min, n.gesamt_max)}`
-      : '—'
-
-  await insertAuftragTimelineEvent({
-    auftrag_id: payload.auftragId,
-    typ: 'nachtrag_akzeptiert',
-    titel: 'Nachtrag vom Kunden bestätigt',
-    beschreibung: `${formatDatumZeit(now)} · ${summeTxt} · IP ${ip}`,
-    sichtbar_fuer_kunde: true,
-  })
-
-  const internTo = process.env.INTERNE_RECHNUNG_WARNUNG_EMAIL ?? process.env.INTERNE_WARNUNG_EMAIL
-  if (internTo) {
-    await sendEmailHtml({
-      to: internTo,
-      subject: `Nachtrag bestätigt: ${payload.kunde.name}`,
-      html: `<p>Nachtrag akzeptiert für Auftrag <strong>${payload.auftragId.slice(0, 8)}</strong>.</p>
-        <p>Kundin: ${payload.kunde.name}<br/>Summe: ${summeTxt}<br/>IP: ${ip}</p>`,
-    })
-  }
-
-  if (!n.handwercher_bestaetigt) {
-    const { data: links, error } = await supabaseAdmin
-      .from('auftrag_handwerker')
-      .select('handwerker(email, name)')
-      .eq('auftrag_id', payload.auftragId)
-    if (error) logDbError('app/auftraege/nachtrag-baustopp-actions:auftrag_handwerker', error)
-
-    for (const row of links ?? []) {
-      const hw = row as { handwerker?: { email?: string | null; name?: string } | { email?: string | null; name?: string }[] }
-      const h = Array.isArray(hw.handwerker) ? hw.handwerker[0] : hw.handwerker
-      const em = h?.email?.trim()
-      if (!em) continue
-      await sendEmailHtml({
-        to: em,
-        subject: 'Nachtrag: Kundenfreigabe liegt vor',
-        html: `<p>Guten Tag ${h?.name ?? ''},</p>
-          <p>die Kundin hat einen Nachtrag bestätigt. Bitte prüfen Sie die Mehrkosten in der Baustelle / im CRM.</p>
-          <p>Auftrag: ${payload.auftragId.slice(0, 8)}</p>`,
-      })
-    }
-  }
-
-  revalidateAuftragDetail(payload.auftragId)
-  return { ok: true as const }
 }
 
 /** Nachtrags-Zeile zum Angebots-Dokument (Marker in beschreibung). */

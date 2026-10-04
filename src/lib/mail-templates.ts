@@ -3,25 +3,25 @@ import type { MailBranding } from '@/lib/mail-branding'
 import { mailPrimaryButtonHtml,mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 import { buildPartnerSubject,buildSubject } from '@/lib/mail/build-subject'
 import {
-  buildPortalLoginLink,
-  portalMailButtonLabel,
-  portalMailPsIntro,
-  type PortalMailAudience,
+buildPortalLoginLink,
+portalMailButtonLabel,
+portalMailPsIntro,
+type PortalMailAudience,
 } from '@/lib/portal-utils'
 import { buildAuftragsbestaetigungMail } from '@/lib/mail/auftragsbestaetigung-mail'
 import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
 import {
-  zahlungserinnerungBetreff,
-  zahlungserinnerungZahlbarBis,
-  type ZahlungserinnerungMailInput,
-  type ZahlungserinnerungStufe,
+zahlungserinnerungBetreff,
+zahlungserinnerungZahlbarBis,
+type ZahlungserinnerungMailInput,
+type ZahlungserinnerungStufe,
 } from '@/lib/mail/zahlungserinnerung-mail'
 import {
-  mailBegruessungZeile,
-  mailTeamGruss,
-  mailText,
-  resolveMailAnrede,
-  type MailAnrede,
+mailBegruessungZeile,
+mailTeamGruss,
+mailText,
+resolveMailAnrede,
+type MailAnrede,
 } from '@/lib/mail/anrede'
 import { BEREICH_LABELS } from '@/lib/utils'
 import { filterAdressRueckfragen,type VorOrtRueckfrage } from '@/lib/anfrage-adresse'
@@ -212,10 +212,6 @@ function btn(text: string, url: string): string {
   return mailPrimaryButtonHtml(text, url)
 }
 
-function btnSecondary(text: string, url: string): string {
-  return mailSecondaryButtonHtml(text, url)
-}
-
 function greenBox(html: string): string {
   return `<div style="background:${C.greenSoft};border-radius:8px;padding:16px 20px;margin:16px 0;">${html}</div>`
 }
@@ -226,10 +222,6 @@ function greenHintBox(html: string): string {
 
 function whiteBorderBox(html: string): string {
   return `<div style="background:${C.white};border:1px solid ${C.gray200};border-radius:8px;padding:16px 20px;margin:12px 0;">${html}</div>`
-}
-
-function detailRow(label: string, value: string): string {
-  return `<tr><td style="color:${C.gray500};padding:5px 0;width:36%;vertical-align:top;font-size:15px;">${esc(label)}:</td><td style="font-weight:600;color:${C.gray800};font-size:15px;padding:5px 0;">${value}</td></tr>`
 }
 
 function mailTerminDetailsInline(datumFmt: string, zeitText: string, ort: string): string {
@@ -819,68 +811,6 @@ export function mailZahlungserinnerung(
     },
     b
   )
-}
-
-export function mailHandwerkerLeistungZuweisung(
-  data: {
-    name: string
-    plz: string
-    leistungen: {
-      gewerk_name: string
-      leistung_name: string
-      beschreibung?: string | null
-      von_bis: string
-    }[]
-    portalLink: string
-  },
-  b: MailBranding
-): { betreff: string; html: string } {
-  const name = esc(data.name)
-  const plz = esc(data.plz.trim() || '—')
-  const cards = data.leistungen
-    .map((l, i) => {
-      const beschreibung = l.beschreibung?.trim() ? esc(l.beschreibung.trim()) : '—'
-      const posLabel =
-        data.leistungen.length > 1
-          ? `<p style="margin:0 0 8px;font-size:12px;font-weight:700;color:${C.green};text-transform:uppercase;">Position ${i + 1} von ${data.leistungen.length}</p>`
-          : ''
-      return whiteBorderBox(`
-        ${posLabel}
-        <table width="100%" cellpadding="0" cellspacing="0">
-        ${detailRow('Gewerk', esc(l.gewerk_name))}
-        ${detailRow('Leistung', esc(l.leistung_name))}
-        ${detailRow('Beschreibung', beschreibung)}
-        ${detailRow('Von – bis', esc(l.von_bis))}
-        ${detailRow('PLZ', plz)}
-        </table>
-      `)
-    })
-    .join('')
-  const subjectLeistung =
-    data.leistungen.length === 1 ? data.leistungen[0]!.leistung_name : `${data.leistungen.length} Positionen`
-  const subjectGewerk =
-    data.leistungen.length === 1 ? data.leistungen[0]!.gewerk_name : subjectLeistung
-
-  return {
-    betreff: buildPartnerSubject({
-      gewerk: subjectGewerk,
-      ort: data.plz.trim() || null,
-      ereignis: 'Leistungsanfrage',
-    }),
-    html: mailHtmlBase(
-      `
-      <h2 style="color:${C.green};margin:0 0 16px;">Neue Leistungsanfrage</h2>
-      <p style="margin:0 0 16px;">Guten Tag ${name},</p>
-      ${data.leistungen.length > 1 ? `<p style="margin:0 0 16px;line-height:1.6;">Folgende <strong>${data.leistungen.length} Positionen</strong> warten auf Ihre Rückmeldung:</p>` : ''}
-      ${cards}
-      ${btnSecondary('Zum Partner-Portal →', data.portalLink)}
-    `,
-      `Leistungsanfrage: ${subjectLeistung}`,
-      b,
-      undefined,
-      { skipMeinBaerenwaldPs: true }
-    ),
-  }
 }
 
 export function mailHandwerkerAnfrage(
