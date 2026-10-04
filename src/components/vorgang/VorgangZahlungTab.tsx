@@ -1,7 +1,7 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
-import { AbschlagStellenSheet } from '@/components/vorgang/AbschlagStellenSheet'
+import { AbschlagsplanSheet } from '@/components/vorgang/AbschlagsplanSheet'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
@@ -11,7 +11,6 @@ import { useLocalTransition } from '@/components/ui/action-busy'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
 import {
   RateDrawer,
   type RateDrawerCta,
@@ -36,7 +35,6 @@ import {
   type RechnungAbschlagLink,
   type ZahlplanRateStatus,
   type Zahlungsplan,
-  planMitNeuemAbschlag,
   planMitSchlussrechnung,
 } from '@/lib/rechnungen/zahlungsplan'
 import {
@@ -191,7 +189,6 @@ export function VorgangZahlungTab({
     [zahlungsplanRaw]
   )
   const [plan, setPlan] = useState<Zahlungsplan>(initial)
-  const [editorOpen, setEditorOpen] = useState(false)
   const [abschlagOpen, setAbschlagOpen] = useState(false)
   const [openRateId, setOpenRateId] = useState<string | null>(null)
 
@@ -497,15 +494,6 @@ export function VorgangZahlungTab({
         .map((z) => z.id),
     [plan.zeilen, abschlagLinks]
   )
-  const frozenMeta = useMemo(() => {
-    const m: Record<string, { rechnungsnummer?: string | null }> = {}
-    for (const id of frozenRateIds) {
-      const link = rechnungFuerAbschlagZeile(id, abschlagLinks)
-      m[id] = { rechnungsnummer: link?.rechnungsnummer ?? null }
-    }
-    return m
-  }, [frozenRateIds, abschlagLinks])
-
   function speichern(next: Zahlungsplan) {
     if (!auftragId) {
       toast.error(TOAST.kein_auftrag_plan_nur_am_angebot_speicherbar)
@@ -522,11 +510,10 @@ export function VorgangZahlungTab({
         return
       }
       setPlan(next)
-      setEditorOpen(false)
       const teile: string[] = []
       if (res.aktualisiert > 0) teile.push(`${res.aktualisiert} Entwurf(e) neu berechnet`)
       if (res.erstellt > 0) teile.push(`${res.erstellt} neu`)
-      if (res.storniertOrphan > 0) teile.push(`${res.storniertOrphan} verwaiste Entwürfe storniert`)
+      if (res.storniertOrphan > 0) teile.push(`${res.storniertOrphan} Entwurf/Entwürfe gelöscht`)
       if (res.gestellteUnveraendert > 0) {
         teile.push(
           `${res.gestellteUnveraendert} gestellte Rate(n) unverändert — ggf. korrigieren & erneut senden`
@@ -686,11 +673,13 @@ export function VorgangZahlungTab({
   /** Schlussrechnung schon gestellt oder alles bezahlt → kein weiterer Abschlag. */
   const schlussGestellt = rows.some((r) => r.istSchluss && r.status !== 'geplant')
   const abschlagMoeglich = !schlussGestellt && offen > 0.005
+  const hatAbschlaege = hasPlan && plan.zeilen.some((z) => z.typ !== 'rest')
   const planAktionen = canEditPlan ? (
     <span style={{ display: 'inline-flex', gap: 8 }}>
-      {abschlagMoeglich ? (
-        <MockBtn sm kind="secondary" icon="plus" onClick={() => setAbschlagOpen(true)}>
-          Abschlag stellen
+      {/* Ein Knopf: Abschläge anlegen und den Plan später ändern */}
+      {abschlagMoeglich || plan.zeilen.some((z) => z.typ !== 'rest') ? (
+        <MockBtn sm kind="secondary" icon={hatAbschlaege ? 'pencil' : 'plus'} onClick={() => setAbschlagOpen(true)}>
+          {hatAbschlaege ? 'Abschlagsplan' : 'Abschlag stellen'}
         </MockBtn>
       ) : null}
       {!hatSchlusszeile ? (
@@ -711,15 +700,17 @@ export function VorgangZahlungTab({
     </span>
   ) : null
   const abschlagSheet = canEditPlan ? (
-    <AbschlagStellenSheet
+    <AbschlagsplanSheet
       open={abschlagOpen}
       onClose={() => setAbschlagOpen(false)}
       gesamtNetto={gesamtNetto}
       gesamtBrutto={totalBrutto}
+      initial={hasPlan ? plan : null}
+      frozenIds={frozenRateIds}
       saving={pending}
-      onSave={(a) => {
+      onSave={(next) => {
         setAbschlagOpen(false)
-        speichern(planMitNeuemAbschlag(hasPlan ? plan : null, a))
+        speichern(next)
       }}
     />
   ) : null
@@ -812,19 +803,6 @@ export function VorgangZahlungTab({
           {afterTable}
         </MockCard>
         {abschlagSheet}
-        {canEditPlan ? (
-          <AbschlagsplanEditorModal
-            open={editorOpen}
-            onClose={() => setEditorOpen(false)}
-            gesamtNetto={gesamtNetto}
-            gesamtBrutto={totalBrutto}
-            initial={null}
-            onSave={speichern}
-            saving={pending}
-            frozenIds={frozenRateIds}
-            frozenMeta={frozenMeta}
-          />
-        ) : null}
       </>
     )
   }
@@ -839,15 +817,6 @@ export function VorgangZahlungTab({
           canEditPlan ? (
             <span style={{ display: 'inline-flex', gap: 8 }}>
               {planAktionen}
-              <MockBtn
-                sm
-                kind="secondary"
-                icon="pencil"
-                title="Abschläge bearbeiten"
-                onClick={() => setEditorOpen(true)}
-              >
-                Bearbeiten
-              </MockBtn>
             </span>
           ) : variant === 'angebot' ? (
             <span style={{ fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>Vorschlag</span>
@@ -964,19 +933,6 @@ export function VorgangZahlungTab({
       />
 
       {abschlagSheet}
-      {canEditPlan ? (
-        <AbschlagsplanEditorModal
-          open={editorOpen}
-          onClose={() => setEditorOpen(false)}
-          gesamtNetto={gesamtNetto}
-          gesamtBrutto={totalBrutto}
-          initial={hasPlan ? plan : null}
-          onSave={speichern}
-          saving={pending}
-          frozenIds={frozenRateIds}
-          frozenMeta={frozenMeta}
-        />
-      ) : null}
     </>
   )
 }

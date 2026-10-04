@@ -22407,3 +22407,25 @@ button.abnahme-pos-pick__item {
   text-align: left; box-shadow: none; color: var(--text);
 }
 button.abnahme-pos-pick__item:hover { background: var(--bg-soft); }
+
+/* Abschlagsplan-Sheet: oben hinzufügen, darunter die Raten */
+.abschlagsplan-neu { display: grid; gap: 8px; margin-bottom: 16px; }
+.abschlagsplan-neu__row { display: flex; gap: 8px; align-items: center; }
+.abschlagsplan-neu__wert { flex: 1; min-width: 0; }
+.abschlagsplan-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.abschlagsplan-zeile {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 0.5px solid var(--border); border-radius: var(--r-sm);
+  background: var(--card);
+}
+.abschlagsplan-zeile.is-fest { background: var(--bg-soft); }
+.abschlagsplan-zeile__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.abschlagsplan-zeile__titel { font-size: var(--fs-text); font-weight: 600; color: var(--text); }
+.abschlagsplan-zeile__sub { font-size: var(--fs-meta); color: var(--text-3); }
+.abschlagsplan-zeile__betrag { font-size: var(--fs-text); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+button.abschlagsplan-zeile__del {
+  width: 32px; height: 32px; display: grid; place-items: center; padding: 0;
+  border: none; background: transparent; color: var(--text-3); box-shadow: none; border-radius: var(--r-xs);
+}
+button.abschlagsplan-zeile__del:hover { background: var(--red-bg); color: var(--red-tx); }
+.abschlagsplan-zeile__del-platz { width: 32px; flex-shrink: 0; }

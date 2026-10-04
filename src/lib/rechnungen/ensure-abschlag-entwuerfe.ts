@@ -1,4 +1,5 @@
 import { logDbError } from '@/lib/errors/log-db-error'
+import { deleteRechnungEntwurf } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { normalizeFaelligAmYmd } from '@/lib/dates/werktag'
 import {
   auftragSummenAusPositionen,
@@ -282,7 +283,7 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
     }
   }
 
-  // Entwürfe zu entfernten Planzeilen stornieren
+  // Entwürfe zu entfernten Planzeilen löschen (nie gesendet — kein Storno nötig)
   let storniertOrphan = 0
   for (const r of bestehend) {
     if (String(r.status ?? '').toLowerCase() !== 'entwurf') continue
@@ -290,7 +291,7 @@ export async function ensureAbschlagEntwuerfeForAuftrag(
     if (art !== 'abschlag' && art !== 'schluss') continue
     const zeileId = r.zahlungsplan_abschlag_id?.trim()
     if (!zeileId || planZeileIds.has(zeileId)) continue
-    const res = await updateRechnungStatus(r.id, 'storniert')
+    const res = await deleteRechnungEntwurf(r.id)
     if (!res.ok) return res
     storniertOrphan += 1
   }
