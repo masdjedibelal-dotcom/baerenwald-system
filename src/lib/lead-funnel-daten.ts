@@ -172,6 +172,7 @@ export const FUNNEL_KUNDENTYP_LABELS: Record<string, string> = {
   mieter: 'Mieter',
   verwaltung: 'Hausverwaltung',
   gewerbe: 'Gewerbe',
+  individuell: 'Individuell',
 }
 
 export const FUNNEL_DRINGLICHKEIT_LABELS: Record<string, string> = {

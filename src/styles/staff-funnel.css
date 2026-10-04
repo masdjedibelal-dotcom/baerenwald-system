@@ -608,3 +608,35 @@
 .staff-funnel .preis-karte--empty .preis-karte-trenner {
   color: var(--text-3);
 }
+
+/* 04.10.2026: Anfrage-Wizard im Look der Website — weiche Karten, größere Schrift, klare Überschriften */
+.staff-funnel .sf-sec-l {
+  font-size: var(--fs-title, 15px);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.staff-funnel .funnel-tile {
+  border-radius: var(--r-lg);
+  border: 1px solid color-mix(in srgb, var(--text) 6%, transparent);
+  padding: 16px;
+  background: var(--card);
+  box-shadow: var(--sh-1);
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+.staff-funnel .funnel-tile:hover:not(.selected) {
+  border-color: color-mix(in srgb, var(--green) 28%, transparent);
+  box-shadow: var(--sh-2);
+  transform: translateY(-1px);
+}
+.staff-funnel .funnel-tile.selected {
+  border-color: var(--green);
+  border-width: 1.5px;
+  background: color-mix(in srgb, var(--green) 4%, var(--card));
+  box-shadow: var(--sh-2);
+}
+.staff-funnel .funnel-tile-icon-wrap img { opacity: 1; }
+.staff-funnel .funnel-tile-label { font-size: 15px; }
+.staff-funnel .funnel-tile-hint { font-size: 13px; color: var(--text-3); }
+.staff-funnel .sf-tile-grid { gap: 12px; }

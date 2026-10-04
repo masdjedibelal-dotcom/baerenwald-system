@@ -113,6 +113,8 @@ export const SITUATION_LABELS: Record<string, string> = {
   neu_bauen: 'Neu bauen',
   betreuung: 'Betreuung',
   gewerbe: 'Gewerbe',
+  /** Website: freie Anfrage (Kontaktformular) */
+  individuell: 'Individuell',
   /** Website / Vor-Ort (neu) */
   erneuern: 'Zuhause erneuern',
   kaputt: 'Reparatur / Defekt',

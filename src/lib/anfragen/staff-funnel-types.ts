@@ -118,6 +118,7 @@ export const STAFF_ANLIEGEN_LABELS: Record<string, string> = {
   betreuung: 'Betreuung',
   kaputt: 'Reparatur & Notfall',
   gewerbe: 'Gewerbe',
+  individuell: 'Individuell',
   termin: 'Termin / Beratung',
   hausverwaltung: 'Hausverwaltung',
 }

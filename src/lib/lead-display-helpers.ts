@@ -10,6 +10,7 @@ const KUNDENTYP_MAP: Record<string, string> = {
   mieter: 'Mieter',
   verwaltung: 'Hausverwaltung',
   gewerbe: 'Gewerbe',
+  individuell: 'Individuell',
   privat: 'Privat',
   hausverwaltung: 'Hausverwaltung',
 }
