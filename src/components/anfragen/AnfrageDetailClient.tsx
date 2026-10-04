@@ -1,4 +1,5 @@
 'use client'
+import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { MockBtn } from '@/components/mock-ui'
 import {
   DetailShell,
@@ -747,20 +748,24 @@ export function AnfrageDetailClient({
         danger: true,
         icon: <MockIcon ctx="btn" n="trash" size={16} />,
         onClick: () => {
-          void (async () => {
-            const res = await deleteAnfrage(lead.id)
-            if (!res.ok) {
-              toast.systemError(res)
-              return
-            }
-            toast.deleted({
-              message: 'Anfrage gelöscht',
-              onUndo: () => {
-                restoreAnfrage(lead.id).then(() => router.push(`/anfragen/${lead.id}`))
-              },
-            })
-            router.push('/vorgaenge?tab=anfrage')
-          })()
+          openDeleteConfirm(
+            'Anfrage löschen?',
+            async () => {
+              const res = await deleteAnfrage(lead.id)
+              if (!res.ok) {
+                toast.systemError(res)
+                throw new Error(res.message)
+              }
+              toast.deleted({
+                message: 'Anfrage gelöscht',
+                onUndo: () => {
+                  restoreAnfrage(lead.id).then(() => router.push(`/anfragen/${lead.id}`))
+                },
+              })
+              router.push('/vorgaenge?tab=anfrage')
+            },
+            { sub: 'Kunde bleibt erhalten.', body: 'Die Anfrage wird gelöscht.' }
+          )
         },
       })
     }

@@ -261,14 +261,19 @@ export function VorgaengeListeClient({
   /** Aufgeklappte Korrektur-Ketten entfallen — eine Card pro Vorgang. */
   // Beim Kunden eingebettet ist die Kunden-Spalte doppelt.
   // Wie Wowflow: Vorgangstitel vorne, Kunde · Adresse darunter — keine eigene Kunden-Spalte mehr
-  const visibleCols: Record<DataColId, boolean> = {
-    kunde: false,
-    titel: true,
-    phase: true,
-    wert: true,
-    datum: true,
-    status: true,
-  }
+  // Phase-Spalte nur unter „Alle“ — im Phasen-Tab steht überall dieselbe Phase
+  const zeigePhaseSpalte = filter === 'alle'
+  const visibleCols: Record<DataColId, boolean> = useMemo(
+    () => ({
+      kunde: false,
+      titel: true,
+      phase: zeigePhaseSpalte,
+      wert: true,
+      datum: true,
+      status: true,
+    }),
+    [zeigePhaseSpalte]
+  )
   const [flashKeys, ] = useState<Record<string, boolean>>({})
   // Standard: wie geladen (zuletzt bearbeitet zuerst); „Fällig“ sortiert auf Klick
   const [sortCol, setSortCol] = useState<SortCol | null>(null)
@@ -336,8 +341,8 @@ export function VorgaengeListeClient({
       setFilter(phase)
       setStatusFilter([])
       if (phase !== 'rechnung') setRechnungRichtung('ausgehend')
-      // Erledigt-Toggle nur unter „Alle“ und „Rechnung“
-      const keepsLifecycle = phase === 'alle' || phase === 'rechnung'
+      // Offen/Erledigt gilt in jeder Phase (außer Bestand)
+      const keepsLifecycle = phase !== 'bestand'
       const nextLc = keepsLifecycle ? lifecycle : 'offen'
       if (!keepsLifecycle) setLifecycle('offen')
       if (!embedded) {
@@ -368,8 +373,8 @@ export function VorgaengeListeClient({
     void r
     setRechnungRichtung('ausgehend')
     const lc = searchParams.get('lifecycle')
-    // Erledigt-Toggle nur unter „Alle“ und „Rechnung“
-    if (phase === 'alle' || phase === 'rechnung') {
+    // Offen/Erledigt in jeder Phase (außer Bestand)
+    if (phase !== 'bestand') {
       if (lc === 'erledigt' || lc === 'offen') setLifecycle(lc)
       else setLifecycle('offen')
     } else {
@@ -494,7 +499,11 @@ export function VorgaengeListeClient({
               ? r === 'eingehend'
               : r !== 'eingehend'
           })
-        : baseRows.filter((v) => (v.rechnungRichtung ?? 'ausgehend') !== 'eingehend')
+        : baseRows.filter(
+            (v) =>
+              (v.rechnungRichtung ?? 'ausgehend') !== 'eingehend' &&
+              (filter === 'alle' || filter === 'bestand' || v.phase === filter)
+          )
     let offen = 0
     let erledigt = 0
     for (const v of scope) {
@@ -505,12 +514,12 @@ export function VorgaengeListeClient({
   }, [baseRows, filter, rechnungRichtung])
 
   const showHwEingang = filter === 'rechnung' && rechnungRichtung === 'eingehend'
-  /** Offen/Erledigt-Toggle bei „Alle“ und „Rechnung“. */
+  /** Offen/Erledigt-Toggle in jeder Phase. */
   // Eingebettet (Kunde, Partner, Objekt): einfach alle Vorgänge, ohne Phasen-Chips und Offen/Erledigt.
-  const showLifecycleToggle = !embedded && (filter === 'alle' || filter === 'rechnung')
+  const showLifecycleToggle = !embedded && filter !== 'bestand'
   const effectiveLifecycleCounts = lifecycleCounts
 
-  /** Erledigt-Filter unter „Alle“ und „Rechnung“; andere Phasen nur Offen. */
+  /** Offen/Erledigt-Filter in jeder Phase; Bestand nur Offen. */
   const lifecycleRows = useMemo(() => {
     if (embedded) return baseRows
     let next = baseRows
@@ -520,18 +529,14 @@ export function VorgaengeListeClient({
         const r = v.rechnungRichtung ?? 'ausgehend'
         return rechnungRichtung === 'eingehend' ? r === 'eingehend' : r !== 'eingehend'
       })
-    } else if (filter === 'alle') {
-      next = next.filter((v) => (v.rechnungRichtung ?? 'ausgehend') !== 'eingehend')
+    } else if (filter === 'bestand') {
+      return next.filter((v) => !isVorgangErledigt(v))
     } else {
-      next = next.filter((v) => !isVorgangErledigt(v))
-      return next
+      next = next.filter((v) => (v.rechnungRichtung ?? 'ausgehend') !== 'eingehend')
     }
-    if (filter === 'alle' || filter === 'rechnung') {
-      return next.filter((v) =>
-        lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
-      )
-    }
-    return next
+    return next.filter((v) =>
+      lifecycle === 'erledigt' ? isVorgangErledigt(v) : !isVorgangErledigt(v)
+    )
   }, [baseRows, lifecycle, filter, rechnungRichtung, embedded])
 
   const statusOptions = useMemo(() => {
@@ -567,8 +572,7 @@ export function VorgaengeListeClient({
       } else if (p === 'rechnung') {
         c[p] = imLifecycle.filter((v) => v.phase === 'rechnung').length
       } else {
-        // Anfrage / Angebot / Auftrag: Tab erzwingt Offen → immer Offen-Zähler
-        c[p] = offen.filter((v) => v.phase === p).length
+        c[p] = imLifecycle.filter((v) => v.phase === p).length
       }
     }
     return c

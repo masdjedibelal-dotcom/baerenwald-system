@@ -12,7 +12,7 @@ import {
   type TransitionStartFunction,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { dismissSoftKeyboard } from '@/lib/a11y/dismiss-soft-keyboard'
 
@@ -121,17 +121,76 @@ export function hideOverlayBusy() {
   hideBusy()
 }
 
+/** Ziel-Pfad einer Navigation, wenn er sich vom aktuellen unterscheidet (nur gleiche Origin). */
+function anderesNavZiel(href: string): boolean {
+  try {
+    const ziel = new URL(href, window.location.href)
+    if (ziel.origin !== window.location.origin) return false
+    return ziel.pathname !== window.location.pathname
+  } catch {
+    return false
+  }
+}
+
+let navBusyTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Jede Seiten-Navigation: kurz warten, dann Ladeanzeige bis der Pfad wechselt. */
+function startNavBusy(href: string) {
+  if (!anderesNavZiel(href)) return
+  if (navBusyTimer) clearTimeout(navBusyTimer)
+  const startPfad = window.location.pathname
+  navBusyTimer = setTimeout(() => {
+    navBusyTimer = null
+    if (window.location.pathname !== startPfad) return
+    showRouteBusy(DEFAULT_LABEL)
+  }, 120)
+}
+
 function RouteBusyPathListener() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const routeKey = `${pathname ?? ''}?${searchParams?.toString() ?? ''}`
   const prevRouteKey = useRef(routeKey)
 
   useEffect(() => {
     if (prevRouteKey.current === routeKey) return
     prevRouteKey.current = routeKey
+    if (navBusyTimer) {
+      clearTimeout(navBusyTimer)
+      navBusyTimer = null
+    }
     if (routeBusyDepth > 0) hideRouteBusy()
   }, [routeKey])
+
+  // router.push/replace überall (Liste, Glocke, Buttons) → Ladeanzeige bei Seitenwechsel
+  useEffect(() => {
+    const r = router as typeof router & { __busyPatched?: boolean }
+    if (r.__busyPatched) return
+    const push = r.push.bind(r)
+    const replace = r.replace.bind(r)
+    r.push = (href, opts) => {
+      startNavBusy(href)
+      return push(href, opts)
+    }
+    r.replace = (href, opts) => {
+      startNavBusy(href)
+      return replace(href, opts)
+    }
+    r.__busyPatched = true
+  }, [router])
+
+  // Interne Links (<Link>/<a>) ebenso
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      const a = (e.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null
+      if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return
+      startNavBusy(a.href)
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [])
 
   return null
 }

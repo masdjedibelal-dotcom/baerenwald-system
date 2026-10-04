@@ -36,9 +36,11 @@ import {
   defaultPortalInviteText,
   defaultPartnerPortalInviteBetreff,
   defaultPartnerPortalInviteText,
+  portalMailButtonLabel,
   type PortalMailAudience,
 } from '@/lib/portal-utils'
 import { C } from '@/lib/tokens/colors'
+import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 
 /** Website-Lead: Bestätigungsmail; mit `force` auch für manuell erfasste Anfragen (Checkbox). */
 export async function sendAnfrageBestaetigung(
@@ -556,6 +558,7 @@ function kundenPortalMailHtml(input: {
   const content = `
     <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${greeting}</p>
     ${body}
+    <p style="margin:20px 0 8px;">${mailPrimaryButtonHtml(portalMailButtonLabel(input.portalAudience), input.portalLink, { margin: '0' })}</p>
     <p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.6;">
       ${
         input.anrede === 'du'
@@ -571,11 +574,8 @@ function kundenPortalMailHtml(input: {
     }),
     input.branding,
     disclaimer,
-    {
-      anrede: input.anrede,
-      portalLink: input.portalLink,
-      portalAudience: input.portalAudience,
-    }
+    // Einladung: Portal-Button steht im Text — kein zusätzliches P.S.
+    { skipMeinBaerenwaldPs: true, anrede: input.anrede }
   )
 }
 

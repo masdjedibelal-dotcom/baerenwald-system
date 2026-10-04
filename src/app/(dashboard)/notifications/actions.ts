@@ -437,7 +437,7 @@ async function collectCrmNotificationItems(opts?: {
     supabase
       .from('position_eintraege')
       .select(
-        'id, typ, beschreibung, created_at, auftrag_id, position_id, erfasst_von, auftrag_positionen(auftrag_id, leistung_name, handwerker:handwerker_id(name))'
+        'id, typ, beschreibung, created_at, auftrag_id, position_id, erfasst_von, auftrag_positionen!position_eintraege_position_id_fkey(auftrag_id, leistung_name, handwerker:handwerker_id(name))'
       )
       .in('erfasst_von', ['partner_app', 'eigenbetrieb_app'])
       .neq('typ', 'weitere_arbeit')
