@@ -246,8 +246,12 @@ export function HandwerkerDetailClient({
     }
   }, [notizen, hw.id, hw.notizen, router])
 
+  // Pflichtnachweise entfallen (04.10.2026): nur noch die Handwerkskarte, Rahmenvertrag separat
   const complianceTypenStandard = useMemo(
-    () => filterStandardComplianceTypen(complianceTypen, hwGewerkSlugs, gewerke),
+    () =>
+      filterStandardComplianceTypen(complianceTypen, hwGewerkSlugs, gewerke).filter(
+        (t) => t.slug === 'handwerkskarte'
+      ),
     [complianceTypen, hwGewerkSlugs, gewerke]
   )
 
@@ -492,7 +496,7 @@ export function HandwerkerDetailClient({
   )
 
   const complianceAnzahl = useMemo(
-    () => standardDokumente(payload.dokumente).length,
+    () => standardDokumente(payload.dokumente).filter((d) => d.typ === 'handwerkskarte').length,
     [payload.dokumente]
   )
   const akteDocsAnzahl = useMemo(
@@ -520,7 +524,7 @@ export function HandwerkerDetailClient({
     },
     {
       id: 'compliance',
-      label: 'Compliance',
+      label: 'Handwerkskarte',
       icon: 'shield-check',
       count: complianceAnzahl || undefined,
       render: () => complianceInhalt,

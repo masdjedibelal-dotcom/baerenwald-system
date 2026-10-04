@@ -4,7 +4,8 @@ import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-type
 import { isAusgehendeRechnung } from '@/lib/rechnungen/rechnung-richtung'
 import { rechnungDokumentBezeichnung } from '@/lib/rechnungen/zahlungsplan'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import type { Angebot, AngebotHandwerkerRow, AuftragDetail, LeadDokumentRow } from '@/lib/types'
+import type { Angebot, AngebotHandwerkerRow, AuftragDetail, DokumentArt, LeadDokumentRow } from '@/lib/types'
+import { DOKUMENT_ART_LABEL } from '@/lib/types'
 import {
   parseHwAnhangStoragePaths,
   partnerHwDokumentListenName,
@@ -374,7 +375,12 @@ export function leadDokumentZeilen(dokumente: LeadDokumentRow[] | null | undefin
     .map((d) => ({
       id: `lead-${d.id}`,
       name: d.name?.trim() || 'Dokument',
-      beschreibung: 'Akte',
+      beschreibung: [
+        DOKUMENT_ART_LABEL[(d.art ?? 'sonstiges') as DokumentArt] ?? 'Sonstiges',
+        d.von === 'partner' ? 'vom Partner' : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
       datum: d.created_at,
       fuerKunde: false,
       href: d.datei_url.trim(),

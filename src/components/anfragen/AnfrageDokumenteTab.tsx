@@ -21,7 +21,9 @@ import {
 } from "@/lib/auftraege/auftrag-dokumente-helpers";
 import { rechnungDokumentBezeichnung } from "@/lib/rechnungen/zahlungsplan";
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
-import type { LeadDokumentRow } from "@/lib/types";
+import type { DokumentArt, LeadDokumentRow } from "@/lib/types";
+import { DOKUMENT_ARTEN, DOKUMENT_ART_LABEL } from "@/lib/types";
+import { MockSegment } from "@/components/mock-ui/MockSegment";
 import type { EntityMenuItem } from "@/lib/entity-menu";
 import { DokMobileCard } from "@/components/ui/DokMobileCard";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -59,6 +61,8 @@ type DocRow = {
   dokumentId?: string;
   beschreibung: string;
   freigabe: boolean;
+  /** „Angebot · vom Partner“ — nur bei Uploads */
+  artLabel?: string;
 };
 
 export type AkteProtokollDokument = {
@@ -109,6 +113,8 @@ export function AnfrageDokumenteTab({
   const [editId, setEditId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  /** Art für neue Uploads: Angebot / Rechnung / Protokoll / Sonstiges */
+  const [uploadArt, setUploadArt] = useState<DokumentArt>("sonstiges");
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
@@ -126,6 +132,12 @@ export function AnfrageDokumenteTab({
         dokumentId: d.id,
         beschreibung: m?.beschreibung ?? "",
         freigabe: m?.freigabe ?? false,
+        artLabel: [
+          DOKUMENT_ART_LABEL[(d.art ?? "sonstiges") as DokumentArt] ?? "Sonstiges",
+          d.von === "partner" ? "vom Partner" : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
       };
     });
 
@@ -232,6 +244,7 @@ export function AnfrageDokumenteTab({
           name: file.name,
           datei_url: json.url,
           groesse_bytes: json.groesse_bytes ?? file.size,
+          art: uploadArt,
         });
         if (!ins.ok) throw new Error(ins.message);
       }
@@ -293,6 +306,15 @@ export function AnfrageDokumenteTab({
   return (
     <>
       <MockDokumenteCard count={docs.length}>
+        <div className="dok-art-wahl">
+          <span className="dok-sort__label">Art</span>
+          <MockSegment
+            value={uploadArt}
+            onChange={(v) => setUploadArt(v as DokumentArt)}
+            options={DOKUMENT_ARTEN.map((a) => ({ value: a, label: DOKUMENT_ART_LABEL[a] }))}
+            aria-label="Art des Dokuments"
+          />
+        </div>
         {!isMobile ? (
           <>
             <input
@@ -348,7 +370,7 @@ export function AnfrageDokumenteTab({
           <div className="dok-mobiles">
             {docs.map((d) => {
               const sizeLabel = formatBytes(d.groesse_bytes);
-              const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(" · ");
+              const meta = [d.artLabel, formatDatum(d.created_at), sizeLabel].filter(Boolean).join(" · ");
               return (
                 <DokMobileCard
                   key={d.id}
@@ -369,7 +391,7 @@ export function AnfrageDokumenteTab({
             {docs.map((d) => {
               const editing = editId === d.id;
               const sizeLabel = formatBytes(d.groesse_bytes);
-              const meta = [formatDatum(d.created_at), sizeLabel].filter(Boolean).join(" · ");
+              const meta = [d.artLabel, formatDatum(d.created_at), sizeLabel].filter(Boolean).join(" · ");
               return (
                 <div
                   key={d.id}

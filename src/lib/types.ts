@@ -212,6 +212,19 @@ export type LeadDokumentRow = {
   groesse_bytes: number | null
   erstellt_von: string | null
   created_at: string
+  /** Angebot / Rechnung / Protokoll / Sonstiges (04.10.2026) */
+  art?: DokumentArt | null
+  /** bw = CRM-Upload, partner = Partner-Portal */
+  von?: 'bw' | 'partner' | null
+}
+
+export const DOKUMENT_ARTEN = ['angebot', 'rechnung', 'protokoll', 'sonstiges'] as const
+export type DokumentArt = (typeof DOKUMENT_ARTEN)[number]
+export const DOKUMENT_ART_LABEL: Record<DokumentArt, string> = {
+  angebot: 'Angebot',
+  rechnung: 'Rechnung',
+  protokoll: 'Protokoll',
+  sonstiges: 'Sonstiges',
 }
 
 export type Lead = {

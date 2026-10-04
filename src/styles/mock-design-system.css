@@ -22345,3 +22345,6 @@ display: flex;
 .einsatz-rechnung-zeile__meta { color: var(--text-3); font-size: var(--fs-meta); }
 .einsatz-rechnung-zeile__aktionen { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .einsatz-rechnung-zeile__pdf { color: var(--green); font-size: var(--fs-meta); font-weight: 500; }
+
+/* Dokumente am Vorgang: Art vor dem Hochladen wählen */
+.dok-art-wahl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }

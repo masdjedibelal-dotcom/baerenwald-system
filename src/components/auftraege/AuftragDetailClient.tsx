@@ -1186,15 +1186,6 @@ export function AuftragDetailClient({
             leadId={detail.lead_id ?? _leadDetail?.id ?? null}
             onChanged={() => refresh()}
           />
-          {istBauprojekt ? (
-            <AuftragComplianceTab
-              detail={detail}
-              complianceTypen={complianceTypen}
-              partnerDokumente={partnerDokumente}
-              gewerke={gewerke as Gewerk[]}
-              onChanged={() => refresh()}
-            />
-          ) : null}
         </div>
       }
       notizen={notizenInhalt}

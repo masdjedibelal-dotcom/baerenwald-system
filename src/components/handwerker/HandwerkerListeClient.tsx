@@ -60,7 +60,6 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'telefon', label: 'Telefon' },
   { key: 'email', label: 'E-Mail' },
   { key: 'gewerke', label: 'Gewerke' },
-  { key: 'compliance_status', label: 'Compliance' },
 ]
 
 /** Schnellfilter: bekannte Slugs, Labels aus DB (Variante B-Namen). */

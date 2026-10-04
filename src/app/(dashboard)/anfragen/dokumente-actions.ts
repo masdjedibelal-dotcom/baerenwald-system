@@ -4,6 +4,7 @@ import { revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { DOKUMENT_ARTEN, type DokumentArt } from '@/lib/types'
 import {
   LEAD_DOKUMENTE_BUCKET,
   leadDokumentStoragePath,
@@ -28,6 +29,8 @@ export async function insertLeadDokument(input: {
   name: string
   datei_url: string
   groesse_bytes?: number | null
+  /** Angebot / Rechnung / Protokoll / Sonstiges */
+  art?: DokumentArt | null
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const gate = await assertLead(input.leadId)
   if (!gate.ok) return gate
@@ -46,6 +49,8 @@ export async function insertLeadDokument(input: {
       datei_url: url,
       groesse_bytes: input.groesse_bytes ?? null,
       erstellt_von: gate.userId,
+      art: input.art && DOKUMENT_ARTEN.includes(input.art) ? input.art : 'sonstiges',
+      von: 'bw',
     })
     .select('id')
     .single()

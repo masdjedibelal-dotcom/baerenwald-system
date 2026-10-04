@@ -45,7 +45,9 @@ import { ensureAndLoadFachdokuSlots } from '@/app/(dashboard)/auftraege/fachdoku
 import type { FachdokuSlotRow } from '@/lib/auftraege/fachdoku-slots'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import type { AuftragDetail, AuftragTimelineEvent, LeadDokumentRow } from '@/lib/types'
+import type { AuftragDetail, AuftragTimelineEvent, DokumentArt, LeadDokumentRow } from '@/lib/types'
+import { DOKUMENT_ARTEN, DOKUMENT_ART_LABEL } from '@/lib/types'
+import { MockSegment } from '@/components/mock-ui/MockSegment'
 import { cn, formatDatum } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
 
@@ -78,6 +80,8 @@ export function AuftragDokumenteTab({
 }) {
   const [pending, startTransition] = useLocalTransition()
   const [uploading, setUploading] = useState(false)
+  /** Art für neue Uploads: Angebot / Rechnung / Protokoll / Sonstiges */
+  const [uploadArt, setUploadArt] = useState<DokumentArt>('sonstiges')
   const [dragOver, setDragOver] = useState(false)
   const [editRow, setEditRow] = useState<AuftragDokumentZeile | null>(null)
   const [editName, setEditName] = useState('')
@@ -190,6 +194,7 @@ export function AuftragDokumenteTab({
             name: file.name,
             datei_url: json.url,
             groesse_bytes: json.groesse_bytes ?? file.size,
+            art: uploadArt,
           })
           if (!ins.ok) throw new Error(ins.message)
         }
@@ -486,6 +491,15 @@ export function AuftragDokumenteTab({
         title={`Dokumente · ${zeilen.length}`}
         icon="files"
       >
+        <div className="dok-art-wahl">
+          <span className="dok-sort__label">Art</span>
+          <MockSegment
+            value={uploadArt}
+            onChange={(v) => setUploadArt(v as DokumentArt)}
+            options={DOKUMENT_ARTEN.map((a) => ({ value: a, label: DOKUMENT_ART_LABEL[a] }))}
+            aria-label="Art des Dokuments"
+          />
+        </div>
         {!isMobile ? (
           <>
             <input
