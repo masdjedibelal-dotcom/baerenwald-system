@@ -1,9 +1,9 @@
 import type { AuftragBautagesbericht } from '@/lib/auftraege/bautagesbericht-types'
 import type {
-  AuftragBaustelleTeam,
-  AuftragBaustellenDokument,
-  AuftragRegiearbeit,
-  AuftragWochenbericht,
+AuftragBaustelleTeam,
+AuftragBaustellenDokument,
+AuftragRegiearbeit,
+AuftragWochenbericht,
 } from '@/lib/auftraege/baustelle-types'
 
 export type LeadStatus =
@@ -148,6 +148,8 @@ export type KundenObjekt = {
   freigabe_schwelle_eur?: number | null
   /** Override Org-Notfall-Direkt; null = erben */
   notfall_direkt?: boolean | null
+  /** Eigene Sofortmaßnahme-Fälle; null = von der HV */
+  akut_fall_ids?: unknown
 }
 
 export type KundenNotizRow = {

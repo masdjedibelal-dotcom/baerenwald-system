@@ -1,10 +1,11 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
+import { normalizeAkutFallIds } from '@/lib/org/sofortmassnahme-faelle'
 import {
-  DetailShell,
-  EntityDetailLayout,
-  type DetailShellGroup,
+DetailShell,
+EntityDetailLayout,
+type DetailShellGroup,
 } from '@/components/layout/EntityDetailLayout'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -30,7 +31,7 @@ import type { VorgangListeRow } from '@/lib/vorgang/types'
 type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'anlagen' | 'historie' | 'vorgaenge' | 'akte'
 
 function objektErbtFreigabe(o: KundenObjekt): boolean {
-  return o.freigabe_schwelle_eur == null && o.notfall_direkt == null
+  return o.freigabe_schwelle_eur == null && o.notfall_direkt == null && o.akut_fall_ids == null
 }
 
 export function ObjektAkteDetailClient({
@@ -54,6 +55,7 @@ export function ObjektAkteDetailClient({
     | 'datenschutz_url'
     | 'freigabe_schwelle_eur'
     | 'notfall_direkt'
+    | 'akut_fall_ids'
   >
   objekt: KundenObjekt
   akte: ObjektAkteDetailPayload
@@ -94,6 +96,7 @@ export function ObjektAkteDetailClient({
   const zeigtFreigabe = Boolean(orgSlug)
 
   const kundeFreigabeDefaults = {
+    akut_fall_ids: normalizeAkutFallIds(kunde.akut_fall_ids),
     notfall_direkt: kunde.notfall_direkt ?? true,
     freigabe_schwelle_eur:
       kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
@@ -184,6 +187,11 @@ export function ObjektAkteDetailClient({
             freigabeErben
               ? { notfall_direkt: null, freigabe_schwelle_eur: null }
               : {
+                  // Eigene Fälle des Objekts, sonst die der HV als Startwert
+                  akut_fall_ids:
+                    objektState.akut_fall_ids != null
+                      ? normalizeAkutFallIds(objektState.akut_fall_ids)
+                      : kundeFreigabeDefaults.akut_fall_ids,
                   notfall_direkt:
                     objektState.notfall_direkt != null
                       ? Boolean(objektState.notfall_direkt)
@@ -195,12 +203,15 @@ export function ObjektAkteDetailClient({
                 }
           }
           kundeDefaults={kundeFreigabeDefaults}
+          showAkutFaelle
           erben={freigabeErben}
           onErbenChange={setFreigabeErben}
           onSave={async (next) =>
             updateKundenObjektFreigabe(objektState.id, kunde.id, {
               notfall_direkt: next.notfall_direkt,
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
+              // erben → null (HV gilt), sonst die gewählten Fälle
+              akut_fall_ids: freigabeErben ? null : next.akut_fall_ids ?? null,
             })
           }
           onSaved={() => refresh()}

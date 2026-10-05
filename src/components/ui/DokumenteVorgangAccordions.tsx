@@ -1,7 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { Accordion } from '@/components/ui/Accordion'
+import { useState } from 'react'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { cn } from '@/lib/utils'
 
 export type DokumentVorgangGruppe<T> = {
@@ -25,18 +26,38 @@ export function DokumenteVorgangAccordions<T>({
   if (groups.length === 0) return null
 
   return (
-    <div className={cn('dok-vorgang-groups space-y-2', className)}>
+    <div className={cn('dok-gruppen', className)}>
       {groups.map((g, i) => (
-        <Accordion
-          key={g.key}
-          className="dok-vorgang-accordion"
-          defaultOpen={defaultOpenFirst ? i === 0 : false}
-          title={`${g.title} (${g.items.length})`}
-        >
+        <DokGruppe key={g.key} titel={g.title} anzahl={g.items.length} defaultOpen={defaultOpenFirst ? i === 0 : false}>
           {renderItems(g.items)}
-        </Accordion>
+        </DokGruppe>
       ))}
     </div>
+  )
+}
+
+/** Flache Gruppe: Titel links (abgeschnitten), Anzahl + Pfeil rechts — keine Karte in der Karte. */
+function DokGruppe({
+  titel,
+  anzahl,
+  defaultOpen,
+  children,
+}: {
+  titel: string
+  anzahl: number
+  defaultOpen: boolean
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className={cn('dok-gruppe', open && 'is-open')}>
+      <button type="button" className="dok-gruppe__kopf" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="dok-gruppe__titel" title={titel}>{titel}</span>
+        <span className="dok-gruppe__anzahl">{anzahl}</span>
+        <MockIcon n="chevron-down" ctx="default" className="dok-gruppe__pfeil h-4 w-4" aria-hidden />
+      </button>
+      {open ? <div className="dok-gruppe__inhalt">{children}</div> : null}
+    </section>
   )
 }
 

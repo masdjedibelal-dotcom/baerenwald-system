@@ -5,8 +5,8 @@ import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { kundeHatOrgKennung } from '@/app/actions/kunden-organisation'
 import {
-  validateKundenObjektInput,
-  type KundenObjektInput,
+validateKundenObjektInput,
+type KundenObjektInput,
 } from '@/lib/kunden-objekte'
 import { normalizeOrgSlug } from '@/lib/org/slug'
 import type { KundenObjekt } from '@/lib/types'
@@ -168,6 +168,8 @@ export async function updateKundenObjektFreigabe(
   input: {
     freigabe_schwelle_eur: number | null
     notfall_direkt: boolean | null
+    /** null = von der HV übernehmen */
+    akut_fall_ids?: string[] | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const oid = objektId?.trim()
@@ -181,6 +183,7 @@ export async function updateKundenObjektFreigabe(
   const payload = {
     freigabe_schwelle_eur: schwelle != null && schwelle > 0 ? schwelle : null,
     notfall_direkt: input.notfall_direkt,
+    ...(input.akut_fall_ids !== undefined ? { akut_fall_ids: input.akut_fall_ids } : {}),
     updated_at: new Date().toISOString(),
   }
 

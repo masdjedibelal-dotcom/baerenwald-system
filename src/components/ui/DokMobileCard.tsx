@@ -2,12 +2,11 @@
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { ReactNode } from 'react'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import { cn } from '@/lib/utils'
 
 /**
- * Mobile Dokument-Karte analog Leistungen:
- * Titel + Badge oben, Meta + Chevron unten — gerendert als MockCard.
+ * Dokument als Listenzeile (mobil wie eine Tabelle, keine Karte in der Karte):
+ * Name + Meta links, Kennzeichnung und Pfeil rechts.
  */
 export function DokMobileCard({
   title,
@@ -25,9 +24,8 @@ export function DokMobileCard({
   children?: ReactNode
 }) {
   return (
-    <MockCard
-      className={cn('dok-mobile', className)}
-      flush
+    <div
+      className={cn('dok-zeile', onClick && 'is-klickbar', className)}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
@@ -42,17 +40,15 @@ export function DokMobileCard({
           : undefined
       }
     >
-      <div className="dok-mobile__head">
-        <span className="dok-mobile__title">{title}</span>
-        {badge ? <div className="dok-mobile__badge">{badge}</div> : null}
+      <div className="dok-zeile__main">
+        <span className="dok-zeile__titel">{title}</span>
+        {meta ? <span className="dok-zeile__meta">{meta}</span> : null}
+        {children}
       </div>
-      {children}
-      <div className="dok-mobile__meta">
-        <span className="dok-mobile__meta-left">{meta || '—'}</span>
-        <span className="dok-mobile__meta-right">
-          <MockIcon n="chevron-right" ctx="default" className="dok-mobile__chev h-4 w-4" aria-hidden />
-        </span>
-      </div>
-    </MockCard>
+      {badge ? <div className="dok-zeile__badge">{badge}</div> : null}
+      {onClick ? (
+        <MockIcon n="chevron-right" ctx="default" className="dok-zeile__chev h-4 w-4" aria-hidden />
+      ) : null}
+    </div>
   )
 }

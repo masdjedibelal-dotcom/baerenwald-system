@@ -22444,3 +22444,54 @@ button.abschlagsplan-zeile__del:hover { background: var(--red-bg); color: var(--
 .preisliste-alle__sub { font-size: var(--fs-meta); color: var(--text-3); }
 .preisliste-alle__preis { font-size: var(--fs-text); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
 .preisliste-alle__einheit { font-weight: 400; color: var(--text-3); font-size: var(--fs-meta); }
+
+/* Partner-Liste mobil: Gewerke-Chips unter dem Betriebsnamen */
+.vg-row--kontakt .vg-gewerk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+/* Dokumente (05.10.2026): flache Gruppen + Listenzeilen statt Karten in Karten — auch mobil */
+.dok-gruppen { display: flex; flex-direction: column; }
+.dok-gruppe { border-top: 0.5px solid var(--border); }
+.dok-gruppe:first-child { border-top: none; }
+button.dok-gruppe__kopf {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 12px 2px; background: transparent; border: none; box-shadow: none;
+  text-align: left; cursor: pointer; color: var(--text);
+}
+.dok-gruppe__titel {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-text); font-weight: 600;
+}
+.dok-gruppe__anzahl {
+  flex-shrink: 0; min-width: 22px; padding: 1px 7px; border-radius: var(--r-pill);
+  background: var(--bg-soft); color: var(--text-3); font-size: var(--fs-meta); text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.dok-gruppe__pfeil { flex-shrink: 0; color: var(--text-3); transition: transform var(--dur-fast) ease; }
+.dok-gruppe.is-open .dok-gruppe__pfeil { transform: rotate(180deg); }
+.dok-gruppe__inhalt { padding: 0 0 8px; }
+.dok-gruppe__inhalt .dok-list,
+.dok-gruppe__inhalt .dok-mobiles { margin: 0; border: none; padding: 0; background: transparent; }
+
+.dok-mobiles { display: flex; flex-direction: column; gap: 0; padding: 0; }
+.dok-zeile {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 2px; border-top: 0.5px solid var(--border);
+  background: transparent; color: var(--text);
+}
+.dok-mobiles > .dok-zeile:first-child { border-top: none; }
+.dok-zeile.is-klickbar { cursor: pointer; }
+.dok-zeile.is-klickbar:active { background: var(--bg-soft); }
+.dok-zeile__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dok-zeile__titel {
+  font-size: var(--fs-text); font-weight: 500; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dok-zeile__meta { font-size: var(--fs-meta); color: var(--text-3); }
+.dok-zeile__badge { flex-shrink: 0; }
+.dok-zeile__chev { flex-shrink: 0; color: var(--text-4, var(--text-3)); }

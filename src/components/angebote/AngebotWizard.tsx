@@ -1471,38 +1471,41 @@ export function AngebotWizard({
               <span className="gfc-v">{sheetFirma}</span>
             </div>
           ) : null}
-          <MockField label="Ansprechpartner" full>
-            <MockSelect className="sel sel--choice" value={ansprechpartnerId ?? ''} onChange={(e) => {
-                const next = e.target.value.trim() || null
-                const prevKontakt = sheetEmail
-                setMeta((m) => ({ ...m, ansprechpartner_id: next }))
-                const ap = next
-                  ? apRows.find((a) => a.id === next)
-                  : apRows.find((a) => a.ist_primaer)
-                const mail = (
-                  ap?.email?.trim() ||
-                  sheetKunde?.email ||
-                  leadState.kontakt_email ||
-                  ''
-                ).trim()
-                setMailTo((prev) => {
-                  if (!versandFolgtKontakt(prev[0] ?? '', prevKontakt)) return prev
-                  if (mail && isValidEmail(mail)) return [mail]
-                  return []
-                })
-                setDraftDirty(true)
-              }} disabled={!(hvKundeId || kundeId)}>
-              <option value="">Hauptansprechpartner</option>
-              {apRows.map((ap) => (
-                <option key={ap.id} value={ap.id}>
-                  {ap.name.trim() || 'Ohne Name'}
-                  {ap.ist_primaer ? ' (Primär)' : ''}
-                  {ap.rolle?.trim() ? ` · ${ap.rolle.trim()}` : ''}
-                  {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
-                </option>
-              ))}
-            </MockSelect>
-          </MockField>
+          {/* Privatkunde ist selbst der Ansprechpartner */}
+          {kundeTyp !== 'privat' ? (
+            <MockField label="Ansprechpartner" full>
+              <MockSelect className="sel sel--choice" value={ansprechpartnerId ?? ''} onChange={(e) => {
+                  const next = e.target.value.trim() || null
+                  const prevKontakt = sheetEmail
+                  setMeta((m) => ({ ...m, ansprechpartner_id: next }))
+                  const ap = next
+                    ? apRows.find((a) => a.id === next)
+                    : apRows.find((a) => a.ist_primaer)
+                  const mail = (
+                    ap?.email?.trim() ||
+                    sheetKunde?.email ||
+                    leadState.kontakt_email ||
+                    ''
+                  ).trim()
+                  setMailTo((prev) => {
+                    if (!versandFolgtKontakt(prev[0] ?? '', prevKontakt)) return prev
+                    if (mail && isValidEmail(mail)) return [mail]
+                    return []
+                  })
+                  setDraftDirty(true)
+                }} disabled={!(hvKundeId || kundeId)}>
+                <option value="">Hauptansprechpartner</option>
+                {apRows.map((ap) => (
+                  <option key={ap.id} value={ap.id}>
+                    {ap.name.trim() || 'Ohne Name'}
+                    {ap.ist_primaer ? ' (Primär)' : ''}
+                    {ap.rolle?.trim() ? ` · ${ap.rolle.trim()}` : ''}
+                    {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
+                  </option>
+                ))}
+              </MockSelect>
+            </MockField>
+          ) : null}
           <KundenVersandEmailField
             apRows={apRows}
             kontaktEmail={sheetEmail}

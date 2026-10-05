@@ -10,25 +10,25 @@ import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo,useRef,useState } from 'react'
 import {
-  deleteLeadDokument,
-  insertLeadDokument,
-} from "@/app/(dashboard)/anfragen/dokumente-actions";
-import { toast } from "@/components/ui/app-toast";
+deleteLeadDokument,
+insertLeadDokument,
+} from "@/app/(dashboard)/anfragen/dokumente-actions"
+import { toast } from "@/components/ui/app-toast"
 import {
-  rechnungIstAlsAkteUnterlage,
-} from "@/lib/auftraege/auftrag-dokumente-helpers";
-import { rechnungDokumentBezeichnung } from "@/lib/rechnungen/zahlungsplan";
+rechnungIstAlsAkteUnterlage,
+} from "@/lib/auftraege/auftrag-dokumente-helpers"
+import { rechnungDokumentBezeichnung } from "@/lib/rechnungen/zahlungsplan"
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
-import type { DokumentArt, LeadDokumentRow } from "@/lib/types";
-import { DOKUMENT_ARTEN, DOKUMENT_ART_LABEL } from "@/lib/types";
-import { MockSegment } from "@/components/mock-ui/MockSegment";
-import type { EntityMenuItem } from "@/lib/entity-menu";
-import { DokMobileCard } from "@/components/ui/DokMobileCard";
-import { useIsMobile } from "@/hooks/useIsMobile";
-import { cn, formatDatum } from "@/lib/utils";
-import { DOC } from "@/lib/crm-labels";
+import type { DokumentArt,LeadDokumentRow } from "@/lib/types"
+import { DOKUMENT_ARTEN,DOKUMENT_ART_LABEL } from "@/lib/types"
+import { MockSegment } from "@/components/mock-ui/MockSegment"
+import type { EntityMenuItem } from "@/lib/entity-menu"
+import { DokMobileCard } from "@/components/ui/DokMobileCard"
+import { useIsMobile } from "@/hooks/useIsMobile"
+import { cn,formatDatum } from "@/lib/utils"
+import { DOC } from "@/lib/crm-labels"
 import { TOAST } from '@/lib/copy'
 
 type AngebotKurz = {
@@ -306,6 +306,8 @@ export function AnfrageDokumenteTab({
   return (
     <>
       <MockDokumenteCard count={docs.length}>
+        {/* Mobil wird über „Dokument“ oben hochgeladen — dort wird die Art abgefragt */}
+        {!isMobile ? (
         <div className="dok-art-wahl">
           <span className="dok-sort__label">Art</span>
           <MockSegment
@@ -315,6 +317,7 @@ export function AnfrageDokumenteTab({
             aria-label="Art des Dokuments"
           />
         </div>
+        ) : null}
         {!isMobile ? (
           <>
             <input

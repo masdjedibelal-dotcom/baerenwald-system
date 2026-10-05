@@ -4,16 +4,16 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockDetailOverflowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect,useMemo,useState } from 'react'
 import { ActionIcon } from '@/components/ui/ActionIcon'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useMobileScrollChrome } from '@/hooks/useMobileScrollChrome'
 import {
-  resolveDetailActions,
-  type DetailActionDef,
-  type DetailActionSlot,
-  type ResolvedDetailAction,
+resolveDetailActions,
+type DetailActionDef,
+type DetailActionSlot,
+type ResolvedDetailAction,
 } from '@/lib/layout/detail-actions-layout'
 import { cn } from '@/lib/utils'
 
@@ -36,6 +36,9 @@ const MOBIL_KURZ: Record<string, string> = {
   'Nächsten Abschlag senden': 'Abschlag',
   'Schlussrechnung versenden': 'Senden',
   'Bewertung einholen': 'Bewertung',
+  // Zwei „erstellen“ nebeneinander (Kunde): das Ding nennen, nicht das Verb
+  'Angebot erstellen': 'Angebot',
+  'Rechnung erstellen': 'Rechnung',
 }
 
 /** P25: Kurzform für die Handy-Leiste, wenn mehrere Knöpfe nebeneinander stehen. */

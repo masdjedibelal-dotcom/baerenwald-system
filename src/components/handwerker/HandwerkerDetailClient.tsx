@@ -1,11 +1,10 @@
 'use client'
 
 import {
-  DetailShell,
-  EntityDetailLayout,
-  type DetailShellGroup,
+DetailShell,
+EntityDetailLayout,
+type DetailShellGroup,
 } from '@/components/layout/EntityDetailLayout'
-import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockNotizComposer,MockNotizenCard } from '@/components/mock-ui/MockDetailCards'
 import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -24,8 +23,8 @@ import { EntityHandwerkerStammdatenCard } from '@/components/crm/EntityHandwerke
 import { EntityHandwerkerBankCard } from '@/components/crm/EntityHandwerkerBankCard'
 import { HandwerkerAkteDokumente } from '@/components/handwerker/HandwerkerAkteDokumente'
 import {
-  filterStandardComplianceTypen,
-  istEigeneUnterlageTyp,
+filterStandardComplianceTypen,
+istEigeneUnterlageTyp,
 } from '@/lib/handwerker/compliance-katalog'
 import { useDetailQuickActions } from '@/components/vorgang/DetailQuickActions'
 import { VorgangAkteTab } from '@/components/vorgang/VorgangAkteTab'
@@ -33,42 +32,39 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { ClientOnly } from '@/components/ui/ClientOnly'
 import { RahmenvertragWizard } from '@/components/vertraege/RahmenvertragWizard'
 import {
-  type RahmenVertragWizardBootstrap
+type RahmenVertragWizardBootstrap
 } from '@/app/(dashboard)/vertraege/wizard-actions'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
 import { toast } from '@/components/ui/app-toast'
 import type { HandwerkerDetailPayload } from '@/app/(dashboard)/handwerker/actions'
 import {
-  formatHandwerkerBewertung,
-  HANDWERKER_BEWERTUNG_KATEGORIEN,
-  type HandwerkerBewertungKategorieKey,
+formatHandwerkerBewertung
 } from '@/lib/handwerker/bewertung-kategorien'
 import {
-  updateHandwerkerNotizen,
-  getPartnerPortalLoginHint
+updateHandwerkerNotizen,
+getPartnerPortalLoginHint
 } from '@/app/(dashboard)/handwerker/actions'
 import {
-  handwerkerDisplayName,
-  handwerkerGfName,
+handwerkerDisplayName,
+handwerkerGfName,
 } from '@/lib/handwerker-stammdaten'
 import {
-  resolveHandwerkerAnschrift,
+resolveHandwerkerAnschrift,
 } from '@/lib/handwerker-anschrift'
 import {
-  getPartnerPortalMailDraft,
-  previewPartnerPortalMail,
-  sendPartnerPortalLinkMail,
+getPartnerPortalMailDraft,
+previewPartnerPortalMail,
+sendPartnerPortalLinkMail,
 } from '@/app/actions/mails'
 import { parseEmailTokens } from '@/lib/email-recipients'
 import { buildPartnerDashboardLink } from '@/lib/portal-utils'
 import type { ComplianceDokumentTyp,Gewerk,Handwerker } from '@/lib/types'
 import {
-  FabVorgangStartModal,
-  type FabVorgangArt,
+FabVorgangStartModal,
+type FabVorgangArt,
 } from '@/components/neu/FabVorgangStartModal'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
-import { formatRelativeDate } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
 
 type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'compliance' | 'akte'
@@ -92,39 +88,6 @@ function gewerkSlugsFromField(gewerke: unknown): string[] {
 
 function gewerkTagsFromSlugs(gewerke: unknown, slugToName: Map<string, string>): string[] {
   return gewerkSlugsFromField(gewerke).map((slug) => slugToName.get(slug) ?? slug)
-}
-
-function RatingStars({ value, size = 14 }: { value: number | null | undefined; size?: number }) {
-const n = typeof value === 'number' && Number.isFinite(value) ? Math.min(5, Math.max(0, value)) : 0
-  const full = Math.floor(n)
-  return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`${formatHandwerkerBewertung(n)} von 5`}>
-      {Array.from({ length: 5 }, (_, i) => (
-        <MockIcon
-          key={i}
-          ctx="default"
-          n={i < full ? 'star-filled' : 'star'}
-          size={size}
-          className={i < full ? `text-[var(--yel-tx,${C.accentGold})]` : 'text-[var(--text-4)]'}
-        />
-      ))}
-    </span>
-  )
-}
-
-function bewertungKategorieWert(
-  hw: Handwerker,
-  key: HandwerkerBewertungKategorieKey
-): number | null {
-  const map: Record<HandwerkerBewertungKategorieKey, number | null | undefined> = {
-    qualitaet: hw.bewertung_qualitaet,
-    termintreue: hw.bewertung_termintreue,
-    sauberkeit: hw.bewertung_sauberkeit,
-    kommunikation: hw.bewertung_kommunikation,
-    preis_leistung: hw.bewertung_preis_leistung,
-  }
-  const v = map[key]
-  return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
 export function HandwerkerDetailClient({
@@ -220,7 +183,6 @@ export function HandwerkerDetailClient({
   )
 
   const bewertungGesamt = hw.bewertung_gesamt ?? null
-  const bewertungAnzahl = hw.bewertung_anzahl ?? 0
   const kategorie = hw.subkategorie?.trim() || gewerkNamen[0] || 'Partner'
 
   async function openPortalModal() {
@@ -313,70 +275,6 @@ export function HandwerkerDetailClient({
 
       <EntityHandwerkerBankCard handwerker={hw} gewerkeOptionen={gewerkeOptionen} />
 
-      <MockCard title="Bewertungen von Kunden" icon="star">
-        <div className="mb-4 flex flex-wrap items-baseline gap-3">
-          <div
-            className="text-[length:var(--fs-head)] font-semibold leading-none tabular-nums"
-            style={{ color: C.accentGold2 }}
-          >
-            {bewertungGesamt != null && bewertungGesamt > 0
-              ? formatHandwerkerBewertung(bewertungGesamt)
-              : '—'}
-          </div>
-          <div>
-            <RatingStars value={bewertungGesamt} size={14} />
-            <div className="mt-0.5 text-[length:var(--fs-meta)] text-[var(--text-3)]">
-              {bewertungAnzahl > 0
-                ? `aus ${bewertungAnzahl} Bewertung${bewertungAnzahl === 1 ? '' : 'en'}`
-                : 'Noch keine Bewertungen'}
-            </div>
-          </div>
-        </div>
-
-        {payload.bewertungen.length > 0 ? (
-          <ul>
-            {payload.bewertungen.map((b) => (
-              <li
-                key={b.id}
-                className="border-b border-[var(--border)] py-2.5 last:border-0"
-              >
-                <div className="mb-1 flex items-center justify-between gap-3">
-                  <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">
-                    {b.kundeName || 'Kunde'}
-                  </div>
-                  <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">
-                    {b.updatedAt ? formatRelativeDate(b.updatedAt) : ''}
-                  </div>
-                </div>
-                <div className="mb-1">
-                  <RatingStars value={b.note} />
-                </div>
-                {b.notiz?.trim() ? (
-                  <p className="text-[length:var(--fs-text)] text-[var(--text-2)]">&ldquo;{b.notiz.trim()}&rdquo;</p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <ul className="space-y-2">
-            {HANDWERKER_BEWERTUNG_KATEGORIEN.map((k) => {
-              const val = bewertungKategorieWert(hw, k.key)
-              return (
-                <li
-                  key={k.key}
-                  className="flex items-center justify-between gap-3 border-b border-[var(--border)] py-2 last:border-0"
-                >
-                  <div className="min-w-0">
-                    <div className="text-[length:var(--fs-text)] font-medium text-[var(--text)]">{k.label}</div>
-                    <div className="text-[length:var(--fs-meta)] text-[var(--text-3)]">{k.hint}</div>
-                  </div>
-                  <RatingStars value={val} />
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </MockCard>
     </div>
   )
 

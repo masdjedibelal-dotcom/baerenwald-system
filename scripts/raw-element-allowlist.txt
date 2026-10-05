@@ -43,3 +43,4 @@ src/components/ui/Toggle.tsx
 src/components/org/FreigabeSettingsCard.tsx
 src/components/einstellungen/EinstellungenBenachrichtigungenClient.tsx
 src/components/einstellungen/EinstellungenIntegrationenMock.tsx
+src/components/ui/DokumenteVorgangAccordions.tsx

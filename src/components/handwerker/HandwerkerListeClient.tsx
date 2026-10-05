@@ -31,8 +31,8 @@ import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import { deleteHandwerker } from '@/app/(dashboard)/handwerker/actions'
 import { gewerkPillClass } from '@/lib/gewerk-pill-tone'
 import {
-  istPortalRegistriert,
-  PortalRegistriertDot,
+istPortalRegistriert,
+PortalRegistriertDot,
 } from '@/components/crm/PortalRegistriertDot'
 
 export type HandwerkerZeile = {
@@ -576,7 +576,6 @@ export function HandwerkerListeClient({
                       .filter((g) => g && g !== '[]' && g !== '—')
                       .slice(0, 3)
                   : []
-            const primaryGewerk = pills[0] ?? null
             const tel = h.telefon?.trim() || ''
             const mail = h.email?.trim() || ''
             const edit = () => openDetail(h.id)
@@ -618,15 +617,15 @@ export function HandwerkerListeClient({
                     {handwerkerDisplayName(h)}
                   </div>
                   <PortalRegistriertDot registered={istPortalRegistriert(h.auth_user_id)} />
-                </div>
-                <div className="vg-status">
-                  {primaryGewerk ? (
-                    <span
-                      className={gewerkPillClass(primaryGewerk)}
-                      title={pills.join(' · ') || undefined}
-                    >
-                      {primaryGewerk}
-                    </span>
+                  {/* Gewerke als Chips direkt unter dem Betriebsnamen */}
+                  {pills.length ? (
+                    <div className="vg-gewerk-chips">
+                      {pills.map((g) => (
+                        <span key={g} className={gewerkPillClass(g)}>
+                          {g}
+                        </span>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
                 <div className="vg-kontakt">

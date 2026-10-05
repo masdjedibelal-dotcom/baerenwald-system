@@ -2,9 +2,9 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import {
-  DetailShell,
-  EntityDetailLayout,
-  type DetailShellGroup,
+DetailShell,
+EntityDetailLayout,
+type DetailShellGroup,
 } from '@/components/layout/EntityDetailLayout'
 import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -23,9 +23,9 @@ import { Card } from '@/components/ui/Card'
 import { CustomFieldRenderer } from '@/components/ui/CustomFieldRenderer'
 import { TypBadge } from '@/components/kunden/TypBadge'
 import {
-  istKundeGewerbeTyp,
-  istKundeHausverwaltungTyp,
-  kundeDisplayName,
+istKundeGewerbeTyp,
+istKundeHausverwaltungTyp,
+kundeDisplayName,
 } from '@/lib/kunde-stammdaten'
 import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
@@ -53,7 +53,7 @@ import { getPortalLoginHint } from '@/app/actions/kunden'
 import { previewKundenPortalMail,sendKundenPortalLinkMail } from '@/app/actions/mails'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import {
-  buildPortalLoginLink
+buildPortalLoginLink
 } from '@/lib/portal-utils'
 import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { CustomFieldDefinition,CustomFieldValueRow } from '@/lib/custom-fields'
@@ -372,11 +372,14 @@ export function KundeDetailClient({
           refresh()
         }}
       />
-      <KundenAnsprechpartnerCard
-        kundeId={kunde.id}
-        initial={kunde.kunden_ansprechpartner ?? []}
-        onChanged={() => refresh()}
-      />
+      {/* Privatkunde ist selbst der Ansprechpartner */}
+      {kunde.typ !== 'privat' ? (
+        <KundenAnsprechpartnerCard
+          kundeId={kunde.id}
+          initial={kunde.kunden_ansprechpartner ?? []}
+          onChanged={() => refresh()}
+        />
+      ) : null}
       {kunde.org_kennung?.trim() ? (
         <MeldeLinksCard
           kundeId={kunde.id}
@@ -395,7 +398,6 @@ export function KundeDetailClient({
       ) : null}
       {zeigtOrganisationTab ? (
         <FreigabeSettingsCard
-          showHmAuto
           showAkutFaelle
           value={freigabeSettingsValue}
           onSave={async (next) => {
@@ -404,7 +406,6 @@ export function KundeDetailClient({
               notfall_direkt: Boolean(next.notfall_direkt),
               freigabe_schwelle_eur: next.freigabe_schwelle_eur,
               freigabe_modus: kunde.freigabe_modus ?? 'freigabe',
-              hm_auto_zuweisen: Boolean(next.hm_auto_zuweisen),
               akut_fall_ids: akutIds,
             })
             if (r.ok) {
@@ -412,7 +413,6 @@ export function KundeDetailClient({
                 ...prev,
                 notfall_direkt: Boolean(next.notfall_direkt),
                 freigabe_schwelle_eur: next.freigabe_schwelle_eur ?? null,
-                hm_auto_zuweisen: Boolean(next.hm_auto_zuweisen),
                 akut_fall_ids: akutIds,
               }))
             }
@@ -560,6 +560,14 @@ export function KundeDetailClient({
               onClick: () => {
                 showRouteBusy('Angebot wird geöffnet…')
                 router.push(createAngebotHref(kunde.id))
+              },
+            }}
+            secondary={{
+              label: 'Rechnung erstellen',
+              icon: 'receipt',
+              onClick: () => {
+                showRouteBusy('Rechnung wird geöffnet…')
+                router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kunde.id)}`)
               },
             }}
             menuItems={detailMenuItems}

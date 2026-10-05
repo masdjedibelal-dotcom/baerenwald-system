@@ -480,24 +480,6 @@ export function formatTagMonatNummer(datum: string | Date): string {
   return `${dd}.${mm}`
 }
 
-/** Relative Zeit für Karten („vor 2h“, „Gestern“ …) */
-export function formatRelativeDate(dateStr: string): string {
-  const date = parseDisplayDate(dateStr)
-  if (!date) return '—'
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-
-  if (mins < 1) return 'gerade eben'
-  if (mins < 60) return `vor ${mins} Min`
-  if (hours < 24) return `vor ${hours}h`
-  if (days === 1) return 'Gestern'
-  if (days < 7) return formatWochentagKurz(date)
-  return formatTagMonatNummer(date)
-}
-
 /** Tabellen-Datum: Heute / Gestern / Wochentag / DD.MM. */
 export function formatLeadListDatum(iso: string): string {
   const d = parseDisplayDate(iso)

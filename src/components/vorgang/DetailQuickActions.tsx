@@ -1,6 +1,8 @@
 'use client'
 
 import { MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockSegment } from '@/components/mock-ui'
+import { DOKUMENT_ARTEN,DOKUMENT_ART_LABEL,type DokumentArt } from '@/lib/types'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { useCallback,useEffect,useRef,useState,type ReactNode } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -13,8 +15,8 @@ import { createAuftragDokumentEintrag } from '@/app/(dashboard)/auftraege/dokume
 import { addKundenNotiz } from '@/app/actions/kunden'
 import { insertKundeDokument } from '@/app/(dashboard)/kunden/dokumente-actions'
 import {
-  insertPartnerDokument,
-  updateHandwerkerNotizen,
+insertPartnerDokument,
+updateHandwerkerNotizen,
 } from '@/app/(dashboard)/handwerker/actions'
 import { INDIVIDUELL_TYP_SLUG } from '@/lib/handwerker/compliance-katalog'
 import { createClient } from '@/lib/supabase'
@@ -73,6 +75,9 @@ export function useDetailQuickActions({
   const [pending, setPending] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  /** Vorgangs-Dokumente: nach der Dateiauswahl die Art abfragen (mobil gibt es keine Art-Leiste mehr) */
+  const [artFiles, setArtFiles] = useState<File[] | null>(null)
+  const [uploadArt, setUploadArt] = useState<DokumentArt>('sonstiges')
 
   useEffect(() => {
     if (!notizOpen) return
@@ -142,7 +147,7 @@ export function useDetailQuickActions({
   }, [notiz, notizText, onSaved, pending])
 
   const uploadFiles = useCallback(
-    async (files: FileList | File[]) => {
+    async (files: FileList | File[], art?: DokumentArt) => {
       if (!dokument || uploading) return
       const list = Array.from(files).slice(0, 5)
       if (!list.length) return
@@ -171,6 +176,7 @@ export function useDetailQuickActions({
                   name: file.name,
                   datei_url: json.url,
                   groesse_bytes: json.groesse_bytes ?? file.size,
+                  art: art ?? 'sonstiges',
                 })
                 if (!ins.ok) throw new Error(ins.message)
               }
@@ -304,9 +310,49 @@ export function useDetailQuickActions({
         className="hidden"
         disabled={!dokument || uploading}
         onChange={(e) => {
-          if (e.target.files?.length) void uploadFiles(e.target.files)
+          const picked = e.target.files?.length ? Array.from(e.target.files) : []
+          if (!picked.length) return
+          // Vorgang: erst Art wählen, dann hochladen
+          if (dokument?.kind === 'lead') {
+            setUploadArt('sonstiges')
+            setArtFiles(picked)
+            if (fileRef.current) fileRef.current.value = ''
+            return
+          }
+          void uploadFiles(picked)
         }}
       />
+
+      <EditorSheet
+        open={Boolean(artFiles)}
+        onClose={() => setArtFiles(null)}
+        title="Dokument hochladen"
+        size="md"
+        secondary={{ label: 'Abbrechen', kind: 'ghost', disabled: uploading }}
+        primary={{
+          label: 'Hochladen',
+          icon: 'upload',
+          busy: uploading,
+          onClick: () => {
+            const list = artFiles
+            setArtFiles(null)
+            if (list?.length) void uploadFiles(list, uploadArt)
+          },
+        }}
+      >
+        <p className="dok-upload-dateien">
+          {artFiles?.length === 1 ? artFiles[0]!.name : `${artFiles?.length ?? 0} Dateien`}
+        </p>
+        <div className="field">
+          <div className="field-label">Art</div>
+          <MockSegment
+            value={uploadArt}
+            onChange={(v) => setUploadArt(v as DokumentArt)}
+            options={DOKUMENT_ARTEN.map((a) => ({ value: a, label: DOKUMENT_ART_LABEL[a] }))}
+            aria-label="Art des Dokuments"
+          />
+        </div>
+      </EditorSheet>
 
       <EditorSheet
         open={notizOpen}

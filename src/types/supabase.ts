@@ -5292,6 +5292,7 @@ export type Database = {
       }
       kunden_objekte: {
         Row: {
+          akut_fall_ids: Json | null
           automatische_schadenakte: boolean
           cover_url: string | null
           created_at: string
@@ -5317,6 +5318,7 @@ export type Database = {
           versicherungs_nr: string | null
         }
         Insert: {
+          akut_fall_ids?: Json | null
           automatische_schadenakte?: boolean
           cover_url?: string | null
           created_at?: string
@@ -5342,6 +5344,7 @@ export type Database = {
           versicherungs_nr?: string | null
         }
         Update: {
+          akut_fall_ids?: Json | null
           automatische_schadenakte?: boolean
           cover_url?: string | null
           created_at?: string

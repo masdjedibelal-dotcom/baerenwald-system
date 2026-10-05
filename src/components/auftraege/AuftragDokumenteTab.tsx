@@ -2,18 +2,18 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
-import { MockField, MockInput } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { useLocalTransition } from '@/components/ui/action-busy'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect,useMemo,useRef,useState } from 'react'
 import {
-  createAuftragDokumentEintrag,
-  deleteAuftragDokumentEintrag,
-  signHandwerkerDokumentStoragePaths,
-  updateAuftragDokumentMeta,
+createAuftragDokumentEintrag,
+deleteAuftragDokumentEintrag,
+signHandwerkerDokumentStoragePaths,
+updateAuftragDokumentMeta,
 } from '@/app/(dashboard)/auftraege/dokumente-actions'
 import { setTimelineKundenfreigabe } from '@/app/(dashboard)/auftraege/kunden-status-actions'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -23,32 +23,32 @@ import { toast } from '@/components/ui/app-toast'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
-  abschlussdokumentZeile,
-  abnahmeDokumentZeile,
-  angebotAusAuftragDetail,
-  angebotDokumentZeile,
-  angebotHandwerkerAusAuftragDetail,
-  dedupeDokumentZeilenByHref,
-  dokumentTypLabel,
-  fachdokuDokumentZeilen,
-  handwerkerDokumentZeilen,
-  leadDokumentZeilen,
-  rechnungDokumentZeilen,
-  sortDokumentZeilen,
-  timelineDokumentZeilen,
-  vertragDokumentZeilen,
-  type AuftragDokumentZeile,
-  type DokumentSortKey,
+abschlussdokumentZeile,
+abnahmeDokumentZeile,
+angebotAusAuftragDetail,
+angebotDokumentZeile,
+angebotHandwerkerAusAuftragDetail,
+dedupeDokumentZeilenByHref,
+dokumentTypLabel,
+fachdokuDokumentZeilen,
+handwerkerDokumentZeilen,
+leadDokumentZeilen,
+rechnungDokumentZeilen,
+sortDokumentZeilen,
+timelineDokumentZeilen,
+vertragDokumentZeilen,
+type AuftragDokumentZeile,
+type DokumentSortKey,
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import { insertLeadDokument } from '@/app/(dashboard)/anfragen/dokumente-actions'
 import { ensureAndLoadFachdokuSlots } from '@/app/(dashboard)/auftraege/fachdoku-actions'
 import type { FachdokuSlotRow } from '@/lib/auftraege/fachdoku-slots'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
 import type { HandwerkerVertragRow } from '@/lib/vertraege/types'
-import type { AuftragDetail, AuftragTimelineEvent, DokumentArt, LeadDokumentRow } from '@/lib/types'
-import { DOKUMENT_ARTEN, DOKUMENT_ART_LABEL } from '@/lib/types'
+import type { AuftragDetail,AuftragTimelineEvent,DokumentArt,LeadDokumentRow } from '@/lib/types'
+import { DOKUMENT_ARTEN,DOKUMENT_ART_LABEL } from '@/lib/types'
 import { MockSegment } from '@/components/mock-ui/MockSegment'
-import { cn, formatDatum } from '@/lib/utils'
+import { cn,formatDatum } from '@/lib/utils'
 import { TOAST } from '@/lib/copy'
 
 export type { AuftragDokumentZeile }
@@ -491,6 +491,8 @@ export function AuftragDokumenteTab({
         title={`Dokumente · ${zeilen.length}`}
         icon="files"
       >
+        {/* Mobil wird über „Dokument“ oben hochgeladen — dort wird die Art abgefragt */}
+        {!isMobile ? (
         <div className="dok-art-wahl">
           <span className="dok-sort__label">Art</span>
           <MockSegment
@@ -500,6 +502,7 @@ export function AuftragDokumenteTab({
             aria-label="Art des Dokuments"
           />
         </div>
+        ) : null}
         {!isMobile ? (
           <>
             <input

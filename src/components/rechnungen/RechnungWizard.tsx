@@ -15,8 +15,8 @@ import { createPortal } from 'react-dom'
 import { DocumentCanvas } from '@/components/surfaces/DocumentCanvas'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import {
-  MetaCrowButton,
-  TotBand,
+MetaCrowButton,
+TotBand,
 } from '@/components/angebote/AngebotWizardCanvasMeta'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { PosBoard } from '@/components/posboard/PosBoard'
@@ -26,17 +26,17 @@ import { DateInput } from '@/components/ui/DateInput'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import {
-  MelderLeistungsortFields,
-  type MelderLeistungsortDraft,
+MelderLeistungsortFields,
+type MelderLeistungsortDraft,
 } from '@/components/crm/MelderLeistungsortFields'
 import {
-  KundenVersandEmailField,
-  versandFolgtKontakt,
+KundenVersandEmailField,
+versandFolgtKontakt,
 } from '@/components/crm/KundenVersandEmailField'
 import { RechnungWizardMailPreview } from '@/components/rechnungen/RechnungWizardMailPreview'
 import {
-  Ustg13bHilfeSheet,
-  Ustg13bHilfeTrigger,
+Ustg13bHilfeSheet,
+Ustg13bHilfeTrigger,
 } from '@/components/rechnungen/Ustg13bHilfeSheet'
 import { toast } from '@/components/ui/app-toast'
 import { listKundenAnsprechpartner } from '@/app/actions/kunden-ansprechpartner'
@@ -44,77 +44,77 @@ import { fetchKundenObjekte } from '@/app/actions/kunden-objekte'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { normalizeKundeNamen,splitDeutscherVollname } from '@/lib/kunde-namen'
 import {
-  istKundeFirmaPflichtTyp,
-  istKundeGewerbeTyp,
-  kundeStrasseHausnummerZeile,
+istKundeFirmaPflichtTyp,
+istKundeGewerbeTyp,
+kundeStrasseHausnummerZeile,
 } from '@/lib/kunde-stammdaten'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import {
-  createAllAbschlagRechnungenFromWizard,
-  finalizeRechnungWizardWithoutMail,
-  previewNaechsteRechnungsnummer,
-  saveRechnungWizardDraft,
-  sendRechnungWizard,
-  syncRechnungWizardMetaToEntwurf,
+createAllAbschlagRechnungenFromWizard,
+finalizeRechnungWizardWithoutMail,
+previewNaechsteRechnungsnummer,
+saveRechnungWizardDraft,
+sendRechnungWizard,
+syncRechnungWizardMetaToEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { abbrecheRechnungKorrekturSession } from '@/app/(dashboard)/rechnungen/actions'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import {
-  createAbschlussberichtPdf,
-  loadAbschlussberichtWizardHint,
+createAbschlussberichtPdf,
+loadAbschlussberichtWizardHint,
 } from '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
-  dokumentZeilenToAngebotPositionen,
-  formatEurBetrag,type DokumentArtikelZeile,
-  type DokumentZeile
+dokumentZeilenToAngebotPositionen,
+formatEurBetrag,type DokumentArtikelZeile,
+type DokumentZeile
 } from '@/lib/dokument-zeilen'
 import { normalizeAngebotPositionen,summenAusPositionen } from '@/lib/angebot-positionen'
 import {
-  berechneHinweis35aAnteil,
-  berechneRechnung,
-  parseKleinunternehmerSetting,
+berechneHinweis35aAnteil,
+berechneRechnung,
+parseKleinunternehmerSetting,
 } from '@/lib/rechnung-berechnung'
 import { DEFAULT_MWST_SATZ } from '@/lib/rechnung-config'
 import { isValidEmail } from '@/lib/email-recipients'
 import {
-  defaultRechnungKorrekturMitStornoMailEinleitung,
-  defaultRechnungMailEinleitung,
+defaultRechnungKorrekturMitStornoMailEinleitung,
+defaultRechnungMailEinleitung,
 } from '@/lib/mail/rechnung-mail'
 import { defaultFirmenEinstellungen,type FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import {
-  dokumentZeilenToPosBoardLines,
-  posBoardLinesToDokumentZeilen,
-  type PosBoardLine,
+dokumentZeilenToPosBoardLines,
+posBoardLinesToDokumentZeilen,
+type PosBoardLine,
 } from '@/lib/posboard/pos-board-line'
 import type {
-  AbschlagRechnungEntwurf,
-  RechnungWizardBootstrap,
-  RechnungWizardMeta,
+AbschlagRechnungEntwurf,
+RechnungWizardBootstrap,
+RechnungWizardMeta,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import {
-  berechneSchlussAbrechnung,
-  berechneZahlungsplan,
-  emptyZahlungsplan,zahlplanAbgerechnetAusLinks,
-  zahlplanRateStatus,
-  type Zahlungsplan,type ZahlungsplanZeile
+berechneSchlussAbrechnung,
+berechneZahlungsplan,
+emptyZahlungsplan,zahlplanAbgerechnetAusLinks,
+zahlplanRateStatus,
+type Zahlungsplan,type ZahlungsplanZeile
 } from '@/lib/rechnungen/zahlungsplan'
 import type { Gewerk,Kunde,KundeAnsprechpartner,KundenObjekt,Preisliste } from '@/lib/types'
 import {
-  normalizeVorgangWiederkehr,
-  WIEDERKEHR_TURNUS_LABELS,
-  WIEDERKEHR_TURNUS_VALUES,
-  type VorgangWiederkehr,
-  type WiederkehrTurnus,
+normalizeVorgangWiederkehr,
+WIEDERKEHR_TURNUS_LABELS,
+WIEDERKEHR_TURNUS_VALUES,
+type VorgangWiederkehr,
+type WiederkehrTurnus,
 } from '@/lib/vorgang/wiederkehrend'
 import { cn } from '@/lib/utils'
 import {
-  faelligAmFromZahlfrist,
-  formatDateDeYmd,
-  patchZahlungsbedingungenMitZahlfrist,
-  ZAHLFRIST_SEG_OPTIONS,
-  type ZahlfristSeg,
-  zahlfristSegFromFaelligAm,
+faelligAmFromZahlfrist,
+formatDateDeYmd,
+patchZahlungsbedingungenMitZahlfrist,
+ZAHLFRIST_SEG_OPTIONS,
+type ZahlfristSeg,
+zahlfristSegFromFaelligAm,
 } from '@/lib/zahlfrist'
 import { RechnungWizardPdfPreview } from '@/components/rechnungen/RechnungWizardPdfPreview'
 import { AbschlagsplanEditorModal } from '@/components/auftraege/AbschlagsplanEditorModal'
@@ -1500,34 +1500,37 @@ export function RechnungWizard({
               <span className="gfc-v">{kundeFirma}</span>
             </div>
           ) : null}
-          <MockField label="Ansprechpartner" full>
-            <MockSelect className="sel sel--choice" value={ansprechpartnerId ?? ''} onChange={(e) => {
-                const next = e.target.value.trim() || null
-                const prevKontakt = kundeEmail
-                setAnsprechpartnerId(next)
-                const ap = next
-                  ? apRows.find((a) => a.id === next)
-                  : apRows.find((a) => a.ist_primaer)
-                const mail = (ap?.email?.trim() || kunde?.email || '').trim()
-                /* Nur nachziehen, wenn Versand noch dem alten Ansprechpartner folgt. */
-                setMailTo((prev) => {
-                  if (!versandFolgtKontakt(prev[0] ?? '', prevKontakt)) return prev
-                  if (mail && isValidEmail(mail)) return [mail]
-                  return []
-                })
-                setDraftDirty(true)
-              }} disabled={!kundeId}>
-              <option value="">Hauptansprechpartner</option>
-              {apRows.map((ap) => (
-                <option key={ap.id} value={ap.id}>
-                  {ap.name.trim() || 'Ohne Name'}
-                  {ap.ist_primaer ? ' (Primär)' : ''}
-                  {ap.rolle?.trim() ? ` · ${ap.rolle.trim()}` : ''}
-                  {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
-                </option>
-              ))}
-            </MockSelect>
-          </MockField>
+          {/* Privatkunde ist selbst der Ansprechpartner */}
+          {kunde?.typ !== 'privat' ? (
+            <MockField label="Ansprechpartner" full>
+              <MockSelect className="sel sel--choice" value={ansprechpartnerId ?? ''} onChange={(e) => {
+                  const next = e.target.value.trim() || null
+                  const prevKontakt = kundeEmail
+                  setAnsprechpartnerId(next)
+                  const ap = next
+                    ? apRows.find((a) => a.id === next)
+                    : apRows.find((a) => a.ist_primaer)
+                  const mail = (ap?.email?.trim() || kunde?.email || '').trim()
+                  /* Nur nachziehen, wenn Versand noch dem alten Ansprechpartner folgt. */
+                  setMailTo((prev) => {
+                    if (!versandFolgtKontakt(prev[0] ?? '', prevKontakt)) return prev
+                    if (mail && isValidEmail(mail)) return [mail]
+                    return []
+                  })
+                  setDraftDirty(true)
+                }} disabled={!kundeId}>
+                <option value="">Hauptansprechpartner</option>
+                {apRows.map((ap) => (
+                  <option key={ap.id} value={ap.id}>
+                    {ap.name.trim() || 'Ohne Name'}
+                    {ap.ist_primaer ? ' (Primär)' : ''}
+                    {ap.rolle?.trim() ? ` · ${ap.rolle.trim()}` : ''}
+                    {ap.email?.trim() ? ` · ${ap.email.trim()}` : ''}
+                  </option>
+                ))}
+              </MockSelect>
+            </MockField>
+          ) : null}
           <KundenVersandEmailField
             apRows={apRows}
             kontaktEmail={kundeEmail}
