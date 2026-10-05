@@ -31,6 +31,8 @@ import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { safeAction } from '@/lib/actions/safe-action'
 import { formatDatum, formatEuro } from '@/lib/format/geld-datum'
 import { toast } from '@/components/ui/app-toast'
+import { WhatsAppChatSheet } from '@/components/whatsapp/WhatsAppChatSheet'
+import { useWhatsAppStatus } from '@/components/whatsapp/useWhatsAppStatus'
 
 // Farben: gesendet blau · in Auftrag gelb · fertig grün · abgelehnt/entzogen rot
 const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
@@ -167,6 +169,10 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const [eText, setEText] = useState('')
   const [eFotos, setEFotos] = useState<File[]>([])
   const [ePdf, setEPdf] = useState<File | null>(null)
+  const wa = useWhatsAppStatus()
+  /** Versandweg beim Anlegen — nur wenn WhatsApp im CRM sichtbar ist */
+  const [kanal, setKanal] = useState<'mail' | 'whatsapp' | 'beides'>('mail')
+  const [chatOffen, setChatOffen] = useState(false)
   const detail = einsaetze?.find((e) => e.id === detailId) ?? null
   const setDetail = (e: EinsatzZeile | null) => setDetailId(e?.id ?? null)
 
@@ -198,6 +204,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       return
     }
     setPartner(res.partner)
+    setKanal('mail')
     setGewerkOptionen(res.gewerke)
     setGewerkFilter(res.gewerkVorschlag)
     setForm({
@@ -235,6 +242,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         ekBetrag: form.ekBetrag || null,
         ekArt: form.ekArt,
         ohneMail,
+        kanal: wa?.sichtbar ? kanal : 'mail',
       })
     )
     setSaving(false)
@@ -242,8 +250,12 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       toast.error(res.message)
       return
     }
-    if (!ohneMail && !res.mailGesendet) {
+    const mitMail = !ohneMail && (!wa?.sichtbar || kanal !== 'whatsapp')
+    if (mitMail && !res.mailGesendet) {
       toast.error('Einsatz angelegt, aber die Mail an den Partner ging nicht raus. Bitte Partner-E-Mail prüfen.')
+    }
+    if (!ohneMail && res.whatsappFehler) {
+      toast.error(`Einsatz angelegt, aber WhatsApp ging nicht raus: ${res.whatsappFehler}`)
     }
     setOpen(false)
     await laden()
@@ -431,6 +443,13 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 </span>
               </div>
               {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
+              {wa?.sichtbar ? (
+                <div className="einsatz-aktionen">
+                  <MockBtn sm kind="secondary" icon="brand-whatsapp" onClick={() => setChatOffen(true)}>
+                    WhatsApp
+                  </MockBtn>
+                </div>
+              ) : null}
               {/* Für den Partner eintragen (Telefon/WhatsApp) — gleiche Schritte wie im Portal */}
               {detail.status === 'gesendet' ? (
                 <div className="einsatz-aktionen">
@@ -637,7 +656,11 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                         >
                           <span className="einsatz-partner__dot" aria-hidden />
                           <span className="einsatz-partner__name">{p.label}</span>
-                          {p.email ? null : <span className="einsatz-partner__hint">keine E-Mail</span>}
+                          {wa?.sichtbar && kanal !== 'mail' ? (
+                            p.whatsapp ? null : <span className="einsatz-partner__hint">keine Handynummer</span>
+                          ) : p.email ? null : (
+                            <span className="einsatz-partner__hint">keine E-Mail</span>
+                          )}
                         </MockBtn>
                       )
                     })}
@@ -645,6 +668,27 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 )
               })()}
             </MockField>
+            {wa?.sichtbar ? (
+              <MockField
+                label="Senden per"
+                hint={
+                  kanal === 'mail'
+                    ? undefined
+                    : 'WhatsApp mit Knöpfen „Annehmen“ / „Ablehnen“ — die Antwort landet direkt im Einsatz.'
+                }
+              >
+                <MockSegment
+                  value={kanal}
+                  onChange={setKanal}
+                  options={[
+                    { value: 'mail', label: 'E-Mail' },
+                    { value: 'whatsapp', label: 'WhatsApp' },
+                    { value: 'beides', label: 'Beides' },
+                  ]}
+                  aria-label="Versandweg"
+                />
+              </MockField>
+            ) : null}
             <MockField label="Titel" required>
               <MockInput value={form.titel} onChange={(ev) => setF({ titel: ev.target.value })} />
             </MockField>
@@ -706,6 +750,17 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         )}
       </EditorSheet>
 
+      {detail ? (
+        <WhatsAppChatSheet
+          open={chatOffen}
+          onClose={() => setChatOffen(false)}
+          ziel={{ handwerkerId: detail.handwerker_id }}
+          name={detail.partner_name}
+          auftragId={auftragId}
+          einsatzId={detail.id}
+          onChanged={() => void laden()}
+        />
+      ) : null}
     </>
   )
 }

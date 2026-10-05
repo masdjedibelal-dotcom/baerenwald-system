@@ -30,6 +30,7 @@ kundeDisplayName,
 import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { KundenAnsprechpartnerCard } from '@/components/kunden/KundenAnsprechpartnerCard'
+import { WhatsAppKontaktKarte } from '@/components/whatsapp/WhatsAppKarten'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
@@ -372,6 +373,7 @@ export function KundeDetailClient({
           refresh()
         }}
       />
+      <WhatsAppKontaktKarte kundeId={kunde.id} name={kunde.name} />
       {/* Privatkunde ist selbst der Ansprechpartner */}
       {kunde.typ !== 'privat' ? (
         <KundenAnsprechpartnerCard

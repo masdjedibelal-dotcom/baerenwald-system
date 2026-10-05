@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480">
+  <rect width="640" height="480" fill="#d9d4cb"/>
+  <g fill="#f4f1ea" stroke="#b9b2a5" stroke-width="3">
+    <rect x="0" y="0" width="160" height="120"/><rect x="160" y="0" width="160" height="120"/><rect x="320" y="0" width="160" height="120"/><rect x="480" y="0" width="160" height="120"/>
+    <rect x="0" y="120" width="160" height="120"/><rect x="160" y="120" width="160" height="120"/><rect x="320" y="120" width="160" height="120"/><rect x="480" y="120" width="160" height="120"/>
+  </g>
+  <rect x="0" y="240" width="640" height="240" fill="#8d9aa3"/>
+  <rect x="70" y="250" width="300" height="140" rx="18" fill="#ffffff" stroke="#c9ced2" stroke-width="4"/>
+  <rect x="420" y="190" width="120" height="200" rx="10" fill="#ffffff" stroke="#c9ced2" stroke-width="4"/>
+  <circle cx="480" cy="230" r="14" fill="#c9ced2"/>
+  <rect x="30" y="410" width="580" height="40" rx="6" fill="#6b7780"/>
+  <text x="24" y="460" font-family="Arial" font-size="20" fill="#ffffff">Bad · Fliesen gesetzt (Testfoto)</text>
+</svg>

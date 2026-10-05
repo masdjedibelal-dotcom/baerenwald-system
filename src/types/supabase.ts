@@ -8164,6 +8164,122 @@ export type Database = {
           },
         ]
       }
+      whatsapp_nachrichten: {
+        Row: {
+          antwort_auf_wa_id: string | null
+          art: string
+          auftrag_id: string | null
+          created_at: string
+          einsatz_id: string | null
+          erstellt_von: string | null
+          fehler: string | null
+          gelesen_at: string | null
+          handwerker_id: string | null
+          id: string
+          ist_mock: boolean
+          knoepfe: Json | null
+          knopf_id: string | null
+          kontakt_typ: string
+          kunde_id: string | null
+          markierung: string | null
+          media_mime: string | null
+          media_name: string | null
+          media_pfad: string | null
+          media_url: string | null
+          richtung: string
+          status: string
+          telefon: string
+          text: string | null
+          vorlage: string | null
+          wa_id: string | null
+        }
+        Insert: {
+          antwort_auf_wa_id?: string | null
+          art?: string
+          auftrag_id?: string | null
+          created_at?: string
+          einsatz_id?: string | null
+          erstellt_von?: string | null
+          fehler?: string | null
+          gelesen_at?: string | null
+          handwerker_id?: string | null
+          id?: string
+          ist_mock?: boolean
+          knoepfe?: Json | null
+          knopf_id?: string | null
+          kontakt_typ: string
+          kunde_id?: string | null
+          markierung?: string | null
+          media_mime?: string | null
+          media_name?: string | null
+          media_pfad?: string | null
+          media_url?: string | null
+          richtung: string
+          status?: string
+          telefon: string
+          text?: string | null
+          vorlage?: string | null
+          wa_id?: string | null
+        }
+        Update: {
+          antwort_auf_wa_id?: string | null
+          art?: string
+          auftrag_id?: string | null
+          created_at?: string
+          einsatz_id?: string | null
+          erstellt_von?: string | null
+          fehler?: string | null
+          gelesen_at?: string | null
+          handwerker_id?: string | null
+          id?: string
+          ist_mock?: boolean
+          knoepfe?: Json | null
+          knopf_id?: string | null
+          kontakt_typ?: string
+          kunde_id?: string | null
+          markierung?: string | null
+          media_mime?: string | null
+          media_name?: string | null
+          media_pfad?: string | null
+          media_url?: string | null
+          richtung?: string
+          status?: string
+          telefon?: string
+          text?: string | null
+          vorlage?: string | null
+          wa_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_nachrichten_auftrag_id_fkey"
+            columns: ["auftrag_id"]
+            isOneToOne: false
+            referencedRelation: "auftraege"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_nachrichten_einsatz_id_fkey"
+            columns: ["einsatz_id"]
+            isOneToOne: false
+            referencedRelation: "einsaetze"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_nachrichten_handwerker_id_fkey"
+            columns: ["handwerker_id"]
+            isOneToOne: false
+            referencedRelation: "handwerker"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_nachrichten_kunde_id_fkey"
+            columns: ["kunde_id"]
+            isOneToOne: false
+            referencedRelation: "kunden"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       handwerker_compliance_status: {

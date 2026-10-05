@@ -107,6 +107,7 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/telegram') ||
     path.startsWith('/api/copilot/') ||
     path.startsWith('/api/cron/') ||
+    path.startsWith('/api/whatsapp/webhook') ||
     path.startsWith('/api/dev/auto-login')
 
   if (devAuthSkipEnabled() && !user && !isPublic) {

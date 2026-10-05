@@ -1,4 +1,4 @@
-export type EinstellungenTabId = 'firma' | 'team' | 'preise' | 'benachrichtigungen'
+export type EinstellungenTabId = 'firma' | 'team' | 'preise' | 'benachrichtigungen' | 'whatsapp'
 
 export type EinstellungenTabDef = {
   id: EinstellungenTabId
@@ -10,7 +10,7 @@ export type EinstellungenTabDef = {
   matchPrefixes: string[]
 }
 
-/** Einstellungen-Nav: Firma · Team · Preislisten · Benachrichtigungen */
+/** Einstellungen-Nav: Firma · Team · Preislisten · Benachrichtigungen · WhatsApp */
 export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
   {
     id: 'firma',
@@ -44,6 +44,13 @@ export const EINSTELLUNGEN_TABS: EinstellungenTabDef[] = [
     label: 'Benachrichtigungen',
     mockIcon: 'bell',
     matchPrefixes: ['/einstellungen/benachrichtigungen'],
+  },
+  {
+    id: 'whatsapp',
+    href: '/einstellungen/whatsapp',
+    label: 'WhatsApp',
+    mockIcon: 'brand-whatsapp',
+    matchPrefixes: ['/einstellungen/whatsapp'],
   },
 ]
 

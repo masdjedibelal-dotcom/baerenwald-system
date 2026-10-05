@@ -174,3 +174,5 @@ uploadFoto
 uploadFotos
 uploadLogo
 vorschauPdf
+simulieren
+aktion

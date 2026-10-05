@@ -29,6 +29,7 @@ export type CrmNotificationTyp =
   | 'partner_compliance_geloescht'
   | 'partner_unterlage'
   | 'partner_fachdoku'
+  | 'whatsapp_eingang'
 
 export type CrmNotificationItem = {
   sourceKey: string
@@ -98,6 +99,8 @@ function typLabel(typ: CrmNotificationTyp): string {
       return 'Partner-Unterlage hochgeladen'
     case 'partner_fachdoku':
       return 'Fachnachweis hochgeladen'
+    case 'whatsapp_eingang':
+      return 'WhatsApp-Nachricht'
   }
 }
 
@@ -131,6 +134,8 @@ function typIcon(typ: CrmNotificationTyp): string {
     case 'partner_unterlage':
     case 'partner_fachdoku':
       return 'upload'
+    case 'whatsapp_eingang':
+      return 'brand-whatsapp'
   }
 }
 
@@ -164,6 +169,8 @@ function ctaLabel(typ: CrmNotificationTyp): string {
     case 'partner_unterlage':
     case 'partner_fachdoku':
       return 'Auftrag öffnen'
+    case 'whatsapp_eingang':
+      return 'Chat öffnen'
   }
 }
 
@@ -211,6 +218,8 @@ function typHint(typ: CrmNotificationTyp): string {
       return 'Partner hat Unterlagen am Auftrag hochgeladen — unter Akte → Dokumente prüfen.'
     case 'partner_fachdoku':
       return 'Partner hat einen Fachnachweis/Protokoll hochgeladen — unter Akte → Dokumente / Fachnachweise.'
+    case 'whatsapp_eingang':
+      return 'Neue WhatsApp-Nachricht. Im Chat zuordnen, als Update/Regie übernehmen oder als Dokument speichern.'
   }
 }
 
@@ -1180,6 +1189,7 @@ async function collectCrmNotificationItems(opts?: {
   }
 
   await collectEinsatzItems(supabase, since, items)
+  await collectWhatsAppItems(supabase, since, items)
 
   items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   if (enrichKunden) {
@@ -1253,6 +1263,53 @@ async function collectEinsatzItems(
           : `${name}: Update zum Einsatz`,
       subtitle: String(row.text ?? '').slice(0, 120),
       href: `/auftraege/${String(row.auftrag_id)}`,
+      createdAt: String(row.created_at ?? since),
+      gelesen: false,
+    })
+  }
+}
+
+/** Ungelesene WhatsApp-Nachrichten: eine Zeile je Kontakt (neueste Nachricht), öffnet den Chat. */
+async function collectWhatsAppItems(
+  supabase: ReturnType<typeof createClient>,
+  since: string,
+  items: CrmNotificationItem[]
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('whatsapp_nachrichten')
+    .select('id, created_at, art, text, media_name, handwerker_id, kunde_id, auftrag_id, telefon, handwerker(name, firma), kunden(name)')
+    .eq('richtung', 'ein')
+    .is('gelesen_at', null)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(PER_SOURCE_LIMIT * 3)
+  if (error) {
+    logDbError('app/notifications/actions:whatsapp', error)
+    return
+  }
+  const gesehen = new Set<string>()
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const kontaktId = String(row.handwerker_id ?? row.kunde_id ?? row.telefon)
+    if (gesehen.has(kontaktId)) continue
+    gesehen.add(kontaktId)
+    const hw = one(row.handwerker as { name?: string | null; firma?: string | null } | null)
+    const kd = one(row.kunden as { name?: string | null } | null)
+    const name = hw?.firma?.trim() || hw?.name?.trim() || kd?.name?.trim() || `+${String(row.telefon ?? '')}`
+    const zielId = String(row.handwerker_id ?? row.kunde_id ?? '')
+    const href = row.auftrag_id
+      ? `/auftraege/${String(row.auftrag_id)}?chat=${zielId}`
+      : row.handwerker_id
+        ? `/handwerker/${String(row.handwerker_id)}?chat=1`
+        : row.kunde_id
+          ? `/kunden/${String(row.kunde_id)}?chat=1`
+          : '/'
+    const text = String(row.text ?? '').trim() || (row.art === 'bild' ? 'Foto' : String(row.media_name ?? 'Datei'))
+    items.push({
+      sourceKey: `whatsapp:${String(row.id)}`,
+      typ: 'whatsapp_eingang',
+      title: `${name} hat per WhatsApp geschrieben`,
+      subtitle: text.slice(0, 120),
+      href,
       createdAt: String(row.created_at ?? since),
       gelesen: false,
     })

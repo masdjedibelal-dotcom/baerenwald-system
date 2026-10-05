@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480">
+  <rect width="640" height="480" fill="#e9e4da"/>
+  <rect x="0" y="0" width="640" height="300" fill="#f7f5f0"/>
+  <path d="M60 80 L250 60 L270 210 L80 240 Z" fill="#c7bfb1" opacity="0.7"/>
+  <path d="M120 120 C160 100, 200 140, 230 120" stroke="#9a8f7e" stroke-width="5" fill="none"/>
+  <rect x="380" y="70" width="190" height="150" fill="#dfe8ee" stroke="#a9b6bf" stroke-width="6"/>
+  <line x1="475" y1="70" x2="475" y2="220" stroke="#a9b6bf" stroke-width="6"/>
+  <rect x="0" y="300" width="640" height="180" fill="#b58f62"/>
+  <g stroke="#9c774c" stroke-width="3"><line x1="0" y1="360" x2="640" y2="360"/><line x1="0" y1="420" x2="640" y2="420"/></g>
+  <rect x="440" y="250" width="110" height="80" rx="6" fill="#3d6b4f"/>
+  <text x="24" y="460" font-family="Arial" font-size="20" fill="#ffffff">Wand gespachtelt, Riss ausgebessert (Testfoto)</text>
+</svg>

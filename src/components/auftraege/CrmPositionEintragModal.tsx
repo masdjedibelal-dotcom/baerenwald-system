@@ -16,6 +16,9 @@ import { optimizeImageForUpload } from '@/lib/media/optimize-image-for-upload'
 import { splitTagebuchBeschreibung } from '@/lib/auftraege/tagebuch-text'
 import type { AuftragPosition } from '@/lib/types'
 import { TOAST } from '@/lib/copy'
+import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
+import { sendeBautagebuchWhatsApp } from '@/app/(dashboard)/whatsapp/actions'
+import { useWhatsAppStatus } from '@/components/whatsapp/useWhatsAppStatus'
 
 const MAX_FOTOS = 12
 
@@ -52,6 +55,9 @@ export function CrmPositionEintragModal({
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [fotoPaths, setFotoPaths] = useState<string[]>([])
+  const wa = useWhatsAppStatus()
+  /** Neuer Eintrag: Kunden zusätzlich per WhatsApp informieren (Link zur Projektseite) */
+  const [perWhatsApp, setPerWhatsApp] = useState(false)
 
   const isEdit = Boolean(editEintrag?.id)
 
@@ -69,6 +75,7 @@ export function CrmPositionEintragModal({
     setTitel('')
     setBeschreibung('')
     setFotoPaths([])
+    setPerWhatsApp(false)
   }, [open, editEintrag])
 
   async function uploadFotos(files: File[]) {
@@ -171,6 +178,11 @@ export function CrmPositionEintragModal({
             throw new Error(r.message)
           }
           toast.success(isEdit ? 'Eintrag aktualisiert' : 'Eintrag gespeichert')
+          if (!isEdit && perWhatsApp && wa?.sichtbar) {
+            const w = await sendeBautagebuchWhatsApp({ auftragId, titel: titel.trim(), text: beschreibung.trim() })
+            if (w.ok) toast.success('Kunde per WhatsApp informiert')
+            else toast.error(`WhatsApp an den Kunden ging nicht raus: ${w.message}`)
+          }
           onSaved?.()
           onClose()
         }
@@ -254,6 +266,16 @@ export function CrmPositionEintragModal({
             Bis zu {MAX_FOTOS} Fotos — Drag & Drop oder Tippen.
           </p>
         </div>
+
+        {!isEdit && wa?.sichtbar ? (
+          <label className="wa-check">
+            <MockCheckbox checked={perWhatsApp} onChange={(e) => setPerWhatsApp(e.target.checked)} />
+            <span>
+              Kunde per WhatsApp informieren
+              <span className="wa-check__sub">Kurzer Text mit Link zur Projektseite (Fotos, Details).</span>
+            </span>
+          </label>
+        ) : null}
       </div>
     </EditorSheet>
   )

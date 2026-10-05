@@ -15,6 +15,8 @@ import {
 } from '@/lib/status/write-einsatz-mitteilung-status'
 import { planAuftragStatusWrite } from '@/lib/status/write-auftrag-status'
 import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
+import { einsatzPerWhatsApp } from '@/lib/whatsapp/dienst'
+import { waNummer } from '@/lib/whatsapp/telefon'
 
 /** Bucket der Partner-Uploads (Portal `PARTNER_UPLOAD_BUCKET`). */
 const PARTNER_UPLOAD_BUCKET = 'handwerker-uploads'
@@ -77,7 +79,14 @@ export type EinsatzMitteilung = {
   erfasst_von: 'partner' | 'bw' | null
 }
 
-export type EinsatzPartnerOption = { id: string; label: string; email: string | null; gewerke: string[] }
+export type EinsatzPartnerOption = {
+  id: string
+  label: string
+  email: string | null
+  /** Handy/WhatsApp vorhanden → Einsatz kann per WhatsApp raus */
+  whatsapp: boolean
+  gewerke: string[]
+}
 export type EinsatzGewerkOption = { slug: string; name: string }
 
 export type EinsatzVorbelegung = {
@@ -252,7 +261,7 @@ export async function loadEinsatzFormular(auftragId: string): Promise<
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
   const [hwRes, aufRes, gwRes, posRes] = await Promise.all([
-    gate.db.from('handwerker').select('id, name, firma, email, aktiv, gewerke').order('firma', { ascending: true }),
+    gate.db.from('handwerker').select('id, name, firma, email, telefon, whatsapp, aktiv, gewerke').order('firma', { ascending: true }),
     gate.db
       .from('auftraege')
       .select('titel, start_datum, end_datum, leads(strasse, hausnummer, plz, kontakt_name, kontakt_telefon)')
@@ -280,6 +289,9 @@ export async function loadEinsatzFormular(auftragId: string): Promise<
       id: String(h.id),
       label: partnerLabel(h as { name?: string | null; firma?: string | null }),
       email: ((h as { email?: string | null }).email ?? '').trim() || null,
+      whatsapp: Boolean(
+        waNummer((h as { whatsapp?: string | null }).whatsapp) ?? waNummer((h as { telefon?: string | null }).telefon)
+      ),
       gewerke: Array.isArray((h as { gewerke?: unknown }).gewerke) ? ((h as { gewerke: string[] }).gewerke) : [],
     }))
   const leadRaw = (aufRes.data as { leads?: unknown }).leads
@@ -326,7 +338,12 @@ export async function createEinsatz(input: {
   ekArt: 'netto' | 'brutto'
   /** Nur eintragen: keine Mail — Partner nimmt im Portal an, oder Bärenwald trägt „Hat angenommen“ ein. */
   ohneMail?: boolean
-}): Promise<{ ok: true; einsatz: EinsatzZeile; mailGesendet: boolean } | { ok: false; message: string }> {
+  /** Versandweg beim Senden (Standard: E-Mail) */
+  kanal?: 'mail' | 'whatsapp' | 'beides'
+}): Promise<
+  | { ok: true; einsatz: EinsatzZeile; mailGesendet: boolean; whatsappFehler: string | null }
+  | { ok: false; message: string }
+> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
   const titel = input.titel.trim()
@@ -360,7 +377,18 @@ export async function createEinsatz(input: {
 
   if (input.ohneMail) {
     revalidatePath(`/auftraege/${input.auftragId}`)
-    return { ok: true, einsatz, mailGesendet: false }
+    return { ok: true, einsatz, mailGesendet: false, whatsappFehler: null }
+  }
+
+  const kanal = input.kanal ?? 'mail'
+  let whatsappFehler: string | null = null
+  if (kanal !== 'mail') {
+    const wa = await einsatzPerWhatsApp(gate.db, einsatz.id, gate.user.id)
+    if (!wa.ok) whatsappFehler = wa.message
+  }
+  if (kanal === 'whatsapp') {
+    revalidatePath(`/auftraege/${input.auftragId}`)
+    return { ok: true, einsatz, mailGesendet: false, whatsappFehler }
   }
 
   // Mail an den Partner — Einsatz ist angelegt, auch wenn die Mail scheitert (Hinweis im CRM).
@@ -401,7 +429,7 @@ export async function createEinsatz(input: {
   }
 
   revalidatePath(`/auftraege/${input.auftragId}`)
-  return { ok: true, einsatz, mailGesendet }
+  return { ok: true, einsatz, mailGesendet, whatsappFehler }
 }
 
 /**

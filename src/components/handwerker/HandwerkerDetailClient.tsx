@@ -66,6 +66,7 @@ type FabVorgangArt,
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 import { TOAST } from '@/lib/copy'
+import { WhatsAppKontaktKarte } from '@/components/whatsapp/WhatsAppKarten'
 
 type HandwerkerDetailTab = 'uebersicht' | 'vorgaenge' | 'compliance' | 'akte'
 
@@ -272,6 +273,8 @@ export function HandwerkerDetailClient({
         portalGesperrt={istPortalGesperrt}
         onInvite={() => void openPortalModal()}
       />
+
+      <WhatsAppKontaktKarte handwerkerId={hw.id} name={handwerkerDisplayName(hw)} />
 
       <EntityHandwerkerBankCard handwerker={hw} gewerkeOptionen={gewerkeOptionen} />
 
