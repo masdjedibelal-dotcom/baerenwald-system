@@ -2,12 +2,13 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BrandLogo } from '@/components/brand/BrandLogo'
-import { SIDEBAR_NAV_GROUPS, navItemIsActive } from '@/lib/nav-config'
+import { SIDEBAR_NAV_GROUPS,navItemIsActive } from '@/lib/nav-config'
 import { cn } from '@/lib/utils'
+import { useWhatsAppStatus,useWhatsAppUngelesen } from '@/components/whatsapp/useWhatsAppStatus'
 
 const SIDEBAR_EXPANDED_KEY = 'bw-sidebar-expanded'
 
@@ -22,6 +23,8 @@ export function Sidebar({
 }) {
   const pathname = usePathname() ?? '/'
   const [expanded, setExpanded] = useState(true)
+  const wa = useWhatsAppStatus()
+  const ungelesen = useWhatsAppUngelesen(Boolean(wa?.sichtbar), pathname)
 
   useEffect(() => {
     try {
@@ -76,7 +79,7 @@ export function Sidebar({
         {SIDEBAR_NAV_GROUPS.map((group) => (
           <div key={group.id}>
             <div className="sidebar-section">{group.label}</div>
-            {group.items.map((item) => (
+            {group.items.filter((item) => !item.nurWhatsApp || wa?.sichtbar).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -86,6 +89,11 @@ export function Sidebar({
               >
                 <MockIcon ctx="sidebar" n={item.iconName} size={18} />
                 <span className="sidebar-label">{item.label}</span>
+                {item.nurWhatsApp && ungelesen > 0 ? (
+                  <span className="nav-zaehler" aria-label={`${ungelesen} ungelesen`}>
+                    {ungelesen > 99 ? '99+' : ungelesen}
+                  </span>
+                ) : null}
               </Link>
             ))}
           </div>

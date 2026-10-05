@@ -3,8 +3,8 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import {
-  isHwZuweisungAkzeptiertLenient,
-  normalizeHwZuweisungStatus,
+isHwZuweisungAkzeptiertLenient,
+normalizeHwZuweisungStatus,
 } from '@/lib/angebote/handwerker-annahme'
 
 export type CrmNotificationTyp =
@@ -1295,14 +1295,12 @@ async function collectWhatsAppItems(
     const hw = one(row.handwerker as { name?: string | null; firma?: string | null } | null)
     const kd = one(row.kunden as { name?: string | null } | null)
     const name = hw?.firma?.trim() || hw?.name?.trim() || kd?.name?.trim() || `+${String(row.telefon ?? '')}`
-    const zielId = String(row.handwerker_id ?? row.kunde_id ?? '')
-    const href = row.auftrag_id
-      ? `/auftraege/${String(row.auftrag_id)}?chat=${zielId}`
-      : row.handwerker_id
-        ? `/handwerker/${String(row.handwerker_id)}?chat=1`
-        : row.kunde_id
-          ? `/kunden/${String(row.kunde_id)}?chat=1`
-          : '/'
+    const chat = row.handwerker_id
+      ? `h:${String(row.handwerker_id)}`
+      : row.kunde_id
+        ? `k:${String(row.kunde_id)}`
+        : `t:${String(row.telefon ?? '')}`
+    const href = `/nachrichten?chat=${encodeURIComponent(chat)}`
     const text = String(row.text ?? '').trim() || (row.art === 'bild' ? 'Foto' : String(row.media_name ?? 'Datei'))
     items.push({
       sourceKey: `whatsapp:${String(row.id)}`,

@@ -1,37 +1,38 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback,useEffect,useState } from 'react'
 
 import {
-  createEinsatz,
-  einsatzFertigErfassen,
-  einsatzRechnungErfassen,
-  einsatzRegieErfassen,
-  einsatzRueckmeldungErfassen,
-  einsatzUpdateErfassen,
-  einsatzUpdatesGesehen,
-  listEinsaetze,
-  loadEinsatzFormular,
-  regieEntscheiden,
-  zurueckziehenEinsatz,
-  type EinsatzMitteilung,
-  type EinsatzGewerkOption,
-  type EinsatzPartnerOption,
-  type EinsatzStatus,
-  type EinsatzZeile,
+createEinsatz,
+einsatzFertigErfassen,
+einsatzRechnungErfassen,
+einsatzRegieErfassen,
+einsatzRueckmeldungErfassen,
+einsatzUpdateErfassen,
+einsatzUpdatesGesehen,
+listEinsaetze,
+loadEinsatzFormular,
+regieEntscheiden,
+zurueckziehenEinsatz,
+type EinsatzMitteilung,
+type EinsatzGewerkOption,
+type EinsatzPartnerOption,
+type EinsatzStatus,
+type EinsatzZeile,
 } from '@/app/(dashboard)/auftraege/einsatz-actions'
-import { MockBadge, MockBtn, MockCard, MockSegment } from '@/components/mock-ui'
+import { MockBadge,MockBtn,MockCard,MockSegment } from '@/components/mock-ui'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
-import { MockField, MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField,MockInput,MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { openConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { DateInput } from '@/components/ui/DateInput'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { safeAction } from '@/lib/actions/safe-action'
-import { formatDatum, formatEuro } from '@/lib/format/geld-datum'
+import { formatDatum,formatEuro } from '@/lib/format/geld-datum'
 import { toast } from '@/components/ui/app-toast'
-import { WhatsAppChatSheet } from '@/components/whatsapp/WhatsAppChatSheet'
+import { useRouter } from 'next/navigation'
+import { nachrichtenHref } from '@/lib/whatsapp/schluessel'
 import { useWhatsAppStatus } from '@/components/whatsapp/useWhatsAppStatus'
 
 // Farben: gesendet blau · in Auftrag gelb · fertig grün · abgelehnt/entzogen rot
@@ -172,7 +173,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   const wa = useWhatsAppStatus()
   /** Versandweg beim Anlegen — nur wenn WhatsApp im CRM sichtbar ist */
   const [kanal, setKanal] = useState<'mail' | 'whatsapp' | 'beides'>('mail')
-  const [chatOffen, setChatOffen] = useState(false)
+  const router = useRouter()
   const detail = einsaetze?.find((e) => e.id === detailId) ?? null
   const setDetail = (e: EinsatzZeile | null) => setDetailId(e?.id ?? null)
 
@@ -445,7 +446,12 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
               {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
               {wa?.sichtbar ? (
                 <div className="einsatz-aktionen">
-                  <MockBtn sm kind="secondary" icon="brand-whatsapp" onClick={() => setChatOffen(true)}>
+                  <MockBtn
+                    sm
+                    kind="secondary"
+                    icon="brand-whatsapp"
+                    onClick={() => router.push(nachrichtenHref({ handwerkerId: detail.handwerker_id }))}
+                  >
                     WhatsApp
                   </MockBtn>
                 </div>
@@ -750,17 +756,6 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         )}
       </EditorSheet>
 
-      {detail ? (
-        <WhatsAppChatSheet
-          open={chatOffen}
-          onClose={() => setChatOffen(false)}
-          ziel={{ handwerkerId: detail.handwerker_id }}
-          name={detail.partner_name}
-          auftragId={auftragId}
-          einsatzId={detail.id}
-          onChanged={() => void laden()}
-        />
-      ) : null}
     </>
   )
 }

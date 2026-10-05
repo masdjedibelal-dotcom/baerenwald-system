@@ -30,7 +30,6 @@ kundeDisplayName,
 import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { KundenAnsprechpartnerCard } from '@/components/kunden/KundenAnsprechpartnerCard'
-import { WhatsAppKontaktKarte } from '@/components/whatsapp/WhatsAppKarten'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
@@ -373,7 +372,6 @@ export function KundeDetailClient({
           refresh()
         }}
       />
-      <WhatsAppKontaktKarte kundeId={kunde.id} name={kunde.name} />
       {/* Privatkunde ist selbst der Ansprechpartner */}
       {kunde.typ !== 'privat' ? (
         <KundenAnsprechpartnerCard
@@ -527,6 +525,7 @@ export function KundeDetailClient({
   const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
     telefon: kunde.telefon,
     email: kunde.email,
+    whatsapp: { kundeId: kunde.id },
     notiz: { kind: 'kunde', kundeId: kunde.id },
     dokument: { kind: 'kunde', kundeId: kunde.id },
     onSaved: () => refresh(),

@@ -2879,7 +2879,9 @@ content: ':';
 
 .detail-quickbar {
 display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 4 Knöpfe, mit WhatsApp 5 — immer eine Zeile */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
   margin: 0 0 14px;
 }
@@ -22616,3 +22618,80 @@ button.dok-gruppe__kopf {
 .wa-anhang__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wa-anhang__groesse { color: var(--text-3); white-space: nowrap; }
 .wa-blase--ein:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* ── Postfach „Nachrichten“ ─────────────────────────────────────────────── */
+.wa-postfach {
+  display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  height: calc(100dvh - var(--topbar-h) - 40px); min-height: 480px;
+  border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--card); overflow: hidden;
+}
+.wa-postfach__liste { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+.wa-postfach__kopf { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-bottom: 1px solid var(--border); }
+.wa-postfach__zeile { display: flex; gap: 8px; align-items: center; }
+.wa-postfach__zeile > .wa-eingabe__feld { flex: 1; min-width: 0; }
+.wa-postfach__kopf .seg { width: 100%; }
+.wa-postfach__eintraege { flex: 1; min-height: 0; overflow-y: auto; }
+.wa-postfach__leer {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  color: var(--text-3); font-size: var(--fs-text); text-align: center; padding: 24px;
+}
+.wa-kontakt {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;
+  border: 0; border-bottom: 1px solid var(--border); background: none; text-align: left; font: inherit; color: inherit; cursor: pointer;
+}
+.wa-kontakt:hover { background: var(--bw-hover); }
+.wa-kontakt.is-aktiv { background: var(--grn-bg); }
+.wa-kontakt__avatar {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%; background: var(--bg-soft); color: var(--text-2);
+  font-size: var(--fs-meta); font-weight: 600;
+}
+.wa-kontakt__avatar--handwerker { background: var(--blue-bg); color: var(--blue-tx); }
+.wa-kontakt__avatar--kunde { background: var(--grn-bg); color: var(--grn-tx); }
+.wa-kontakt__avatar--unbekannt { background: var(--yel-bg); color: var(--yel-tx); }
+.wa-kontakt__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.wa-kontakt__name { font-weight: 600; font-size: var(--fs-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-kontakt__vorschau { color: var(--text-2); font-size: var(--fs-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-kontakt__typ { color: var(--text-3); font-size: var(--fs-caption); }
+.wa-kontakt__rechts { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.wa-kontakt__zeit { color: var(--text-3); font-size: var(--fs-caption); white-space: nowrap; }
+
+.wa-pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.wa-pane__kopf { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.wa-pane__titel { display: flex; flex-direction: column; min-width: 0; }
+.wa-pane__name { font-weight: 600; font-size: var(--fs-title); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-pane__nr { color: var(--text-3); font-size: var(--fs-meta); }
+.wa-pane .wa-chat { flex: 1; min-height: 0; padding: 12px 16px 0; gap: 10px; }
+.wa-pane .wa-verlauf { flex: 1; min-height: 0; max-height: none; }
+
+.wa-pop { display: flex; flex-direction: column; gap: 12px; padding: 12px; max-height: min(72vh, 520px); overflow-y: auto; }
+.wa-pop__kopf { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: var(--fs-text); }
+.wa-pop__fuss { display: flex; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.wa-pop .einsatz-partner-liste { max-height: 200px; overflow-y: auto; }
+
+.sidebar-icon .nav-zaehler, .nav-zaehler {
+  margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--green); color: var(--card); font-size: var(--fs-caption); font-weight: 600;
+}
+.bottomnav-item { position: relative; }
+.nav-zaehler--bottom { position: absolute; top: 4px; left: calc(50% + 6px); margin: 0; height: 16px; min-width: 16px; padding: 0 4px; }
+
+@media (max-width: 767px) {
+  .wa-postfach {
+    grid-template-columns: minmax(0, 1fr); border: 0; border-radius: 0; background: none;
+    height: calc(100dvh - var(--topbar-h) - var(--mobile-bottom-nav-height) - 12px); min-height: 0;
+  }
+  .wa-postfach__liste { border-right: 0; }
+  .wa-pane__kopf { padding: 8px 4px; }
+  .wa-pane .wa-chat { padding: 8px 0 0; }
+}
+.detail-entity-toprow__wa { margin-left: auto; }
+
+.wa-sim__kopf { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wa-sim__auf { align-self: flex-start; }
+/* Schnellaktionen: mit WhatsApp 5 Kacheln — schrumpfen statt abschneiden */
+.detail-quickbar__btn { min-width: 0; }
+.detail-quickbar__btn > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.detail-quickbar:has(> :nth-child(5)) { gap: 6px; }
+.detail-quickbar:has(> :nth-child(5)) .detail-quickbar__btn { font-size: 11px; letter-spacing: -0.01em; padding-inline: 1px; }

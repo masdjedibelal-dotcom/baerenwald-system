@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BOTTOM_NAV_ITEMS,navItemIsActive } from '@/lib/nav-config'
 import { cn } from '@/lib/utils'
+import { useWhatsAppStatus,useWhatsAppUngelesen } from '@/components/whatsapp/useWhatsAppStatus'
 
 /**
  * Bottom-Nav Spec §3: Dashboard · Vorgänge | + | Kunden · Mehr
@@ -12,8 +13,11 @@ import { cn } from '@/lib/utils'
  */
 export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
   const pathname = usePathname() ?? '/'
-  const left = BOTTOM_NAV_ITEMS.slice(0, 2)
-  const right = BOTTOM_NAV_ITEMS.slice(2)
+  const wa = useWhatsAppStatus()
+  const ungelesen = useWhatsAppUngelesen(Boolean(wa?.sichtbar), pathname)
+  const items = BOTTOM_NAV_ITEMS.filter((item) => !item.nurWhatsApp || wa?.sichtbar)
+  const left = items.slice(0, 2)
+  const right = items.slice(2)
   const mehrActive =
     pathname === '/mehr' ||
     pathname.startsWith('/mehr/') ||
@@ -46,6 +50,9 @@ export function BottomNav({ onNeuOpen }: { onNeuOpen?: () => void }) {
           title={item.label}
         >
           <MockIcon ctx="sidebar" n={item.iconName} size={20} />
+          {item.nurWhatsApp && ungelesen > 0 ? (
+            <span className="nav-zaehler nav-zaehler--bottom">{ungelesen > 99 ? '99+' : ungelesen}</span>
+          ) : null}
           <span className="bottomnav-item__lbl">{item.label}</span>
         </Link>
       ))}

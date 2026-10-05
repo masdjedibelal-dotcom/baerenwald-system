@@ -23,6 +23,9 @@ import { createClient } from '@/lib/supabase'
 import type { QuickBarAction } from '@/components/vorgang/DetailQuickBar'
 import { TOAST } from '@/lib/copy'
 import { useFieldErrors } from '@/lib/validation/form-schema'
+import { useRouter } from 'next/navigation'
+import { useWhatsAppStatus } from '@/components/whatsapp/useWhatsAppStatus'
+import { nachrichtenHref,type WaZielSchluessel } from '@/lib/whatsapp/schluessel'
 
 const DOC_ACCEPT =
   '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
@@ -61,15 +64,20 @@ export function useDetailQuickActions({
   email,
   notiz,
   dokument,
+  whatsapp,
   onSaved,
 }: {
   telefon?: string | null
   email?: string | null
+  /** Sprung in den Chat im Postfach „Nachrichten“ (nur wenn WhatsApp sichtbar) */
+  whatsapp?: WaZielSchluessel | null
   notiz?: DetailQuickNotizTarget | null
   dokument?: DetailQuickDokumentTarget | null
   onSaved?: () => void
 }): { quickBar: QuickBarAction[]; sheets: ReactNode } {
   const { fieldErrors, applyFieldErrors } = useFieldErrors()
+  const router = useRouter()
+  const wa = useWhatsAppStatus()
   const [notizOpen, setNotizOpen] = useState(false)
   const [notizText, setNotizText] = useState('')
   const [pending, setPending] = useState(false)
@@ -284,6 +292,16 @@ export function useDetailQuickActions({
       disabled: !email?.trim(),
       onClick: openMail,
     },
+    ...(whatsapp && wa?.sichtbar
+      ? [
+          {
+            id: 'whatsapp',
+            label: 'WhatsApp',
+            icon: 'brand-whatsapp',
+            onClick: () => router.push(nachrichtenHref(whatsapp)),
+          },
+        ]
+      : []),
     {
       id: 'notiz',
       label: 'Notiz',

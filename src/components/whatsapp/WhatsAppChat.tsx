@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import {
   ladeWhatsAppVerlauf,
@@ -18,6 +18,8 @@ import {
 import { MockBadge, MockBtn, MockSegment } from '@/components/mock-ui'
 import { MockField, MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockPopover } from '@/components/mock-ui/MockPopover'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { toast } from '@/components/ui/app-toast'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
@@ -120,37 +122,32 @@ function Medium({ m, onLoad }: { m: NonNullable<WaNachricht['medium']>; onLoad?:
 }
 
 /**
- * WhatsApp-Verlauf mit einem Partner oder Kunden. Im Auftrag: Filter „Dieser Auftrag“ und neue
- * Nachrichten werden dem Auftrag/Einsatz zugeordnet. Eingehende antippen → einordnen.
+ * Ein Chat im Postfach „Nachrichten“: kompletter Verlauf mit dem Kontakt (über alle Aufträge).
+ * Eingehende Nachricht antippen → einordnen (Auftrag/Einsatz wählen, Update/Regie/Dokument/erledigt).
  */
-export function WhatsAppChatSheet({
-  open,
-  onClose,
+export function WhatsAppChat({
   ziel,
   name,
-  auftragId,
-  einsatzId,
+  zurueck,
   onChanged,
 }: {
-  open: boolean
-  onClose: () => void
   ziel: WaZiel
   name: string
-  auftragId?: string | null
-  einsatzId?: string | null
+  /** Mobil: Zurück zur Liste */
+  zurueck?: ReactNode
   onChanged?: () => void
 }) {
   const [verlauf, setVerlauf] = useState<WaVerlauf | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
-  const [nurAuftrag, setNurAuftrag] = useState<'auftrag' | 'alle'>('auftrag')
   const [text, setText] = useState('')
   const [senden, setSenden] = useState(false)
   const [simText, setSimText] = useState('')
+  const [simOffen, setSimOffen] = useState(false)
   const [anhang, setAnhang] = useState<File | null>(null)
   const dateiRef = useRef<HTMLInputElement>(null)
-  const [aktiv, setAktiv] = useState<WaNachricht | null>(null)
+  const [aktiv, setAktiv] = useState<{ n: WaNachricht; el: HTMLElement } | null>(null)
   const listeRef = useRef<HTMLDivElement>(null)
-  const zielKey = `${ziel.handwerkerId ?? ''}|${ziel.kundeId ?? ''}`
+  const zielKey = `${ziel.handwerkerId ?? ''}|${ziel.kundeId ?? ''}|${ziel.telefon ?? ''}`
 
   const laden = useCallback(async () => {
     const res = await safeAction(ladeWhatsAppVerlauf(ziel, { gelesen: true }))
@@ -164,23 +161,18 @@ export function WhatsAppChatSheet({
   }, [zielKey])
 
   useEffect(() => {
-    if (!open) return
     setVerlauf(null)
     setText('')
     setAnhang(null)
-    setNurAuftrag('auftrag')
-    void laden()
-    // Neue Nachrichten (Webhook) nachladen, solange das Blatt offen ist
+    setAktiv(null)
+    void laden().then(() => onChanged?.())
+    // Neue Nachrichten (Webhook) nachladen, solange der Chat offen ist
     const t = window.setInterval(() => void laden(), 15000)
     return () => window.clearInterval(t)
-  }, [open, laden])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onChanged nur nach dem ersten Laden (Zähler)
+  }, [laden])
 
-  const sichtbar = useMemo(() => {
-    const alle = verlauf?.nachrichten ?? []
-    return auftragId && nurAuftrag === 'auftrag'
-      ? alle.filter((n) => n.auftrag_id === auftragId || !n.auftrag_id)
-      : alle
-  }, [verlauf, auftragId, nurAuftrag])
+  const sichtbar = verlauf?.nachrichten ?? []
 
   const nachUnten = useCallback(() => {
     const el = listeRef.current
@@ -194,7 +186,7 @@ export function WhatsAppChatSheet({
   async function absenden() {
     if (!text.trim() && !anhang) return
     setSenden(true)
-    const kontext = { ziel, auftragId: auftragId ?? null, einsatzId: einsatzId ?? null }
+    const kontext = { ziel, auftragId: null, einsatzId: null }
     let res: { ok: true } | { ok: false; message: string } = { ok: true }
     if (anhang) {
       res = await anhangSenden(anhang, kontext)
@@ -285,14 +277,14 @@ export function WhatsAppChatSheet({
 
   return (
     <>
-      <EditorSheet
-        open={open}
-        onClose={onClose}
-        title={name || 'WhatsApp'}
-        crumb={verlauf?.kontakt ? `WhatsApp · ${waNummerAnzeige(verlauf.kontakt.nummer)}` : 'WhatsApp'}
-        size="lg"
-        bodyClassName="wa-sheet-body"
-      >
+      <section className="wa-pane">
+        <header className="wa-pane__kopf">
+          {zurueck}
+          <div className="wa-pane__titel">
+            <span className="wa-pane__name">{name || verlauf?.kontakt?.name || 'WhatsApp'}</span>
+            {verlauf?.kontakt ? <span className="wa-pane__nr">{waNummerAnzeige(verlauf.kontakt.nummer)}</span> : null}
+          </div>
+        </header>
         <div className="wa-chat">
           {mock ? (
             <div className="wa-hinweis">
@@ -301,17 +293,6 @@ export function WhatsAppChatSheet({
                 Testmodus: Es geht nichts an WhatsApp raus. Antworten des Kontakts unten simulieren.
               </span>
             </div>
-          ) : null}
-          {auftragId ? (
-            <MockSegment
-              value={nurAuftrag}
-              onChange={setNurAuftrag}
-              options={[
-                { value: 'auftrag', label: 'Dieser Auftrag' },
-                { value: 'alle', label: 'Alle Nachrichten' },
-              ]}
-              aria-label="Nachrichten filtern"
-            />
           ) : null}
 
           <div className="wa-verlauf" ref={listeRef}>
@@ -325,11 +306,7 @@ export function WhatsAppChatSheet({
               const trenner = t !== letzterTag
               letzterTag = t
               const ein = n.richtung === 'ein'
-              // Im Auftrags-Filter nur andere bzw. offene Zuordnungen zeigen
-              const zuordnung =
-                auftragId && nurAuftrag === 'auftrag' && n.auftrag_id === auftragId
-                  ? null
-                  : n.einsatz_titel || n.auftrag_titel
+              const zuordnung = n.einsatz_titel || n.auftrag_titel
               return (
                 <div key={n.id} className="wa-zeile-wrap">
                   {trenner ? <div className="wa-tag">{t}</div> : null}
@@ -342,11 +319,11 @@ export function WhatsAppChatSheet({
                             role: 'button',
                             tabIndex: 0,
                             title: 'Nachricht einordnen',
-                            onClick: () => setAktiv(n),
-                            onKeyDown: (e: React.KeyboardEvent) => {
+                            onClick: (e: React.MouseEvent<HTMLElement>) => setAktiv({ n, el: e.currentTarget }),
+                            onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault()
-                                setAktiv(n)
+                                setAktiv({ n, el: e.currentTarget })
                               }
                             },
                           }
@@ -440,9 +417,17 @@ export function WhatsAppChatSheet({
                   <span className="wa-senden-text">Senden</span>
                 </MockBtn>
               </div>
-              {mock ? (
+              {mock && !simOffen ? (
+                <MockBtn sm kind="ghost" icon="info-circle" className="wa-sim__auf" onClick={() => setSimOffen(true)}>
+                  Antwort simulieren (Testmodus)
+                </MockBtn>
+              ) : null}
+              {mock && simOffen ? (
                 <div className="wa-sim">
-                  <span className="wa-sim__titel">Antwort von {name || 'Kontakt'} simulieren</span>
+                  <div className="wa-sim__kopf">
+                    <span className="wa-sim__titel">Antwort von {name || verlauf?.kontakt?.name || 'Kontakt'} simulieren</span>
+                    <MockBtn icon="x" title="Einklappen" onClick={() => setSimOffen(false)} />
+                  </div>
                   {offeneKnoepfe.length ? (
                     <div className="wa-sim__knoepfe">
                       {offeneKnoepfe.map((k) => (
@@ -482,10 +467,11 @@ export function WhatsAppChatSheet({
             </div>
           ) : null}
         </div>
-      </EditorSheet>
+      </section>
 
       <NachrichtEinordnen
-        nachricht={aktiv}
+        nachricht={aktiv?.n ?? null}
+        anker={aktiv?.el ?? null}
         laufend={verlauf?.laufend ?? []}
         istPartner={Boolean(ziel.handwerkerId)}
         onClose={() => setAktiv(null)}
@@ -502,12 +488,15 @@ export function WhatsAppChatSheet({
 /** Eingehende Nachricht: zuordnen, als Update/Regie übernehmen, als Dokument speichern, erledigt. */
 function NachrichtEinordnen({
   nachricht,
+  anker,
   laufend,
   istPartner,
   onClose,
   onDone,
 }: {
   nachricht: WaNachricht | null
+  /** Angetippte Blase — Desktop: Popover daran, Handy: Blatt von unten */
+  anker: HTMLElement | null
   laufend: WaVerlauf['laufend']
   istPartner: boolean
   onClose: () => void
@@ -520,6 +509,9 @@ function NachrichtEinordnen({
   const [regieText, setRegieText] = useState('')
   const [art, setArt] = useState<DokumentArt>('sonstiges')
   const [busy, setBusy] = useState(false)
+  const mobil = useIsMobile()
+  const ankerRef = useRef<HTMLElement | null>(null)
+  ankerRef.current = anker
 
   useEffect(() => {
     if (!nachricht) return
@@ -581,33 +573,24 @@ function NachrichtEinordnen({
   const hatEinsatz = istPartner && Boolean(gewaehlt)
   const einsatzLaeuft = gewaehlt?.status === 'angenommen'
 
-  return (
-    <EditorSheet
-      open
-      onClose={onClose}
-      title="Nachricht einordnen"
-      crumb={formatDatum(nachricht.created_at)}
-      secondary={{
-        label: nachricht.markierung === 'erledigt' ? 'Wieder offen' : 'Erledigt',
-        kind: 'ghost',
-        disabled: busy,
-        onClick: () => void aktion('erledigt'),
-      }}
-      primary={
-        modus === 'regie'
-          ? { label: 'Regie speichern', icon: 'check', busy, disabled: busy || stunden <= 0 || !regieText.trim() || !hatEinsatz, onClick: () => void aktion('regie') }
-          : modus === 'dokument'
-            ? { label: 'Speichern', icon: 'check', busy, disabled: busy || !gewaehlt, onClick: () => void aktion('dokument') }
-            : zuordnungGeaendert
-              ? { label: 'Zuordnung speichern', icon: 'check', busy, disabled: busy, onClick: () => void aktion('zuordnen').then(() => undefined) }
-              : null
-      }
-    >
+  const primary =
+    modus === 'regie'
+      ? { label: 'Regie speichern', disabled: busy || stunden <= 0 || !regieText.trim() || !hatEinsatz, onClick: () => void aktion('regie') }
+      : modus === 'dokument'
+        ? { label: 'Speichern', disabled: busy || !gewaehlt, onClick: () => void aktion('dokument') }
+        : zuordnungGeaendert
+          ? { label: 'Zuordnung speichern', disabled: busy, onClick: () => void aktion('zuordnen') }
+          : null
+  const erledigtLabel = nachricht.markierung === 'erledigt' ? 'Wieder offen' : 'Erledigt'
+
+  const inhalt = (
       <div className="wa-einordnen">
-        <div className="wa-zitat">
+        {mobil ? (
+  <div className="wa-zitat">
           {nachricht.medium ? <Medium m={nachricht.medium} /> : null}
           {nachricht.text ? <p>{nachricht.text}</p> : null}
         </div>
+        ) : null}
 
         <MockField label={istPartner ? 'Gehört zu Einsatz' : 'Gehört zu Auftrag'}>
           {laufend.length ? (
@@ -699,6 +682,42 @@ function NachrichtEinordnen({
 
         {nachricht.markierung ? <MockBadge kind="aktiv">{MARKIERUNG[nachricht.markierung]}</MockBadge> : null}
       </div>
-    </EditorSheet>
+  )
+
+  if (mobil) {
+    return (
+      <EditorSheet
+        open
+        onClose={onClose}
+        title="Nachricht einordnen"
+        crumb={formatDatum(nachricht.created_at)}
+        secondary={{ label: erledigtLabel, kind: 'ghost', disabled: busy, onClick: () => void aktion('erledigt') }}
+        primary={primary ? { ...primary, icon: 'check', busy } : null}
+      >
+        {inhalt}
+      </EditorSheet>
+    )
+  }
+
+  return (
+    <MockPopover open onClose={onClose} anchorRef={ankerRef} align="left" width={360}>
+      <div className="wa-pop">
+        <div className="wa-pop__kopf">
+          <span>Nachricht einordnen</span>
+          <MockBtn icon="x" title="Schließen" onClick={onClose} />
+        </div>
+        {inhalt}
+        <div className="wa-pop__fuss">
+          <MockBtn sm kind="ghost" disabled={busy} onClick={() => void aktion('erledigt')}>
+            {erledigtLabel}
+          </MockBtn>
+          {primary ? (
+            <MockBtn sm kind="primary" icon="check" disabled={primary.disabled} loading={busy} onClick={primary.onClick}>
+              {primary.label}
+            </MockBtn>
+          ) : null}
+        </div>
+      </div>
+    </MockPopover>
   )
 }

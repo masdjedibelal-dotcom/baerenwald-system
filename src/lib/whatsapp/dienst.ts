@@ -3,13 +3,13 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { logDbError } from '@/lib/errors/log-db-error'
-import { formatDatum, formatEuro } from '@/lib/format/geld-datum'
+import { formatDatum,formatEuro } from '@/lib/format/geld-datum'
 import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
 import { writeWhatsAppStatus } from '@/lib/status/write-whatsapp-status'
-import { whatsappProvider, vorlageAnzeige } from '@/lib/whatsapp/provider'
+import { whatsappProvider,vorlageAnzeige } from '@/lib/whatsapp/provider'
 import { waNummer } from '@/lib/whatsapp/telefon'
-import { einsatzKnopfId, parseEinsatzKnopfId, type VorlagenName } from '@/lib/whatsapp/vorlagen'
-import { parseWhatsAppWebhook, type WaEingang } from '@/lib/whatsapp/webhook-parse'
+import { einsatzKnopfId,parseEinsatzKnopfId,type VorlagenName } from '@/lib/whatsapp/vorlagen'
+import { parseWhatsAppWebhook,type WaEingang } from '@/lib/whatsapp/webhook-parse'
 
 /**
  * WhatsApp-Kern: Kontakt zur Nummer finden, eingehende Nachrichten zuordnen und speichern,
@@ -23,6 +23,8 @@ const FENSTER_MS = 24 * 60 * 60 * 1000
 export type WaKontakt =
   | { typ: 'handwerker'; id: string; name: string; nummer: string }
   | { typ: 'kunde'; id: string; name: string; nummer: string }
+  /** Nummer ohne Kunde/Partner im CRM (id = Nummer) */
+  | { typ: 'unbekannt'; id: string; name: string; nummer: string }
 
 function partnerName(h: { name?: string | null; firma?: string | null }): string {
   return h.firma?.trim() || h.name?.trim() || 'Partner'
@@ -51,8 +53,13 @@ export async function kontaktZuNummer(db: SupabaseClient, nummer: string): Promi
 
 export async function kontaktLaden(
   db: SupabaseClient,
-  ziel: { handwerkerId?: string | null; kundeId?: string | null }
+  ziel: { handwerkerId?: string | null; kundeId?: string | null; telefon?: string | null }
 ): Promise<WaKontakt | null> {
+  if (ziel.telefon) {
+    const nr = waNummer(ziel.telefon)
+    if (!nr) return null
+    return (await kontaktZuNummer(db, nr)) ?? { typ: 'unbekannt', id: nr, name: `+${nr}`, nummer: nr }
+  }
   if (ziel.handwerkerId) {
     const { data } = await db
       .from('handwerker')

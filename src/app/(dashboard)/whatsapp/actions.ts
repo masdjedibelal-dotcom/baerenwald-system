@@ -5,19 +5,20 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { logDbError } from '@/lib/errors/log-db-error'
-import { DOKUMENT_ARTEN, type DokumentArt } from '@/lib/types'
+import { DOKUMENT_ARTEN,type DokumentArt } from '@/lib/types'
 import {
-  aktiveEinsaetze,
-  bautagebuchPerWhatsApp,
-  imFenster,
-  kontaktLaden,
-  nachrichtSenden,
-  webhookVerarbeiten,
-  WHATSAPP_MEDIEN_BUCKET,
-  type WaKontakt,
+aktiveEinsaetze,
+bautagebuchPerWhatsApp,
+imFenster,
+kontaktLaden,
+nachrichtSenden,
+webhookVerarbeiten,
+WHATSAPP_MEDIEN_BUCKET,
+type WaKontakt,
 } from '@/lib/whatsapp/dienst'
 import { whatsappKonfig } from '@/lib/whatsapp/konfig'
 import { whatsappProvider } from '@/lib/whatsapp/provider'
+import { gespraechSchluessel } from '@/lib/whatsapp/schluessel'
 import { mockWebhookPayload } from '@/lib/whatsapp/webhook-parse'
 
 /**
@@ -25,7 +26,8 @@ import { mockWebhookPayload } from '@/lib/whatsapp/webhook-parse'
  * Übernehmen als Update/Regie, Speichern als Dokument. Testmodus: Antworten simulieren.
  */
 
-export type WaZiel = { handwerkerId?: string | null; kundeId?: string | null }
+/** Kontakt eines Chats: Partner, Kunde oder (unbekannte) Nummer */
+export type WaZiel = { handwerkerId?: string | null; kundeId?: string | null; telefon?: string | null }
 
 export type WaNachricht = {
   id: string
@@ -150,10 +152,14 @@ export async function ladeWhatsAppVerlauf(
 ): Promise<({ ok: true } & WaVerlauf) | Fail> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
-  if (!ziel.handwerkerId && !ziel.kundeId) return { ok: false, message: 'Kein Kontakt gewählt.' }
+  if (!ziel.handwerkerId && !ziel.kundeId && !ziel.telefon) return { ok: false, message: 'Kein Kontakt gewählt.' }
   const kontakt = await kontaktLaden(gate.db, ziel)
-  let q = gate.db.from('whatsapp_nachrichten').select(SELECT).order('created_at', { ascending: true }).limit(300)
-  q = ziel.handwerkerId ? q.eq('handwerker_id', ziel.handwerkerId) : q.eq('kunde_id', ziel.kundeId!)
+  let q = gate.db.from('whatsapp_nachrichten').select(SELECT).order('created_at', { ascending: true }).limit(500)
+  q = ziel.handwerkerId
+    ? q.eq('handwerker_id', ziel.handwerkerId)
+    : ziel.kundeId
+      ? q.eq('kunde_id', ziel.kundeId)
+      : q.eq('telefon', kontakt?.nummer ?? String(ziel.telefon)).eq('kontakt_typ', 'unbekannt')
   const { data, error } = await q
   if (error) {
     logDbError('app/whatsapp/actions:verlauf', error)
@@ -184,116 +190,12 @@ export async function ladeWhatsAppVerlauf(
   }
 }
 
-export type WaKontaktZeile = {
-  typ: 'handwerker' | 'kunde'
-  id: string
-  name: string
-  rolle: string
-  hatNummer: boolean
-  letzte: { text: string; at: string; richtung: 'ein' | 'aus' } | null
-  ungelesen: number
-}
-
 function vorschau(r: { art?: unknown; text?: unknown; media_name?: unknown }): string {
   const t = String(r.text ?? '').trim()
   if (t) return t.replace(/\s+/g, ' ').slice(0, 90)
   if (r.art === 'bild') return 'Foto'
   if (r.art === 'dokument') return String(r.media_name ?? 'Dokument')
   return 'Nachricht'
-}
-
-/** Kontakte eines Auftrags (Kunde + Partner der Einsätze) mit letzter Nachricht. */
-export async function ladeWhatsAppKontakteAuftrag(
-  auftragId: string
-): Promise<{ ok: true; kontakte: WaKontaktZeile[] } | Fail> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-  const [aufRes, einRes] = await Promise.all([
-    gate.db.from('auftraege').select('kunde_id, kunden(id, name, telefon, org_telefon)').eq('id', auftragId).maybeSingle(),
-    gate.db
-      .from('einsaetze')
-      .select('handwerker_id, titel, handwerker(id, name, firma, telefon, whatsapp)')
-      .eq('auftrag_id', auftragId)
-      .order('created_at', { ascending: true }),
-  ])
-  const kontakte: WaKontaktZeile[] = []
-  for (const e of (einRes.data ?? []) as Record<string, unknown>[]) {
-    const h = one(e.handwerker as { id: string; name?: string | null; firma?: string | null; telefon?: string | null; whatsapp?: string | null } | null)
-    if (!h || kontakte.some((k) => k.typ === 'handwerker' && k.id === String(h.id))) continue
-    kontakte.push({
-      typ: 'handwerker',
-      id: String(h.id),
-      name: h.firma?.trim() || h.name?.trim() || 'Partner',
-      rolle: `Partner · ${String(e.titel ?? '')}`,
-      hatNummer: Boolean((h.whatsapp ?? h.telefon ?? '').trim()),
-      letzte: null,
-      ungelesen: 0,
-    })
-  }
-  const k = one((aufRes.data as { kunden?: unknown } | null)?.kunden as {
-    id: string
-    name?: string | null
-    telefon?: string | null
-    org_telefon?: string | null
-  } | null)
-  if (k) {
-    kontakte.unshift({
-      typ: 'kunde',
-      id: String(k.id),
-      name: String(k.name ?? 'Kunde'),
-      rolle: 'Kunde',
-      hatNummer: Boolean((k.telefon ?? k.org_telefon ?? '').trim()),
-      letzte: null,
-      ungelesen: 0,
-    })
-  }
-  await letzteNachrichten(gate.db, kontakte)
-  return { ok: true, kontakte }
-}
-
-async function letzteNachrichten(db: SupabaseClient, kontakte: WaKontaktZeile[]): Promise<void> {
-  await Promise.all(
-    kontakte.map(async (k) => {
-      const spalte = k.typ === 'handwerker' ? 'handwerker_id' : 'kunde_id'
-      const [letzte, offen] = await Promise.all([
-        db
-          .from('whatsapp_nachrichten')
-          .select('art, text, media_name, created_at, richtung')
-          .eq(spalte, k.id)
-          .order('created_at', { ascending: false })
-          .limit(1),
-        db
-          .from('whatsapp_nachrichten')
-          .select('id', { count: 'exact', head: true })
-          .eq(spalte, k.id)
-          .eq('richtung', 'ein')
-          .is('gelesen_at', null),
-      ])
-      const r = letzte.data?.[0]
-      k.letzte = r
-        ? { text: vorschau(r), at: String(r.created_at), richtung: r.richtung === 'aus' ? 'aus' : 'ein' }
-        : null
-      k.ungelesen = offen.count ?? 0
-    })
-  )
-}
-
-/** Kurzinfo für die Karte bei Partner/Kunde: letzte Nachricht + ungelesen. */
-export async function ladeWhatsAppKurz(ziel: WaZiel): Promise<{ ok: true; zeile: WaKontaktZeile } | Fail> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-  const kontakt = await kontaktLaden(gate.db, ziel)
-  const zeile: WaKontaktZeile = {
-    typ: ziel.handwerkerId ? 'handwerker' : 'kunde',
-    id: String(ziel.handwerkerId ?? ziel.kundeId ?? ''),
-    name: kontakt?.name ?? '',
-    rolle: '',
-    hatNummer: Boolean(kontakt),
-    letzte: null,
-    ungelesen: 0,
-  }
-  await letzteNachrichten(gate.db, [zeile])
-  return { ok: true, zeile }
 }
 
 export async function sendeWhatsApp(input: {
@@ -610,4 +512,107 @@ export async function sendeWhatsAppAnhang(input: {
     userId: gate.user.id,
   })
   return r.ok ? { ok: true } : r
+}
+
+/* ── Postfach „Nachrichten“ ─────────────────────────────────────────────── */
+
+export type WaGespraech = {
+  /** Schlüssel für die URL: h:<id> · k:<id> · t:<nummer> */
+  schluessel: string
+  ziel: WaZiel
+  typ: 'handwerker' | 'kunde' | 'unbekannt'
+  name: string
+  letzte: { text: string; at: string; richtung: 'ein' | 'aus'; status: string }
+  ungelesen: number
+  /** Eingehende ohne Auftrag und ohne Markierung */
+  offen: number
+}
+
+/** Alle Chats, neueste zuerst (eine Zeile je Kontakt). */
+export async function ladeWhatsAppPostfach(): Promise<{ ok: true; gespraeche: WaGespraech[] } | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  const { data, error } = await gate.db
+    .from('whatsapp_nachrichten')
+    .select('id, created_at, richtung, art, text, media_name, status, handwerker_id, kunde_id, telefon, auftrag_id, markierung, gelesen_at, handwerker(name, firma), kunden(name)')
+    .order('created_at', { ascending: false })
+    .limit(2000)
+  if (error) {
+    logDbError('app/whatsapp/actions:postfach', error)
+    return { ok: false, message: 'Nachrichten konnten nicht geladen werden.' }
+  }
+  const map = new Map<string, WaGespraech>()
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const ziel: WaZiel = r.handwerker_id
+      ? { handwerkerId: String(r.handwerker_id) }
+      : r.kunde_id
+        ? { kundeId: String(r.kunde_id) }
+        : { telefon: String(r.telefon ?? '') }
+    const key = gespraechSchluessel(ziel)
+    let g = map.get(key)
+    if (!g) {
+      const hw = one(r.handwerker as { name?: string | null; firma?: string | null } | null)
+      const kd = one(r.kunden as { name?: string | null } | null)
+      g = {
+        schluessel: key,
+        ziel,
+        typ: r.handwerker_id ? 'handwerker' : r.kunde_id ? 'kunde' : 'unbekannt',
+        name: hw?.firma?.trim() || hw?.name?.trim() || kd?.name?.trim() || `+${String(r.telefon ?? '')}`,
+        letzte: {
+          text: vorschau(r),
+          at: String(r.created_at),
+          richtung: r.richtung === 'aus' ? 'aus' : 'ein',
+          status: String(r.status ?? ''),
+        },
+        ungelesen: 0,
+        offen: 0,
+      }
+      map.set(key, g)
+    }
+    if (r.richtung === 'ein' && !r.gelesen_at) g.ungelesen += 1
+    if (r.richtung === 'ein' && !r.auftrag_id && !r.markierung) g.offen += 1
+  }
+  return { ok: true, gespraeche: [...map.values()] }
+}
+
+/** Menü-Zähler: ungelesene eingehende Nachrichten. */
+export async function zaehleUngeleseneWhatsApp(): Promise<number> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return 0
+  const { count } = await gate.db
+    .from('whatsapp_nachrichten')
+    .select('id', { count: 'exact', head: true })
+    .eq('richtung', 'ein')
+    .is('gelesen_at', null)
+  return count ?? 0
+}
+
+export type WaKontaktTreffer = { ziel: WaZiel; typ: 'handwerker' | 'kunde'; name: string; sub: string }
+
+/** „Neuer Chat“: Kunden und Partner mit Handynummer. */
+export async function sucheWhatsAppKontakte(q: string): Promise<{ ok: true; treffer: WaKontaktTreffer[] } | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  const such = q.trim().replace(/[%,()]/g, ' ')
+  if (such.length < 2) return { ok: true, treffer: [] }
+  const [hw, kd] = await Promise.all([
+    gate.db
+      .from('handwerker')
+      .select('id, name, firma, telefon, whatsapp')
+      .or(`name.ilike.%${such}%,firma.ilike.%${such}%`)
+      .limit(10),
+    gate.db.from('kunden').select('id, name, telefon, org_telefon').ilike('name', `%${such}%`).limit(10),
+  ])
+  const treffer: WaKontaktTreffer[] = []
+  for (const h of hw.data ?? []) {
+    const nr = h.whatsapp || h.telefon
+    if (!nr) continue
+    treffer.push({ ziel: { handwerkerId: String(h.id) }, typ: 'handwerker', name: h.firma?.trim() || h.name?.trim() || 'Partner', sub: `Partner · ${nr}` })
+  }
+  for (const k of kd.data ?? []) {
+    const nr = k.telefon || k.org_telefon
+    if (!nr) continue
+    treffer.push({ ziel: { kundeId: String(k.id) }, typ: 'kunde', name: String(k.name ?? 'Kunde'), sub: `Kunde · ${nr}` })
+  }
+  return { ok: true, treffer }
 }

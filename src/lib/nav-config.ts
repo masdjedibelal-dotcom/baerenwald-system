@@ -14,6 +14,8 @@ export type NavItemDef = {
   exact?: boolean
   /** Zusätzliche Pfade, die diesen Eintrag aktiv markieren (z. B. Phasen-Routen unter Vorgänge). */
   activeAlso?: string[]
+  /** Nur sichtbar, wenn WhatsApp angebunden ist (oder Staging-Testmodus) */
+  nurWhatsApp?: boolean
 }
 
 export type NavGroupDef = {
@@ -56,6 +58,7 @@ export const SIDEBAR_NAV_GROUPS: NavGroupDef[] = [
         '/auftraege',
         '/rechnungen',
       ]),
+      { ...nav('/nachrichten', 'brand-whatsapp', 'Nachrichten'), nurWhatsApp: true },
       nav('/kunden', 'users', 'Kunden'),
       nav('/handwerker', 'tool', COPY_ROLE.partner),
     ],
@@ -75,6 +78,7 @@ export const BOTTOM_NAV_ITEMS: NavItemDef[] = [
     '/rechnungen',
   ]),
   nav('/kunden', 'users', 'Kunden'),
+  { ...nav('/nachrichten', 'brand-whatsapp', 'Nachrichten'), nurWhatsApp: true },
 ]
 
 /** Mobile Mehr-Screen (Kachel-Grid). */
@@ -119,6 +123,7 @@ export const ROUTE_META: Record<string, RouteMetaDef> = {
   },
   '/einstellungen': { title: 'Einstellungen' },
   '/mehr': { title: 'Mehr' },
+  '/nachrichten': { title: 'Nachrichten' },
 }
 
 export const SECTION_LABELS: Record<string, string> = {
@@ -131,6 +136,7 @@ export const SECTION_LABELS: Record<string, string> = {
   angebote: 'Angebote',
   einstellungen: 'Einstellungen',
   mehr: 'Mehr',
+  nachrichten: 'Nachrichten',
 }
 
 export const SUB_LABELS: Record<string, Record<string, string>> = {

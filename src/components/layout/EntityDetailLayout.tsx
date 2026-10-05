@@ -1,5 +1,7 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
+
 import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { MockTabs } from '@/components/mock-ui/MockTabs'
 import type { ReactNode,TouchEvent } from 'react'
@@ -7,8 +9,8 @@ import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { usePathname,useSearchParams } from 'next/navigation'
 import { DetailMobileTopSlotProvider } from '@/components/layout/detail-mobile-top-slot'
 import {
-  VorgangResolverBanner,
-  vorgangResolverBannerVisible,
+VorgangResolverBanner,
+vorgangResolverBannerVisible,
 } from '@/components/vorgang/VorgangResolverBanner'
 import { AkteRueckwegChip } from '@/components/vorgang/AkteRueckwegChip'
 import { DetailQuickBar,type QuickBarAction } from '@/components/vorgang/DetailQuickBar'
@@ -22,8 +24,8 @@ import type { ResolvedVorgang } from '@/lib/vorgang/types'
 import type { VorgangPhase } from '@/lib/vorgang/types'
 import { parseAkteFromParam } from '@/lib/vorgang/akte-from'
 import {
-  defaultListHrefForDetail,
-  parseReturn,
+defaultListHrefForDetail,
+parseReturn,
 } from '@/lib/list-return-url'
 import type { MockIconName } from '@/lib/mock-icons'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -338,6 +340,7 @@ export function EntityDetailLayout({
             </div>
           ) : null
 
+  const waAktion = quickBar?.find((a) => a.id === 'whatsapp') ?? null
   const showResolver =
     resolvedVorgang != null && vorgangResolverBannerVisible(resolvedVorgang)
 
@@ -353,6 +356,12 @@ export function EntityDetailLayout({
             ) : (
               <span className="detail-entity-toprow__spacer" aria-hidden />
             )}
+            {/* Desktop hat keine Schnellaktionsleiste — Sprung ins Postfach „Nachrichten“ hier oben */}
+            {!isMobile && waAktion ? (
+              <MockBtn sm kind="secondary" icon="brand-whatsapp" className="detail-entity-toprow__wa" onClick={waAktion.onClick}>
+                WhatsApp
+              </MockBtn>
+            ) : null}
             <div className="detail-entity-toprow__actions">
               <span
                 ref={setTopOverflowHost}

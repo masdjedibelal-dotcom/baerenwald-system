@@ -5,7 +5,6 @@ import { posBoardLinesFromAngebotPositionen } from '@/lib/posboard/pos-board-lin
 
 import { MockBtn } from '@/components/mock-ui'
 import { AuftragEinsaetzeCard } from '@/components/auftraege/AuftragEinsaetzeCard'
-import { AuftragWhatsAppCard } from '@/components/whatsapp/WhatsAppKarten'
 import {
 DetailShell,
 EntityDetailLayout,
@@ -401,6 +400,7 @@ export function AuftragDetailClient({
   const { quickBar, sheets: quickActionSheets } = useDetailQuickActions({
     telefon: kundeTel,
     email: kundeEmail,
+    whatsapp: detail.kunden?.id ? { kundeId: detail.kunden.id } : null,
     notiz: {
       kind: 'auftrag',
       auftragId: detail.id,
@@ -758,13 +758,12 @@ export function AuftragDetailClient({
 
   const stammdatenInhalt = (
     <>
-      <AuftragEinsaetzeCard auftragId={detail.id} />
-      <AuftragWhatsAppCard auftragId={detail.id} />
       <AuftragStammdatenCard
         detail={detail}
         lead={_leadDetail ?? null}
         onSaved={() => refresh()}
       />
+      <AuftragEinsaetzeCard auftragId={detail.id} />
       {_leadDetail ? (
         <HvMeldungKontextCards lead={_leadDetail} onSaved={() => refresh()} />
       ) : null}

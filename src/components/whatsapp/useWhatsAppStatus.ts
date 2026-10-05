@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 
-import { whatsappStatus, type WaStatusInfo } from '@/app/(dashboard)/whatsapp/actions'
+import { whatsappStatus,zaehleUngeleseneWhatsApp,type WaStatusInfo } from '@/app/(dashboard)/whatsapp/actions'
 
 let cache: Promise<WaStatusInfo> | null = null
 
@@ -20,4 +20,26 @@ export function useWhatsAppStatus(): WaStatusInfo | null {
     }
   }, [])
   return status
+}
+
+/** Menü-Zähler „Nachrichten“: ungelesene WhatsApp, bei Seitenwechsel und jede Minute neu. */
+export function useWhatsAppUngelesen(aktiv: boolean, pfad: string): number {
+  const [anzahl, setAnzahl] = useState(0)
+  useEffect(() => {
+    if (!aktiv) return
+    let lebt = true
+    const holen = () =>
+      zaehleUngeleseneWhatsApp()
+        .then((n) => {
+          if (lebt) setAnzahl(n)
+        })
+        .catch(() => undefined)
+    holen()
+    const t = window.setInterval(holen, 60000)
+    return () => {
+      lebt = false
+      window.clearInterval(t)
+    }
+  }, [aktiv, pfad])
+  return anzahl
 }
