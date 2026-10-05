@@ -9,7 +9,7 @@ import { writeWhatsAppStatus } from '@/lib/status/write-whatsapp-status'
 import { whatsappProvider,vorlageAnzeige } from '@/lib/whatsapp/provider'
 import { waNummer } from '@/lib/whatsapp/telefon'
 import { einsatzKnopfId,parseEinsatzKnopfId,type VorlagenName } from '@/lib/whatsapp/vorlagen'
-import { parseWhatsAppWebhook,type WaEingang } from '@/lib/whatsapp/webhook-parse'
+import { parseTwilioWebhook,type TwilioFelder,type WaEingang } from '@/lib/whatsapp/webhook-parse'
 
 /**
  * WhatsApp-Kern: Kontakt zur Nummer finden, eingehende Nachrichten zuordnen und speichern,
@@ -149,12 +149,22 @@ async function zuordnen(db: SupabaseClient, kontakt: WaKontakt | null, e: WaEing
   if (kontakt?.typ === 'handwerker') {
     const laufend = await aktiveEinsaetze(db, kontakt.id)
     if (laufend.length === 1) return { auftrag_id: laufend[0]!.auftrag_id, einsatz_id: laufend[0]!.id }
+    // „Annehmen“/„Ablehnen“ ohne Bezug: der einzige noch offene (gesendete) Einsatz
+    const offen = laufend.filter((l) => l.status === 'gesendet')
+    if (knopfAntwort(e) && offen.length === 1) return { auftrag_id: offen[0]!.auftrag_id, einsatz_id: offen[0]!.id }
   }
   if (kontakt?.typ === 'kunde') {
     const laufend = await aktiveAuftraegeKunde(db, kontakt.id)
     if (laufend.length === 1) return { auftrag_id: laufend[0]!, einsatz_id: null }
   }
   return { auftrag_id: null, einsatz_id: null }
+}
+
+/** Knopf „Annehmen“/„Ablehnen“ der Einsatz-Vorlage (Twilio liefert nur den Knopftext/-Payload). */
+function knopfAntwort(e: WaEingang): 'annehmen' | 'ablehnen' | null {
+  if (e.art !== 'antwort' && e.art !== 'text') return null
+  const t = String(e.knopfId ?? e.text ?? '').trim().toLowerCase()
+  return t === 'annehmen' ? 'annehmen' : t === 'ablehnen' ? 'ablehnen' : null
 }
 
 async function mediumSpeichern(
@@ -229,12 +239,12 @@ async function einsatzKnopf(db: SupabaseClient, kontakt: WaKontakt, knopfId: str
 /** Webhook-Inhalt verarbeiten: Nachrichten speichern + zuordnen, Zustellstatus nachtragen. */
 export async function webhookVerarbeiten(
   db: SupabaseClient,
-  payload: unknown,
-  opts: { mock?: boolean; mockMedium?: { url: string; name: string; mime: string } | null } = {}
+  felder: TwilioFelder,
+  opts: { mock?: boolean } = {}
 ): Promise<{ nachrichten: number; status: number }> {
   let nachrichten = 0
   let status = 0
-  for (const ev of parseWhatsAppWebhook(payload)) {
+  for (const ev of parseTwilioWebhook(felder)) {
     if (ev.typ === 'status') {
       const w = await writeWhatsAppStatus(db, { waId: ev.waId, status: ev.status, fehler: ev.fehler })
       if (!w.ok) console.warn('[whatsapp] Status:', w.error)
@@ -246,13 +256,9 @@ export async function webhookVerarbeiten(
     if (schon) continue
     const kontakt = await kontaktZuNummer(db, ev.von)
     const ziel = await zuordnen(db, kontakt, ev)
+    // Testmodus: Datei liegt unter /mock/whatsapp — nichts herunterladen
     const medium = opts.mock
-      ? {
-          media_pfad: null,
-          media_url: opts.mockMedium?.url ?? null,
-          media_mime: opts.mockMedium?.mime ?? null,
-          media_name: opts.mockMedium?.name ?? null,
-        }
+      ? { media_pfad: null, media_url: ev.medium?.mediaId ?? null, media_mime: ev.medium?.mime ?? null, media_name: ev.medium?.name ?? null }
       : await mediumSpeichern(db, ev)
     const { error } = await db.from('whatsapp_nachrichten').insert({
       richtung: 'ein',
@@ -277,7 +283,11 @@ export async function webhookVerarbeiten(
       continue
     }
     nachrichten += 1
-    if (kontakt && ev.knopfId) await einsatzKnopf(db, kontakt, ev.knopfId, Boolean(opts.mock))
+    // Knopf: eigene Antwort-ID (Testmodus) oder „Annehmen“/„Ablehnen“ zum zugeordneten Einsatz
+    const antwort = knopfAntwort(ev)
+    const knopfId =
+      parseEinsatzKnopfId(ev.knopfId) ? ev.knopfId : antwort && ziel.einsatz_id ? einsatzKnopfId(ziel.einsatz_id, antwort) : null
+    if (kontakt && knopfId) await einsatzKnopf(db, kontakt, knopfId, Boolean(opts.mock))
   }
   return { nachrichten, status }
 }
@@ -309,14 +319,14 @@ export async function nachrichtSenden(
   let vorlage: string | null = null
   let ergebnis
 
-  if (input.vorlage && !(offen && input.knoepfe?.length)) {
-    // Vorlage (Pflicht außerhalb des Fensters); im Fenster mit Knöpfen lieber interaktiv
+  if (input.vorlage && !(offen && input.knoepfe?.length && p.freieKnoepfe)) {
+    // Vorlage (Pflicht außerhalb des Fensters; bei Twilio gibt es Knöpfe nur so)
     const v = vorlageAnzeige(input.vorlage.name, input.vorlage.werte)
     art = 'vorlage'
     vorlage = input.vorlage.name
     text = v.text
     knoepfe = (input.vorlage.knopfIds ?? []).map((id, i) => ({ id, titel: v.knoepfe[i] ?? id }))
-    ergebnis = await p.sendeVorlage(input.kontakt.nummer, input.vorlage.name, input.vorlage.werte, input.vorlage.knopfIds)
+    ergebnis = await p.sendeVorlage(input.kontakt.nummer, input.vorlage.name, input.vorlage.werte)
   } else if (input.knoepfe?.length) {
     art = 'knoepfe'
     knoepfe = input.knoepfe

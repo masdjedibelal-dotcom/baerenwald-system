@@ -1,7 +1,7 @@
 /**
  * WhatsApp-Vorlagen (Message Templates). Außerhalb des 24-Stunden-Fensters darf ein Unternehmen
- * nur freigegebene Vorlagen schicken. Diese Vorlagen werden nach dem Anlegen des 360dialog-Kontos
- * einmal im 360dialog-Hub (bzw. Meta Business Manager) eingereicht — Name, Sprache „de“,
+ * nur freigegebene Vorlagen schicken. Diese Vorlagen werden einmal in Twilio (Content Template
+ * Builder) angelegt und für WhatsApp eingereicht; die Content-SID kommt in Netlify — Name, Sprache „de“,
  * Kategorie „Utility“, Text und Knöpfe genau wie unten.
  *
  * Der Testmodus zeigt im Chat denselben Text, den der Empfänger später sieht.

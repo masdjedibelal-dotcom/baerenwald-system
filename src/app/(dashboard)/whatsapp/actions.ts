@@ -17,7 +17,6 @@ WHATSAPP_MEDIEN_BUCKET,
 type WaKontakt,
 } from '@/lib/whatsapp/dienst'
 import { whatsappKonfig } from '@/lib/whatsapp/konfig'
-import { whatsappProvider } from '@/lib/whatsapp/provider'
 import { gespraechSchluessel } from '@/lib/whatsapp/schluessel'
 import { mockWebhookPayload } from '@/lib/whatsapp/webhook-parse'
 
@@ -60,10 +59,10 @@ export type WaVerlauf = {
   /** Laufende Einsätze (Partner) bzw. Aufträge (Kunde) zum Zuordnen */
   laufend: WaLaufend[]
   imFenster: boolean
-  modus: 'mock' | '360dialog'
+  modus: 'mock' | 'twilio'
 }
 
-export type WaStatusInfo = { sichtbar: boolean; modus: 'mock' | '360dialog'; nummer: string | null }
+export type WaStatusInfo = { sichtbar: boolean; modus: 'mock' | 'twilio'; nummer: string | null }
 
 type Fail = { ok: false; message: string }
 
@@ -174,9 +173,6 @@ export async function ladeWhatsAppVerlauf(
         .from('whatsapp_nachrichten')
         .update({ gelesen_at: now })
         .in('id', ungelesen.map((r) => String(r.id)))
-      const p = whatsappProvider()
-      const letzte = ungelesen[ungelesen.length - 1] as { wa_id?: string } | undefined
-      if (letzte?.wa_id) await p.alsGelesen(letzte.wa_id)
     }
   }
   return {
@@ -446,9 +442,9 @@ export async function simuliereWhatsAppAntwort(input: {
     name: kontakt.name,
     text: input.text ?? null,
     knopf: input.knopf ?? null,
-    medium: m && input.medium ? { art: input.medium, name: m.name, mime: m.mime } : null,
+    medium: m,
   })
-  await webhookVerarbeiten(gate.db, payload, { mock: true, mockMedium: m })
+  await webhookVerarbeiten(gate.db, payload, { mock: true })
   return { ok: true }
 }
 

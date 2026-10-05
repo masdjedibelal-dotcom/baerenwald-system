@@ -1,6 +1,8 @@
+import { createHmac,timingSafeEqual } from 'crypto';
+
 /**
- * Webhook von 360dialog (Format der WhatsApp Cloud API) → einheitliche Ereignisse.
- * Ohne Datenbank, damit es sich einzeln testen lässt.
+ * Twilio-Webhook (Formularfelder) → einheitliche Ereignisse. Ohne Datenbank, damit es sich
+ * einzeln testen lässt. Eingehende Nachrichten haben immer „NumMedia“, Status-Meldungen nicht.
  */
 
 export type WaEingangMedium = { mediaId: string; mime: string | null; name: string | null }
@@ -14,9 +16,9 @@ export type WaEingang = {
   art: 'text' | 'bild' | 'dokument' | 'audio' | 'video' | 'antwort' | 'standort'
   text: string | null
   medium: WaEingangMedium | null
-  /** Gedrückter Knopf (interaktiv oder Vorlage) */
+  /** Gedrückter Knopf (Payload aus der Vorlage bzw. Testmodus) */
   knopfId: string | null
-  /** WhatsApp-ID der Nachricht, auf die geantwortet wurde */
+  /** Twilio-SID der Nachricht, auf die geantwortet wurde */
   antwortAufWaId: string | null
 }
 
@@ -27,159 +29,116 @@ export type WaStatus = {
   fehler: string | null
 }
 
-type Roh = Record<string, unknown>
+export type TwilioFelder = Record<string, string>
 
 const STATUS: Record<string, WaStatus['status']> = {
   sent: 'gesendet',
   delivered: 'zugestellt',
   read: 'gelesen',
   failed: 'fehler',
+  undelivered: 'fehler',
 }
 
-function str(v: unknown): string | null {
-  const s = typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : ''
-  return s || null
+function feld(f: TwilioFelder, name: string): string | null {
+  const v = f[name]?.trim()
+  return v ? v : null
 }
 
-function zeitAus(ts: unknown): string {
-  const n = Number(ts)
-  return Number.isFinite(n) && n > 0 ? new Date(n * 1000).toISOString() : new Date().toISOString()
+function artAus(f: TwilioFelder, mime: string | null): WaEingang['art'] {
+  const typ = feld(f, 'MessageType')
+  if (typ === 'button' || typ === 'interactive' || feld(f, 'ButtonPayload') || feld(f, 'ButtonText')) return 'antwort'
+  if (typ === 'location' || feld(f, 'Latitude')) return 'standort'
+  if (!mime) return 'text'
+  if (mime.startsWith('image/')) return 'bild'
+  if (mime.startsWith('audio/')) return 'audio'
+  if (mime.startsWith('video/')) return 'video'
+  return 'dokument'
 }
 
-function nachricht(m: Roh, namen: Map<string, string>): WaEingang | null {
-  const waId = str(m.id)
-  const von = str(m.from)
-  if (!waId || !von) return null
-  const basis = {
-    typ: 'nachricht' as const,
-    waId,
-    von,
-    profilName: namen.get(von) ?? null,
-    zeit: zeitAus(m.timestamp),
-    antwortAufWaId: str((m.context as Roh | undefined)?.id),
-    knopfId: null as string | null,
-    medium: null as WaEingangMedium | null,
-    text: null as string | null,
+function endung(mime: string | null): string {
+  const m = (mime ?? '').split(';')[0] ?? ''
+  if (m === 'application/pdf') return 'pdf'
+  if (m === 'audio/mpeg') return 'mp3'
+  return m.split('/')[1]?.split('+')[0] || 'bin'
+}
+
+const MEDIEN_NAME: Record<string, string> = { bild: 'Foto', dokument: 'Dokument', audio: 'Sprachnachricht', video: 'Video' }
+
+export function parseTwilioWebhook(f: TwilioFelder): (WaEingang | WaStatus)[] {
+  const sid = feld(f, 'MessageSid') ?? feld(f, 'SmsSid')
+  if (!sid) return []
+  if (!('NumMedia' in f)) {
+    // Status-Meldung zu einer ausgehenden Nachricht
+    const status = STATUS[feld(f, 'MessageStatus') ?? '']
+    if (!status) return []
+    const code = feld(f, 'ErrorCode')
+    return [
+      {
+        typ: 'status',
+        waId: sid,
+        status,
+        fehler: status === 'fehler' ? feld(f, 'ErrorMessage') ?? (code ? `Fehler ${code}` : null) : null,
+      },
+    ]
   }
-  const medium = (o: unknown): WaEingangMedium | null => {
-    const r = (o ?? {}) as Roh
-    const id = str(r.id)
-    return id ? { mediaId: id, mime: str(r.mime_type), name: str(r.filename) } : null
-  }
-  switch (m.type) {
-    case 'text':
-      return { ...basis, art: 'text', text: str((m.text as Roh | undefined)?.body) }
-    case 'image':
-      return { ...basis, art: 'bild', text: str((m.image as Roh | undefined)?.caption), medium: medium(m.image) }
-    case 'document':
-      return {
-        ...basis,
-        art: 'dokument',
-        text: str((m.document as Roh | undefined)?.caption),
-        medium: medium(m.document),
-      }
-    case 'audio':
-      return { ...basis, art: 'audio', medium: medium(m.audio) }
-    case 'video':
-      return { ...basis, art: 'video', text: str((m.video as Roh | undefined)?.caption), medium: medium(m.video) }
-    case 'location': {
-      const l = (m.location ?? {}) as Roh
-      const text = [str(l.name), str(l.address), `${l.latitude ?? ''}, ${l.longitude ?? ''}`]
-        .filter(Boolean)
-        .join(' · ')
-      return { ...basis, art: 'standort', text }
-    }
-    case 'button': {
-      // Schnellantwort aus einer Vorlage
-      const b = (m.button ?? {}) as Roh
-      return { ...basis, art: 'antwort', text: str(b.text), knopfId: str(b.payload) }
-    }
-    case 'interactive': {
-      const i = (m.interactive ?? {}) as Roh
-      const r = ((i.button_reply ?? i.list_reply) ?? {}) as Roh
-      return { ...basis, art: 'antwort', text: str(r.title), knopfId: str(r.id) }
-    }
-    default:
-      return { ...basis, art: 'text', text: `[Nicht unterstützter Nachrichtentyp: ${String(m.type ?? '?')}]` }
-  }
+  const von = (feld(f, 'WaId') ?? feld(f, 'From') ?? '').replace(/^whatsapp:/, '').replace(/\D/g, '')
+  if (!von) return []
+  const mime = Number(f.NumMedia) > 0 ? feld(f, 'MediaContentType0') : null
+  const art = artAus(f, mime)
+  const standort =
+    art === 'standort'
+      ? [feld(f, 'Label'), feld(f, 'Address'), `${f.Latitude ?? ''}, ${f.Longitude ?? ''}`].filter(Boolean).join(' · ')
+      : null
+  const mediaUrl = feld(f, 'MediaUrl0')
+  return [
+    {
+      typ: 'nachricht',
+      waId: sid,
+      von,
+      profilName: feld(f, 'ProfileName'),
+      zeit: new Date().toISOString(),
+      art,
+      text: art === 'antwort' ? feld(f, 'ButtonText') ?? feld(f, 'Body') : standort ?? feld(f, 'Body'),
+      medium: mime && mediaUrl ? { mediaId: mediaUrl, mime, name: `WhatsApp-${MEDIEN_NAME[art] ?? 'Datei'}.${endung(mime)}` } : null,
+      knopfId: art === 'antwort' ? feld(f, 'ButtonPayload') ?? feld(f, 'ButtonText') : null,
+      antwortAufWaId: feld(f, 'OriginalRepliedMessageSid'),
+    },
+  ]
 }
 
-export function parseWhatsAppWebhook(payload: unknown): (WaEingang | WaStatus)[] {
-  const out: (WaEingang | WaStatus)[] = []
-  const entries = Array.isArray((payload as Roh | null)?.entry) ? ((payload as Roh).entry as Roh[]) : []
-  for (const entry of entries) {
-    const changes = Array.isArray(entry.changes) ? (entry.changes as Roh[]) : []
-    for (const change of changes) {
-      const value = (change.value ?? {}) as Roh
-      const namen = new Map<string, string>()
-      for (const c of (Array.isArray(value.contacts) ? value.contacts : []) as Roh[]) {
-        const id = str(c.wa_id)
-        const name = str((c.profile as Roh | undefined)?.name)
-        if (id && name) namen.set(id, name)
-      }
-      for (const m of (Array.isArray(value.messages) ? value.messages : []) as Roh[]) {
-        const n = nachricht(m, namen)
-        if (n) out.push(n)
-      }
-      for (const s of (Array.isArray(value.statuses) ? value.statuses : []) as Roh[]) {
-        const waId = str(s.id)
-        const status = STATUS[String(s.status)]
-        if (!waId || !status) continue
-        const err = (Array.isArray(s.errors) ? s.errors[0] : null) as Roh | null
-        out.push({ typ: 'status', waId, status, fehler: err ? str(err.message) ?? str(err.title) : null })
-      }
-    }
-  }
-  return out
+/**
+ * Twilio-Signatur prüfen: Base64(HMAC-SHA1(AuthToken, URL + alle Felder alphabetisch als Name+Wert)).
+ * Die URL muss genau die bei Twilio eingetragene sein.
+ */
+export function twilioSignaturOk(authToken: string, url: string, felder: TwilioFelder, signatur: string | null): boolean {
+  if (!signatur) return false
+  const daten = Object.keys(felder)
+    .sort()
+    .reduce((acc, k) => acc + k + felder[k], url)
+  const soll = Buffer.from(createHmac('sha1', authToken).update(daten, 'utf8').digest('base64'))
+  const ist = Buffer.from(signatur)
+  return soll.length === ist.length && timingSafeEqual(soll, ist)
 }
 
-/** Testmodus: eingehende Nachricht im selben Format bauen, wie 360dialog sie schickt. */
+/** Testmodus: eingehende Nachricht im selben Format bauen, wie Twilio sie schickt. */
 export function mockWebhookPayload(input: {
   von: string
   name?: string | null
   text?: string | null
   knopf?: { id: string; titel: string } | null
-  /** Foto/Dokument (Testmodus: Datei liegt unter /mock/whatsapp) */
-  medium?: { art: 'bild' | 'dokument' | 'audio' | 'video'; name: string; mime: string } | null
-  antwortAufWaId?: string | null
-}): Record<string, unknown> {
-  const id = `mock-in-${crypto.randomUUID()}`
-  const message: Roh = {
-    from: input.von,
-    id,
-    timestamp: String(Math.floor(Date.now() / 1000)),
-    ...(input.antwortAufWaId ? { context: { from: 'bw', id: input.antwortAufWaId } } : {}),
-    ...(input.knopf
-      ? { type: 'interactive', interactive: { type: 'button_reply', button_reply: { id: input.knopf.id, title: input.knopf.titel } } }
-      : input.medium?.art === 'bild'
-        ? { type: 'image', image: { id: `mock-media-${id}`, mime_type: input.medium.mime, caption: input.text ?? undefined } }
-        : input.medium?.art === 'audio'
-          ? { type: 'audio', audio: { id: `mock-media-${id}`, mime_type: input.medium.mime, voice: true } }
-          : input.medium?.art === 'video'
-            ? { type: 'video', video: { id: `mock-media-${id}`, mime_type: input.medium.mime, caption: input.text ?? undefined } }
-            : input.medium
-          ? {
-              type: 'document',
-              document: { id: `mock-media-${id}`, mime_type: input.medium.mime, filename: input.medium.name, caption: input.text ?? undefined },
-            }
-          : { type: 'text', text: { body: input.text ?? '' } }),
-  }
+  /** Foto/Dokument/Sprachnachricht/Video (Testmodus: Datei liegt unter /mock/whatsapp) */
+  medium?: { name: string; mime: string; url: string } | null
+}): TwilioFelder {
   return {
-    object: 'whatsapp_business_account',
-    entry: [
-      {
-        id: 'mock',
-        changes: [
-          {
-            field: 'messages',
-            value: {
-              messaging_product: 'whatsapp',
-              contacts: [{ wa_id: input.von, profile: { name: input.name ?? '' } }],
-              messages: [message],
-            },
-          },
-        ],
-      },
-    ],
+    MessageSid: `mock-in-${crypto.randomUUID()}`,
+    From: `whatsapp:+${input.von}`,
+    WaId: input.von,
+    ProfileName: input.name ?? '',
+    Body: input.knopf ? input.knopf.titel : input.text ?? '',
+    NumMedia: input.medium ? '1' : '0',
+    ...(input.medium ? { MediaUrl0: input.medium.url, MediaContentType0: input.medium.mime } : {}),
+    ...(input.knopf
+      ? { MessageType: 'button', ButtonText: input.knopf.titel, ButtonPayload: input.knopf.id }
+      : { MessageType: input.medium ? 'media' : 'text' }),
   }
 }

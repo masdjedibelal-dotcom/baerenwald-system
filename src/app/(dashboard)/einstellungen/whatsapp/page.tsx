@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 import { EinstellungenWhatsAppClient } from '@/components/einstellungen/EinstellungenWhatsAppClient'
-import { whatsappKonfig } from '@/lib/whatsapp/konfig'
+import { whatsappKonfig,whatsappWebhookUrl } from '@/lib/whatsapp/konfig'
 import { VORLAGEN } from '@/lib/whatsapp/vorlagen'
 
 export const metadata: Metadata = {
@@ -16,8 +16,8 @@ export default function EinstellungenWhatsAppPage() {
     <EinstellungenWhatsAppClient
       modus={k.modus}
       nummer={k.nummer}
-      webhookBereit={Boolean(k.webhookToken)}
-      vorlagen={Object.values(VORLAGEN)}
+      webhookUrl={whatsappWebhookUrl()}
+      vorlagen={Object.values(VORLAGEN).map((v) => ({ ...v, contentSid: k.vorlagen[v.name] }))}
     />
   )
 }

@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { assertKnownStatus } from '@/lib/status/write-helpers'
 
 /**
- * Zustellstatus ausgehender WhatsApp-Nachrichten (vom 360dialog-Webhook):
+ * Zustellstatus ausgehender WhatsApp-Nachrichten (StatusCallback von Twilio):
  * gesendet → zugestellt → gelesen, oder fehler. Nie zurück (spätere Meldung kann früher ankommen).
  */
 export const WHATSAPP_WRITE_STATUSES = ['gesendet', 'zugestellt', 'gelesen', 'fehler'] as const

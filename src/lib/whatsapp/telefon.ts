@@ -1,5 +1,5 @@
 /**
- * Telefonnummern für WhatsApp: international ohne „+“ (so liefert und erwartet es 360dialog),
+ * Telefonnummern für WhatsApp: international ohne „+“ (Twilio bekommt „whatsapp:+…“ davor),
  * z. B. „0176 1234 5678“ → „4917612345678“. Ohne Ländervorwahl gilt Deutschland.
  */
 export function waNummer(raw: string | null | undefined): string | null {

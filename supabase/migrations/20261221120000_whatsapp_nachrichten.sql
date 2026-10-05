@@ -1,4 +1,4 @@
--- WhatsApp (360dialog, Bärenwald-Nummer): ein Verlauf je Kontakt (Partner oder Kunde).
+-- WhatsApp (Twilio, Bärenwald-Nummer): ein Verlauf je Kontakt (Partner oder Kunde).
 -- Eingehende Nachrichten kommen über den Webhook /api/whatsapp/webhook, ausgehende aus dem CRM.
 -- Zuordnung zu Auftrag/Einsatz: automatisch (Antwort auf unsere Nachricht, einziger aktiver Einsatz)
 -- oder von Hand im Chat. Testdaten tragen ist_mock = true und lassen sich gesammelt löschen.
@@ -41,7 +41,7 @@ create table if not exists public.whatsapp_nachrichten (
 );
 
 comment on table public.whatsapp_nachrichten is
-  'WhatsApp-Verlauf mit Partnern und Kunden (360dialog). ist_mock = Testdaten aus dem Testmodus.';
+  'WhatsApp-Verlauf mit Partnern und Kunden (Twilio). ist_mock = Testdaten aus dem Testmodus.';
 
 create index if not exists whatsapp_nachrichten_hw_idx on public.whatsapp_nachrichten (handwerker_id, created_at desc);
 create index if not exists whatsapp_nachrichten_kunde_idx on public.whatsapp_nachrichten (kunde_id, created_at desc);

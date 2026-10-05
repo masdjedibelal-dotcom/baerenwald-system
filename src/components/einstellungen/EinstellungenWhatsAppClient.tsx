@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 
-import { loescheWhatsAppTestdaten, zaehleWhatsAppTestdaten } from '@/app/(dashboard)/whatsapp/actions'
+import { loescheWhatsAppTestdaten,zaehleWhatsAppTestdaten } from '@/app/(dashboard)/whatsapp/actions'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
-import { MockBadge, MockBtn } from '@/components/mock-ui'
+import { MockBadge,MockBtn } from '@/components/mock-ui'
 import { toast } from '@/components/ui/app-toast'
 import { openConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { safeAction } from '@/lib/actions/safe-action'
@@ -20,20 +20,22 @@ function Sec({ title, children }: { title: string; children: React.ReactNode }) 
   )
 }
 
-/** WhatsApp (360dialog): Stand der Anbindung, Vorlagen zum Einreichen, Testdaten. */
+type VorlageMitSid = VorlagenDefinition & { contentSid: string | null }
+
+/** WhatsApp (Twilio): Stand der Anbindung, Vorlagen für den Content Template Builder, Testdaten. */
 export function EinstellungenWhatsAppClient({
   modus,
   nummer,
-  webhookBereit,
+  webhookUrl,
   vorlagen,
 }: {
-  modus: 'mock' | '360dialog'
+  modus: 'mock' | 'twilio'
   nummer: string | null
-  webhookBereit: boolean
-  vorlagen: VorlagenDefinition[]
+  webhookUrl: string
+  vorlagen: VorlageMitSid[]
 }) {
+  const echt = modus === 'twilio'
   const [testdaten, setTestdaten] = useState<number | null>(null)
-  const echt = modus === '360dialog'
 
   useEffect(() => {
     safeAction(zaehleWhatsAppTestdaten())
@@ -59,11 +61,11 @@ export function EinstellungenWhatsAppClient({
             <div className="lbl">Anbindung</div>
             <div className="sub">
               {echt
-                ? 'Verbunden über 360dialog — Nachrichten gehen wirklich raus.'
+                ? 'Verbunden über Twilio — Nachrichten gehen wirklich raus.'
                 : 'Testmodus — nichts geht an WhatsApp raus. Zum Anschauen im CRM (Staging).'}
             </div>
           </div>
-          <MockBadge kind={echt ? 'aktiv' : 'warten'}>{echt ? '360dialog' : 'Testmodus'}</MockBadge>
+          <MockBadge kind={echt ? 'aktiv' : 'warten'}>{echt ? 'Twilio' : 'Testmodus'}</MockBadge>
         </div>
         <div className="setting-row">
           <div>
@@ -75,10 +77,9 @@ export function EinstellungenWhatsAppClient({
           <div>
             <div className="lbl">Eingehende Nachrichten (Webhook)</div>
             <div className="sub">
-              {webhookBereit ? 'Token gesetzt — /api/whatsapp/webhook?token=…' : 'Noch kein Webhook-Token gesetzt.'}
+              In Twilio beim WhatsApp-Absender unter „Webhook URL for incoming messages“ (POST): <code>{webhookUrl}</code>
             </div>
           </div>
-          <MockBadge kind={webhookBereit ? 'aktiv' : 'plain'}>{webhookBereit ? 'bereit' : 'offen'}</MockBadge>
         </div>
         {testdaten ? (
           <div className="setting-row">
@@ -108,13 +109,16 @@ export function EinstellungenWhatsAppClient({
       <Sec title="Vorlagen zum Einreichen">
         <p className="wa-einst-hinweis">
           Außerhalb von 24 Std. nach der letzten Nachricht des Kontakts erlaubt WhatsApp nur freigegebene Vorlagen.
-          Diese drei im 360dialog-Hub einreichen — Sprache Deutsch, Kategorie „Utility“, Text genau so.
+          Diese drei in Twilio unter Messaging → Content Template Builder anlegen (Sprache Deutsch, Kategorie „Utility“,
+          Text genau so; Einsatz als Typ „Quick reply“ mit beiden Knöpfen) und für WhatsApp zur Freigabe einreichen.
+          Die Content-SID (HX…) jeweils in Netlify eintragen.
         </p>
         {vorlagen.map((v) => (
           <div key={v.name} className="wa-einst-vorlage">
             <div className="wa-einst-vorlage__kopf">
               <code>{v.name}</code>
               <span>{v.beschreibung}</span>
+              <MockBadge kind={v.contentSid ? 'aktiv' : 'plain'}>{v.contentSid ? 'hinterlegt' : 'Content-SID fehlt'}</MockBadge>
             </div>
             <pre>{v.text}</pre>
             {v.knoepfe?.length ? (
@@ -132,16 +136,21 @@ export function EinstellungenWhatsAppClient({
 
       <Sec title="Einrichtung">
         <ol className="wa-einst-schritte">
-          <li>360dialog-Konto anlegen, Bärenwald-Nummer verbinden (bestehende Nummer: Koexistenz mit der WhatsApp-Business-App).</li>
-          <li>Im 360dialog-Hub einen API-Key für den Kanal erzeugen.</li>
+          <li>Twilio-Konto upgraden (mit dem Testkonto lässt sich keine eigene Nummer verbinden).</li>
           <li>
-            In Netlify (CRM) setzen: <code>WHATSAPP_PROVIDER=360dialog</code>, <code>D360_API_KEY</code>,{' '}
-            <code>WHATSAPP_NUMMER</code>, <code>WHATSAPP_WEBHOOK_TOKEN</code> (beliebiger geheimer Wert).
+            Messaging → Senders → WhatsApp senders → „Create new sender“: Nummer eintragen, mit dem Facebook-Konto
+            (Admin des Bärenwald-Unternehmens) verbinden, Anzeigename „Bärenwald“, Code per SMS bestätigen. Die Nummer
+            darf nicht mehr in der normalen WhatsApp-App aktiv sein.
           </li>
           <li>
-            Webhook bei 360dialog eintragen: <code>/api/whatsapp/webhook?token=&lt;WHATSAPP_WEBHOOK_TOKEN&gt;</code>
+            Beim Absender als Webhook für eingehende Nachrichten eintragen (POST): <code>{webhookUrl}</code>
           </li>
-          <li>Die drei Vorlagen oben einreichen und Freigabe abwarten.</li>
+          <li>Die drei Vorlagen oben im Content Template Builder anlegen und zur WhatsApp-Freigabe einreichen.</li>
+          <li>
+            In Netlify (CRM) setzen: <code>WHATSAPP_PROVIDER=twilio</code>, <code>TWILIO_ACCOUNT_SID</code>,{' '}
+            <code>TWILIO_AUTH_TOKEN</code>, <code>TWILIO_WHATSAPP_NUMMER</code> (z. B. +4989…),{' '}
+            <code>TWILIO_VORLAGE_EINSATZ</code>, <code>TWILIO_VORLAGE_BAUTAGEBUCH</code>, <code>TWILIO_VORLAGE_NACHRICHT</code>.
+          </li>
           <li>Testnachrichten löschen, dann mit einem eigenen Handy testen.</li>
         </ol>
       </Sec>

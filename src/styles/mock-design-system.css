@@ -22498,7 +22498,7 @@ button.dok-gruppe__kopf {
 .dok-zeile__badge { flex-shrink: 0; }
 .dok-zeile__chev { flex-shrink: 0; color: var(--text-4, var(--text-3)); }
 
-/* ── WhatsApp (360dialog / Testmodus) ───────────────────────────────────── */
+/* ── WhatsApp (Twilio / Testmodus) ───────────────────────────────────── */
 .wa-sheet-body { padding-bottom: 0; }
 .wa-chat { display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
 .wa-hinweis {
