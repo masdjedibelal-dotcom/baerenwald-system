@@ -11,12 +11,11 @@ import { formatAuftragsNr,auftragTitel } from '@/lib/auftraege/auftrag-liste-hel
 import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { loadLeistungszeitraumAusRechnung } from '@/lib/auftraege/abschlussdokumentation-leistungszeitraum'
 import {
-  collectAbschlussBautagebuch,
-  collectAbschlussFotoUrls,
-  loadAbnahmeForAbschlussbericht,
+collectAbschlussBautagebuch,
+collectAbschlussFotoUrls,
+loadAbnahmeForAbschlussbericht,
 } from '@/lib/auftraege/abschlussdokumentation-collect'
 import { renderAbschlussdokumentationPdfBuffer } from '@/lib/auftraege/render-abschlussdokumentation-pdf'
-import { persistAbschlussdokumentationPdf } from '@/lib/auftraege/persist-abschlussdokumentation-pdf'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 
 export type AbschlussdokuOptionen = {
@@ -162,64 +161,6 @@ export async function downloadAbschlussdokumentationPdf(
     ok: true,
     pdfBase64: built.buffer.toString('base64'),
     filename: `Abschlussbericht-${formatAuftragsNr(built.detail)}.pdf`,
-  }
-}
-
-/** Erzeugt und speichert den Abschlussbericht (ohne Versand / ohne Auftrag abzuschließen).
- * Standard: Dokumentationsformat ohne Preise — Abrechnung bleibt Rechnung/Endabrechnung. */
-export async function createAbschlussberichtPdf(
-  auftragId: string,
-  optionen: AbschlussdokuOptionen = {
-    mitBautagebuch: true,
-    mitFotos: true,
-    mitPreisen: false,
-  }
-): Promise<{ ok: true; publicUrl: string } | { ok: false; message: string }> {
-  const built = await buildAbschlussPdf(auftragId, optionen)
-  if (!built.ok) return built
-
-  const stored = await persistAbschlussdokumentationPdf(auftragId, built.buffer)
-  if (!stored.ok) return stored
-
-  const now = new Date().toISOString()
-  await supabaseAdmin
-    .from('auftraege')
-    .update({
-      abschlussdokumentation_url: stored.publicUrl,
-      updated_at: now,
-    })
-    .eq('id', auftragId)
-
-  await insertAuftragTimelineEvent({
-    auftrag_id: auftragId,
-    typ: 'notiz',
-    titel: 'Abschlussbericht erstellt',
-    beschreibung: 'Abschlussbericht als PDF gespeichert.',
-  })
-
-  revalidateAuftragDetail(auftragId)
-  return { ok: true, publicUrl: stored.publicUrl }
-}
-
-/** Ob der Wizard-Block „Abschlussbericht“ Sinn ergibt. */
-export async function loadAbschlussberichtWizardHint(auftragId: string): Promise<{
-  hasAbnahme: boolean
-  hasBautagebuch: boolean
-  hasBericht: boolean
-  berichtUrl: string | null
-  showBlock: boolean
-}> {
-  const detail = await loadAuftragDetail(auftragId)
-  const bt = await listAuftragBautagebuch(auftragId)
-  const hasAbnahme = Boolean(detail?.abnahme_protokoll_url)
-  const hasBautagebuch = bt.length > 0
-  const berichtUrl = detail?.abschlussdokumentation_url?.trim() || null
-  return {
-    hasAbnahme,
-    hasBautagebuch,
-    hasBericht: Boolean(berichtUrl),
-    berichtUrl,
-    showBlock: hasAbnahme || hasBautagebuch || Boolean(berichtUrl),
   }
 }
 

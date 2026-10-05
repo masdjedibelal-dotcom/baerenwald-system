@@ -10,21 +10,21 @@ import { getMailBranding } from '@/lib/get-mail-branding'
 import { formatDatumDeFromIso } from '@/lib/mail/versand-helpers'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import {
-  kundeAngebotBegruessung,
-  kundeAnredeKontextFromEmpfaenger,
-  kundeRechnungsempfaengerAusStammdaten,
+kundeAngebotBegruessung,
+kundeAnredeKontextFromEmpfaenger,
+kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
 import {
-  buildRechnungMail,
+buildRechnungMail,
 } from '@/lib/mail/rechnung-mail'
 import { buildZahlungserinnerungMail } from '@/lib/mail-templates'
 import {
-  zahlungserinnerungZahlbarBis,
-  type ZahlungserinnerungStufe,
+zahlungserinnerungZahlbarBis,
+type ZahlungserinnerungStufe,
 } from '@/lib/mail/zahlungserinnerung-mail'
 import {
-  mahnungBetragKontextFuerRechnung,
-  mahnungBetragMailFelder,
+mahnungBetragKontextFuerRechnung,
+mahnungBetragMailFelder,
 } from '@/lib/rechnungen/mahnung-betrag'
 import { tageSeitFaelligkeitRechnung } from '@/lib/rechnungen/mahnverlauf'
 import { buildZahlungsbestaetigungMail } from '@/lib/mail/zahlungsbestaetigung-mail'
@@ -33,17 +33,17 @@ import { insertAuftragTimelineEvent } from '@/lib/auftraege/timeline'
 import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
 import { linkRechnungKorrekturKette,resolveRechnungKorrekturKette } from '@/lib/rechnungen/rechnung-korrektur'
 import {
-  planRechnungStatusWrite,
-  planRechnungStornoWrite,
-  writeRechnungStatus,
+planRechnungStatusWrite,
+planRechnungStornoWrite,
+writeRechnungStatus,
 } from '@/lib/status/write-rechnung-status'
 import {
-  berechneRechnungMitFirmeneinstellungen,
-  isRechnungComplianceSchemaError,
-  positionenFuerGutschrift,
-  rechnungComplianceMigrationHinweis,
-  rechnungInsertMitSchemaFallback,
-  rechnungUpdateMitSchemaFallback,
+berechneRechnungMitFirmeneinstellungen,
+isRechnungComplianceSchemaError,
+positionenFuerGutschrift,
+rechnungComplianceMigrationHinweis,
+rechnungInsertMitSchemaFallback,
+rechnungUpdateMitSchemaFallback,
 } from '@/lib/rechnungen/rechnung-speichern'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { validateRechnungPflichtangaben } from '@/lib/rechnung-validierung'
@@ -53,8 +53,8 @@ import { syncNeueLeistungenToPreisliste } from '@/app/(dashboard)/preislisten/ac
 import { syncInputsFromAngebotPositionen } from '@/lib/preislisten/sync-neue-leistungen'
 import { loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
 import {
-  ensureRechnungsnummerFuerVersand,
-  releaseRechnungsnummerWennEntwurf,
+ensureRechnungsnummerFuerVersand,
+releaseRechnungsnummerWennEntwurf,
 } from '@/lib/rechnungen/next-rechnungsnummer'
 
 export type RechnungEntwurfPayload = {
@@ -920,7 +920,7 @@ export async function updateRechnungStatus(
 /** Rechnung per Mail (PDF + mail-templates + email_log). */
 export async function sendRechnung(
   rechnungId: string,
-  options?: { to?: string[]; cc?: string[]; mitAbschlussbericht?: boolean }
+  options?: { to?: string[]; cc?: string[] }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
@@ -1243,52 +1243,6 @@ export async function sendRechnung(
     fallback: '',
   })
 
-  /** Optional: Abschlussbericht mit Rechnung versenden. */
-  let abschlussAnhang: { filename: string; buffer: Buffer } | null = null
-  if (options?.mitAbschlussbericht && rec.auftrag_id) {
-    const auftragIdAb = String(rec.auftrag_id)
-    const { data: aufMeta, error } = await supabaseAdmin
-      .from('auftraege')
-      .select('abschlussdokumentation_url, created_at')
-      .eq('id', auftragIdAb)
-      .maybeSingle()
-    if (error) logDbError('app/rechnungen/actions:auftraege', error)
-    let url = String(aufMeta?.abschlussdokumentation_url ?? '').trim()
-    if (!url) {
-      const { createAbschlussberichtPdf } = await import(
-        '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
-      )
-      const created = await createAbschlussberichtPdf(auftragIdAb)
-      if (!created.ok) {
-        return {
-          ok: false,
-          message: created.message || 'Abschlussbericht konnte nicht erstellt werden.',
-        }
-      }
-      url = created.publicUrl
-    }
-    try {
-      const res = await fetch(url, { cache: 'no-store' })
-      if (!res.ok) {
-        return { ok: false, message: 'Abschlussbericht-PDF konnte nicht geladen werden.' }
-      }
-      const { formatAuftragsNr } = await import('@/lib/auftraege/auftrag-liste-helpers')
-      const nrHint = formatAuftragsNr({
-        id: auftragIdAb,
-        created_at: String(aufMeta?.created_at ?? new Date().toISOString()),
-      })
-      abschlussAnhang = {
-        filename: `Abschlussbericht-${nrHint}.pdf`,
-        buffer: Buffer.from(await res.arrayBuffer()),
-      }
-    } catch {
-      return { ok: false, message: 'Abschlussbericht-PDF konnte nicht geladen werden.' }
-    }
-  }
-
-  const abschlussHinweis = abschlussAnhang
-    ? 'Zusätzlich im Anhang: der Abschlussbericht zu Ihrem Auftrag.'
-    : null
   const mailEinleitungBase = (rec.mail_einleitung as string | null)?.trim() || null
 
   // Korrektur-Kette: Original ↔ neue RE ↔ Storno-Gutschrift
@@ -1381,7 +1335,7 @@ export async function sendRechnung(
   // Korrektur: nie die kopierte PDF-Einleitung („Hiermit stellen wir…“) — Standard-Korrekturtext
   const mailEinleitung = istKorrekturVersand
     ? null
-    : [abschlussHinweis, mailEinleitungBase].filter(Boolean).join('\n\n') || null
+    : mailEinleitungBase
 
   let korrekturOriginalNr =
     stornoAnhang?.bezugRechnungsnummer?.trim() || null
@@ -1413,7 +1367,6 @@ export async function sendRechnung(
       mitStornoAnhang,
       stornoGutschriftNummer: stornoAnhang?.nr ?? null,
       stornoBezugRechnungsnummer: korrekturOriginalNr,
-      mitAbschlussberichtAnhang: Boolean(abschlussAnhang),
     },
     branding
   )
@@ -1421,9 +1374,6 @@ export async function sendRechnung(
   const extraPdfAttachments = [
     ...(stornoAnhang
       ? [{ filename: `Storno-${stornoAnhang.nr}.pdf`, content: stornoAnhang.buffer }]
-      : []),
-    ...(abschlussAnhang
-      ? [{ filename: abschlussAnhang.filename, content: abschlussAnhang.buffer }]
       : []),
   ]
 
@@ -1491,9 +1441,7 @@ export async function sendRechnung(
       typ: 'rechnung_gesendet',
       titel: istKorrekturVersand
         ? `Korrektur ${rechnungsnummer} versendet`
-        : abschlussAnhang
-          ? `Rechnung ${rechnungsnummer} + Abschlussbericht versendet`
-          : `Rechnung ${rechnungsnummer} versendet`,
+        : `Rechnung ${rechnungsnummer} versendet`,
       beschreibung: `An ${(toList.length ? toList : [email]).filter(Boolean).join(', ')}`,
       erstellt_von: user?.id ?? null,
       sichtbar_fuer_kunde: true,

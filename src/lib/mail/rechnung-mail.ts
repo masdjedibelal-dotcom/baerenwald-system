@@ -2,11 +2,11 @@ import type { MailBranding } from '@/lib/mail-branding'
 import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import { buildSubject } from '@/lib/mail/build-subject'
 import {
-  mailHtmlBase,
-  mailKundenContactLine,
-  mailKundenGruss,
-  mailKundenStandardOptions,
-  mailSummaryBlock,
+mailHtmlBase,
+mailKundenContactLine,
+mailKundenGruss,
+mailKundenStandardOptions,
+mailSummaryBlock,
 } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { formatEuro } from '@/lib/format/geld-datum'
@@ -40,8 +40,6 @@ export type RechnungMailInput = {
   stornoGutschriftNummer?: string | null
   /** Ursprungs-RE, die storniert wird (z. B. RE2026-2088) */
   stornoBezugRechnungsnummer?: string | null
-  /** Abschlussbericht als zusätzlicher PDF-Anhang */
-  mitAbschlussberichtAnhang?: boolean
 }
 
 export function rechnungMailBetreff(
@@ -189,11 +187,7 @@ export function buildRechnungMail(
         : defaultRechnungMailEinleitung(anrede))
   const intro = esc(introRaw)
 
-  const pdfHinweis = data.mitAbschlussberichtAnhang
-    ? anrede === 'du'
-      ? 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
-      : 'Im Anhang: Rechnung und Abschlussbericht als PDF.'
-    : mitStorno
+  const pdfHinweis = mitStorno
       ? anrede === 'du'
         ? data.stornoGutschriftNummer
           ? `Zwei PDFs im Anhang: Storno-Gutschrift ${data.stornoGutschriftNummer} und Rechnung ${data.rechnungsnummer}.`

@@ -1,5 +1,4 @@
 'use client'
-import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockInput } from '@/components/mock-ui/MockForm'
@@ -59,10 +58,6 @@ syncRechnungWizardMetaToEntwurf,
 } from '@/app/(dashboard)/rechnungen/wizard-actions'
 import { abbrecheRechnungKorrekturSession } from '@/app/(dashboard)/rechnungen/actions'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
-import {
-createAbschlussberichtPdf,
-loadAbschlussberichtWizardHint,
-} from '@/app/(dashboard)/auftraege/abschlussdokumentation-actions'
 import { angebotPositionenToWizardZeilen } from '@/lib/angebote/wizard-positionen-laden'
 import {
 dokumentZeilenToAngebotPositionen,
@@ -315,15 +310,8 @@ export function RechnungWizard({
     kundeEmail && isValidEmail(kundeEmail) ? [kundeEmail] : []
   )
   const [mailCc, setMailCc] = useState<string[]>([])
-  const [abschlussHint, setAbschlussHint] = useState<{
-    showBlock: boolean
-    hasBericht: boolean
-    berichtUrl: string | null
-  } | null>(null)
-  const [abschlussMitVersand, setAbschlussMitVersand] = useState(false)
-  const [abschlussBusy, setAbschlussBusy] = useState(false)
   const [sheet, setSheet] = useState<
-    'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | 'abschluss' | 'pruefen' | null
+    'kunde' | 'dokument' | 'zahlung' | 'versand' | 'vorschau' | 'pruefen' | null
   >(null)
   const [planEditorOpen, setPlanEditorOpen] = useState(false)
 
@@ -381,26 +369,6 @@ export function RechnungWizard({
     if (seg === 'datum') setZahlfristDatum(datum)
     setDraftDirty(true)
   }
-  useEffect(() => {
-    const aid = bootstrap.auftragId?.trim()
-    if (!aid || istDirektrechnung) {
-      setAbschlussHint(null)
-      return
-    }
-    let cancelled = false
-    void loadAbschlussberichtWizardHint(aid).then((h) => {
-      if (cancelled) return
-      setAbschlussHint({
-        showBlock: h.showBlock,
-        hasBericht: h.hasBericht,
-        berichtUrl: h.berichtUrl,
-      })
-      if (h.hasBericht) setAbschlussMitVersand(true)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [bootstrap.auftragId, istDirektrechnung])
 
   useEffect(() => {
     const kid = kundeId.trim()
@@ -1038,9 +1006,6 @@ export function RechnungWizard({
         rechnungId: id,
         mailTo: to,
         mailCc: mailCc.filter((e) => isValidEmail(e)),
-        mitAbschlussbericht: Boolean(
-          abschlussMitVersand && abschlussHint?.showBlock && hatAuftrag
-        ),
       })
       if (!res?.ok) {
         toast.systemError(res, 'ui', 'Versand fehlgeschlagen.')
@@ -1137,15 +1102,6 @@ export function RechnungWizard({
         .join(' · ')
 
   const versandCrowValue = mailTo[0]?.trim() || 'Kundenportal'
-
-  const abschlussCrowValue = !abschlussHint?.showBlock
-    ? null
-    : [
-        abschlussHint.hasBericht ? 'PDF vorhanden' : 'Noch nicht erstellt',
-        abschlussMitVersand ? 'mit Versand' : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
 
   /** Abschlag aus Plan: Positionen nur anzeigen — Betrag steuert der Plan, nur Versenden. */
   const abschlagNurVersand = Boolean(
@@ -1324,13 +1280,6 @@ export function RechnungWizard({
         sectionId="zahlung"
         onClick={() => setSheet('zahlung')}
       />
-      {abschlussHint?.showBlock ? (
-        <MetaCrowButton
-          label="Abschlussbericht"
-          value={abschlussCrowValue || 'Anhang'}
-          onClick={() => setSheet('abschluss')}
-        />
-      ) : null}
       <MetaCrowButton
         label="Versand"
         value={versandCrowValue}
@@ -1874,122 +1823,6 @@ export function RechnungWizard({
         />
       </EditorSheet>
 
-      <EditorSheet
-        open={sheet === 'abschluss'}
-        onClose={closeSheet}
-        title="Abschlussbericht"
-        context="canvas"
-        onConfirm={closeSheet}
-        confirmLabel="Speichern"
-      >
-        <div className="form-grid form-grid--sheet">
-          <div className="full" style={{ display: 'grid', gap: 12 }}>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 'var(--fs-meta)',
-                color: 'var(--bw-text-muted, ${C.gray500})',
-              }}
-            >
-              Dokumentationsbericht (Leistungen, Bautagebuch, Abnahme, Fotos) —{' '}
-              <strong>keine</strong> Endabrechnung. Preise und Zahlbetrag bleiben auf der
-              Rechnung.
-              {abschlussHint?.hasBericht ? ' · PDF vorhanden' : ' · noch nicht erstellt'}.
-            </p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <MockBtn
-                kind="primary"
-                disabled={saving || abschlussBusy || !bootstrap.auftragId}
-                onClick={() => {
-                  const aid = bootstrap.auftragId?.trim()
-                  if (!aid) return
-                  setAbschlussBusy(true)
-                  void createAbschlussberichtPdf(aid)
-                    .then((r) => {
-                      if (!r?.ok) {
-                        toast.systemError(r, 'ui', 'Abschlussbericht fehlgeschlagen.')
-                        return
-                      }
-                      setAbschlussHint({
-                        showBlock: true,
-                        hasBericht: true,
-                        berichtUrl: r.publicUrl,
-                      })
-                      setAbschlussMitVersand(true)
-                      toast.success(TOAST.abschlussbericht_erstellt)
-                    })
-                    .finally(() => setAbschlussBusy(false))
-                }}
-              >
-                {abschlussBusy
-                  ? '…'
-                  : abschlussHint?.hasBericht
-                    ? 'PDF neu erzeugen'
-                    : 'PDF erzeugen'}
-              </MockBtn>
-            </div>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 8,
-                cursor: 'pointer',
-                fontSize: 'var(--fs-text)',
-              }}
-            >
-              <MockCheckbox
-                className="mt-0.5"
-                checked={abschlussMitVersand}
-                disabled={saving}
-                onChange={(e) => setAbschlussMitVersand(e.target.checked)}
-              />
-              <span>
-                <span style={{ fontWeight: 500 }}>Als Anhang zur Rechnung mitsenden</span>
-                <span
-                  style={{
-                    display: 'block',
-                    marginTop: 2,
-                    fontSize: 'var(--fs-meta)',
-                    color: 'var(--bw-text-muted, ${C.gray500})',
-                  }}
-                >
-                  Ja = Abschlussbericht zusätzlich zur Endabrechnung / Rechnung. Nein = nur die
-                  Rechnung. Fehlt noch ein PDF, wird es beim Senden erzeugt.
-                </span>
-              </span>
-            </label>
-            <div
-              className="full"
-              style={{
-                border: '0.0625rem solid var(--bw-border, ${C.gray200})',
-                borderRadius: 10,
-                overflow: 'hidden',
-                minHeight: 280,
-                background: 'var(--bw-bg, ${C.gray50})',
-              }}
-            >
-              {abschlussHint?.berichtUrl ? (
-                <iframe
-                  title="Abschlussbericht Vorschau"
-                  src={abschlussHint.berichtUrl}
-                  style={{ width: '100%', height: 420, border: 0, display: 'block' }}
-                />
-              ) : (
-                <div
-                  style={{
-                    padding: 24,
-                    textAlign: 'center',
-                    fontSize: 'var(--fs-meta)',
-                    color: 'var(--bw-text-muted, ${C.gray500})',
-                  }}
-                >
-                  Noch keine Vorschau — zuerst PDF erzeugen.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </EditorSheet>
 
       <EditorSheet
         open={sheet === 'versand'}

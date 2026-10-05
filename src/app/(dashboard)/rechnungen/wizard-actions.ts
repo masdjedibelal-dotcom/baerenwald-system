@@ -6,15 +6,15 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import {
-  createGutschriftFromRechnung,
-  createRechnungEntwurf,
-  sendRechnung,
-  updateRechnungEntwurf,
+createGutschriftFromRechnung,
+createRechnungEntwurf,
+sendRechnung,
+updateRechnungEntwurf,
 } from '@/app/(dashboard)/rechnungen/actions'
 import { persistPdfForRechnung } from '@/lib/rechnungen/persist-pdf'
 import {
-  aggregateRegieBeschreibungFromEintraege,
-  auftragPositionenToAngebotPositionen,
+aggregateRegieBeschreibungFromEintraege,
+auftragPositionenToAngebotPositionen,
 } from '@/lib/auftraege/auftrag-positionen-rechnung'
 import { formatAuftragsNr } from '@/lib/auftraege/auftrag-liste-helpers'
 import { normalizeAngebotPositionen,repairAngebotPositionen } from '@/lib/angebot-positionen'
@@ -23,44 +23,44 @@ import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadGewerkeAusfuehrung,sanitizeAngebotPositionenForExport } from '@/lib/gewerke-ausfuehrung'
 import { KUNDE_EMBED_SELECT,KUNDE_EMBED_SELECT_LEGACY,loadKundeFuerRechnung } from '@/lib/rechnungen/kunde-select'
 import {
-  defaultRechnungWizardMeta,
-  defaultZahlungszielTage,
-  rechnungDarfImWizardBearbeitetWerden,
-  type RechnungWizardBootstrap,
-  type RechnungWizardMeta,
-  type AbschlagRechnungEntwurf,
+defaultRechnungWizardMeta,
+defaultZahlungszielTage,
+rechnungDarfImWizardBearbeitetWerden,
+type RechnungWizardBootstrap,
+type RechnungWizardMeta,
+type AbschlagRechnungEntwurf,
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { resolveRechnungProjektTitel } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import { normalizeFaelligAmYmd } from '@/lib/dates/werktag'
 import { mahnungFelderBeiFaelligkeitAenderung } from '@/lib/rechnungen/rechnung-zahlungsziel-patch'
 import { resolveVertragsKundeIdForLead } from '@/lib/leads/resolve-vertrags-kunde'
 import {
-  rechnungMaterialFingerprint,
-  rechnungBrauchtStornoBeiAenderung,
-  type RechnungMaterialSnapshot,
-  linkRechnungKorrekturKette,
+rechnungMaterialFingerprint,
+rechnungBrauchtStornoBeiAenderung,
+type RechnungMaterialSnapshot,
+linkRechnungKorrekturKette,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import { berechneRechnungMitFirmeneinstellungen } from '@/lib/rechnungen/rechnung-speichern'
 import {
-  abschlagBereitsAbgerechnet,
-  auftragSummenAusPositionen,
-  berechneBereitsGestellt,
-  berechneZahlungsplan,
-  naechsteAbschlagZumVersenden,
-  naechsteOffeneAbschlagZeile,
-  parseZahlungsplan,
-  abschlagZahlungstextFuerRechnung,
-  istAbschlagPauschalPosition,
-  berechneSchlussAbrechnung,
-  positionenFuerAbschlagRechnung,
-  rechnungArtFuerZeile,
-  rechnungBerechnungFuerAbschlagZeile,
-  rechnungPositionenMitAuftrag,standardRechnungZahlungstext,
-  validateGestellteRechnungenGegenVk,
-  zahlplanAbgerechnetAusLinks,
-  zahlungsplanVorlage50_50,
-  type Zahlungsplan,
-  type ZahlungsplanZeileBerechnet
+abschlagBereitsAbgerechnet,
+auftragSummenAusPositionen,
+berechneBereitsGestellt,
+berechneZahlungsplan,
+naechsteAbschlagZumVersenden,
+naechsteOffeneAbschlagZeile,
+parseZahlungsplan,
+abschlagZahlungstextFuerRechnung,
+istAbschlagPauschalPosition,
+berechneSchlussAbrechnung,
+positionenFuerAbschlagRechnung,
+rechnungArtFuerZeile,
+rechnungBerechnungFuerAbschlagZeile,
+rechnungPositionenMitAuftrag,standardRechnungZahlungstext,
+validateGestellteRechnungenGegenVk,
+zahlplanAbgerechnetAusLinks,
+zahlungsplanVorlage50_50,
+type Zahlungsplan,
+type ZahlungsplanZeileBerechnet
 } from '@/lib/rechnungen/zahlungsplan'
 import { saveAuftragZahlungsplan } from '@/app/(dashboard)/auftraege/zahlungsplan-actions'
 import { nextRechnungsnummerAusDb } from '@/lib/rechnungen/next-rechnungsnummer'
@@ -1843,13 +1843,11 @@ export async function sendRechnungWizard(input: {
   rechnungId: string
   mailTo: string[]
   mailCc?: string[]
-  mitAbschlussbericht?: boolean
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
     const res = await sendRechnung(input.rechnungId, {
       to: input.mailTo,
       cc: input.mailCc,
-      mitAbschlussbericht: input.mitAbschlussbericht,
     })
     if (!res?.ok) {
       return res?.ok === false

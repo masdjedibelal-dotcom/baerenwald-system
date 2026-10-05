@@ -12,8 +12,6 @@ export const TOAST = {
   abschlagsplaene_sind_nur_mit_auftrag_moeglich: "Abschlagspläne sind nur mit Auftrag möglich.",
   abschlagsrechnungen_sind_nur_mit_auftrag_moeglic: "Abschlagsrechnungen sind nur mit Auftrag möglich.",
   abschluss_rueckgaengig: "Abschluss rückgängig",
-  abschlussbericht_erst_nach_signiertem_abnahmepro: "Abschlussbericht erst nach signiertem Abnahmeprotokoll möglich.",
-  abschlussbericht_erstellt: "Abschlussbericht erstellt",
   als_gesendet_markiert: "Als gesendet markiert",
   als_kontaktiert_markiert: "Als kontaktiert markiert",
   aenderungsprotokoll_geoeffnet_demo: "Änderungsprotokoll geöffnet (Demo)",
