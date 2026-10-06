@@ -4,8 +4,8 @@ import type { AngebotPosition,Kunde,RechnungStatus } from '@/lib/types'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { kundeZeigt35a,parseKleinunternehmerSetting } from '@/lib/rechnung-berechnung'
 import {
-  defaultRechnungEinleitung,
-  defaultRechnungHinweise,
+defaultRechnungEinleitung,
+defaultRechnungHinweise,
 } from '@/lib/rechnungen/rechnung-texte'
 import { defaultRechnungMailEinleitung } from '@/lib/mail/rechnung-mail'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
@@ -31,6 +31,8 @@ export type RechnungWizardMeta = {
   zahlungsbedingungen: string
   /** Welche Planzeile diese Rechnung abrechnet (bei abschlaege) */
   abschlag_zeile_id: string | null
+  /** Titel aus dem Wizard (Spalte rechnungen.titel); leer = Titel aus Angebot/Auftrag */
+  titel?: string
 }
 
 export type RechnungWizardAbschlagKontext = {

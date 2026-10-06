@@ -1,11 +1,12 @@
 'use client'
 
+import { PdfSeiten } from '@/components/ui/PdfSeiten'
+
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useEffect, useState } from 'react'
-import { C } from '@/lib/tokens/colors'
-/** Step „Vorschau“: Angebots-PDF wie beim Versand (HTML-Template = PDF-Layout). */
+import { useEffect,useState } from 'react'
+/** Step „Vorschau“: das echte Angebots-PDF (wie beim Versand), im Browser angezeigt. */
 export function AngebotWizardPdfPreview({
   angebotId,
   loading,
@@ -17,7 +18,7 @@ export function AngebotWizardPdfPreview({
 }) {
   const [failed, setFailed] = useState(false)
   const previewSrc = angebotId
-    ? `/api/angebot-pdf?angebotId=${encodeURIComponent(angebotId)}&preview=html`
+    ? `/api/angebot-pdf?angebotId=${encodeURIComponent(angebotId)}&inline=1`
     : null
   const pdfHref = angebotId
     ? `/api/angebot-pdf?angebotId=${encodeURIComponent(angebotId)}`
@@ -108,19 +109,7 @@ export function AngebotWizardPdfPreview({
               </MockBtn>
             ) : null}
           </div>
-          <iframe
-            key={previewSrc}
-            title="Angebots-PDF-Vorschau"
-            src={previewSrc}
-            onError={() => setFailed(true)}
-            style={{
-              width: '100%',
-              height: 'min(72vh, 51.25rem)',
-              border: 0,
-              background: C.white,
-              display: 'block',
-            }}
-          />
+          <PdfSeiten key={previewSrc} url={previewSrc} className="pdf-vorschau" />
         </MockCard>
       )}
     </>

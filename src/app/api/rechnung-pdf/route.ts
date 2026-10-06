@@ -4,8 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import {
-  buildRechnungHtmlAusDetail,
-  loadRechnungDetailForPdf,
+buildRechnungHtmlAusDetail,
+loadRechnungDetailForPdf,
 } from '@/lib/rechnungen/rechnung-html-payload'
 import { renderRechnungPdfForDetail } from '@/lib/rechnungen/render-rechnung-pdf-for-detail'
 
@@ -30,6 +30,8 @@ export async function GET(request: Request) {
   const rechnungId = url.searchParams.get('rechnungId') ?? url.searchParams.get('id')
   const previewRaw = url.searchParams.get('preview') ?? ''
   const wantPreview = previewRaw === '1' || previewRaw === 'true' || previewRaw === 'html'
+  /** inline=1: PDF im Browser anzeigen (Vorschau im Wizard) statt herunterladen */
+  const inline = url.searchParams.get('inline') === '1'
 
   if (!rechnungId?.trim()) {
     return NextResponse.json({ error: 'rechnungId fehlt' }, { status: 400 })
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Rechnung_${nr}_Baerenwald.pdf"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="Rechnung_${nr}_Baerenwald.pdf"`,
       },
     })
   } catch (e) {

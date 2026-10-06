@@ -30,6 +30,8 @@ export async function GET(request: Request) {
   const angebotId = url.searchParams.get('angebotId') ?? url.searchParams.get('id')
   const previewRaw = url.searchParams.get('preview') ?? ''
   const wantPreview = previewRaw === '1' || previewRaw === 'true' || previewRaw === 'html'
+  /** inline=1: PDF im Browser anzeigen (Vorschau im Wizard) statt herunterladen */
+  const inline = url.searchParams.get('inline') === '1'
 
   if (!angebotId?.trim()) {
     return NextResponse.json({ error: 'angebotId fehlt' }, { status: 400 })
@@ -64,7 +66,7 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Angebot_${nr}_Baerenwald.pdf"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="Angebot_${nr}_Baerenwald.pdf"`,
       },
     })
   } catch (e) {

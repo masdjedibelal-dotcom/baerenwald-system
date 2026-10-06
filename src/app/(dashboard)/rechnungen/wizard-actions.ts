@@ -938,6 +938,7 @@ export async function loadRechnungWizardBootstrap(
     hinweise: String(rec.hinweise ?? '').trim() || metaDefaults.hinweise,
     mail_einleitung: String(rec.mail_einleitung ?? '').trim() || metaDefaults.mail_einleitung,
     mail_betreff: String(rec.mail_betreff ?? '').trim() || metaDefaults.mail_betreff,
+    titel: String(rec.titel ?? '').trim() || undefined,
     reverse_charge_13b: Boolean(rec.reverse_charge_13b),
     hinweis_35a:
       typeof rec.hinweis_35a === 'boolean' ? rec.hinweis_35a : metaDefaults.hinweis_35a,
@@ -1073,6 +1074,7 @@ export async function loadRechnungWizardBootstrapStandalone(
     hinweise: String(rec.hinweise ?? '').trim() || metaDefaults.hinweise,
     mail_einleitung: String(rec.mail_einleitung ?? '').trim() || metaDefaults.mail_einleitung,
     mail_betreff: String(rec.mail_betreff ?? '').trim() || metaDefaults.mail_betreff,
+    titel: String(rec.titel ?? '').trim() || undefined,
     reverse_charge_13b: Boolean(rec.reverse_charge_13b),
     hinweis_35a:
       typeof rec.hinweis_35a === 'boolean' ? rec.hinweis_35a : metaDefaults.hinweis_35a,
@@ -1340,6 +1342,7 @@ async function saveRechnungWizardDraftInner(
     hinweise: input.meta.hinweise || null,
     mail_einleitung: input.meta.mail_einleitung || null,
     mail_betreff: input.meta.mail_betreff || null,
+    titel: input.meta.titel?.trim() || null,
     zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
     rechnung_art: rechnungArt,
     abschlag_index:
@@ -1587,6 +1590,7 @@ function entwurfPayloadAusWizardMeta(
     hinweise: input.meta.hinweise || null,
     mail_einleitung: input.meta.mail_einleitung || null,
     mail_betreff: input.meta.mail_betreff || null,
+    titel: input.meta.titel?.trim() || null,
     zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
     rechnung_art: rechnungArt,
     abschlag_index: zeile?.index ?? null,
@@ -1820,6 +1824,7 @@ export async function syncRechnungWizardMetaToEntwurf(
         hinweise: input.meta.hinweise || null,
         mail_einleitung: input.meta.mail_einleitung || null,
         mail_betreff: input.meta.mail_betreff || null,
+        titel: input.meta.titel?.trim() || null,
         zahlungsbedingungen: input.meta.zahlungsbedingungen?.trim() || null,
         ...mahnungFelderBeiFaelligkeitAenderung(faelligNeu, cur?.faellig_am as string | null),
         updated_at: new Date().toISOString(),

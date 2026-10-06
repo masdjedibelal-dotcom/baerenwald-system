@@ -7548,6 +7548,7 @@ export type Database = {
           zahlungsbedingungen: string | null
           zahlungsplan_abschlag_id: string | null
           zahlungsziel_tage: number | null
+          titel: string | null
         }
         Insert: {
           abschlag_index?: number | null
@@ -7609,6 +7610,7 @@ export type Database = {
           zahlungsbedingungen?: string | null
           zahlungsplan_abschlag_id?: string | null
           zahlungsziel_tage?: number | null
+          titel?: string | null
         }
         Update: {
           abschlag_index?: number | null
@@ -7670,6 +7672,7 @@ export type Database = {
           zahlungsbedingungen?: string | null
           zahlungsplan_abschlag_id?: string | null
           zahlungsziel_tage?: number | null
+          titel?: string | null
         }
         Relationships: [
           {

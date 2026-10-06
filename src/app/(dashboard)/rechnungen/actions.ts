@@ -326,6 +326,8 @@ export async function createGutschriftFromRechnung(
       rechnungsdatum: new Date().toISOString().slice(0, 10),
       pdf_url: null,
       erstellt_von: gate.user.id,
+      // Storno: fester Titel mit Verweis auf das Original (nicht abfragen)
+      titel: `Stornorechnung zu ${String(orig.rechnungsnummer ?? '').trim() || 'Rechnung'}`,
       zahlungsplan_abschlag_id: orig.zahlungsplan_abschlag_id ?? null,
       rechnung_art: orig.rechnung_art ?? null,
       abschlag_index: orig.abschlag_index ?? null,
@@ -470,6 +472,8 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
       erstellt_von: gate.user.id,
       einleitung: orig.einleitung ?? null,
       hinweise: orig.hinweise ?? null,
+      // Korrektur übernimmt den Titel des Originals (im Wizard änderbar)
+      titel: orig.titel ?? null,
       zahlungsbedingungen: orig.zahlungsbedingungen ?? null,
       mail_einleitung: null,
       mail_betreff: null,

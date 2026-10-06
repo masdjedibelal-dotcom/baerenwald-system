@@ -259,9 +259,14 @@ export function RechnungWizard({
   const [, ] = useState(1)
   const [zeilen, setZeilen] = useState<DokumentZeile[]>(initialZeilen)
   const [meta, setMeta] = useState<RechnungWizardMeta>(() => bootstrap.meta)
+  // Gespeicherter Titel der Rechnung vor Angebots-/Auftragstitel
   const [rechnungTitel, setRechnungTitel] = useState(
-    () => bootstrap.projektTitel?.trim() || ''
+    () => bootstrap.meta.titel?.trim() || bootstrap.projektTitel?.trim() || ''
   )
+  // Titel wird mit den übrigen Wizard-Daten gespeichert (Spalte rechnungen.titel)
+  useEffect(() => {
+    setMeta((m) => (m.titel === rechnungTitel ? m : { ...m, titel: rechnungTitel }))
+  }, [rechnungTitel])
   const [wiederkehr, setWiederkehr] = useState<VorgangWiederkehr>(() =>
     normalizeVorgangWiederkehr({
       ist_wiederkehrend: bootstrap.ist_wiederkehrend,

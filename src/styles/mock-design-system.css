@@ -22695,3 +22695,9 @@ button.dok-gruppe__kopf {
 .detail-quickbar__btn > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .detail-quickbar:has(> :nth-child(5)) { gap: 6px; }
 .detail-quickbar:has(> :nth-child(5)) .detail-quickbar__btn { font-size: 11px; letter-spacing: -0.01em; padding-inline: 1px; }
+
+/* PDF-Vorschau (Seiten selbst gezeichnet, pdf.js) */
+.pdf-vorschau { max-height: min(72vh, 52rem); overflow-y: auto; background: var(--bg-soft); padding: 12px; }
+.pdf-seiten { display: flex; flex-direction: column; gap: 12px; }
+.pdf-seite { display: block; width: 100%; height: auto; background: var(--card); box-shadow: var(--sh-1); border-radius: var(--r-xs); }
+.pdf-seiten__hinweis { margin: 0; padding: 24px; text-align: center; color: var(--text-3); font-size: var(--fs-meta); }

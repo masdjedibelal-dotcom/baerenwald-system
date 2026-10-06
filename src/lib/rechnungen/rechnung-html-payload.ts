@@ -1,17 +1,17 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { formatKundennr } from '@/lib/angebot-utils'
-import { normalizeAngebotPositionen, summenAusPositionen, summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
+import { normalizeAngebotPositionen,summenAusPositionen,summenKostenaufstellungAusPositionen } from '@/lib/angebot-positionen'
 import {
-  firmenBankverbindungZeilen,
-  firmenSteuerFooterZeilen,
+firmenBankverbindungZeilen,
+firmenSteuerFooterZeilen,
 } from '@/lib/angebote/angebot-rechtshinweise'
 import { mapAngebotPositionenToTemplateRows } from '@/lib/angebote/angebot-projekt-pdf-blocks'
 import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import {
-  resolveRechnungProjektTitel,
-  type AngebotLeistungsumfangQuelle,
+resolveRechnungProjektTitel,
+type AngebotLeistungsumfangQuelle,
 } from '@/lib/angebote/resolve-angebot-leistungsumfang'
-import { buildAngebotHtml, type AngebotHtmlInput } from '@/lib/templates/angebot-template'
+import { buildAngebotHtml,type AngebotHtmlInput } from '@/lib/templates/angebot-template'
 import { istPrivatKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { resolveRechnungEinleitung } from '@/lib/rechnungen/rechnung-texte'
 import { angebotPdfBegruessung } from '@/lib/templates/angebot-mail'
@@ -19,29 +19,29 @@ import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import {
-  formatRechnungEmpfaengerFuerDokument,
-  kundeAnredeKontextFromEmpfaenger,
-  kundeRechnungsempfaengerAusStammdaten,
+formatRechnungEmpfaengerFuerDokument,
+kundeAnredeKontextFromEmpfaenger,
+kundeRechnungsempfaengerAusStammdaten,
 } from '@/lib/kunde-rechnungsempfaenger'
 import {
-  berechneHinweis35aAnteil,
-  berechneRechnung,
-  parseKleinunternehmerSetting,
-  resolveRechnungHinweis35a,
+berechneHinweis35aAnteil,
+berechneRechnung,
+parseKleinunternehmerSetting,
+resolveRechnungHinweis35a,
 } from '@/lib/rechnung-berechnung'
 import {
-  DEFAULT_MWST_SATZ,
-  HINWEIS_KLEINUNTERNEHMER,
-  HINWEIS_REVERSE_CHARGE_13B,
+DEFAULT_MWST_SATZ,
+HINWEIS_KLEINUNTERNEHMER,
+HINWEIS_REVERSE_CHARGE_13B,
 } from '@/lib/rechnung-config'
-import { loadGewerkeAusfuehrung, sanitizeAngebotPositionenForExport } from '@/lib/gewerke-ausfuehrung'
+import { loadGewerkeAusfuehrung,sanitizeAngebotPositionenForExport } from '@/lib/gewerke-ausfuehrung'
 import {
-  berechneSchlussAbrechnung,
-  istAbschlagPauschalPosition,
-  type RechnungAbschlagLink,
+berechneSchlussAbrechnung,
+istAbschlagPauschalPosition,
+type RechnungAbschlagLink,
 } from '@/lib/rechnungen/zahlungsplan'
 import { resolveRechnungLeistungsortIn } from '@/lib/kunden-objekte'
-import type { AngebotPosition, Auftrag, Gewerk, Kunde, KundenObjekt, Rechnung } from '@/lib/types'
+import type { AngebotPosition,Auftrag,Gewerk,Kunde,KundenObjekt,Rechnung } from '@/lib/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatDatum } from '@/lib/utils'
 
@@ -98,6 +98,9 @@ function firstJoin<T>(raw: T | T[] | null | undefined): T | null {
 }
 
 function projektTitelAusRechnungDetail(row: RechnungDetailForPdf): string {
+  // Titel aus dem Rechnungs-Wizard hat Vorrang
+  const eigen = (row as { titel?: string | null }).titel?.trim()
+  if (eigen) return eigen
   const angebot =
     firstJoin(row.angebote) ?? firstJoin(firstJoin(row.auftraege)?.angebote) ?? null
   return resolveRechnungProjektTitel({

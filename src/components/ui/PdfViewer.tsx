@@ -1,5 +1,6 @@
 'use client'
-import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
+import { PdfSeiten } from '@/components/ui/PdfSeiten'
+import { EditorSheet,type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 
 interface PdfViewerProps {
   open: boolean
@@ -27,13 +28,7 @@ export function PdfViewer({
       secondary={{ label: 'Schließen', onClick: onClose, kind: 'ghost' }}
       primary={{ label: 'Herunterladen', href: url, download: true }}
     >
-      <div className="h-96 w-full md:h-[600px]">
-        <iframe
-          src={`${url}#toolbar=0`}
-          className="h-full w-full rounded-card border border-bw-border"
-          title={title}
-        />
-      </div>
+      {open && url ? <PdfSeiten url={url} className="pdf-vorschau" /> : null}
     </EditorSheet>
   )
 }
