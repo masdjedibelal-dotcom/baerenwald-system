@@ -19,6 +19,7 @@ import {
   umsatzMonatGesamt,
 } from '@/lib/dashboard/dashboard-analytics'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
+import { DashboardMarketingCard } from '@/components/dashboard/DashboardMarketingCard'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatWochentagDatumLang } from '@/lib/utils'
 import { formatEuro } from '@/lib/format/geld-datum'
@@ -416,7 +417,7 @@ rankingHandwerker: RankingZeile[]
       </section>
 
       <section className="dash-sec" aria-label="Marketing">
-        {/* P16: Marketing-Kacheln entfernt (Anbindung defekt, KI-Analytics auf Streichliste) */}
+        <DashboardMarketingCard data={marketing} />
       </section>
 
       <section className="dash-sec dash-sec--zahlen" aria-label="Auswertung">
