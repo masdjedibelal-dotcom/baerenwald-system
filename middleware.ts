@@ -108,6 +108,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/copilot/') ||
     path.startsWith('/api/cron/') ||
     path.startsWith('/api/whatsapp/webhook') ||
+    path.startsWith('/einsatz/') ||
+    path.startsWith('/api/einsatz-antwort') ||
     path.startsWith('/api/dev/auto-login')
 
   if (devAuthSkipEnabled() && !user && !isPublic) {

@@ -22749,3 +22749,21 @@ button.dok-gruppe__kopf {
 .wa-medienwahl__eintrag img { width: 100%; height: 84px; object-fit: cover; border-radius: var(--r-xs); }
 .wa-medienwahl__eintrag .mock-checkbox { position: absolute; top: 8px; left: 8px; }
 .wa-medienwahl__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Einsatz annehmen/ablehnen (öffentliche Seite aus der Mail) */
+.einsatz-antwort__daten { display: grid; gap: 8px; margin: 16px 0; padding: 14px 16px; border-radius: var(--r-lg); background: var(--card); box-shadow: var(--sh-1); }
+.einsatz-antwort__daten div { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-text); }
+.einsatz-antwort__daten dt { color: var(--text-3); }
+.einsatz-antwort__daten dd { margin: 0; text-align: right; color: var(--text); }
+.einsatz-antwort__anweisung { white-space: pre-wrap; font-size: var(--fs-text); line-height: 1.5; color: var(--text-2); margin: 0 0 20px; }
+.einsatz-antwort__aktionen { display: flex; flex-direction: column; gap: 10px; }
+.einsatz-antwort__knoepfe { display: flex; flex-wrap: wrap; gap: 10px; }
+.einsatz-antwort__knoepfe .btn { flex: 1 1 160px; min-height: 48px; }
+.einsatz-antwort__label { font-size: var(--fs-meta); color: var(--text-3); }
+.einsatz-antwort__ergebnis { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: var(--r-lg); background: var(--bg-soft); font-size: var(--fs-text); }
+.einsatz-antwort__ergebnis.is-ok { background: var(--grn-bg); color: var(--grn-tx); }
+.einsatz-antwort__knoepfe .btn { justify-content: center; }
+@media (max-width: 480px) {
+  .einsatz-antwort__knoepfe { flex-direction: column; }
+  .einsatz-antwort__knoepfe .btn { flex: 1 1 auto; width: 100%; }
+}

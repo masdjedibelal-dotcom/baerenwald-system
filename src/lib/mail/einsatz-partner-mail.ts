@@ -1,7 +1,7 @@
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailAnredeFromKundeTyp, mailBegruessungZeile, mailTeamGruss } from '@/lib/mail/anrede'
 import { buildSubject } from '@/lib/mail/build-subject'
-import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
+import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 import { mailHtmlBase, mailSummaryBlock } from '@/lib/mail-templates'
 import { formatEuro } from '@/lib/format/geld-datum'
 
@@ -29,6 +29,9 @@ export function buildEinsatzPartnerMail(
     ekBetrag: number | null
     ekArt: 'netto' | 'brutto'
     portalLink: string
+    /** Bestätigungsseite ohne Login (Annehmen / Ablehnen) */
+    annehmenLink: string
+    ablehnenLink: string
   },
   branding: MailBranding
 ): { betreff: string; html: string } {
@@ -56,10 +59,16 @@ export function buildEinsatzPartnerMail(
     : ''
   const content = `
     <p>${esc(mailBegruessungZeile(anrede, input.partnerName))}</p>
-    <p>wir haben einen neuen Einsatz für Sie. Bitte nehmen Sie ihn im Partner-Portal an oder lehnen Sie ihn ab.</p>
+    <p>wir haben einen neuen Einsatz für Sie. Bitte sagen Sie uns kurz, ob Sie ihn übernehmen — ein Klick genügt, ohne Anmeldung.</p>
     ${summary}
     ${text}
-    ${mailPrimaryButtonHtml('Einsatz ansehen', input.portalLink)}
-    <p>${esc(mailTeamGruss(anrede, branding.firmenname ?? ''))}</p>`
+    <div style="margin:20px 0 8px;">
+      ${mailPrimaryButtonHtml('Einsatz annehmen', input.annehmenLink, { margin: '0 8px 8px 0' })}
+      ${mailSecondaryButtonHtml('Ablehnen', input.ablehnenLink, { margin: '0 0 8px 0' })}
+    </div>
+    <p style="font-size:13px;color:#6B7280;margin:0 0 16px;">
+      Alle Einsätze, Updates und Rechnungen finden Sie auch im <a href="${esc(input.portalLink)}" style="color:#2C6E49;">Partner-Portal</a>.
+    </p>
+    <p>${mailTeamGruss(anrede, branding.firmenname ?? '')}</p>`
   return { betreff, html: mailHtmlBase(content, `Neuer Einsatz: ${input.titel}`, branding) }
 }

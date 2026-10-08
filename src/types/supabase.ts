@@ -2883,6 +2883,7 @@ export type Database = {
       }
       einsaetze: {
         Row: {
+          antwort_token: string | null
           abgelehnt_at: string | null
           ablehnung_grund: string | null
           angenommen_at: string | null
@@ -2915,6 +2916,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          antwort_token?: string | null
           abgelehnt_at?: string | null
           ablehnung_grund?: string | null
           angenommen_at?: string | null
@@ -2947,6 +2949,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          antwort_token?: string | null
           abgelehnt_at?: string | null
           ablehnung_grund?: string | null
           angenommen_at?: string | null
