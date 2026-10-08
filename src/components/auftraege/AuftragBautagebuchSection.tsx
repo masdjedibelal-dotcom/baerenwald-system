@@ -14,6 +14,9 @@ import type { PositionEintrag } from '@/lib/auftraege/position-lebenszyklus'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatDatum } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { RichTextContent } from '@/components/ui/RichTextContent'
+import { splitTagebuchBeschreibung } from '@/lib/auftraege/tagebuch-text'
+import { richTextToPlain } from '@/lib/rich-text'
 import { TOAST } from '@/lib/copy'
 
 export type BautagebuchListenEintrag = PositionEintrag & {
@@ -59,7 +62,8 @@ function eintragText(e: BautagebuchListenEintrag): string {
   if (lines.length <= 1) {
     return body.length > 160 ? `${body.slice(0, 157)}…` : ''
   }
-  return lines.slice(1).join(' ').slice(0, 220)
+  // Beschreibung kann formatiert sein (HTML) → in der Vorschau als reiner Text
+  return richTextToPlain(lines.slice(1).join('\n')).replace(/\s+/g, ' ').trim().slice(0, 220)
 }
 
 function toEditSeed(e: BautagebuchListenEintrag): CrmTagebuchEditSeed {
@@ -316,7 +320,17 @@ export function AuftragBautagebuchSection({
             </div>
 
             {activeText ? (
-              <p className="bt-eintrag-sheet__text">{activeText}</p>
+              <div className="bt-eintrag-sheet__text">
+                {(() => {
+                  const { titel, beschreibung } = splitTagebuchBeschreibung(activeText)
+                  return (
+                    <>
+                      {titel ? <p>{titel}</p> : null}
+                      <RichTextContent html={beschreibung} />
+                    </>
+                  )
+                })()}
+              </div>
             ) : (
               <p className="bt-eintrag-sheet__empty">Kein Text hinterlegt.</p>
             )}

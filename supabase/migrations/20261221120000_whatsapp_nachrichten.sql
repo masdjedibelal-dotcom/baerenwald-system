@@ -29,8 +29,8 @@ create table if not exists public.whatsapp_nachrichten (
   vorlage text,
   -- Antwort auf diese Nachricht (WhatsApp-ID unserer Nachricht)
   antwort_auf_wa_id text,
-  -- Von Bärenwald eingeordnet: Update / Regie (ins Einsatz-Verlauf übernommen) oder erledigt
-  markierung text check (markierung in ('update', 'regie', 'erledigt')),
+  -- Von Bärenwald übernommen: Update / Tagebuch / Dokument / Einsatz fertig gemeldet (regie = Altdaten)
+  markierung text check (markierung in ('update', 'regie', 'erledigt', 'tagebuch', 'dokument', 'fertig')),
   status text not null default 'gesendet'
     check (status in ('wartend', 'gesendet', 'zugestellt', 'gelesen', 'fehler', 'empfangen')),
   fehler text,

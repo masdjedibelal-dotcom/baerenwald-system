@@ -9,10 +9,10 @@ import { KiAssistIconButton } from '@/components/assistent/KiAssistIconButton'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { listKatalogPositionen,listVerwendetePositionen } from '@/app/(dashboard)/katalog/actions'
 import {
-  katalogPreisLabel,
-  katalogVarianteLabel,
-  type KatalogPosition,
-  type KatalogVariante,
+katalogPreisLabel,
+katalogVarianteLabel,
+type KatalogPosition,
+type KatalogVariante,
 } from '@/lib/katalog/katalog-types'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
 import { formatEurBetrag,type GesamtrabattModus } from '@/lib/dokument-zeilen'
@@ -604,6 +604,7 @@ export function PositionAddSheet({
                 value={beschreibung}
                 onSave={setBeschreibung}
                 multiline
+                formatierbar
                 rows={3}
                 placeholder="Projektspezifisch"
                 sheetContext="canvas"

@@ -1615,6 +1615,7 @@ export function AngebotWizard({
             value={projektbeschreibung}
             onSave={setProjektbeschreibung}
             multiline
+            formatierbar
             className="sheet-editable-field--dok-beschreibung"
             kiExtraHint="Projektbeschreibung für das Angebot (kundensichtbar)."
             placeholder="Projektbeschreibung…"

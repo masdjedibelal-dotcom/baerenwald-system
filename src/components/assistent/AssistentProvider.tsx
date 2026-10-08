@@ -1,15 +1,15 @@
 'use client'
 
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
+createContext,
+useCallback,
+useContext,
+useMemo,
+useState,
+type ReactNode,
 } from 'react'
 import { usePathname } from 'next/navigation'
-import type { KiAssistDraft, KiAssistScopeId } from '@/lib/copilot/ki-assist-scopes'
+import type { KiAssistDraft,KiAssistScopeId } from '@/lib/copilot/ki-assist-scopes'
 import { getKiAssistScope } from '@/lib/copilot/ki-assist-scopes'
 
 export type AssistentScopedSession = {
@@ -18,6 +18,8 @@ export type AssistentScopedSession = {
   extraHint?: string | null
   /** Vorbelegung im Eingabefeld */
   draftInput?: string | null
+  /** KI-Hilfe an einem Feld: der aktuelle Feldtext, sichtbar oben im Chat */
+  aktuellerText?: string | null
   /**
    * over-sheet: über EditorSheet/Wizard (z-index), nach Übernehmen schließen.
    * Für kontextbezogene KI an Formularen.

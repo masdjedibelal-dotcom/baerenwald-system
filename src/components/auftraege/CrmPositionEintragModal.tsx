@@ -2,15 +2,15 @@
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 
 import { MockBtn } from '@/components/mock-ui'
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { toast } from '@/components/ui/app-toast'
 import { actionBusy } from '@/components/ui/action-busy'
 import {
-  createCrmTagebuchEintrag,
-  updateCrmTagebuchEintrag,
+createCrmTagebuchEintrag,
+updateCrmTagebuchEintrag,
 } from '@/app/(dashboard)/auftraege/position-lebenszyklus-actions'
 import { optimizeImageForUpload } from '@/lib/media/optimize-image-for-upload'
 import { splitTagebuchBeschreibung } from '@/lib/auftraege/tagebuch-text'
@@ -35,6 +35,7 @@ export function CrmPositionEintragModal({
   onClose,
   auftragId,
   editEintrag = null,
+  vorbelegung = null,
   onSaved,
 }: {
   open: boolean
@@ -46,6 +47,8 @@ export function CrmPositionEintragModal({
   initialPositionId?: string | null
   /** Vorhandener Eintrag — öffnet im Bearbeiten-Modus */
   editEintrag?: CrmTagebuchEditSeed | null
+  /** Neuer Eintrag vorausgefüllt (z. B. aus WhatsApp-Nachrichten) */
+  vorbelegung?: { titel?: string; beschreibung?: string; fotoPaths?: string[] } | null
   onSaved?: () => void
 }) {
   const [pending, setPending] = useState(false)
@@ -72,11 +75,11 @@ export function CrmPositionEintragModal({
       return
     }
     setSelectedIds([])
-    setTitel('')
-    setBeschreibung('')
-    setFotoPaths([])
+    setTitel(vorbelegung?.titel ?? '')
+    setBeschreibung(vorbelegung?.beschreibung ?? '')
+    setFotoPaths((vorbelegung?.fotoPaths ?? []).slice(0, MAX_FOTOS))
     setPerWhatsApp(false)
-  }, [open, editEintrag])
+  }, [open, editEintrag, vorbelegung])
 
   async function uploadFotos(files: File[]) {
     if (!files.length || uploading) return
@@ -219,6 +222,7 @@ export function CrmPositionEintragModal({
 
         <SheetEditableField
           label="Beschreibung"
+          formatierbar
           value={beschreibung}
           onSave={setBeschreibung}
           multiline

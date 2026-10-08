@@ -22701,3 +22701,51 @@ button.dok-gruppe__kopf {
 .pdf-seiten { display: flex; flex-direction: column; gap: 12px; }
 .pdf-seite { display: block; width: 100%; height: auto; background: var(--card); box-shadow: var(--sh-1); border-radius: var(--r-xs); }
 .pdf-seiten__hinweis { margin: 0; padding: 24px; text-align: center; color: var(--text-3); font-size: var(--fs-meta); }
+.sheet-editable-field__format { align-self: flex-start; margin-top: 4px; }
+.rich-text-body ul { list-style: disc; padding-left: 20px; margin: 4px 0; }
+.rich-text-body ol { list-style: decimal; padding-left: 20px; margin: 4px 0; }
+.ki-feldtext {
+  display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; padding: 10px 12px;
+  border-left: 3px solid var(--green); border-radius: var(--r-sm); background: var(--bg-soft);
+}
+.ki-feldtext__titel { font-size: var(--fs-caption); color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.ki-feldtext__text { margin: 0; white-space: pre-wrap; font-size: var(--fs-text); line-height: 1.45; max-height: 220px; overflow-y: auto; }
+
+/* WhatsApp: Partner/Kunde kennzeichnen, Auswahl-Modus, Aktionen */
+.wa-pane__name { display: inline-flex; align-items: center; gap: 8px; }
+.wa-typ { padding: 1px 8px; border-radius: var(--r-pill); font-size: var(--fs-caption); font-weight: 500; }
+.wa-typ--handwerker { background: var(--blue-bg); color: var(--blue-tx); }
+.wa-typ--kunde { background: var(--grn-bg); color: var(--grn-tx); }
+.wa-typ--unbekannt { background: var(--yel-bg); color: var(--yel-tx); }
+.wa-pane__auswahl { margin-left: auto; }
+.wa-zeile { align-items: center; gap: 8px; }
+.wa-zeile__wahl { flex-shrink: 0; }
+.wa-blase.is-waehlbar { cursor: pointer; }
+.wa-blase.is-gewaehlt { outline: 2px solid var(--blue-tx); outline-offset: 1px; }
+.wa-auswahlleiste {
+  position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 0 14px; background: var(--card); font-size: var(--fs-text);
+}
+.wa-aktionen { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.wa-aktion {
+  display: flex; align-items: flex-start; gap: 12px; padding: 14px; text-align: left; font: inherit; color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--card); cursor: pointer;
+}
+.wa-aktion:hover:not(:disabled) { border-color: var(--green); background: var(--grn-bg); }
+.wa-aktion.is-gesperrt { opacity: 0.5; cursor: not-allowed; }
+.wa-aktion__icon {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 50%; background: var(--bg-soft); color: var(--green);
+}
+.wa-aktion__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wa-aktion__titel { font-weight: 600; font-size: var(--fs-text); }
+.wa-aktion__sub { color: var(--text-3); font-size: var(--fs-meta); }
+.wa-medienwahl { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.wa-medienwahl__eintrag {
+  position: relative; display: flex; flex-direction: column; gap: 4px; padding: 6px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--r-sm); font-size: var(--fs-caption); color: var(--text-2);
+}
+.wa-medienwahl__eintrag.is-an { border-color: var(--green); background: var(--grn-bg); }
+.wa-medienwahl__eintrag img { width: 100%; height: 84px; object-fit: cover; border-radius: var(--r-xs); }
+.wa-medienwahl__eintrag .mock-checkbox { position: absolute; top: 8px; left: 8px; }
+.wa-medienwahl__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

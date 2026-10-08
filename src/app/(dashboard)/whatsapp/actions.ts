@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { requireStaffAndServiceRole } from '@/lib/auth/require-staff-service-role'
 import { logDbError } from '@/lib/errors/log-db-error'
+import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
 import { DOKUMENT_ARTEN,type DokumentArt } from '@/lib/types'
 import {
 aktiveEinsaetze,
@@ -41,7 +42,7 @@ export type WaNachricht = {
   vorlage: string | null
   status: string
   fehler: string | null
-  markierung: 'update' | 'regie' | 'erledigt' | null
+  markierung: 'update' | 'regie' | 'erledigt' | 'tagebuch' | 'dokument' | 'fertig' | null
   auftrag_id: string | null
   einsatz_id: string | null
   auftrag_titel: string | null
@@ -106,7 +107,7 @@ async function mapNachrichten(db: SupabaseClient, rows: Record<string, unknown>[
         vorlage: (r.vorlage as string | null) ?? null,
         status: String(r.status ?? ''),
         fehler: (r.fehler as string | null) ?? null,
-        markierung: mark === 'update' || mark === 'regie' || mark === 'erledigt' ? mark : null,
+        markierung: (['update', 'regie', 'erledigt', 'tagebuch', 'dokument', 'fertig'] as const).find((m) => m === mark) ?? null,
         auftrag_id: (r.auftrag_id as string | null) ?? null,
         einsatz_id: (r.einsatz_id as string | null) ?? null,
         auftrag_titel: one(r.auftraege as { titel?: string | null } | null)?.titel ?? null,
@@ -234,172 +235,262 @@ async function einsatzImAuftrag(
   return data?.[0]?.id ? String(data[0].id) : null
 }
 
-async function nachrichtLaden(db: SupabaseClient, id: string) {
+/* ── Auswahl: mehrere Nachrichten → Auftrag/Einsatz → Aktion (nur Partner-Chats) ─────── */
+
+type WaRoh = {
+  id: string
+  created_at: string
+  richtung: string
+  art: string
+  text: string | null
+  handwerker_id: string | null
+  media_pfad: string | null
+  media_url: string | null
+  media_name: string | null
+  media_mime: string | null
+}
+
+async function nachrichtenLaden(db: SupabaseClient, ids: string[]): Promise<WaRoh[]> {
+  if (!ids.length) return []
   const { data, error } = await db
     .from('whatsapp_nachrichten')
-    .select('id, richtung, art, text, handwerker_id, auftrag_id, einsatz_id, media_pfad, media_url, media_name, media_mime')
-    .eq('id', id)
-    .maybeSingle()
-  if (error) logDbError('app/whatsapp/actions:nachricht', error)
-  return data
+    .select('id, created_at, richtung, art, text, handwerker_id, media_pfad, media_url, media_name, media_mime')
+    .in('id', ids)
+    .order('created_at', { ascending: true })
+  if (error) logDbError('app/whatsapp/actions:nachrichten', error)
+  return (data ?? []) as WaRoh[]
 }
 
-export async function whatsAppZuordnen(
-  id: string,
-  ziel: { auftragId: string | null; einsatzId?: string | null }
-): Promise<{ ok: true } | Fail> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-  const { error } = await gate.db
+/** Texte der Auswahl in zeitlicher Reihenfolge (ohne Knopf-Antworten). */
+function auswahlText(rows: WaRoh[]): string {
+  return rows
+    .filter((r) => r.art !== 'antwort' && r.text?.trim())
+    .map((r) => r.text!.trim())
+    .join('\n\n')
+}
+
+/** Datei einer Nachricht laden (eigener Bucket oder Link). Testdateien (/mock/…) → null, Link bleibt. */
+async function medienDaten(db: SupabaseClient, r: WaRoh): Promise<{ buf: Buffer; mime: string } | null> {
+  const mime = r.media_mime || 'application/octet-stream'
+  if (r.media_pfad) {
+    const { data, error } = await db.storage.from(WHATSAPP_MEDIEN_BUCKET).download(r.media_pfad)
+    if (error || !data) return null
+    return { buf: Buffer.from(await data.arrayBuffer()), mime }
+  }
+  if (r.media_url && /^https?:\/\//.test(r.media_url)) {
+    const res = await fetch(r.media_url, { cache: 'no-store' }).catch(() => null)
+    if (!res?.ok) return null
+    return { buf: Buffer.from(await res.arrayBuffer()), mime }
+  }
+  return null
+}
+
+function dateiEndung(r: WaRoh): string {
+  const vonName = r.media_name?.split('.').pop()?.toLowerCase()
+  if (vonName && vonName.length <= 5) return vonName.replace(/[^a-z0-9]/g, '') || 'bin'
+  const m = (r.media_mime ?? '').split(';')[0] ?? ''
+  return m === 'application/pdf' ? 'pdf' : m.split('/')[1]?.split('+')[0] || 'bin'
+}
+
+/**
+ * Medien in einen Ziel-Bucket kopieren. Liefert je Datei den Verweis, den das Ziel erwartet:
+ * öffentliche URL (publik) oder Speicherpfad; Testdateien behalten ihren Link.
+ */
+async function medienKopieren(
+  db: SupabaseClient,
+  rows: WaRoh[],
+  ziel: { bucket: string; ordner: string; publik: boolean }
+): Promise<{ name: string; verweis: string; mime: string | null }[]> {
+  const out: { name: string; verweis: string; mime: string | null }[] = []
+  for (const r of rows) {
+    if (!r.media_pfad && !r.media_url) continue
+    const daten = await medienDaten(db, r)
+    if (!daten) {
+      if (r.media_url) out.push({ name: r.media_name || 'WhatsApp', verweis: r.media_url, mime: r.media_mime })
+      continue
+    }
+    const pfad = `${ziel.ordner}/${crypto.randomUUID()}.${dateiEndung(r)}`
+    const { error } = await db.storage.from(ziel.bucket).upload(pfad, daten.buf, { contentType: daten.mime, upsert: false })
+    if (error) {
+      logDbError('app/whatsapp/actions:kopieren', error)
+      continue
+    }
+    out.push({
+      name: r.media_name || 'WhatsApp',
+      verweis: ziel.publik ? db.storage.from(ziel.bucket).getPublicUrl(pfad).data.publicUrl : pfad,
+      mime: r.media_mime,
+    })
+  }
+  return out
+}
+
+async function auswahlAbschliessen(
+  db: SupabaseClient,
+  ids: string[],
+  markierung: 'update' | 'tagebuch' | 'dokument' | 'fertig',
+  ziel: { auftragId: string; einsatzId?: string | null }
+): Promise<void> {
+  const { error } = await db
     .from('whatsapp_nachrichten')
-    .update({ auftrag_id: ziel.auftragId, einsatz_id: ziel.einsatzId ?? null })
-    .eq('id', id)
-  if (error) {
-    logDbError('app/whatsapp/actions:zuordnen', error)
-    return { ok: false, message: 'Zuordnung konnte nicht gespeichert werden.' }
+    .update({ markierung, auftrag_id: ziel.auftragId, einsatz_id: ziel.einsatzId ?? null })
+    .in('id', ids)
+  if (error) logDbError('app/whatsapp/actions:abschliessen', error)
+  revalidatePath(`/auftraege/${ziel.auftragId}`)
+}
+
+export type WaAuswahlKontext = {
+  text: string
+  medien: { id: string; name: string; mime: string | null; url: string }[]
+}
+
+/** Vorausfüllen: Texte und Dateien der ausgewählten Nachrichten. */
+export async function whatsAppAuswahlKontext(ids: string[]): Promise<({ ok: true } & WaAuswahlKontext) | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  const rows = await nachrichtenLaden(gate.db, ids)
+  const medien = await mapNachrichten(gate.db, rows as unknown as Record<string, unknown>[])
+  return {
+    ok: true,
+    text: auswahlText(rows),
+    medien: medien
+      .filter((m) => m.medium)
+      .map((m) => ({ id: m.id, name: m.medium!.name, mime: m.medium!.mime, url: m.medium!.url })),
   }
+}
+
+/** Tagebuch: Fotos/PDFs ins Tagebuch-Fach des Auftrags kopieren (öffentliche Links wie beim Upload). */
+export async function whatsAppFotosFuerTagebuch(
+  ids: string[],
+  auftragId: string
+): Promise<{ ok: true; fotoUrls: string[] } | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  const rows = (await nachrichtenLaden(gate.db, ids)).filter(
+    (r) => r.media_mime?.startsWith('image/') || r.media_mime === 'application/pdf'
+  )
+  const kopien = await medienKopieren(gate.db, rows, { bucket: 'protokolle', ordner: `${auftragId}/timeline`, publik: true })
+  return { ok: true, fotoUrls: kopien.map((k) => k.verweis) }
+}
+
+/** Nach dem Speichern des Tagebuch-Eintrags: Nachrichten zuordnen und markieren. */
+export async function whatsAppAlsTagebuchMarkieren(ids: string[], auftragId: string): Promise<{ ok: true } | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  await auswahlAbschliessen(gate.db, ids, 'tagebuch', { auftragId })
   return { ok: true }
 }
 
-export async function whatsAppMarkieren(
-  id: string,
-  markierung: 'erledigt' | null
-): Promise<{ ok: true } | Fail> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-  const { error } = await gate.db.from('whatsapp_nachrichten').update({ markierung }).eq('id', id)
-  if (error) {
-    logDbError('app/whatsapp/actions:markieren', error)
-    return { ok: false, message: 'Konnte nicht gespeichert werden.' }
-  }
-  return { ok: true }
+async function einsatzLaden(db: SupabaseClient, einsatzId: string) {
+  const { data } = await db.from('einsaetze').select('id, auftrag_id, handwerker_id, status').eq('id', einsatzId).maybeSingle()
+  return data as { id: string; auftrag_id: string; handwerker_id: string; status: string } | null
 }
 
-/** Nachricht ins Einsatz-Verlauf übernehmen: als Update (Text/Foto) oder Regie (mit Stunden). */
-export async function whatsAppUebernehmen(input: {
-  id: string
-  als: 'update' | 'regie'
-  stunden?: number
-  stundensatz?: number | null
-  text?: string
-}): Promise<{ ok: true } | Fail> {
+/** Update im Einsatz anlegen — Text und ausgewählte Dateien wie ein Partner-Update. */
+export async function whatsAppUpdateErstellen(input: {
+  ids: string[]
+  einsatzId: string
+  text: string
+  medienIds: string[]
+}): Promise<{ ok: true; auftragId: string } | Fail> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate
-  const n = await nachrichtLaden(gate.db, input.id)
-  if (!n) return { ok: false, message: 'Nachricht nicht gefunden.' }
-  if (!n.einsatz_id) return { ok: false, message: 'Bitte die Nachricht zuerst einem Einsatz zuordnen.' }
-  const { data: e } = await gate.db
-    .from('einsaetze')
-    .select('id, auftrag_id, handwerker_id, status')
-    .eq('id', n.einsatz_id)
-    .maybeSingle()
+  const e = await einsatzLaden(gate.db, input.einsatzId)
   if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
-  const text = (input.text ?? n.text ?? '').trim()
-  const dateien = n.media_url
-    ? [{ name: n.media_name || 'WhatsApp', url: n.media_url }]
-    : n.media_pfad
-      ? [{ name: n.media_name || 'WhatsApp', url: await signiertDauerhaft(gate.db, n.media_pfad) }]
-      : []
-  const now = new Date().toISOString()
-  if (input.als === 'update') {
-    if (e.status !== 'angenommen' && e.status !== 'fertig') {
-      return { ok: false, message: 'Updates sind möglich, sobald der Einsatz angenommen ist.' }
-    }
-    const { error } = await gate.db.from('einsatz_mitteilungen').insert({
-      einsatz_id: e.id,
-      auftrag_id: e.auftrag_id,
-      handwerker_id: e.handwerker_id,
-      typ: 'update',
-      text: text || 'Foto per WhatsApp',
-      dateien,
-      status: 'erledigt',
-      erledigt_at: now,
-      erfasst_von: 'bw',
-    })
-    if (error) {
-      logDbError('app/whatsapp/actions:update', error)
-      return { ok: false, message: 'Update konnte nicht gespeichert werden.' }
-    }
-  } else {
-    const stunden = Number(input.stunden) || 0
-    if (stunden <= 0) return { ok: false, message: 'Bitte die Stunden angeben.' }
-    if (!text) return { ok: false, message: 'Bitte beschreiben, was gemacht wurde.' }
-    if (e.status !== 'angenommen' && e.status !== 'fertig') {
-      return { ok: false, message: 'Regie ist möglich, sobald der Einsatz angenommen ist.' }
-    }
-    const satz = input.stundensatz && input.stundensatz > 0 ? Math.round(input.stundensatz * 100) / 100 : null
-    const { error } = await gate.db.from('einsatz_mitteilungen').insert({
-      einsatz_id: e.id,
-      auftrag_id: e.auftrag_id,
-      handwerker_id: e.handwerker_id,
-      typ: 'regie',
-      text,
-      stunden: Math.round(stunden * 100) / 100,
-      stundensatz: satz,
-      dateien,
-      status: 'uebernommen',
-      erledigt_at: now,
-      erfasst_von: 'bw',
-    })
-    if (error) {
-      logDbError('app/whatsapp/actions:regie', error)
-      return { ok: false, message: 'Regie konnte nicht gespeichert werden.' }
-    }
+  if (e.status !== 'angenommen' && e.status !== 'fertig') {
+    return { ok: false, message: 'Updates sind möglich, sobald der Einsatz angenommen ist.' }
   }
-  await gate.db.from('whatsapp_nachrichten').update({ markierung: input.als }).eq('id', input.id)
-  revalidatePath(`/auftraege/${String(e.auftrag_id)}`)
-  return { ok: true }
-}
-
-/** Langer Link (1 Jahr) für Medien, die ins Einsatz-Verlauf übernommen werden. */
-async function signiertDauerhaft(db: SupabaseClient, pfad: string): Promise<string> {
-  const { data } = await db.storage.from(WHATSAPP_MEDIEN_BUCKET).createSignedUrl(pfad, 60 * 60 * 24 * 365)
-  return data?.signedUrl ?? ''
-}
-
-/** Foto/PDF aus WhatsApp in die Dokumente des Vorgangs (mit Art). */
-export async function whatsAppAlsDokument(id: string, art: DokumentArt): Promise<{ ok: true } | Fail> {
-  const gate = await requireStaffAndServiceRole()
-  if (!gate.ok) return gate
-  const n = await nachrichtLaden(gate.db, id)
-  if (!n) return { ok: false, message: 'Nachricht nicht gefunden.' }
-  if (!n.auftrag_id) return { ok: false, message: 'Bitte die Nachricht zuerst einem Auftrag zuordnen.' }
-  if (!n.media_pfad && !n.media_url) return { ok: false, message: 'Diese Nachricht hat keine Datei.' }
-  const { data: auf } = await gate.db.from('auftraege').select('lead_id').eq('id', n.auftrag_id).maybeSingle()
-  if (!auf?.lead_id) return { ok: false, message: 'Zum Auftrag gibt es keinen Vorgang für Dokumente.' }
-  let url = String(n.media_url ?? '')
-  let groesse: number | null = null
-  if (n.media_pfad) {
-    // In den Dokumenten-Bucket kopieren, damit der Link dauerhaft gilt
-    const { data: blob, error } = await gate.db.storage.from(WHATSAPP_MEDIEN_BUCKET).download(n.media_pfad)
-    if (error || !blob) return { ok: false, message: 'Datei konnte nicht geladen werden.' }
-    const buf = Buffer.from(await blob.arrayBuffer())
-    groesse = buf.length
-    const name = (n.media_name || 'WhatsApp').replace(/[^\w.\-äöüÄÖÜß]+/gi, '_')
-    const pfad = `${auf.lead_id}/${Date.now()}-whatsapp-${name}`
-    const up = await gate.db.storage
-      .from('lead-dokumente')
-      .upload(pfad, buf, { contentType: n.media_mime || undefined, upsert: false })
-    if (up.error) {
-      logDbError('app/whatsapp/actions:dokument-upload', up.error)
-      return { ok: false, message: 'Datei konnte nicht gespeichert werden.' }
-    }
-    url = gate.db.storage.from('lead-dokumente').getPublicUrl(pfad).data.publicUrl
-  }
-  const { error } = await gate.db.from('lead_dokumente').insert({
-    lead_id: auf.lead_id,
-    name: n.media_name || 'WhatsApp-Datei',
-    datei_url: url,
-    groesse_bytes: groesse,
-    erstellt_von: gate.user.id,
-    art: DOKUMENT_ARTEN.includes(art) ? art : 'sonstiges',
+  const text = input.text.trim()
+  const medien = await nachrichtenLaden(gate.db, input.medienIds)
+  if (!text && !medien.length) return { ok: false, message: 'Bitte einen Text oder eine Datei auswählen.' }
+  const kopien = await medienKopieren(gate.db, medien, {
+    bucket: 'handwerker-uploads',
+    ordner: `${e.handwerker_id}/einsatz/${e.id}/mitteilung`,
+    publik: false,
+  })
+  const { error } = await gate.db.from('einsatz_mitteilungen').insert({
+    einsatz_id: e.id,
+    auftrag_id: e.auftrag_id,
+    handwerker_id: e.handwerker_id,
+    typ: 'update',
+    text: text || 'Fotos per WhatsApp',
+    dateien: kopien.map((k) => (k.verweis.startsWith('/') || /^https?:/.test(k.verweis) ? { name: k.name, url: k.verweis } : { name: k.name, path: k.verweis })),
+    status: 'erledigt',
+    erledigt_at: new Date().toISOString(),
+    erfasst_von: 'bw',
   })
   if (error) {
-    logDbError('app/whatsapp/actions:dokument', error)
-    return { ok: false, message: 'Dokument konnte nicht gespeichert werden.' }
+    logDbError('app/whatsapp/actions:update', error)
+    return { ok: false, message: 'Update konnte nicht gespeichert werden.' }
   }
-  revalidatePath(`/auftraege/${String(n.auftrag_id)}`)
-  return { ok: true }
+  await auswahlAbschliessen(gate.db, input.ids, 'update', { auftragId: e.auftrag_id, einsatzId: e.id })
+  return { ok: true, auftragId: e.auftrag_id }
+}
+
+/** Einsatz aus Sicht des Partners als erledigt melden (wie „Fertig gemeldet“ im CRM). */
+export async function whatsAppEinsatzErledigt(input: {
+  ids: string[]
+  einsatzId: string
+  text: string
+  medienIds: string[]
+}): Promise<{ ok: true; auftragId: string } | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  const e = await einsatzLaden(gate.db, input.einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  if (e.status !== 'angenommen') return { ok: false, message: 'Der Einsatz muss angenommen sein, um ihn als erledigt zu melden.' }
+  const medien = await nachrichtenLaden(gate.db, input.medienIds)
+  const kopien = await medienKopieren(gate.db, medien, {
+    bucket: 'handwerker-uploads',
+    ordner: `${e.handwerker_id}/einsatz/${e.id}/fertig`,
+    publik: false,
+  })
+  const w = await writeEinsatzStatus(gate.db, {
+    einsatzId: e.id,
+    von: 'angenommen',
+    nach: 'fertig',
+    extra: {
+      fertig_at: new Date().toISOString(),
+      fertig_text: input.text.trim() || null,
+      fertig_dateien: kopien.map((k) => (k.verweis.startsWith('/') || /^https?:/.test(k.verweis) ? { name: k.name, url: k.verweis } : { name: k.name, path: k.verweis })),
+      fertig_von: 'bw',
+    },
+  })
+  if (!w.ok) return { ok: false, message: w.error }
+  await auswahlAbschliessen(gate.db, input.ids, 'fertig', { auftragId: e.auftrag_id, einsatzId: e.id })
+  return { ok: true, auftragId: e.auftrag_id }
+}
+
+/** Ausgewählte Dateien in die Dokumente des Vorgangs (mit Art). */
+export async function whatsAppAlsDokumente(input: {
+  ids: string[]
+  auftragId: string
+  einsatzId?: string | null
+  art: DokumentArt
+}): Promise<{ ok: true; anzahl: number } | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  const { data: auf } = await gate.db.from('auftraege').select('lead_id').eq('id', input.auftragId).maybeSingle()
+  if (!auf?.lead_id) return { ok: false, message: 'Zum Auftrag gibt es keinen Vorgang für Dokumente.' }
+  const rows = (await nachrichtenLaden(gate.db, input.ids)).filter((r) => r.media_pfad || r.media_url)
+  if (!rows.length) return { ok: false, message: 'In der Auswahl ist keine Datei.' }
+  const kopien = await medienKopieren(gate.db, rows, { bucket: 'lead-dokumente', ordner: String(auf.lead_id), publik: true })
+  if (kopien.length) {
+    const { error } = await gate.db.from('lead_dokumente').insert(
+      kopien.map((k) => ({
+        lead_id: auf.lead_id,
+        name: k.name,
+        datei_url: k.verweis,
+        erstellt_von: gate.user.id,
+        art: DOKUMENT_ARTEN.includes(input.art) ? input.art : 'sonstiges',
+      }))
+    )
+    if (error) {
+      logDbError('app/whatsapp/actions:dokumente', error)
+      return { ok: false, message: 'Dokumente konnten nicht gespeichert werden.' }
+    }
+  }
+  await auswahlAbschliessen(gate.db, input.ids, 'dokument', { auftragId: input.auftragId, einsatzId: input.einsatzId })
+  return { ok: true, anzahl: kopien.length }
 }
 
 /** Tagebuch-Eintrag dem Kunden per WhatsApp schicken (nach dem Speichern). */

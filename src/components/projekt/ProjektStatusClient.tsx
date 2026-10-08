@@ -297,7 +297,7 @@ export function ProjektStatusClient({
               >
                 <p className="text-xs text-muted">{formatDatumZeit(u.created_at)}</p>
                 <p className="mt-1 font-medium text-bw-dark">{u.titel}</p>
-                {u.beschreibung ? <p className="mt-2 whitespace-pre-wrap text-sm text-bw-text-mid">{u.beschreibung}</p> : null}
+                {u.beschreibung ? <RichTextContent html={u.beschreibung} className="mt-2 text-sm text-bw-text-mid" /> : null}
                 {(u.foto_urls ?? []).length > 0 ? (
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {(u.foto_urls ?? []).map((url) => (

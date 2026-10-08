@@ -1,14 +1,14 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
-import { MockInput, MockSelect } from '@/components/mock-ui/MockForm'
+import { MockInput,MockSelect } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { Toggle } from '@/components/ui/Toggle'
 import { NachlassModusFields } from '@/components/posboard/NachlassModusFields'
 import { POSITION_MENGE_EINHEITEN } from '@/lib/dokument-einheiten'
-import { formatEurBetrag, gesamtrabattArt, type GesamtrabattModus } from '@/lib/dokument-zeilen'
+import { formatEurBetrag,gesamtrabattArt,type GesamtrabattModus } from '@/lib/dokument-zeilen'
 import type { KostenVerteilung } from '@/lib/angebot-kosten-split'
 import type { PosBoardLine } from '@/lib/posboard/pos-board-line'
 import { posBoardLineNetto } from '@/lib/posboard/pos-board-line'
@@ -149,9 +149,10 @@ export function PositionModal({
           </Field>
           <SheetEditableField
             label="Beschreibung"
-            value={richTextToEditablePlain(p.beschreibung)}
+            value={p.beschreibung ?? ''}
             onSave={(beschreibung) => onChange({ beschreibung })}
             multiline
+            formatierbar
             rows={3}
             placeholder="Details zur Leistung…"
             sheetContext="canvas"

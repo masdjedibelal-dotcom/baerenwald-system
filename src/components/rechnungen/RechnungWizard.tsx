@@ -1866,6 +1866,7 @@ export function RechnungWizard({
             value={einleitung}
             onSave={setEinleitung}
             multiline
+            formatierbar
             rows={5}
             kiExtraHint="Anschreiben in der Mail und auf der Rechnung."
             placeholder="Einleitung…"

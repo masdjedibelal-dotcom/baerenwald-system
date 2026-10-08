@@ -440,7 +440,8 @@ export async function bautagebuchPerWhatsApp(
   const { projektUrlFromToken } = await import('@/lib/projekt/projekt-url')
   const token = await ensureKundenTokenForAuftrag(input.auftragId)
   if (!token) return { ok: false, message: 'Projekt-Link konnte nicht erstellt werden.' }
-  const inhalt = [input.titel.trim(), String(input.text ?? '').trim()].filter(Boolean).join(' — ').slice(0, 500)
+  const { richTextToPlain } = await import('@/lib/rich-text')
+  const inhalt = [input.titel.trim(), richTextToPlain(input.text ?? '').trim()].filter(Boolean).join(' — ').slice(0, 500)
   return nachrichtSenden(db, {
     kontakt,
     vorlage: {

@@ -2,7 +2,8 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useId, useState, type ReactNode } from 'react'
+import { useId,useState,type ReactNode } from 'react'
+import { looksLikeHtml,richTextToPlain } from '@/lib/rich-text'
 import { useAssistentOptional } from '@/components/assistent/AssistentProvider'
 import { useKiAssistDraftConsumer } from '@/components/assistent/useKiAssistDraftConsumer'
 import { cn } from '@/lib/utils'
@@ -57,7 +58,8 @@ export function KiAssistFieldLabel({
     if (!assistent || disabled) return
     activeFieldAssistId = fieldId
     setAwaiting(true)
-    const current = value.trim()
+    // Formatierter Text (HTML) → lesbarer Text für die KI
+    const current = (looksLikeHtml(value) ? richTextToPlain(value) : value).trim()
     const hintParts = [
       `Feldname: ${labelText}`,
       extraHint?.trim() ? `Hinweis: ${extraHint.trim()}` : null,
@@ -70,6 +72,7 @@ export function KiAssistFieldLabel({
       scopeId: 'feld',
       extraHint: hintParts.join('\n'),
       draftInput: null,
+      aktuellerText: current || null,
       layer: 'over-sheet',
     })
   }

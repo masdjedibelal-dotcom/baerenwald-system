@@ -1,12 +1,14 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
-import { MockInput, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockInput,MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { useEffect, useState } from 'react'
-import { EditorSheet, type EditorSheetContext } from '@/components/surfaces/EditorSheet'
+import { useEffect,useState } from 'react'
+import { EditorSheet,type EditorSheetContext } from '@/components/surfaces/EditorSheet'
 import { KiAssistFieldLabel } from '@/components/assistent/KiAssistFieldLabel'
 import { DateInput } from '@/components/ui/DateInput'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { looksLikeHtml,richTextToPlain } from '@/lib/rich-text'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
@@ -44,6 +46,11 @@ type Props = {
    * `long` = lange Texte (Beschreibung etc.).
    */
   kind?: SheetEditableFieldKind
+  /**
+   * Fett, kursiv, Aufzählung … über „Formatieren“ (aufklappbare Leiste). Gespeichert als sicheres HTML —
+   * nur für Texte, deren Ausgabe (PDF, Mail, Portal) formatierten Text kann.
+   */
+  formatierbar?: boolean
 }
 
 function isShortKind(kind: SheetEditableFieldKind | undefined, multiline: boolean): boolean {
@@ -71,6 +78,7 @@ export function SheetEditableField({
   sheetContext = 'canvas',
   editMode = 'auto',
   kind,
+  formatierbar = false,
 }: Props) {
   const isMobile = useIsMobile()
   const short = isShortKind(kind, multiline) || (!multiline && kind !== 'long')
@@ -87,6 +95,8 @@ export function SheetEditableField({
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value)
   const [dirty, setDirty] = useState(false)
+  /** Formatierungsleiste aufgeklappt */
+  const [leiste, setLeiste] = useState(false)
 
   useEffect(() => {
     if (autoOpen && useSheet) setOpen(true)
@@ -104,7 +114,7 @@ export function SheetEditableField({
     setOpen(false)
   }
 
-  const display = value.trim()
+  const display = (looksLikeHtml(value) ? richTextToPlain(value) : value).trim()
   const showKi =
     Boolean(kiExtraHint != null || multiline || resolvedKind === 'long') &&
     resolvedKind !== 'date' &&
@@ -123,6 +133,20 @@ export function SheetEditableField({
           disabled={disabled}
           autoFocus={opts?.autoFocus}
           onChange={(e) => onChange(e.target.value)}
+        />
+      )
+    }
+    if ((multiline || resolvedKind === 'long') && formatierbar && (leiste || looksLikeHtml(current))) {
+      // Formatierter Text (oder Leiste offen): Editor statt Textfeld
+      return (
+        <RichTextEditor
+          value={current}
+          onChange={onChange}
+          toolbar={leiste}
+          disabled={disabled}
+          placeholder={placeholder}
+          minHeight={Math.max(96, rows * 22)}
+          aria-label={label}
         />
       )
     }
@@ -153,8 +177,28 @@ export function SheetEditableField({
     )
   }
 
+  const formatKnopf =
+    formatierbar && (multiline || resolvedKind === 'long') ? (
+      <MockBtn
+        sm
+        kind="ghost"
+        icon="bold"
+        className="sheet-editable-field__format"
+        aria-expanded={leiste}
+        disabled={disabled}
+        onClick={() => setLeiste((v) => !v)}
+      >
+        {leiste ? 'Formatierung ausblenden' : 'Formatieren'}
+      </MockBtn>
+    ) : null
+
   if (!useSheet) {
-    const control = renderControl(value, onSave)
+    const control = (
+      <>
+        {renderControl(value, onSave)}
+        {formatKnopf}
+      </>
+    )
 
     return (
       <div
@@ -254,6 +298,7 @@ export function SheetEditableField({
                 },
                 { autoFocus: true }
               )}
+              {formatKnopf}
             </KiAssistFieldLabel>
           ) : (
             <div className="full">
@@ -265,6 +310,7 @@ export function SheetEditableField({
                 },
                 { autoFocus: true }
               )}
+              {formatKnopf}
             </div>
           )}
         </div>

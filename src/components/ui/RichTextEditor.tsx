@@ -1,9 +1,9 @@
 'use client'
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef,useCallback,useEffect,useImperativeHandle,useRef,useState } from 'react'
 import { cn } from '@/lib/utils'
-import { normalizeEditorHtml, serializeEditorHtml } from '@/lib/rich-text'
+import { normalizeEditorHtml,serializeEditorHtml } from '@/lib/rich-text'
 
 type ToolbarBtn = {
   icon: string
@@ -13,12 +13,12 @@ type ToolbarBtn = {
 }
 
 const TOOLBAR: ToolbarBtn[] = [
-  { icon: 'text-caption', label: 'Fett', command: 'bold' },
-  { icon: 'text-caption', label: 'Kursiv', command: 'italic' },
-  { icon: 'text-caption', label: 'Unterstrichen', command: 'underline' },
+  { icon: 'bold', label: 'Fett', command: 'bold' },
+  { icon: 'italic', label: 'Kursiv', command: 'italic' },
+  { icon: 'underline', label: 'Unterstrichen', command: 'underline' },
   { icon: 'list', label: 'Aufzählung', command: 'insertUnorderedList' },
   { icon: 'list-numbers', label: 'Nummerierung', command: 'insertOrderedList' },
-  { icon: 'text-caption', label: 'Formatierung entfernen', command: 'removeFormat' },
+  { icon: 'clear-formatting', label: 'Formatierung entfernen', command: 'removeFormat' },
 ]
 
 export type RichTextEditorProps = {
@@ -32,6 +32,8 @@ export type RichTextEditorProps = {
   'aria-label'?: string
   onFocus?: () => void
   onBlur?: () => void
+  /** Formatierungsleiste zeigen (z. B. über „Formatieren“ aufklappbar) */
+  toolbar?: boolean
 }
 
 export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(function RichTextEditor(
@@ -46,6 +48,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(fu
     'aria-label': ariaLabel,
     onFocus: onFocusProp,
     onBlur: onBlurProp,
+    toolbar = true,
   },
   ref
 ) {
@@ -94,7 +97,7 @@ export const RichTextEditor = forwardRef<HTMLDivElement, RichTextEditorProps>(fu
         className
       )}
     >
-      <div className="rich-text-toolbar flex flex-wrap items-center gap-0.5 border-b border-bw-border bg-bw-bg px-1.5 py-1">
+      <div hidden={!toolbar} className="rich-text-toolbar flex flex-wrap items-center gap-0.5 border-b border-bw-border bg-bw-bg px-1.5 py-1">
         {TOOLBAR.map(({ icon, label, command, value: cmdVal }) => (
           <button
             key={command}

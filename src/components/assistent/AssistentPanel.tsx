@@ -3,26 +3,26 @@
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { useAssistent } from '@/components/assistent/AssistentProvider'
 import { AssistentMarkdown } from '@/components/assistent/AssistentMarkdown'
-import { KiChatComposer, KI_CHAT_POSITIONEN_MAX_CHARS } from '@/components/assistent/KiChatComposer'
+import { KiChatComposer,KI_CHAT_POSITIONEN_MAX_CHARS } from '@/components/assistent/KiChatComposer'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { useVisualViewportFrame } from '@/hooks/useVisualViewportFrame'
 import { buildAssistentContextHint } from '@/lib/copilot/assistent-context'
 import {
-  getKiAssistScope,
-  parseBwApplyDraft,
-  stripBwApplyBlock,
-  type KiAssistDraft,
+getKiAssistScope,
+parseBwApplyDraft,
+stripBwApplyBlock,
+type KiAssistDraft,
 } from '@/lib/copilot/ki-assist-scopes'
 import { sanitizeAssistentChatText } from '@/lib/copilot/sanitize-chat-text'
 import {
-  emptyAssistentUi,
-  type AssistentNavLink,
-  type AssistentPreview,
-  type AssistentUiPayload,
+emptyAssistentUi,
+type AssistentNavLink,
+type AssistentPreview,
+type AssistentUiPayload,
 } from '@/lib/copilot/assistent-ui'
 import { formatEurBetrag } from '@/lib/dokument-zeilen'
 import { cn } from '@/lib/utils'
@@ -552,6 +552,12 @@ export function AssistentPanel() {
         </header>
 
         <div className="assistent-panel__body" ref={bodyRef}>
+          {scoped?.aktuellerText?.trim() ? (
+            <div className="ki-feldtext">
+              <span className="ki-feldtext__titel">Aktueller Text</span>
+              <p className="ki-feldtext__text">{scoped.aktuellerText}</p>
+            </div>
+          ) : null}
           {!chatStarted ? (
             <div className="assistent-panel__start">
               <p className="assistent-panel__start-headline">{startHeadline}</p>

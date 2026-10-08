@@ -11,6 +11,7 @@ mailSummaryBlock,
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
+import { richTextToSafePdfHtml } from '@/lib/rich-text'
 
 function esc(s: string): string {
   return s
@@ -185,7 +186,8 @@ export function buildRechnungMail(
             neueNr: data.rechnungsnummer,
           })
         : defaultRechnungMailEinleitung(anrede))
-  const intro = esc(introRaw)
+  // Einleitung kann formatiert sein (fett, Aufzählung) — sicher als HTML, Zeilenumbrüche bleiben
+  const intro = richTextToSafePdfHtml(introRaw)
 
   const pdfHinweis = mitStorno
       ? anrede === 'du'
@@ -226,7 +228,7 @@ export function buildRechnungMail(
 
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
-      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</p>
+      <div style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</div>
       ${summaryHtml}
       <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
       <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
