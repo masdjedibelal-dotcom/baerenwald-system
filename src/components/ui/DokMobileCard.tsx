@@ -1,6 +1,7 @@
 'use client'
 
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { ListRowCheck } from '@/components/ui/ListRowCheck'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +17,7 @@ export function DokMobileCard({
   className,
   children,
   menu,
+  auswahl,
 }: {
   title: string
   badge?: ReactNode
@@ -25,6 +27,8 @@ export function DokMobileCard({
   children?: ReactNode
   /** „…“-Menü (z. B. Löschen) — Klick öffnet nicht die Datei */
   menu?: ReactNode
+  /** Häkchen für Mehrfachauswahl; `null` = Platzhalter (Zeile nicht löschbar) */
+  auswahl?: { checked: boolean; onToggle: () => void } | null
 }) {
   return (
     <div
@@ -43,6 +47,16 @@ export function DokMobileCard({
           : undefined
       }
     >
+      {auswahl ? (
+        <ListRowCheck
+          className="dok-zeile__check"
+          checked={auswahl.checked}
+          onToggle={auswahl.onToggle}
+          title={auswahl.checked ? 'Auswahl aufheben' : 'Auswählen'}
+        />
+      ) : auswahl === null ? (
+        <span className="dok-zeile__check" aria-hidden />
+      ) : null}
       <div className="dok-zeile__main">
         <span className="dok-zeile__titel">{title}</span>
         {meta ? <span className="dok-zeile__meta">{meta}</span> : null}

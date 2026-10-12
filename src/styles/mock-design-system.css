@@ -8245,6 +8245,10 @@ background: rgba(255,255,255,0.15); color: #fff; border-color: transparent;
 .bulkbar-clear {
     display: none !important;
   }
+/* Detailseiten: während einer Auswahl ersetzt die Leiste die Aktionsleiste unten */
+body:has(.bulkbar) .detail-mobile-action-bar {
+    display: none;
+  }
 .page-inner:has(.bulkbar) {
     padding-bottom: calc(
       var(--mobile-bottom-nav-height, calc(48px + env(safe-area-inset-bottom, 0px))) + 64px
@@ -22497,6 +22501,7 @@ button.dok-gruppe__kopf {
 .dok-zeile__meta { font-size: var(--fs-meta); color: var(--text-3); }
 .dok-zeile__badge { flex-shrink: 0; }
 .dok-zeile__menu { flex-shrink: 0; }
+.dok-zeile__check { display: inline-flex; flex-shrink: 0; width: 22px; }
 .dok-zeile__chev { flex-shrink: 0; color: var(--text-4, var(--text-3)); }
 
 /* ── WhatsApp (Twilio / Testmodus) ───────────────────────────────────── */

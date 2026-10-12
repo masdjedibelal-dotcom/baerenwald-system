@@ -20,6 +20,7 @@ import { setTimelineKundenfreigabe } from '@/app/(dashboard)/auftraege/kunden-st
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { Card } from '@/components/ui/Card'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
+import { useDokAuswahl } from '@/components/ui/DokAuswahl'
 import { toast } from '@/components/ui/app-toast'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -282,18 +283,32 @@ export function AuftragDokumenteTab({
     })
   }
 
+  function zeileLoeschbar(row: AuftragDokumentZeile): boolean {
+    return Boolean((row.quelle === 'timeline' && row.timelineId) || (row.quelle === 'lead' && row.leadDokument))
+  }
+
+  function zeileLoeschen(row: AuftragDokumentZeile) {
+    const leadDok = row.leadDokument
+    return leadDok
+      ? deleteLeadDokument(leadDok.id, leadDok.leadId)
+      : deleteAuftragDokumentEintrag({ auftragId: detail.id, timelineId: row.timelineId! })
+  }
+
+  const auswahl = useDokAuswahl({
+    rows: zeilen,
+    rowId: (r) => r.id,
+    loeschbar: zeileLoeschbar,
+    loeschen: zeileLoeschen,
+    onFertig: onChanged,
+  })
+
   function removeRow(row: AuftragDokumentZeile) {
     const leadDok = row.leadDokument
     if (!row.timelineId && !leadDok) return
     openDeleteConfirm(
       'Dokument löschen?',
       async () => {
-        const r = leadDok
-          ? await deleteLeadDokument(leadDok.id, leadDok.leadId)
-          : await deleteAuftragDokumentEintrag({
-              auftragId: detail.id,
-              timelineId: row.timelineId!,
-            })
+        const r = await zeileLoeschen(row)
         if (!r.ok) {
           toast.systemError(r)
           throw new Error(r.message)
@@ -501,10 +516,9 @@ export function AuftragDokumenteTab({
             {freigabeLabelText}
           </span>
         }
+        auswahl={auswahl.auswahlFuer(row) ?? null}
         menu={
-          (row.quelle === 'timeline' && row.timelineId) || (row.quelle === 'lead' && row.leadDokument) ? (
-            <MockEntityRowMenu items={docMenuItems(row)} title="Dokument" />
-          ) : null
+          zeileLoeschbar(row) ? <MockEntityRowMenu items={docMenuItems(row)} title="Dokument" /> : null
         }
       />
     )
@@ -599,7 +613,10 @@ export function AuftragDokumenteTab({
               : 'Noch keine Dokumente.'}
           </p>
         ) : isMobile ? (
-          <div className="dok-mobiles">{zeilen.map(renderMobileCard)}</div>
+          <>
+            {auswahl.leiste}
+            <div className="dok-mobiles">{zeilen.map(renderMobileCard)}</div>
+          </>
         ) : (
           <div className="dok-list">{zeilen.map(renderDeskRow)}</div>
         )}

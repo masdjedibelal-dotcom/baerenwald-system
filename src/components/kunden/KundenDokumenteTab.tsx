@@ -21,6 +21,7 @@ import type { KundeDetailPayload } from '@/lib/kunden/load-kunde-detail'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { rechnungPdfHref } from '@/lib/rechnungen/rechnung-pdf-href'
 import { DokMobileCard } from '@/components/ui/DokMobileCard'
+import { useDokAuswahl } from '@/components/ui/DokAuswahl'
 import {
   DokumenteVorgangAccordions,
   groupByVorgangTitel,
@@ -406,6 +407,14 @@ export function KundenDokumenteTab({
     }
   }
 
+  const auswahl = useDokAuswahl({
+    rows: docs,
+    rowId: (r) => r.id,
+    loeschbar: (r) => r.quelle === 'upload' && Boolean(r.dokumentId),
+    loeschen: (r) => deleteKundeDokument(r.dokumentId!, kundeId),
+    onFertig: onReload,
+  })
+
   function removeDoc(row: DocRow) {
     if (row.quelle !== 'upload' || !row.dokumentId) return
     openDeleteConfirm(
@@ -461,6 +470,7 @@ export function KundenDokumenteTab({
                 title={d.name}
                 meta={metaLine}
                 onClick={() => openDokumentDatei(d.href)}
+                auswahl={auswahl.auswahlFuer(d) ?? null}
                 badge={
                   <span className={cn('dok-mobile__tag', d.freigabe && 'is-kunde')}>
                     {d.freigabe ? 'Kunde' : 'intern'}
@@ -602,7 +612,10 @@ export function KundenDokumenteTab({
             <MockEmpty icon="files" title={DOC.emptyTitle} hint={DOC.emptyHint} />
           ) : null
         ) : (
-          <DokumenteVorgangAccordions groups={groups} renderItems={renderDocList} />
+          <>
+            {isMobile ? auswahl.leiste : null}
+            <DokumenteVorgangAccordions groups={groups} renderItems={renderDocList} />
+          </>
         )}
       </MockDokumenteCard>
     </>

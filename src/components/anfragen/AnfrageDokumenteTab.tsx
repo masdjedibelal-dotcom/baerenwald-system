@@ -27,6 +27,7 @@ import { DOKUMENT_ARTEN,DOKUMENT_ART_LABEL } from "@/lib/types"
 import { MockSegment } from "@/components/mock-ui/MockSegment"
 import type { EntityMenuItem } from "@/lib/entity-menu"
 import { DokMobileCard } from "@/components/ui/DokMobileCard"
+import { useDokAuswahl } from "@/components/ui/DokAuswahl"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { cn,formatDatum } from "@/lib/utils"
 import { DOC } from "@/lib/crm-labels"
@@ -269,6 +270,14 @@ export function AnfrageDokumenteTab({
     }
   }
 
+  const auswahl = useDokAuswahl({
+    rows: docs,
+    rowId: (r) => r.id,
+    loeschbar: (r) => r.quelle === "upload" && Boolean(r.dokumentId),
+    loeschen: (r) => deleteLeadDokument(r.dokumentId!, leadId),
+    onFertig: onReload,
+  });
+
   function removeDoc(row: DocRow) {
     if (row.quelle !== "upload" || !row.dokumentId) return;
     openDeleteConfirm(
@@ -379,6 +388,8 @@ export function AnfrageDokumenteTab({
             <MockEmpty icon="files" title={DOC.emptyTitle} hint={DOC.emptyHint} />
           ) : null
         ) : isMobile ? (
+          <>
+          {auswahl.leiste}
           <div className="dok-mobiles">
             {docs.map((d) => {
               const sizeLabel = formatBytes(d.groesse_bytes);
@@ -389,6 +400,7 @@ export function AnfrageDokumenteTab({
                   title={d.name}
                   meta={meta}
                   onClick={() => openDokumentDatei(d.href)}
+                  auswahl={auswahl.auswahlFuer(d) ?? null}
                   badge={
                     <span className={cn("dok-mobile__tag", d.freigabe && "is-kunde")}>
                       {d.freigabe ? "Kunde" : "intern"}
@@ -398,6 +410,7 @@ export function AnfrageDokumenteTab({
               );
             })}
           </div>
+          </>
         ) : (
           <div className="dok-list">
             {docs.map((d) => {
