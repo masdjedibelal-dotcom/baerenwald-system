@@ -22496,6 +22496,7 @@ button.dok-gruppe__kopf {
 }
 .dok-zeile__meta { font-size: var(--fs-meta); color: var(--text-3); }
 .dok-zeile__badge { flex-shrink: 0; }
+.dok-zeile__menu { flex-shrink: 0; }
 .dok-zeile__chev { flex-shrink: 0; color: var(--text-4, var(--text-3)); }
 
 /* ── WhatsApp (Twilio / Testmodus) ───────────────────────────────────── */

@@ -54,6 +54,8 @@ export type AuftragDokumentZeile = {
   timelineId?: string
   /** Storage-Pfad im Bucket handwerker-uploads — wird serverseitig signiert. */
   storagePath?: string
+  /** Hochgeladenes Akte-Dokument (lead_dokumente) — darf gelöscht werden. */
+  leadDokument?: { id: string; leadId: string }
 }
 
 export type DokumentSortKey = 'datum' | 'name' | 'typ'
@@ -374,6 +376,7 @@ export function leadDokumentZeilen(dokumente: LeadDokumentRow[] | null | undefin
       fuerKunde: false,
       href: d.datei_url.trim(),
       quelle: 'lead' as const,
+      leadDokument: { id: d.id, leadId: d.lead_id },
     }))
 }
 

@@ -41,7 +41,7 @@ vertragDokumentZeilen,
 type AuftragDokumentZeile,
 type DokumentSortKey,
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
-import { insertLeadDokument } from '@/app/(dashboard)/anfragen/dokumente-actions'
+import { deleteLeadDokument, insertLeadDokument } from '@/app/(dashboard)/anfragen/dokumente-actions'
 import { ensureAndLoadFachdokuSlots } from '@/app/(dashboard)/auftraege/fachdoku-actions'
 import type { FachdokuSlotRow } from '@/lib/auftraege/fachdoku-slots'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
@@ -283,14 +283,17 @@ export function AuftragDokumenteTab({
   }
 
   function removeRow(row: AuftragDokumentZeile) {
-    if (!row.timelineId) return
+    const leadDok = row.leadDokument
+    if (!row.timelineId && !leadDok) return
     openDeleteConfirm(
       'Dokument löschen?',
       async () => {
-        const r = await deleteAuftragDokumentEintrag({
-          auftragId: detail.id,
-          timelineId: row.timelineId!,
-        })
+        const r = leadDok
+          ? await deleteLeadDokument(leadDok.id, leadDok.leadId)
+          : await deleteAuftragDokumentEintrag({
+              auftragId: detail.id,
+              timelineId: row.timelineId!,
+            })
         if (!r.ok) {
           toast.systemError(r)
           throw new Error(r.message)
@@ -321,6 +324,17 @@ export function AuftragDokumenteTab({
         disabled: busy,
         onClick: () => openEdit(row),
       })
+      items.push({
+        icon: 'trash',
+        label: 'Löschen',
+        danger: true,
+        disabled: busy,
+        onClick: () => removeRow(row),
+      })
+    }
+    // Hochgeladene Dateien (auch vom Partner) — Angebote, Rechnungen, Verträge, Protokolle bleiben
+    if (row.quelle === 'lead' && row.leadDokument) {
+      if (items.length) items.push('sep')
       items.push({
         icon: 'trash',
         label: 'Löschen',
@@ -486,6 +500,11 @@ export function AuftragDokumenteTab({
           <span className={cn('dok-mobile__tag', row.fuerKunde && 'is-kunde')}>
             {freigabeLabelText}
           </span>
+        }
+        menu={
+          (row.quelle === 'timeline' && row.timelineId) || (row.quelle === 'lead' && row.leadDokument) ? (
+            <MockEntityRowMenu items={docMenuItems(row)} title="Dokument" />
+          ) : null
         }
       />
     )

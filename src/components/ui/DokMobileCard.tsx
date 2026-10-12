@@ -15,6 +15,7 @@ export function DokMobileCard({
   onClick,
   className,
   children,
+  menu,
 }: {
   title: string
   badge?: ReactNode
@@ -22,6 +23,8 @@ export function DokMobileCard({
   onClick?: () => void
   className?: string
   children?: ReactNode
+  /** „…“-Menü (z. B. Löschen) — Klick öffnet nicht die Datei */
+  menu?: ReactNode
 }) {
   return (
     <div
@@ -46,7 +49,11 @@ export function DokMobileCard({
         {children}
       </div>
       {badge ? <div className="dok-zeile__badge">{badge}</div> : null}
-      {onClick ? (
+      {menu ? (
+        <div className="dok-zeile__menu" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          {menu}
+        </div>
+      ) : onClick ? (
         <MockIcon n="chevron-right" ctx="default" className="dok-zeile__chev h-4 w-4" aria-hidden />
       ) : null}
     </div>
