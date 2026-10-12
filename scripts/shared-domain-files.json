@@ -70,6 +70,10 @@
       "portal": "src/lib/shared-domain/regie-betrag.ts"
     },
     {
+      "crm": "src/lib/shared-domain/gesamtrabatt.ts",
+      "portal": "src/lib/shared-domain/gesamtrabatt.ts"
+    },
+    {
       "crm": "src/lib/media/optimize-image-for-upload.ts",
       "portal": "src/lib/media/optimize-image-for-upload.ts"
     },
