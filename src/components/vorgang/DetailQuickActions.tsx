@@ -1,5 +1,6 @@
 'use client'
 
+import { uploadVorbereiten } from '@/lib/upload-grenze'
 import { MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockSegment } from '@/components/mock-ui'
 import { DOKUMENT_ARTEN,DOKUMENT_ART_LABEL,type DokumentArt } from '@/lib/types'
@@ -157,8 +158,15 @@ export function useDetailQuickActions({
   const uploadFiles = useCallback(
     async (files: FileList | File[], art?: DokumentArt) => {
       if (!dokument || uploading) return
-      const list = Array.from(files).slice(0, 5)
-      if (!list.length) return
+      const roh = Array.from(files).slice(0, 5)
+      if (!roh.length) return
+      // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
+      const vor = await uploadVorbereiten(roh)
+      if (!vor.ok) {
+        toast.error(vor.error)
+        return
+      }
+      const list = vor.files
       setUploading(true)
       try {
         await actionBusy.run(

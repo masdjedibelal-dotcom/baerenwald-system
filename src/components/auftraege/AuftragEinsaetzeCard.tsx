@@ -1,5 +1,6 @@
 'use client'
 
+import { mb, UPLOAD_MAX_BYTES, uploadVorbereiten } from '@/lib/upload-grenze'
 import { useCallback,useEffect,useState } from 'react'
 
 import {
@@ -313,11 +314,26 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         einsatzRegieErfassen({ einsatzId: detail.id, text: eText, stunden: rStunden, stundensatz: rSatz || null })
       )
     } else {
+      // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
+      const vor = await uploadVorbereiten([...eFotos, ...(ePdf ? [ePdf] : [])])
+      if (!vor.ok) {
+        setSaving(false)
+        toast.error(vor.error)
+        return
+      }
+      const fotos = vor.files.slice(0, eFotos.length)
+      const pdf = ePdf ? vor.files[eFotos.length] : null
+      const gesamt = vor.files.reduce((n, f) => n + f.size, 0)
+      if (gesamt > UPLOAD_MAX_BYTES) {
+        setSaving(false)
+        toast.error(`Zusammen ${mb(gesamt)} — pro Speichern höchstens ${mb(UPLOAD_MAX_BYTES)}. Bitte in mehreren Schritten hochladen.`)
+        return
+      }
       const fd = new FormData()
       fd.set('einsatzId', detail.id)
       fd.set('text', eText)
-      for (const f of eFotos) fd.append('dateien', f)
-      if (ePdf) fd.set('rechnungPdf', ePdf)
+      for (const f of fotos) fd.append('dateien', f)
+      if (pdf) fd.set('rechnungPdf', pdf)
       res = await safeAction(
         erfassen === 'update'
           ? einsatzUpdateErfassen(fd)

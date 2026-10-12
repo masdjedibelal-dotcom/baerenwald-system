@@ -1,4 +1,5 @@
 'use client'
+import { uploadVorbereiten } from '@/lib/upload-grenze'
 import { DateInput } from '@/components/ui/DateInput'
 import { useLocalTransition } from '@/components/ui/action-busy'
 
@@ -337,11 +338,17 @@ export function AbnahmeprotokollCreateWizard({
 
   async function uploadFotos(files: FileList | null) {
     if (!files?.length) return
+    const room = Math.max(0, 4 - meta.uebergabe_foto_urls.length)
+    // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
+    const vor = await uploadVorbereiten(Array.from(files).slice(0, room))
+    if (!vor.ok) {
+      toast.error(vor.error)
+      return
+    }
     setUploading(true)
     try {
       const urls: string[] = []
-      const room = Math.max(0, 4 - meta.uebergabe_foto_urls.length)
-      for (const file of Array.from(files).slice(0, room)) {
+      for (const file of vor.files) {
         const fd = new FormData()
         fd.set('file', file)
         fd.set('filename', file.name)

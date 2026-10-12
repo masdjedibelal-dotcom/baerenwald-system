@@ -1,5 +1,6 @@
 'use client'
 
+import { uploadVorbereiten } from '@/lib/upload-grenze'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
 import { MockField,MockInput } from '@/components/mock-ui/MockForm'
@@ -89,7 +90,11 @@ export function anlageInputFromFormState(s: ObjektAnlageFormState) {
   }
 }
 
-async function uploadKundeDatei(kundeId: string, file: File): Promise<string> {
+async function uploadKundeDatei(kundeId: string, roh: File): Promise<string> {
+  // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
+  const vor = await uploadVorbereiten([roh])
+  if (!vor.ok) throw new Error(vor.error)
+  const file = vor.files[0]!
   const fd = new FormData()
   fd.set('file', file)
   fd.set('filename', file.name)

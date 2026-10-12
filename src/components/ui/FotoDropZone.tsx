@@ -3,6 +3,7 @@
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import type { ReactNode } from 'react'
 import { useImageFileDrop } from '@/hooks/useImageFileDrop'
+import { UPLOAD_HINWEIS } from '@/lib/upload-grenze'
 import { cn } from '@/lib/utils'
 
 type FotoDropZoneProps = {
@@ -19,6 +20,8 @@ type FotoDropZoneProps = {
   labelDragging?: string
   /** Optional: anderes Icon statt Kamera. */
   icon?: ReactNode
+  /** Hinweis unter dem Text (Standard: erlaubte Dateien und Größe) — null blendet ihn aus. */
+  hinweis?: string | null
   /** Vollständige Custom-Inhalte statt Icon+Label. */
   children?: ReactNode
 }
@@ -38,6 +41,7 @@ export function FotoDropZone({
   labelDragging = 'Bilder hier ablegen',
   icon,
   children,
+  hinweis = UPLOAD_HINWEIS,
 }: FotoDropZoneProps) {
   const { isDragging, submit, dropProps } = useImageFileDrop({
     disabled,
@@ -59,6 +63,7 @@ export function FotoDropZone({
         <>
           {icon ?? <MockIcon n="photo" ctx="default" className="h-5 w-5" aria-hidden />}
           <span>{isDragging ? labelDragging : label}</span>
+          {hinweis ? <span className="lt-foto-zone__hinweis">{hinweis}</span> : null}
         </>
       )}
       <input

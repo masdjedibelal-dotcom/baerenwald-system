@@ -1,5 +1,6 @@
 'use client'
 
+import { UPLOAD_HINWEIS, uploadVorbereiten } from '@/lib/upload-grenze'
 import { MockBtn } from '@/components/mock-ui'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
 import { MockEmpty } from '@/components/mock-ui/MockEmpty'
@@ -357,8 +358,15 @@ export function KundenDokumenteTab({
   }
 
   async function uploadFiles(files: FileList | File[]) {
-    const list = Array.from(files).slice(0, 5)
-    if (!list.length) return
+    const roh = Array.from(files).slice(0, 5)
+    if (!roh.length) return
+    // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
+    const vor = await uploadVorbereiten(roh)
+    if (!vor.ok) {
+      toast.error(vor.error)
+      return
+    }
+    const list = vor.files
     setUploading(true)
     try {
       for (const file of list) {
@@ -584,6 +592,7 @@ export function KundenDokumenteTab({
             >
               <MockIcon ctx="btn" n="cloud-upload" size={18} />
               {uploading ? 'Wird hochgeladen…' : DOC.uploadHint}
+              <span className="dok-upload-zone__hinweis">{UPLOAD_HINWEIS}</span>
             </div>
           </>
         ) : null}

@@ -22767,3 +22767,5 @@ button.dok-gruppe__kopf {
   .einsatz-antwort__knoepfe { flex-direction: column; }
   .einsatz-antwort__knoepfe .btn { flex: 1 1 auto; width: 100%; }
 }
+.lt-foto-zone__hinweis { display: block; font-size: var(--fs-caption); color: var(--text-3); }
+.dok-upload-zone__hinweis { display: block; width: 100%; font-size: var(--fs-caption); color: var(--text-3); }
