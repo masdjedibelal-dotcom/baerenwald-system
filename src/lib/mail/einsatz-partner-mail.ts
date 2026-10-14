@@ -22,6 +22,8 @@ export function buildEinsatzPartnerMail(
     partnerName: string
     titel: string
     anweisung: string | null
+    /** Fotos zur Anweisung (öffentliche URLs) */
+    fotos?: string[]
     terminVon: string | null
     terminBis: string | null
     ort: string | null
@@ -57,11 +59,28 @@ export function buildEinsatzPartnerMail(
   const text = input.anweisung?.trim()
     ? `<p style="margin:16px 0;white-space:pre-wrap">${esc(input.anweisung.trim())}</p>`
     : ''
+  // Fotos als Vorschau, zwei je Zeile (passt aufs Handy; Tabelle hält in allen Mail-Programmen); Klick öffnet groß
+  const fotos = (input.fotos ?? []).filter((u) => /^https:\/\//i.test(u))
+  const fotosHtml = fotos.length
+    ? `<p style="margin:16px 0 8px;"><b>Fotos (${fotos.length})</b> — zum Vergrößern anklicken</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 8px;">
+      ${Array.from({ length: Math.ceil(fotos.length / 2) }, (_, r) =>
+        `<tr>${fotos
+          .slice(r * 2, r * 2 + 2)
+          .map(
+            (u, i) =>
+              `<td style="padding:0 8px 8px 0;vertical-align:top;"><a href="${esc(u)}" target="_blank"><img src="${esc(u)}" width="140" height="105" alt="Foto ${r * 2 + i + 1}" style="display:block;width:140px;height:105px;object-fit:cover;border-radius:8px;border:1px solid #E5E7EB;"></a></td>`
+          )
+          .join('')}</tr>`
+      ).join('')}
+    </table>`
+    : ''
   const content = `
     <p>${esc(mailBegruessungZeile(anrede, input.partnerName))}</p>
     <p>wir haben einen neuen Einsatz für Sie. Bitte sagen Sie uns kurz, ob Sie ihn übernehmen — ein Klick genügt, ohne Anmeldung.</p>
     ${summary}
     ${text}
+    ${fotosHtml}
     <div style="margin:20px 0 8px;">
       ${mailPrimaryButtonHtml('Einsatz annehmen', input.annehmenLink, { margin: '0 8px 8px 0' })}
       ${mailSecondaryButtonHtml('Ablehnen', input.ablehnenLink, { margin: '0 0 8px 0' })}

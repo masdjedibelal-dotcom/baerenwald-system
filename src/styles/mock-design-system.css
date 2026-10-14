@@ -21897,6 +21897,11 @@ display: flex;
 .einsatz-kopf { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .einsatz-kopf__meta { color: var(--text-3); font-size: var(--fs-meta); }
 .einsatz-anweisung { margin: 0; white-space: pre-wrap; line-height: 1.45; }
+.einsatz-fotos { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.einsatz-fotos img {
+  width: 72px; height: 72px; object-fit: cover; display: block;
+  border-radius: var(--r-sm); border: 0.5px solid var(--border);
+}
 .einsatz-gruppe { display: flex; flex-direction: column; gap: 8px; }
 .einsatz-gruppe__kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px; }
 .einsatz-gruppe__titel { font-weight: 600; }

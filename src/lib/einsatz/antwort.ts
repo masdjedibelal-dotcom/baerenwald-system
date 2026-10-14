@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { crmBasisUrl } from '@/lib/crm-basis-url'
+import { anweisungFotos } from '@/lib/einsatz/anweisung-fotos'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
 
@@ -26,6 +27,7 @@ export type EinsatzPerToken = {
   handwerker_id: string
   titel: string
   anweisung: string | null
+  anweisung_fotos: string[]
   termin_von: string | null
   termin_bis: string | null
   ort: string | null
@@ -47,7 +49,7 @@ export async function einsatzPerToken(db: SupabaseClient, token: string): Promis
   const { data, error } = await db
     .from('einsaetze')
     .select(
-      'id, auftrag_id, handwerker_id, titel, anweisung, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, ablehnung_grund, handwerker(name, firma)'
+      'id, auftrag_id, handwerker_id, titel, anweisung, anweisung_fotos, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, ablehnung_grund, handwerker(name, firma)'
     )
     .eq('antwort_token', token)
     .maybeSingle()
@@ -61,6 +63,7 @@ export async function einsatzPerToken(db: SupabaseClient, token: string): Promis
     handwerker_id: String(data.handwerker_id),
     titel: String(data.titel ?? ''),
     anweisung: (data.anweisung as string | null) ?? null,
+    anweisung_fotos: anweisungFotos(data.anweisung_fotos),
     termin_von: (data.termin_von as string | null) ?? null,
     termin_bis: (data.termin_bis as string | null) ?? null,
     ort: (data.ort as string | null) ?? null,

@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { anweisungFotos } from '@/lib/einsatz/anweisung-fotos'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { formatDatum,formatEuro } from '@/lib/format/geld-datum'
 import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
@@ -195,7 +196,7 @@ async function einsatzKnopf(db: SupabaseClient, kontakt: WaKontakt, knopfId: str
   if (!k || kontakt.typ !== 'handwerker') return
   const { data: e } = await db
     .from('einsaetze')
-    .select('id, auftrag_id, titel, status, handwerker_id')
+    .select('id, auftrag_id, titel, status, handwerker_id, anweisung_fotos')
     .eq('id', k.einsatzId)
     .maybeSingle()
   if (!e || String(e.handwerker_id) !== kontakt.id) return
@@ -234,6 +235,31 @@ async function einsatzKnopf(db: SupabaseClient, kontakt: WaKontakt, knopfId: str
     userId: null,
     mock,
   })
+  // Fotos zur Anweisung: jetzt ist das 24-Stunden-Fenster offen (der Partner hat geantwortet)
+  if (k.antwort === 'annehmen' && String(e.status) === 'gesendet') {
+    await einsatzFotosSenden(db, kontakt, { id: String(e.id), auftrag_id: String(e.auftrag_id) }, anweisungFotos(e.anweisung_fotos), mock)
+  }
+}
+
+/** Fotos zur Einsatz-Anweisung einzeln als Bild schicken (nur im 24-Stunden-Fenster erlaubt). */
+async function einsatzFotosSenden(
+  db: SupabaseClient,
+  kontakt: WaKontakt,
+  e: { id: string; auftrag_id: string },
+  fotos: string[],
+  mock = false
+): Promise<void> {
+  for (const [i, url] of fotos.entries()) {
+    await nachrichtSenden(db, {
+      kontakt,
+      text: i === 0 ? `Fotos zum Einsatz (${fotos.length})` : '',
+      medium: { url, art: 'bild', name: `Foto ${i + 1}.jpg`, mime: 'image/jpeg' },
+      auftragId: e.auftrag_id,
+      einsatzId: e.id,
+      userId: null,
+      mock,
+    })
+  }
 }
 
 /** Webhook-Ereignisse verarbeiten: Nachrichten speichern + zuordnen, Zustellstatus nachtragen. */
@@ -389,7 +415,7 @@ export async function einsatzPerWhatsApp(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: e } = await db
     .from('einsaetze')
-    .select('id, auftrag_id, handwerker_id, titel, anweisung, termin_von, termin_bis, ort, ek_betrag, ek_art')
+    .select('id, auftrag_id, handwerker_id, titel, anweisung, anweisung_fotos, termin_von, termin_bis, ort, ek_betrag, ek_art')
     .eq('id', einsatzId)
     .maybeSingle()
   if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
@@ -409,8 +435,12 @@ export async function einsatzPerWhatsApp(
     e.ek_betrag != null ? `${formatEuro(Number(e.ek_betrag))} ${e.ek_art === 'brutto' ? 'brutto' : 'netto'}` : '—',
     String(e.anweisung ?? '').trim().slice(0, 600) || 'Details folgen.',
   ]
+  const fotos = anweisungFotos(e.anweisung_fotos)
+  const offen = await imFenster(db, kontakt.nummer)
+  // Außerhalb des Fensters dürfen keine freien Fotos raus → nach dem Annehmen schicken
+  if (fotos.length && !offen) werte[5] = `${werte[5]} (${fotos.length} Foto${fotos.length === 1 ? '' : 's'} folgen nach dem Annehmen)`
   const knopfIds = [einsatzKnopfId(einsatzId, 'annehmen'), einsatzKnopfId(einsatzId, 'ablehnen')]
-  return nachrichtSenden(db, {
+  const r = await nachrichtSenden(db, {
     kontakt,
     vorlage: { name: 'bw_einsatz_neu', werte, knopfIds },
     knoepfe: [
@@ -421,6 +451,10 @@ export async function einsatzPerWhatsApp(
     einsatzId,
     userId,
   })
+  if (r.ok && fotos.length && offen) {
+    await einsatzFotosSenden(db, kontakt, { id: einsatzId, auftrag_id: String(e.auftrag_id) }, fotos)
+  }
+  return r
 }
 
 /** Tagebuch-Eintrag an den Kunden: kurzer Text + Link zur Projektseite (ohne Login). */

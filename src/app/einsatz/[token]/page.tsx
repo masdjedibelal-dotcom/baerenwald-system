@@ -61,6 +61,16 @@ export default async function EinsatzAntwortPage({
           ))}
         </dl>
         {e.anweisung ? <p className="einsatz-antwort__anweisung">{e.anweisung}</p> : null}
+        {e.anweisung_fotos.length ? (
+          <div className="einsatz-fotos">
+            {e.anweisung_fotos.map((url, i) => (
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer" title="Groß ansehen">
+                {/* eslint-disable-next-line @next/next/no-img-element -- öffentliche Storage-Links */}
+                <img src={url} alt={`Foto ${i + 1}`} />
+              </a>
+            ))}
+          </div>
+        ) : null}
         <EinsatzAntwortClient token={params.token} status={e.status} vorwahl={vorwahl} />
       </main>
     </div>

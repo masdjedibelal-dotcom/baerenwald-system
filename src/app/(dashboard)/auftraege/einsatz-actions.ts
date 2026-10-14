@@ -16,6 +16,7 @@ import {
 import { planAuftragStatusWrite } from '@/lib/status/write-auftrag-status'
 import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
 import { einsatzPerWhatsApp } from '@/lib/whatsapp/dienst'
+import { anweisungFotos, EINSATZ_FOTOS_MAX, istEinsatzFotoUrl } from '@/lib/einsatz/anweisung-fotos'
 import { einsatzAntwortLink, neuerAntwortToken } from '@/lib/einsatz/antwort'
 import { waNummer } from '@/lib/whatsapp/telefon'
 
@@ -36,6 +37,8 @@ export type EinsatzZeile = {
   partner_name: string
   titel: string
   anweisung: string | null
+  /** Fotos zur Anweisung (öffentliche URLs) */
+  anweisung_fotos: string[]
   termin_von: string | null
   termin_bis: string | null
   ort: string | null
@@ -99,7 +102,7 @@ export type EinsatzVorbelegung = {
 }
 
 const SELECT =
-  'id, auftrag_id, handwerker_id, titel, anweisung, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, gesendet_at, angenommen_at, angenommen_von, fertig_von, rechnung_von, ablehnung_grund, fertig_at, fertig_text, fertig_dateien, rechnung_pdf_url, rechnung_betrag, rechnung_eingereicht_at, rechnung_bezahlt_at, handwerker(name, firma)'
+  'id, auftrag_id, handwerker_id, titel, anweisung, anweisung_fotos, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, gesendet_at, angenommen_at, angenommen_von, fertig_von, rechnung_von, ablehnung_grund, fertig_at, fertig_text, fertig_dateien, rechnung_pdf_url, rechnung_betrag, rechnung_eingereicht_at, rechnung_bezahlt_at, handwerker(name, firma)'
 
 function partnerLabel(hw: { name?: string | null; firma?: string | null } | null | undefined): string {
   return hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
@@ -118,6 +121,7 @@ function mapZeile(r: Record<string, unknown>): EinsatzZeile {
     partner_name: partnerLabel(hw),
     titel: String(r.titel ?? ''),
     anweisung: (r.anweisung as string | null) ?? null,
+    anweisung_fotos: anweisungFotos(r.anweisung_fotos),
     termin_von: (r.termin_von as string | null) ?? null,
     termin_bis: (r.termin_bis as string | null) ?? null,
     ort: (r.ort as string | null) ?? null,
@@ -331,6 +335,8 @@ export async function createEinsatz(input: {
   handwerkerId: string
   titel: string
   anweisung?: string | null
+  /** Fotos zur Anweisung (aus FotoUploadFeld, Ordner „einsatz“) */
+  fotos?: string[]
   terminVon?: string | null
   terminBis?: string | null
   ort?: string | null
@@ -350,6 +356,9 @@ export async function createEinsatz(input: {
   const titel = input.titel.trim()
   if (!input.handwerkerId) return { ok: false, message: 'Bitte einen Partner wählen.' }
   if (!titel) return { ok: false, message: 'Bitte einen Titel angeben.' }
+  const fotos = anweisungFotos(input.fotos)
+    .filter((u) => istEinsatzFotoUrl(u, input.auftragId))
+    .slice(0, EINSATZ_FOTOS_MAX)
 
   const { data, error } = await gate.db
     .from('einsaetze')
@@ -358,6 +367,7 @@ export async function createEinsatz(input: {
       handwerker_id: input.handwerkerId,
       titel,
       anweisung: input.anweisung?.trim() || null,
+      anweisung_fotos: fotos,
       termin_von: input.terminVon || null,
       termin_bis: input.terminBis || null,
       ort: input.ort?.trim() || null,
@@ -409,6 +419,7 @@ export async function createEinsatz(input: {
         partnerName: partnerLabel(hw as { name?: string | null; firma?: string | null }),
         titel: einsatz.titel,
         anweisung: einsatz.anweisung,
+        fotos: einsatz.anweisung_fotos,
         terminVon: einsatz.termin_von,
         terminBis: einsatz.termin_bis,
         ort: einsatz.ort,

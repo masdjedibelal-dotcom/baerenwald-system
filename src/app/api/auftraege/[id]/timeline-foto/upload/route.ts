@@ -20,7 +20,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const buf = Buffer.from(await file.arrayBuffer())
   const name = (formData.get('filename') as string) || 'foto.jpg'
-  const path = `${params.id}/timeline/${Date.now()}-${name.replace(/[^\w.\-]+/g, '_')}`
+  // Tagebuch (Standard) oder Fotos zur Einsatz-Anweisung
+  const ordner = formData.get('ordner') === 'einsatz' ? 'einsatz' : 'timeline'
+  const path = `${params.id}/${ordner}/${Date.now()}-${name.replace(/[^\w.\-]+/g, '_')}`
 
   const { error: upErr } = await supabaseAdmin.storage
     .from('protokolle')

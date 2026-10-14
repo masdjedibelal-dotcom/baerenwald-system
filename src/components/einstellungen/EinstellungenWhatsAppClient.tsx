@@ -9,7 +9,6 @@ import { toast } from '@/components/ui/app-toast'
 import { openConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { safeAction } from '@/lib/actions/safe-action'
 import { waNummerAnzeige } from '@/lib/whatsapp/telefon'
-import type { VorlagenDefinition } from '@/lib/whatsapp/vorlagen'
 
 function Sec({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -20,18 +19,16 @@ function Sec({ title, children }: { title: string; children: React.ReactNode }) 
   )
 }
 
-/** WhatsApp (360dialog): Stand der Anbindung, Webhook, Vorlagen zum Einreichen, Testdaten. */
+/** WhatsApp (360dialog): Stand der Anbindung, Webhook, Testdaten. */
 export function EinstellungenWhatsAppClient({
   modus,
   nummer,
   webhookUrl,
-  vorlagen,
 }: {
   modus: 'mock' | '360dialog'
   nummer: string | null
   /** null = WHATSAPP_WEBHOOK_TOKEN fehlt */
   webhookUrl: string | null
-  vorlagen: VorlagenDefinition[]
 }) {
   const echt = modus === '360dialog'
   const [testdaten, setTestdaten] = useState<number | null>(null)
@@ -132,33 +129,6 @@ export function EinstellungenWhatsAppClient({
         ) : null}
       </Sec>
 
-      <Sec title="Vorlagen zum Einreichen">
-        <p className="wa-einst-hinweis">
-          Außerhalb von 24 Std. nach der letzten Nachricht des Kontakts erlaubt WhatsApp nur freigegebene Vorlagen.
-          Diese drei im 360dialog-Hub (WhatsApp Manager → Vorlagen) anlegen: Name genau wie angegeben, Sprache Deutsch,
-          Kategorie „Utility“, Text genau so (Platzhalter {'{{1}}'}, {'{{2}}'} …, Beispielwerte frei wählbar). Beim Einsatz
-          zwei Knöpfe vom Typ „Schnellantwort“ (Quick reply) in dieser Reihenfolge. Dann zur Freigabe einreichen.
-        </p>
-        {vorlagen.map((v) => (
-          <div key={v.name} className="wa-einst-vorlage">
-            <div className="wa-einst-vorlage__kopf">
-              <code>{v.name}</code>
-              <span>{v.beschreibung}</span>
-            </div>
-            <pre>{v.text}</pre>
-            {v.knoepfe?.length ? (
-              <div className="wa-knoepfe">
-                {v.knoepfe.map((k) => (
-                  <span key={k} className="wa-knopf">
-                    {k}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </Sec>
-
       <Sec title="Einrichtung">
         <ol className="wa-einst-schritte">
           <li>Im 360dialog-Hub beim Kanal der Bärenwald-Nummer einen API-Key erzeugen.</li>
@@ -168,7 +138,6 @@ export function EinstellungenWhatsAppClient({
             neu veröffentlichen.
           </li>
           <li>Hier oben „Webhook eintragen“ drücken.</li>
-          <li>Die drei Vorlagen oben im 360dialog-Hub anlegen und zur Freigabe einreichen.</li>
           <li>Testnachrichten löschen, dann mit einem eigenen Handy testen.</li>
         </ol>
       </Sec>

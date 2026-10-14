@@ -29,6 +29,8 @@ import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
 import { openConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { DateInput } from '@/components/ui/DateInput'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
+import { FotoUploadFeld } from '@/components/ui/FotoUploadFeld'
+import { EINSATZ_FOTOS_MAX } from '@/lib/einsatz/anweisung-fotos'
 import { safeAction } from '@/lib/actions/safe-action'
 import { formatDatum,formatEuro } from '@/lib/format/geld-datum'
 import { toast } from '@/components/ui/app-toast'
@@ -138,6 +140,8 @@ type Form = {
   handwerkerId: string
   titel: string
   anweisung: string
+  /** Fotos zur Anweisung (öffentliche URLs) */
+  fotos: string[]
   /** Ein Tag oder Zeitraum */
   terminArt: 'tag' | 'zeitraum'
   terminVon: string
@@ -213,6 +217,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       handwerkerId: '',
       titel: res.vorbelegung.titel,
       anweisung: '',
+      fotos: [],
       terminArt:
         res.vorbelegung.termin_bis && res.vorbelegung.termin_bis !== res.vorbelegung.termin_von
           ? 'zeitraum'
@@ -235,6 +240,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         handwerkerId: form.handwerkerId,
         titel: form.titel,
         anweisung: form.anweisung,
+        fotos: form.fotos,
         terminVon: form.terminVon || null,
         // Ein Tag: Ende = Beginn
         terminBis: (form.terminArt === 'tag' ? form.terminVon : form.terminBis) || null,
@@ -363,7 +369,8 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
           : true
 
   const setF = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f))
-  const ok = Boolean(form?.handwerkerId && form.titel.trim())
+  const [fotosLaden, setFotosLaden] = useState(false)
+  const ok = Boolean(form?.handwerkerId && form.titel.trim()) && !fotosLaden
 
   return (
     <>
@@ -460,6 +467,16 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 </span>
               </div>
               {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
+              {detail.anweisung_fotos.length ? (
+                <div className="einsatz-fotos">
+                  {detail.anweisung_fotos.map((url, i) => (
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer" title="Groß ansehen">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- öffentliche Storage-Links */}
+                      <img src={url} alt={`Foto ${i + 1}`} />
+                    </a>
+                  ))}
+                </div>
+              ) : null}
               {wa?.sichtbar ? (
                 <div className="einsatz-aktionen">
                   <MockBtn
@@ -719,6 +736,17 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 rows={5}
                 value={form.anweisung}
                 onChange={(ev) => setF({ anweisung: ev.target.value })}
+              />
+            </MockField>
+            <MockField label="Fotos" hint="Optional — z. B. Schaden oder Stelle. Der Partner sieht sie in Mail, WhatsApp und Portal.">
+              <FotoUploadFeld
+                auftragId={auftragId}
+                ordner="einsatz"
+                max={EINSATZ_FOTOS_MAX}
+                value={form.fotos}
+                onChange={(fotos) => setF({ fotos })}
+                disabled={saving}
+                onBusyChange={setFotosLaden}
               />
             </MockField>
             <MockField label="Termin">
