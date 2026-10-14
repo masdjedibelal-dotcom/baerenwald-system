@@ -22738,6 +22738,56 @@ button.dok-gruppe__kopf {
   padding: 12px 0 14px; background: var(--card); font-size: var(--fs-text);
 }
 .wa-aktionen { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+
+/* WhatsApp-Look im Chat (15.10.): beiger Verlauf, grüne/weiße Blasen, runde Eingabe ohne Kasten */
+.wa-pane {
+  --wa-bg: #efeae2; --wa-aus: #d9fdd3; --wa-ein: #ffffff; --wa-gruen: #25a366; --wa-text: #111b21; --wa-meta: #667781;
+}
+.wa-pane .wa-chat { padding: 0; gap: 0; background: var(--wa-bg); }
+.wa-pane .wa-verlauf { border-radius: 0; background: var(--wa-bg); padding: 12px 16px; gap: 3px; }
+.wa-pane .wa-hinweis { margin: 8px 16px 0; }
+.wa-pane .wa-tag { background: var(--wa-ein); color: var(--wa-meta); box-shadow: var(--sh-1); }
+.wa-pane .wa-blase { border-radius: var(--r-sm); padding: 6px 8px 4px; color: var(--wa-text); gap: 2px; }
+.wa-pane .wa-blase--ein { background: var(--wa-ein); border-top-left-radius: 0; }
+.wa-pane .wa-blase--ein:hover { background: var(--wa-ein); filter: brightness(0.98); }
+.wa-pane .wa-blase--aus { background: var(--wa-aus); border-top-right-radius: 0; }
+.wa-pane .wa-meta { color: var(--wa-meta); font-size: 11px; }
+.wa-pane .wa-vorlage { background: transparent; padding: 0; color: var(--wa-meta); font-size: 11px; }
+.wa-pane__kopf { gap: 10px; background: var(--card); }
+.wa-pane__kopf .wa-kontakt__avatar { width: 36px; height: 36px; }
+.wa-pane__titel { flex: 1; }
+.wa-pane__name { display: block; font-size: var(--fs-text); }
+.wa-pane__nr { font-size: var(--fs-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-typ-text--handwerker { color: var(--blue-tx); font-weight: 600; }
+.wa-typ-text--kunde { color: var(--grn-tx); font-weight: 600; }
+.wa-typ-text--unbekannt { color: var(--yel-tx); font-weight: 600; }
+.wa-pane .wa-eingabe { background: var(--wa-bg); padding: 6px 10px 10px; gap: 6px; }
+.wa-pane .wa-eingabe__zeile { align-items: flex-end; gap: 6px; }
+.wa-pane .wa-eingabe__feld {
+  border-radius: var(--r-pill); border: 0; background: var(--wa-ein); box-shadow: var(--sh-1);
+  padding: 10px 16px; min-height: 44px; max-height: 140px; resize: none; line-height: 1.35; overflow-y: auto;
+}
+.wa-pane .wa-rund { width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: var(--r-pill); justify-content: center; }
+.wa-pane .wa-rund:not(.wa-senden) { background: var(--wa-ein); border: 0; box-shadow: var(--sh-1); color: var(--wa-meta); }
+.wa-pane .wa-senden { background: var(--wa-gruen); border-color: var(--wa-gruen); color: #ffffff; }
+.wa-pane .wa-senden:disabled { opacity: 0.55; }
+.wa-pane .wa-anhang { background: var(--wa-ein); border-radius: var(--r-sm); }
+.wa-pane .wa-auswahlleiste { background: var(--card); padding: 10px 16px; }
+.wa-pane__kopf > .btn, .wa-pane__kopf .wa-pane__auswahl:not(.primary) { border: 0; background: none; box-shadow: none; }
+.wa-pane .wa-eingabe__feld:focus, .wa-pane .wa-eingabe__feld:focus-visible { outline: none; border: 0; box-shadow: var(--sh-1); }
+
+@media (max-width: 767px) {
+  /* Offener Chat füllt den Bildschirm wie in WhatsApp — App-Menü und Seitenkopf treten zurück */
+  .wa-postfach.has-chat {
+    position: fixed; inset: 0; z-index: 120; height: 100dvh; min-height: 0;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--card);
+  }
+  body:has(.wa-postfach.has-chat) .bottomnav { display: none; }
+  .wa-postfach.has-chat .wa-pane { height: 100%; }
+  .wa-postfach.has-chat .wa-pane__kopf { padding: 8px 10px; }
+  .wa-pane .wa-blase { max-width: 85%; }
+}
 .wa-aktion {
   display: flex; align-items: flex-start; gap: 12px; padding: 14px; text-align: left; font: inherit; color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--card); cursor: pointer;

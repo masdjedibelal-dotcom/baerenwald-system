@@ -14,7 +14,7 @@ export type WaSendErgebnis = { ok: true; waId: string } | { ok: false; fehler: s
 export type WaKnopf = { id: string; titel: string }
 export type WaMedienArt = 'bild' | 'dokument' | 'audio' | 'video'
 /** url muss für WhatsApp öffentlich abrufbar sein (befristeter Storage-Link reicht). */
-export type WaMediumSenden = { url: string; art: WaMedienArt; name?: string | null; caption?: string | null }
+export type WaMediumSenden = { url: string; art: WaMedienArt; name?: string | null; caption?: string | null; mime?: string | null }
 
 export interface WhatsAppProvider {
   modus: 'mock' | '360dialog'
@@ -88,6 +88,30 @@ function dialog360(apiKey: string): WhatsAppProvider {
     }
   }
 
+  async function medienHochladen(m: WaMediumSenden): Promise<{ ok: true; id: string } | { ok: false; fehler: string }> {
+    try {
+      const datei = await fetch(m.url, { cache: 'no-store' })
+      if (!datei.ok) return { ok: false, fehler: `Datei nicht abrufbar (${datei.status}).` }
+      const mime = (m.mime || datei.headers.get('content-type') || 'application/octet-stream').split(';')[0]!.trim()
+      const form = new FormData()
+      form.append('messaging_product', 'whatsapp')
+      form.append('file', new Blob([await datei.arrayBuffer()], { type: mime }), m.name || 'datei')
+      const res = await fetch(`${D360_BASIS}/media`, {
+        method: 'POST',
+        headers: { 'D360-API-KEY': apiKey },
+        body: form,
+        cache: 'no-store',
+      })
+      const json = (await res.json().catch(() => ({}))) as { id?: string; error?: { message?: string; code?: number } }
+      if (!res.ok || !json.id) {
+        return { ok: false, fehler: json.error?.message ? `${json.error.message}${json.error.code ? ` (${json.error.code})` : ''}` : `Hochladen fehlgeschlagen (${res.status})` }
+      }
+      return { ok: true, id: json.id }
+    } catch (e) {
+      return { ok: false, fehler: e instanceof Error ? e.message : 'Datei konnte nicht hochgeladen werden.' }
+    }
+  }
+
   return {
     modus: '360dialog',
     freieKnoepfe: true,
@@ -116,13 +140,18 @@ function dialog360(apiKey: string): WhatsAppProvider {
       })
       return post({ to: an, type: 'template', template: { name, language: { code: 'de' }, components } })
     },
-    sendeMedium(an, m) {
+    async sendeMedium(an, m) {
+      // Erst selbst bei 360dialog hochladen, dann per ID senden — Meta muss keinen Link abrufen
+      // (Link-Abruf scheitert oft mit „Media upload error“).
+      const hoch = await medienHochladen(m)
+      if (!hoch.ok) return hoch
+      const ref = { id: hoch.id }
       const caption = m.caption || undefined
-      if (m.art === 'bild') return post({ to: an, type: 'image', image: { link: m.url, caption } })
-      if (m.art === 'video') return post({ to: an, type: 'video', video: { link: m.url, caption } })
+      if (m.art === 'bild') return post({ to: an, type: 'image', image: { ...ref, caption } })
+      if (m.art === 'video') return post({ to: an, type: 'video', video: { ...ref, caption } })
       // Sprachnachricht/Audio: WhatsApp erlaubt keine Bildunterschrift
-      if (m.art === 'audio') return post({ to: an, type: 'audio', audio: { link: m.url } })
-      return post({ to: an, type: 'document', document: { link: m.url, filename: m.name ?? 'Dokument.pdf', caption } })
+      if (m.art === 'audio') return post({ to: an, type: 'audio', audio: ref })
+      return post({ to: an, type: 'document', document: { ...ref, filename: m.name ?? 'Dokument.pdf', caption } })
     },
     async ladeMedium(mediaId) {
       try {

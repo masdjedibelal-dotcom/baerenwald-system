@@ -46,6 +46,12 @@ function tag(iso: string): string {
   return formatDatum(iso)
 }
 
+
+function kopfInitialen(name: string): string {
+  const teile = name.replace(/[^\p{L}\s]/gu, ' ').trim().split(/\s+/)
+  return ((teile[0]?.[0] ?? '') + (teile[1]?.[0] ?? '')).toUpperCase() || '#'
+}
+
 /** ✓ gesendet · ✓✓ zugestellt · blaue ✓✓ gelesen · ! Fehler */
 function Haken({ status }: { status: string }) {
   if (status === 'fehler') return <span className="wa-haken wa-haken--fehler">!</span>
@@ -283,6 +289,8 @@ export function WhatsAppChat({
   }
 
   const mock = verlauf?.modus === 'mock'
+  const typKlasse = ziel.handwerkerId ? 'handwerker' : ziel.kundeId ? 'kunde' : 'unbekannt'
+  const typLabel = ziel.handwerkerId ? 'Partner' : ziel.kundeId ? 'Kunde' : 'Unbekannt'
   let letzterTag = ''
 
   return (
@@ -290,25 +298,26 @@ export function WhatsAppChat({
       <section className="wa-pane">
         <header className="wa-pane__kopf">
           {zurueck}
+          <span className={cn('wa-kontakt__avatar', `wa-kontakt__avatar--${typKlasse}`)} aria-hidden>
+            {kopfInitialen(name || verlauf?.kontakt?.name || '')}
+          </span>
           <div className="wa-pane__titel">
-            <span className="wa-pane__name">
-              {name || verlauf?.kontakt?.name || 'WhatsApp'}
-              <span className={cn('wa-typ', `wa-typ--${ziel.handwerkerId ? 'handwerker' : ziel.kundeId ? 'kunde' : 'unbekannt'}`)}>
-                {ziel.handwerkerId ? 'Partner' : ziel.kundeId ? 'Kunde' : 'Unbekannt'}
-              </span>
+            <span className="wa-pane__name">{name || verlauf?.kontakt?.name || 'WhatsApp'}</span>
+            <span className="wa-pane__nr">
+              <span className={cn('wa-typ-text', `wa-typ-text--${typKlasse}`)}>{typLabel}</span>
+              {verlauf?.kontakt ? ` · ${waNummerAnzeige(verlauf.kontakt.nummer)}` : ''}
             </span>
-            {verlauf?.kontakt ? <span className="wa-pane__nr">{waNummerAnzeige(verlauf.kontakt.nummer)}</span> : null}
           </div>
           {istPartner && verlauf?.nachrichten.length ? (
             <MockBtn
               sm
-              kind={auswahl ? 'primary' : 'secondary'}
-              icon={auswahl ? 'x' : 'check'}
+              kind={auswahl ? 'primary' : 'ghost'}
+              icon={auswahl ? 'x' : 'checks'}
               className="wa-pane__auswahl"
+              title={auswahl ? 'Auswahl abbrechen' : 'Nachrichten auswählen (Tagebuch, Update, Dokument …)'}
+              aria-label={auswahl ? 'Auswahl abbrechen' : 'Nachrichten auswählen'}
               onClick={() => setAuswahl(auswahl ? null : new Set())}
-            >
-              {auswahl ? 'Abbrechen' : 'Auswählen'}
-            </MockBtn>
+            />
           ) : null}
         </header>
         <div className="wa-chat">
@@ -414,12 +423,6 @@ export function WhatsAppChat({
             <p className="wa-leer">Keine Handynummer hinterlegt — bitte in den Stammdaten eintragen.</p>
           ) : verlauf ? (
             <div className="wa-eingabe">
-              {!verlauf.imFenster ? (
-                <p className="wa-fenster">
-                  Seit über 24 Std. keine Nachricht vom Kontakt: Ihre Nachricht geht als Vorlage „Nachricht von
-                  Bärenwald“ raus.
-                </p>
-              ) : null}
               {anhang ? (
                 <div className="wa-anhang">
                   <MockIcon
@@ -434,9 +437,11 @@ export function WhatsAppChat({
               ) : null}
               <div className="wa-eingabe__zeile">
                 <MockBtn
-                  kind="secondary"
+                  kind="ghost"
                   icon="paperclip"
+                  className="wa-rund"
                   title="Anhang: Foto, Video, Sprachnachricht oder Dokument"
+                  aria-label="Anhang"
                   disabled={senden}
                   onClick={() => dateiRef.current?.click()}
                 />
@@ -449,10 +454,15 @@ export function WhatsAppChat({
                 />
                 <MockTextarea
                   className="wa-eingabe__feld"
-                  rows={2}
+                  rows={1}
                   value={text}
                   placeholder={anhang ? 'Bildunterschrift (optional) …' : 'Nachricht schreiben …'}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={(e) => {
+                    setText(e.target.value)
+                    // Mitwachsen wie bei WhatsApp (bis max-height, dann scrollen)
+                    e.target.style.height = 'auto'
+                    e.target.style.height = `${e.target.scrollHeight}px`
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void absenden()
                   }}
@@ -460,13 +470,12 @@ export function WhatsAppChat({
                 <MockBtn
                   kind="primary"
                   icon="send"
+                  className="wa-rund wa-senden"
                   aria-label="Senden"
                   disabled={(!text.trim() && !anhang) || senden}
                   loading={senden}
                   onClick={() => void absenden()}
-                >
-                  <span className="wa-senden-text">Senden</span>
-                </MockBtn>
+                />
               </div>
               {mock && !simOffen ? (
                 <MockBtn sm kind="ghost" icon="info-circle" className="wa-sim__auf" onClick={() => setSimOffen(true)}>
