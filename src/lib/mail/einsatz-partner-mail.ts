@@ -38,7 +38,10 @@ export function buildEinsatzPartnerMail(
   branding: MailBranding
 ): { betreff: string; html: string } {
   const anrede = mailAnredeFromKundeTyp(null)
-  const wann = [datum(input.terminVon), datum(input.terminBis)].filter(Boolean).join(' bis ')
+  const von = datum(input.terminVon)
+  const bis = datum(input.terminBis)
+  // Ein Tag: nur einmal das Datum
+  const wann = von && bis && von !== bis ? `${von} bis ${bis}` : von || bis
   const betreff = buildSubject({ ereignis: 'Neuer Einsatz', objekt: input.ort, nummer: null })
   const meta = [
     wann ? `<b>Wann:</b> ${esc(wann)}` : '',
@@ -89,5 +92,9 @@ export function buildEinsatzPartnerMail(
       Alle Einsätze, Updates und Rechnungen finden Sie auch im <a href="${esc(input.portalLink)}" style="color:#2C6E49;">Partner-Portal</a>.
     </p>
     <p>${mailTeamGruss(anrede, branding.firmenname ?? '')}</p>`
-  return { betreff, html: mailHtmlBase(content, `Neuer Einsatz: ${input.titel}`, branding) }
+  // Kein Kunden-P.S. („MeinBärenwald“) — Partner haben das Partner-Portal (Link oben)
+  return {
+    betreff,
+    html: mailHtmlBase(content, `Neuer Einsatz: ${input.titel}`, branding, undefined, { skipMeinBaerenwaldPs: true }),
+  }
 }
