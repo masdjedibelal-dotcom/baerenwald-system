@@ -1,31 +1,28 @@
 import 'server-only'
 
 import { isStagingSupabase } from '@/lib/auth/staging-admin'
-import { getPublicAppUrl } from '@/lib/utils'
-import type { VorlagenName } from '@/lib/whatsapp/vorlagen'
+import { crmBasisUrl } from '@/lib/crm-basis-url'
 
 /**
  * WhatsApp-Einstellungen aus der Umgebung (Netlify → Environment variables):
  *
- *   WHATSAPP_PROVIDER            „twilio“ schaltet echt; leer/„mock“ = Testmodus (nichts geht raus)
- *   TWILIO_ACCOUNT_SID           Account SID (Twilio-Konsole, Startseite)
- *   TWILIO_AUTH_TOKEN            Auth Token (prüft auch die Signatur eingehender Webhooks)
- *   TWILIO_WHATSAPP_NUMMER       WhatsApp-Absender, z. B. +4989123456
- *   TWILIO_VORLAGE_EINSATZ       Content-SID (HX…) der Vorlage bw_einsatz_neu
- *   TWILIO_VORLAGE_BAUTAGEBUCH   Content-SID der Vorlage bw_bautagebuch
- *   TWILIO_VORLAGE_NACHRICHT     Content-SID der Vorlage bw_nachricht
- *   WHATSAPP_WEBHOOK_URL         optional; Standard: <CRM-Adresse>/api/whatsapp/webhook
+ *   WHATSAPP_PROVIDER       „360dialog“ schaltet echt; leer/„mock“ = Testmodus (nichts geht raus)
+ *   D360_API_KEY            API-Key aus dem 360dialog-Hub (Kanal der Bärenwald-Nummer)
+ *   WHATSAPP_NUMMER         Bärenwald-Nummer zur Anzeige, z. B. 4989123456
+ *   WHATSAPP_WEBHOOK_TOKEN  geheimer Wert (lang, zufällig); steht in der Webhook-URL als ?token=…
+ *
+ * Vorlagen werden bei 360dialog über ihren Namen (bw_einsatz_neu …) angesprochen, Sprache „de“.
  *
  * Sichtbar im CRM: echt verbunden — oder Staging (Testmodus zum Anschauen). Auf Prod bleibt
- * WhatsApp ausgeblendet, bis Twilio eingerichtet ist.
+ * WhatsApp ausgeblendet, bis 360dialog eingerichtet ist.
  */
-export type WhatsAppModus = 'mock' | 'twilio'
+export type WhatsAppModus = 'mock' | '360dialog'
 
 export type WhatsAppKonfig = {
   modus: WhatsAppModus
-  twilio: { sid: string; token: string; von: string } | null
+  apiKey: string | null
   nummer: string | null
-  vorlagen: Record<VorlagenName, string | null>
+  webhookToken: string | null
   sichtbar: boolean
 }
 
@@ -34,26 +31,20 @@ function env(name: string): string | null {
 }
 
 export function whatsappKonfig(): WhatsAppKonfig {
-  const sid = env('TWILIO_ACCOUNT_SID')
-  const token = env('TWILIO_AUTH_TOKEN')
-  const von = env('TWILIO_WHATSAPP_NUMMER')
-  const echt = env('WHATSAPP_PROVIDER')?.toLowerCase() === 'twilio' && Boolean(sid && token && von)
+  const apiKey = env('D360_API_KEY')
+  const echt = env('WHATSAPP_PROVIDER')?.toLowerCase() === '360dialog' && Boolean(apiKey)
   return {
-    modus: echt ? 'twilio' : 'mock',
-    twilio: echt ? { sid: sid!, token: token!, von: von! } : null,
-    nummer: von,
-    vorlagen: {
-      bw_einsatz_neu: env('TWILIO_VORLAGE_EINSATZ'),
-      bw_bautagebuch: env('TWILIO_VORLAGE_BAUTAGEBUCH'),
-      bw_nachricht: env('TWILIO_VORLAGE_NACHRICHT'),
-    },
+    modus: echt ? '360dialog' : 'mock',
+    apiKey: echt ? apiKey : null,
+    nummer: env('WHATSAPP_NUMMER'),
+    webhookToken: env('WHATSAPP_WEBHOOK_TOKEN'),
     sichtbar: echt || isStagingSupabase(),
   }
 }
 
-/** Adresse, die bei Twilio als Webhook eingetragen ist (gleiche URL prüft die Signatur). */
-export function whatsappWebhookUrl(): string {
-  const fest = env('WHATSAPP_WEBHOOK_URL')
-  if (fest) return fest
-  return `${getPublicAppUrl()}/api/whatsapp/webhook`
+/** Webhook-Adresse für 360dialog (mit geheimem Token, 360dialog signiert nicht). */
+export function whatsappWebhookUrl(): string | null {
+  const token = env('WHATSAPP_WEBHOOK_TOKEN')
+  if (!token) return null
+  return `${crmBasisUrl()}/api/whatsapp/webhook?token=${encodeURIComponent(token)}`
 }

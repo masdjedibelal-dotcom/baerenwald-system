@@ -1,8 +1,8 @@
 /**
  * WhatsApp-Vorlagen (Message Templates). Außerhalb des 24-Stunden-Fensters darf ein Unternehmen
- * nur freigegebene Vorlagen schicken. Diese Vorlagen werden einmal in Twilio (Content Template
- * Builder) angelegt und für WhatsApp eingereicht; die Content-SID kommt in Netlify — Name, Sprache „de“,
- * Kategorie „Utility“, Text und Knöpfe genau wie unten.
+ * nur freigegebene Vorlagen schicken. Diese Vorlagen werden einmal im 360dialog-Hub (WhatsApp Manager →
+ * Vorlagen) angelegt und eingereicht — Name, Sprache „Deutsch“ (de), Kategorie „Utility“, Text und Knöpfe
+ * genau wie unten. Meta lehnt Vorlagen ab, die mit einem Platzhalter beginnen oder enden.
  *
  * Der Testmodus zeigt im Chat denselben Text, den der Empfänger später sieht.
  */
@@ -29,12 +29,12 @@ export const VORLAGEN: Record<VorlagenName, VorlagenDefinition> = {
   bw_bautagebuch: {
     name: 'bw_bautagebuch',
     text:
-      'Guten Tag {{1}}, es gibt ein neues Update zu Ihrem Projekt „{{2}}“:\n\n{{3}}\n\nFotos und alle Details: {{4}}',
+      'Guten Tag {{1}}, es gibt ein neues Update zu Ihrem Projekt „{{2}}“:\n\n{{3}}\n\nFotos und alle Details: {{4}}\n\nIhr Bärenwald-Team',
     beschreibung: 'Bautagebuch-Eintrag an den Kunden, mit Link zur Projektseite.',
   },
   bw_nachricht: {
     name: 'bw_nachricht',
-    text: 'Nachricht von Bärenwald:\n\n{{1}}',
+    text: 'Nachricht von Bärenwald:\n\n{{1}}\n\nSie können direkt hier antworten.',
     beschreibung: 'Freie Nachricht, wenn der Kontakt seit über 24 Stunden nicht geschrieben hat.',
   },
 }

@@ -17,9 +17,10 @@ webhookVerarbeiten,
 WHATSAPP_MEDIEN_BUCKET,
 type WaKontakt,
 } from '@/lib/whatsapp/dienst'
-import { whatsappKonfig } from '@/lib/whatsapp/konfig'
+import { whatsappKonfig,whatsappWebhookUrl } from '@/lib/whatsapp/konfig'
+import { webhookBei360dialogEintragen } from '@/lib/whatsapp/provider'
 import { gespraechSchluessel } from '@/lib/whatsapp/schluessel'
-import { mockWebhookPayload } from '@/lib/whatsapp/webhook-parse'
+import { mockWebhookPayload,parseWhatsAppWebhook } from '@/lib/whatsapp/webhook-parse'
 
 /**
  * WhatsApp im CRM: Verlauf je Partner/Kunde, Senden, Zuordnen zu Auftrag/Einsatz,
@@ -60,10 +61,10 @@ export type WaVerlauf = {
   /** Laufende Einsätze (Partner) bzw. Aufträge (Kunde) zum Zuordnen */
   laufend: WaLaufend[]
   imFenster: boolean
-  modus: 'mock' | 'twilio'
+  modus: 'mock' | '360dialog'
 }
 
-export type WaStatusInfo = { sichtbar: boolean; modus: 'mock' | 'twilio'; nummer: string | null }
+export type WaStatusInfo = { sichtbar: boolean; modus: 'mock' | '360dialog'; nummer: string | null }
 
 type Fail = { ok: false; message: string }
 
@@ -535,7 +536,7 @@ export async function simuliereWhatsAppAntwort(input: {
     knopf: input.knopf ?? null,
     medium: m,
   })
-  await webhookVerarbeiten(gate.db, payload, { mock: true })
+  await webhookVerarbeiten(gate.db, parseWhatsAppWebhook(payload), { mock: true })
   return { ok: true }
 }
 
@@ -560,6 +561,18 @@ export async function loescheWhatsAppTestdaten(): Promise<{ ok: true; geloescht:
     return { ok: false, message: 'Testdaten konnten nicht gelöscht werden.' }
   }
   return { ok: true, geloescht: data?.length ?? 0 }
+}
+
+/** Einstellungen: Webhook-Adresse (mit Token) bei 360dialog eintragen. */
+export async function whatsappWebhookEintragen(): Promise<{ ok: true } | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  const k = whatsappKonfig()
+  if (k.modus !== '360dialog' || !k.apiKey) return { ok: false, message: 'Erst WHATSAPP_PROVIDER und D360_API_KEY in Netlify setzen.' }
+  const url = whatsappWebhookUrl()
+  if (!url) return { ok: false, message: 'Erst WHATSAPP_WEBHOOK_TOKEN in Netlify setzen.' }
+  const r = await webhookBei360dialogEintragen(k.apiKey, url)
+  return r.ok ? { ok: true } : { ok: false, message: r.fehler }
 }
 
 /** WhatsApp-Arten nach Dateityp (Bilder nur JPG/PNG — sonst als Dokument, wie WhatsApp es verlangt). */

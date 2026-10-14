@@ -1,12 +1,11 @@
 import 'server-only'
 
 import { randomBytes } from 'crypto'
-import { headers } from 'next/headers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { crmBasisUrl } from '@/lib/crm-basis-url'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
-import { getPublicAppUrl } from '@/lib/utils'
 
 /**
  * Einsatz annehmen/ablehnen per Mail-Link (ohne Portal-Login).
@@ -15,24 +14,6 @@ import { getPublicAppUrl } from '@/lib/utils'
 
 export function neuerAntwortToken(): string {
   return randomBytes(24).toString('hex')
-}
-
-/**
- * Adresse des CRM, über das gerade gearbeitet wird (Seite /einsatz liegt im CRM).
- * Env-Werte können auf Prod fehlen → sonst landete der Mail-Link auf localhost.
- */
-function crmBasisUrl(): string {
-  try {
-    const h = headers()
-    const host = (h.get('x-forwarded-host') ?? h.get('host') ?? '').split(',')[0]!.trim()
-    if (host && !/^(localhost|127\.0\.0\.1)(:|$)/.test(host)) {
-      const proto = (h.get('x-forwarded-proto') ?? 'https').split(',')[0]!.trim()
-      return `${proto}://${host}`
-    }
-  } catch {
-    // außerhalb einer Anfrage (z. B. Skript) → Env-Rückfall
-  }
-  return getPublicAppUrl()
 }
 
 export function einsatzAntwortLink(token: string, antwort?: 'annehmen' | 'ablehnen'): string {

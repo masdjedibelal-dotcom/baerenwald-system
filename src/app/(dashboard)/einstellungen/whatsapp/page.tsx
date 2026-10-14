@@ -17,7 +17,7 @@ export default function EinstellungenWhatsAppPage() {
       modus={k.modus}
       nummer={k.nummer}
       webhookUrl={whatsappWebhookUrl()}
-      vorlagen={Object.values(VORLAGEN).map((v) => ({ ...v, contentSid: k.vorlagen[v.name] }))}
+      vorlagen={Object.values(VORLAGEN)}
     />
   )
 }

@@ -1,38 +1,45 @@
+import { timingSafeEqual } from 'crypto'
 import { NextResponse,type NextRequest } from 'next/server'
 
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { webhookVerarbeiten } from '@/lib/whatsapp/dienst'
-import { whatsappKonfig,whatsappWebhookUrl } from '@/lib/whatsapp/konfig'
-import { twilioSignaturOk,type TwilioFelder } from '@/lib/whatsapp/webhook-parse'
+import { whatsappKonfig } from '@/lib/whatsapp/konfig'
+import { parseWhatsAppWebhook } from '@/lib/whatsapp/webhook-parse'
 
 /**
- * Twilio-Webhook: eingehende WhatsApp-Nachrichten, Knopf-Antworten und Zustellstatus.
- * In Twilio beim WhatsApp-Absender eintragen (eingehend, POST):
- *   https://baerenwald-backend.netlify.app/api/whatsapp/webhook
- * Den Zustellstatus schickt das CRM bei jeder Nachricht selbst als StatusCallback mit.
- * Schutz: Twilio-Signatur (X-Twilio-Signature) mit dem Auth Token — fremde Aufrufe → 403.
+ * Webhook für 360dialog: eingehende Nachrichten, Knopf-Antworten und Zustellstatus.
+ * 360dialog signiert nicht — Schutz über geheimes Token in der URL:
+ *   https://baerenwald-backend.netlify.app/api/whatsapp/webhook?token=<WHATSAPP_WEBHOOK_TOKEN>
+ * Eintragen über Einstellungen → WhatsApp → „Webhook eintragen“.
  */
 export const dynamic = 'force-dynamic'
 
+function tokenOk(req: NextRequest): boolean {
+  const webhookSecret = whatsappKonfig().webhookToken
+  const ist = req.nextUrl.searchParams.get('token') ?? ''
+  if (!webhookSecret || !ist) return false
+  const a = Buffer.from(ist)
+  const b = Buffer.from(webhookSecret)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
 export async function POST(req: NextRequest) {
-  const k = whatsappKonfig()
-  if (k.modus !== 'twilio' || !k.twilio) return NextResponse.json({ ok: false }, { status: 404 })
-  const form = await req.formData().catch(() => null)
-  if (!form) return NextResponse.json({ ok: false }, { status: 400 })
-  const felder: TwilioFelder = {}
-  form.forEach((v, key) => {
-    if (typeof v === 'string') felder[key] = v
-  })
-  const webhookSecret = k.twilio.token
-  if (!twilioSignaturOk(webhookSecret, whatsappWebhookUrl(), felder, req.headers.get('x-twilio-signature'))) {
-    return NextResponse.json({ ok: false }, { status: 403 })
-  }
+  if (whatsappKonfig().modus !== '360dialog') return NextResponse.json({ ok: false }, { status: 404 })
+  if (!tokenOk(req)) return NextResponse.json({ ok: false }, { status: 401 })
+  const payload = await req.json().catch(() => null)
+  if (!payload) return NextResponse.json({ ok: false }, { status: 400 })
   try {
-    await webhookVerarbeiten(getSupabaseAdmin(), felder)
+    const r = await webhookVerarbeiten(getSupabaseAdmin(), parseWhatsAppWebhook(payload))
+    return NextResponse.json({ ok: true, ...r })
   } catch (e) {
-    // Fehler nur loggen — sonst wiederholt Twilio die Zustellung
     console.error('[whatsapp/webhook]', e)
+    // 200, damit WhatsApp nicht endlos wiederholt; Fehler steht im Log
+    return NextResponse.json({ ok: false })
   }
-  // Leere TwiML-Antwort: Twilio schickt dann keine automatische Antwort
-  return new NextResponse('<Response></Response>', { headers: { 'Content-Type': 'text/xml' } })
+}
+
+/** Erreichbarkeits-Test (Browser/360dialog). */
+export async function GET(req: NextRequest) {
+  if (!tokenOk(req)) return NextResponse.json({ ok: false }, { status: 401 })
+  return NextResponse.json({ ok: true, modus: whatsappKonfig().modus })
 }

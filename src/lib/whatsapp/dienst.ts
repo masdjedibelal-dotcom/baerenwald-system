@@ -9,7 +9,7 @@ import { writeWhatsAppStatus } from '@/lib/status/write-whatsapp-status'
 import { whatsappProvider,vorlageAnzeige } from '@/lib/whatsapp/provider'
 import { waNummer } from '@/lib/whatsapp/telefon'
 import { einsatzKnopfId,parseEinsatzKnopfId,type VorlagenName } from '@/lib/whatsapp/vorlagen'
-import { parseTwilioWebhook,type TwilioFelder,type WaEingang } from '@/lib/whatsapp/webhook-parse'
+import type { WaEingang,WaStatus } from '@/lib/whatsapp/webhook-parse'
 
 /**
  * WhatsApp-Kern: Kontakt zur Nummer finden, eingehende Nachrichten zuordnen und speichern,
@@ -160,7 +160,7 @@ async function zuordnen(db: SupabaseClient, kontakt: WaKontakt | null, e: WaEing
   return { auftrag_id: null, einsatz_id: null }
 }
 
-/** Knopf „Annehmen“/„Ablehnen“ der Einsatz-Vorlage (Twilio liefert nur den Knopftext/-Payload). */
+/** „Annehmen“/„Ablehnen“ als Text (z. B. getippt statt Knopf) → zugeordneter Einsatz. */
 function knopfAntwort(e: WaEingang): 'annehmen' | 'ablehnen' | null {
   if (e.art !== 'antwort' && e.art !== 'text') return null
   const t = String(e.knopfId ?? e.text ?? '').trim().toLowerCase()
@@ -236,15 +236,15 @@ async function einsatzKnopf(db: SupabaseClient, kontakt: WaKontakt, knopfId: str
   })
 }
 
-/** Webhook-Inhalt verarbeiten: Nachrichten speichern + zuordnen, Zustellstatus nachtragen. */
+/** Webhook-Ereignisse verarbeiten: Nachrichten speichern + zuordnen, Zustellstatus nachtragen. */
 export async function webhookVerarbeiten(
   db: SupabaseClient,
-  felder: TwilioFelder,
+  ereignisse: (WaEingang | WaStatus)[],
   opts: { mock?: boolean } = {}
 ): Promise<{ nachrichten: number; status: number }> {
   let nachrichten = 0
   let status = 0
-  for (const ev of parseTwilioWebhook(felder)) {
+  for (const ev of ereignisse) {
     if (ev.typ === 'status') {
       const w = await writeWhatsAppStatus(db, { waId: ev.waId, status: ev.status, fehler: ev.fehler })
       if (!w.ok) console.warn('[whatsapp] Status:', w.error)
@@ -320,13 +320,13 @@ export async function nachrichtSenden(
   let ergebnis
 
   if (input.vorlage && !(offen && input.knoepfe?.length && p.freieKnoepfe)) {
-    // Vorlage (Pflicht außerhalb des Fensters; bei Twilio gibt es Knöpfe nur so)
+    // Vorlage (Pflicht außerhalb des 24-Stunden-Fensters)
     const v = vorlageAnzeige(input.vorlage.name, input.vorlage.werte)
     art = 'vorlage'
     vorlage = input.vorlage.name
     text = v.text
     knoepfe = (input.vorlage.knopfIds ?? []).map((id, i) => ({ id, titel: v.knoepfe[i] ?? id }))
-    ergebnis = await p.sendeVorlage(input.kontakt.nummer, input.vorlage.name, input.vorlage.werte)
+    ergebnis = await p.sendeVorlage(input.kontakt.nummer, input.vorlage.name, input.vorlage.werte, input.vorlage.knopfIds)
   } else if (input.knoepfe?.length) {
     art = 'knoepfe'
     knoepfe = input.knoepfe
