@@ -2,7 +2,8 @@
  * WhatsApp-Vorlagen (Message Templates). Außerhalb des 24-Stunden-Fensters darf ein Unternehmen
  * nur freigegebene Vorlagen schicken. Diese Vorlagen werden einmal im 360dialog-Hub (WhatsApp Manager →
  * Vorlagen) angelegt und eingereicht — Name, Sprache „Deutsch“ (de), Kategorie „Utility“, Text und Knöpfe
- * genau wie unten. Meta lehnt Vorlagen ab, die mit einem Platzhalter beginnen oder enden.
+ * genau wie unten. Meta lehnt Vorlagen ab, die mit einem Platzhalter beginnen oder enden oder in denen
+ * zwei Platzhalter nur durch Leerraum getrennt sind.
  *
  * Der Testmodus zeigt im Chat denselben Text, den der Empfänger später sieht.
  */
@@ -22,7 +23,7 @@ export const VORLAGEN: Record<VorlagenName, VorlagenDefinition> = {
   bw_einsatz_neu: {
     name: 'bw_einsatz_neu',
     text:
-      'Hallo {{1}}, Bärenwald hat einen neuen Einsatz für Sie:\n\n*{{2}}*\nTermin: {{3}}\nOrt: {{4}}\nEK: {{5}}\n\n{{6}}\n\nBitte nehmen Sie den Einsatz an oder lehnen Sie ihn ab.',
+      'Hallo {{1}}, Bärenwald hat einen neuen Einsatz für Sie:\n\n*{{2}}*\nTermin: {{3}}\nOrt: {{4}}\nEK: {{5}}\n\nHinweise: {{6}}\n\nBitte nehmen Sie den Einsatz an oder lehnen Sie ihn ab.',
     knoepfe: ['Annehmen', 'Ablehnen'],
     beschreibung: 'Neuer Einsatz an einen Partner, mit Annehmen/Ablehnen.',
   },
