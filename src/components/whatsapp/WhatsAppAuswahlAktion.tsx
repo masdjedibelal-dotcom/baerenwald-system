@@ -15,9 +15,11 @@ import {
 import { CrmPositionEintragModal } from '@/components/auftraege/CrmPositionEintragModal'
 import { MockBtn, MockSegment } from '@/components/mock-ui'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
-import { MockField, MockTextarea } from '@/components/mock-ui/MockForm'
+import { MockField } from '@/components/mock-ui/MockForm'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { EINSATZ_TEXT_KI } from '@/lib/einsatz/einsatz-texte'
 import { toast } from '@/components/ui/app-toast'
 import { safeAction } from '@/lib/actions/safe-action'
 import { DOKUMENT_ARTEN, DOKUMENT_ART_LABEL, type DokumentArt } from '@/lib/types'
@@ -143,7 +145,7 @@ export function WhatsAppAuswahlAktion({
   const medien = kontext?.medien ?? []
   const titel =
     schritt === 'einsatz'
-      ? 'Zu welchem Einsatz?'
+      ? 'Zu welchem Auftrag?'
       : schritt === 'aktion'
         ? 'Was soll passieren?'
         : AKTIONEN.find((a) => a.id === schritt)?.titel ?? ''
@@ -184,7 +186,7 @@ export function WhatsAppAuswahlAktion({
       >
         {schritt === 'einsatz' ? (
           laufend.length ? (
-            <div className="einsatz-partner-liste" role="radiogroup" aria-label="Einsatz">
+            <div className="einsatz-partner-liste" role="radiogroup" aria-label="Auftrag">
               {laufend.map((l) => {
                 const on = einsatzId === l.id
                 return (
@@ -197,17 +199,21 @@ export function WhatsAppAuswahlAktion({
                     onClick={() => setEinsatzId(l.id)}
                   >
                     <span className="einsatz-partner__dot" aria-hidden />
-                    <span className="einsatz-partner__name">
-                      {l.auftrag_titel}
-                      {l.titel && l.titel !== l.auftrag_titel ? ` · ${l.titel}` : ''}
+                    <span className="einsatz-partner__name">{l.auftrag_titel}</span>
+                    <span className="einsatz-partner__hint">
+                      {[
+                        l.titel && l.titel !== l.auftrag_titel ? l.titel : null,
+                        l.status === 'gesendet' ? 'noch nicht angenommen' : 'läuft',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
-                    <span className="einsatz-partner__hint">{l.status === 'gesendet' ? 'noch nicht angenommen' : 'läuft'}</span>
                   </MockBtn>
                 )
               })}
             </div>
           ) : (
-            <p className="einsatz-partner-leer">Dieser Partner hat keinen laufenden Einsatz.</p>
+            <p className="einsatz-partner-leer">Dieser Partner hat keinen laufenden Auftrag.</p>
           )
         ) : null}
 
@@ -238,9 +244,17 @@ export function WhatsAppAuswahlAktion({
         ) : null}
 
         {schritt === 'update' || schritt === 'erledigt' ? (
-          <MockField label={schritt === 'erledigt' ? 'Was wurde gemacht?' : 'Text'}>
-            <MockTextarea rows={5} value={text} onChange={(e) => setText(e.target.value)} />
-          </MockField>
+          // Gleiches Feld wie „Update erfassen“ am Einsatz — mit KI-Hilfe
+          <SheetEditableField
+            label={schritt === 'erledigt' ? 'Was wurde gemacht?' : 'Text'}
+            value={text}
+            onSave={setText}
+            multiline
+            rows={8}
+            kiExtraHint={EINSATZ_TEXT_KI[schritt]}
+            placeholder={schritt === 'erledigt' ? 'Was hat der Partner erledigt?' : 'Was gibt es Neues vom Einsatz?'}
+            sheetContext="detail"
+          />
         ) : null}
 
         {schritt === 'dokument' ? (

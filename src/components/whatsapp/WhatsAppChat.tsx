@@ -341,7 +341,6 @@ export function WhatsAppChat({
               const trenner = t !== letzterTag
               letzterTag = t
               const ein = n.richtung === 'ein'
-              const zuordnung = n.einsatz_titel || n.auftrag_titel
               return (
                 <div key={n.id} className="wa-zeile-wrap">
                   {trenner ? <div className="wa-tag">{t}</div> : null}
@@ -391,11 +390,6 @@ export function WhatsAppChat({
                         </span>
                       ) : null}
                       <span className="wa-meta">
-                        {zuordnung ? (
-                          <span className="wa-zuordnung">{zuordnung}</span>
-                        ) : ein && !n.auftrag_id ? (
-                          <span className="wa-zuordnung wa-zuordnung--offen">nicht zugeordnet</span>
-                        ) : null}
                         <span>{uhrzeit(n.created_at)}</span>
                         {!ein ? <Haken status={n.status} /> : null}
                       </span>

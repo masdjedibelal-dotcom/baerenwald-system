@@ -22765,7 +22765,7 @@ button.dok-gruppe__kopf {
 .wa-pane .wa-eingabe__zeile { align-items: flex-end; gap: 6px; }
 .wa-pane .wa-eingabe__feld {
   border-radius: var(--r-pill); border: 0; background: var(--wa-ein); box-shadow: var(--sh-1);
-  padding: 10px 16px; min-height: 44px; max-height: 140px; resize: none; line-height: 1.35; overflow-y: auto;
+  padding: 10px 16px; min-height: 44px; max-height: 108px; resize: none; line-height: 1.35; overflow-y: auto;
 }
 .wa-pane .wa-rund { width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: var(--r-pill); justify-content: center; }
 .wa-pane .wa-rund:not(.wa-senden) { background: var(--wa-ein); border: 0; box-shadow: var(--sh-1); color: var(--wa-meta); }
@@ -22779,11 +22779,16 @@ button.dok-gruppe__kopf {
 @media (max-width: 767px) {
   /* Offener Chat füllt den Bildschirm wie in WhatsApp — App-Menü und Seitenkopf treten zurück */
   .wa-postfach.has-chat {
-    position: fixed; inset: 0; z-index: 120; height: 100dvh; min-height: 0;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 120; height: 100dvh; min-height: 0;
     padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: var(--card);
+    background: #efeae2; overscroll-behavior: contain;
   }
+  /* Tastatur offen: kein Abstand für die Home-Leiste (sonst heller Streifen über der Tastatur) */
+  .wa-postfach.has-chat:has(textarea:focus) { padding-bottom: 0; }
+  .wa-postfach.has-chat .wa-pane, .wa-postfach.has-chat .wa-chat { background: #efeae2; }
   body:has(.wa-postfach.has-chat) .bottomnav { display: none; }
+  body:has(.wa-postfach.has-chat) { overflow: hidden; }
+  .wa-pane .wa-eingabe__feld { font-size: 16px; }
   .wa-postfach.has-chat .wa-pane { height: 100%; }
   .wa-postfach.has-chat .wa-pane__kopf { padding: 8px 10px; }
   .wa-pane .wa-blase { max-width: 85%; }

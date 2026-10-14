@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import {
@@ -48,6 +48,7 @@ export function NachrichtenClient() {
   const pathname = usePathname()
   const params = useSearchParams()
   const mobil = useIsMobile()
+  const rahmenRef = useRef<HTMLDivElement>(null)
   const [gespraeche, setGespraeche] = useState<WaGespraech[] | null>(null)
   const [filter, setFilter] = useState<Filter>('alle')
   const [suche, setSuche] = useState('')
@@ -57,6 +58,27 @@ export function NachrichtenClient() {
   const [neuName, setNeuName] = useState<string>('')
   const aktivKey = params.get('chat')
   const aktivZiel = useMemo(() => zielAusSchluessel(aktivKey), [aktivKey])
+
+  // Handy: Chat genau über der Tastatur halten (iOS rechnet die Tastatur nicht in 100dvh ein)
+  const chatOffen = mobil && Boolean(aktivZiel)
+  useEffect(() => {
+    const el = rahmenRef.current
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!chatOffen || !el || !vv) return
+    const anpassen = () => {
+      el.style.height = `${vv.height}px`
+      el.style.transform = `translateY(${vv.offsetTop}px)`
+    }
+    anpassen()
+    vv.addEventListener('resize', anpassen)
+    vv.addEventListener('scroll', anpassen)
+    return () => {
+      vv.removeEventListener('resize', anpassen)
+      vv.removeEventListener('scroll', anpassen)
+      el.style.height = ''
+      el.style.transform = ''
+    }
+  }, [chatOffen])
 
   const laden = useCallback(async () => {
     const res = await safeAction(ladeWhatsAppPostfach())
@@ -228,7 +250,7 @@ export function NachrichtenClient() {
   )
 
   return (
-    <div className={cn('wa-postfach', aktivZiel && 'has-chat')}>
+    <div ref={rahmenRef} className={cn('wa-postfach', aktivZiel && 'has-chat')}>
       {mobil ? (aktivZiel ? chatSpalte : listenSpalte) : (
         <>
           {listenSpalte}

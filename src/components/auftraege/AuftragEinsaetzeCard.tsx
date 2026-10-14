@@ -30,6 +30,8 @@ import { openConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { DateInput } from '@/components/ui/DateInput'
 import { FotoDropZone } from '@/components/ui/FotoDropZone'
 import { FotoUploadFeld } from '@/components/ui/FotoUploadFeld'
+import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
+import { EINSATZ_TEXT_KI } from '@/lib/einsatz/einsatz-texte'
 import { EINSATZ_FOTOS_MAX } from '@/lib/einsatz/anweisung-fotos'
 import { safeAction } from '@/lib/actions/safe-action'
 import { formatDatum,formatEuro } from '@/lib/format/geld-datum'
@@ -609,9 +611,16 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         ) : null}
         {erfassen === 'update' || erfassen === 'fertig' ? (
           <>
-            <MockField label={erfassen === 'fertig' ? 'Was wurde gemacht?' : 'Text'}>
-              <MockTextarea rows={3} value={eText} onChange={(ev) => setEText(ev.target.value)} />
-            </MockField>
+            <SheetEditableField
+              label={erfassen === 'fertig' ? 'Was wurde gemacht?' : 'Text'}
+              value={eText}
+              onSave={setEText}
+              multiline
+              rows={8}
+              kiExtraHint={EINSATZ_TEXT_KI[erfassen === 'fertig' ? 'erledigt' : 'update']}
+              placeholder={erfassen === 'fertig' ? 'Was hat der Partner erledigt?' : 'Was gibt es Neues vom Einsatz?'}
+              sheetContext="detail"
+            />
             <MockField label="Fotos">
               <FotoDropZone
                 multiple
