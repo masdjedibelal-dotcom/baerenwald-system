@@ -1,5 +1,5 @@
 'use client'
-import { MockBtn, MockTable } from '@/components/mock-ui'
+import { MockBtn, MockPager, MockTable } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -8,6 +8,8 @@ import { useMemo, useState } from 'react'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatNumber } from '@/lib/format/geld-datum'
+
+const SUCHBEGRIFFE_PRO_SEITE = 20
 
 function formatNum(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
@@ -57,6 +59,39 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
   const [tab, setTab] = useState<'marketing' | 'sichtbarkeit'>('marketing')
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
   const [funnelOpen, setFunnelOpen] = useState(false)
+  /** Meistgesucht: Sortierung (Klicks/Impressionen, absteigend/aufsteigend) und Seite */
+  const [sort, setSort] = useState<{ nach: 'clicks' | 'impressions'; dir: 'desc' | 'asc' }>({ nach: 'clicks', dir: 'desc' })
+  const [seite, setSeite] = useState(0)
+  const suchbegriffe = useMemo(() => {
+    const f = sort.dir === 'desc' ? -1 : 1
+    return [...data.topQueries].sort(
+      (a, b) => f * (a[sort.nach] - b[sort.nach]) || f * (a[sort.nach === 'clicks' ? 'impressions' : 'clicks'] - b[sort.nach === 'clicks' ? 'impressions' : 'clicks'])
+    )
+  }, [data.topQueries, sort])
+  const seiten = Math.max(1, Math.ceil(suchbegriffe.length / SUCHBEGRIFFE_PRO_SEITE))
+  const seiteSicher = Math.min(seite, seiten - 1)
+  const sichtbar = suchbegriffe.slice(seiteSicher * SUCHBEGRIFFE_PRO_SEITE, (seiteSicher + 1) * SUCHBEGRIFFE_PRO_SEITE)
+  function sortieren(nach: 'clicks' | 'impressions') {
+    setSort((cur) => (cur.nach === nach ? { nach, dir: cur.dir === 'desc' ? 'asc' : 'desc' } : { nach, dir: 'desc' }))
+    setSeite(0)
+  }
+  function ariaSort(nach: 'clicks' | 'impressions'): 'descending' | 'ascending' | undefined {
+    return sort.nach === nach ? (sort.dir === 'desc' ? 'descending' : 'ascending') : undefined
+  }
+  function sortKopf(nach: 'clicks' | 'impressions', label: string) {
+    const an = sort.nach === nach
+    return (
+      <MockBtn
+        type="button"
+        className="mkt-sort"
+        aria-label={`Nach ${label} sortieren`}
+        onClick={() => sortieren(nach)}
+      >
+        {label}
+        <MockIcon n={an && sort.dir === 'asc' ? 'arrow-up' : 'arrow-down'} ctx="default" className={an ? 'h-3 w-3' : 'h-3 w-3 opacity-30'} aria-hidden />
+      </MockBtn>
+    )
+  }
 
   const maxFunnel = useMemo(() => {
     const counts = data.funnelStages.map((s) => s.count)
@@ -210,12 +245,12 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                     <thead>
                       <tr className="border-b border-[var(--border)] text-[length:var(--fs-meta)] uppercase tracking-[0.03em] text-[var(--text-3)]">
                         <th className="px-3 py-2 font-semibold">Suchbegriff</th>
-                        <th className="px-3 py-2 text-right font-semibold">Klicks</th>
-                        <th className="px-3 py-2 text-right font-semibold">Impr.</th>
+                        <th className="px-3 py-2 text-right font-semibold" aria-sort={ariaSort('clicks')}>{sortKopf('clicks', 'Klicks')}</th>
+                        <th className="px-3 py-2 text-right font-semibold" aria-sort={ariaSort('impressions')}>{sortKopf('impressions', 'Impr.')}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.topQueries.map((q) => (
+                      {sichtbar.map((q) => (
                         <tr key={q.query} className="border-b border-[var(--border)] last:border-0">
                           <td className="px-3 py-2 text-[var(--text)]">{q.query}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatNum(q.clicks)}</td>
@@ -226,11 +261,22 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                       ))}
                     </tbody>
                 </MockTable>
-              ) : (
+              ) : null}
+              {suchbegriffe.length > SUCHBEGRIFFE_PRO_SEITE ? (
+                <MockPager
+                  pageIndex={seiteSicher}
+                  totalPages={seiten}
+                  total={suchbegriffe.length}
+                  pageSize={SUCHBEGRIFFE_PRO_SEITE}
+                  unit="Suchbegriffe"
+                  onPageChange={setSeite}
+                />
+              ) : null}
+              {data.topQueries.length === 0 ? (
                 <div className="rounded-[10px] border border-[var(--border)] px-3 py-6 text-center text-[length:var(--fs-meta)] text-[var(--text-3)]">
                   —
                 </div>
-              )}
+              ) : null}
             </div>
           </>
         )}

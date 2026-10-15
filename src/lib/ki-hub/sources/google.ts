@@ -44,7 +44,7 @@ export async function fetchGscSummary(range?: {
           startDate,
           endDate,
           dimensions: ['query'],
-          rowLimit: 10,
+          rowLimit: 250,
         }),
         next: { revalidate: 0 },
         signal: AbortSignal.timeout(4000),
@@ -76,7 +76,7 @@ export async function fetchGscSummary(range?: {
       { clicks: 0, impressions: 0 }
     )
 
-    const topQueries = rows.slice(0, 5).map((row) => ({
+    const topQueries = rows.map((row) => ({
       query: row.keys?.[0] ?? '—',
       clicks: row.clicks ?? 0,
       impressions: row.impressions ?? 0,
