@@ -23,6 +23,8 @@ import {
   type AssistentUiPayload,
 } from '@/lib/copilot/assistent-ui'
 import { sanitizeAssistentChatText } from '@/lib/copilot/sanitize-chat-text'
+import { formatKiAnbieterFehler, kiAnbieter } from '@/lib/ki/ki'
+import { openAiChat, type OpenAiNachricht, type OpenAiWerkzeug } from '@/lib/shared-domain/ki-openai'
 
 export type CopilotChatMessage = {
   role: 'user' | 'assistant'
@@ -36,6 +38,8 @@ export type CopilotChatSuccess = {
 }
 
 function formatCopilotError(e: unknown): string {
+  const openAi = formatKiAnbieterFehler(e)
+  if (openAi) return openAi
   if (e instanceof Anthropic.AuthenticationError) {
     console.error('[copilot/chat] Claude 401', describeClaudeKeyForDebug())
     return claudeAuthErrorForClient()
@@ -73,6 +77,15 @@ export async function runCopilotChat(opts: {
   ]
 
   let ui = emptyAssistentUi()
+
+  if (kiAnbieter() === 'openai') {
+    try {
+      const r = await openAiWerkzeugSchleife(system, history, userText)
+      return { ok: true, text: r.text || 'Erledigt — keine Textantwort.', ui: r.ui }
+    } catch (e) {
+      return { ok: false, error: formatCopilotError(e) }
+    }
+  }
 
   try {
     const anthropic = createAnthropicClient(getClaudeApiKey())
@@ -139,4 +152,53 @@ export async function runCopilotChat(opts: {
   } catch (e) {
     return { ok: false, error: formatCopilotError(e) }
   }
+}
+
+/** Claude-Werkzeuge → OpenAI-Funktionen (gleiche Namen, Beschreibungen und Eingaben). */
+const COPILOT_OPENAI_TOOLS: OpenAiWerkzeug[] = COPILOT_CLAUDE_TOOLS.map((t) => ({
+  type: 'function',
+  function: {
+    name: t.name,
+    description: t.description,
+    parameters: t.input_schema as unknown as Record<string, unknown>,
+  },
+}))
+
+/** Werkzeug-Schleife wie bei Claude: KI ruft CRM-Werkzeuge, bis sie mit Text antwortet. */
+async function openAiWerkzeugSchleife(
+  system: string,
+  history: CopilotChatMessage[],
+  userText: string
+): Promise<{ text: string; ui: AssistentUiPayload }> {
+  let ui = emptyAssistentUi()
+  const messages: OpenAiNachricht[] = [
+    ...history.map((m) => ({ role: m.role, content: m.content }) as OpenAiNachricht),
+    { role: 'user', content: userText },
+  ]
+  for (let runde = 0; runde < 8; runde++) {
+    const r = await openAiChat({ system, messages, maxTokens: 2048, tools: COPILOT_OPENAI_TOOLS })
+    if (!r.toolCalls.length) return { text: sanitizeAssistentChatText(r.text), ui }
+    messages.push(r.nachricht)
+    for (const call of r.toolCalls) {
+      let input: Record<string, unknown> = {}
+      try {
+        input = JSON.parse(call.function.arguments || '{}') as Record<string, unknown>
+      } catch {
+        input = {}
+      }
+      const result = await executeCopilotTool(call.function.name, input)
+      ui = mergeAssistentUi(ui, collectAssistentUiFromToolResult(call.function.name, result, input))
+      let serialized: string
+      try {
+        serialized = JSON.stringify(result)
+      } catch {
+        serialized = JSON.stringify({ error: 'Tool-Ergebnis nicht serialisierbar.' })
+      }
+      if (serialized.length > 24_000) {
+        serialized = JSON.stringify({ error: 'Tool-Antwort zu groß — bitte kleinere Anfrage.' })
+      }
+      messages.push({ role: 'tool', tool_call_id: call.id, content: serialized })
+    }
+  }
+  return { text: 'Das war zu viel auf einmal — bitte die Frage aufteilen.', ui }
 }

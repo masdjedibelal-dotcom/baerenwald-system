@@ -1,10 +1,6 @@
 import 'server-only'
 
-import {
-  createAnthropicClient,
-  getClaudeApiKey,
-  getClaudeModel,
-} from '@/lib/copilot/claude-api-key'
+import { kiKonfiguriert, kiTextClient } from '@/lib/ki/ki'
 import { formatAnthropicError } from '@/lib/copilot/format-anthropic-error'
 import { extractJsonObject } from '@/lib/visualize/claude-json'
 import {
@@ -82,8 +78,7 @@ export async function generateAbnahmeFreitexte(input: {
   notizen?: string | null
 }): Promise<AbnahmeKiFreitexte> {
   const empty: AbnahmeKiFreitexte = { leistungsumfang_kurz: '', hinweis_sonstiges: '' }
-  const key = getClaudeApiKey()
-  if (!key) return empty
+  if (!kiKonfiguriert()) return empty
 
   const user = [
     `Auftrag: ${input.auftragTitel.trim() || '—'}`,
@@ -104,9 +99,8 @@ export async function generateAbnahmeFreitexte(input: {
     .join('\n')
 
   try {
-    const client = createAnthropicClient(key)
+    const client = kiTextClient()
     const response = await client.messages.create({
-      model: getClaudeModel(),
       max_tokens: 700,
       system: SYSTEM,
       messages: [{ role: 'user', content: user }],

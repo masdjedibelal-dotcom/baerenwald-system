@@ -74,6 +74,10 @@
       "portal": "src/lib/shared-domain/gesamtrabatt.ts"
     },
     {
+      "crm": "src/lib/shared-domain/ki-openai.ts",
+      "portal": "src/lib/shared-domain/ki-openai.ts"
+    },
+    {
       "crm": "src/lib/media/optimize-image-for-upload.ts",
       "portal": "src/lib/media/optimize-image-for-upload.ts"
     },

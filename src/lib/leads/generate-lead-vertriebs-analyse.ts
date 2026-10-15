@@ -1,10 +1,6 @@
 import 'server-only'
 
-import {
-  createAnthropicClient,
-  getClaudeApiKey,
-  getClaudeModel,
-} from '@/lib/copilot/claude-api-key'
+import { kiKonfiguriert, kiTextClient } from '@/lib/ki/ki'
 import { formatAnthropicError } from '@/lib/copilot/format-anthropic-error'
 import { extractJsonObject } from '@/lib/visualize/claude-json'
 import type { LeadVertriebsKontext } from '@/lib/leads/lead-vertriebs-kontext'
@@ -89,15 +85,13 @@ export function formatLeadVertriebsAnalyse(analyse: LeadVertriebsAnalyse): strin
 export async function generateLeadVertriebsAnalyse(
   kontext: LeadVertriebsKontext
 ): Promise<LeadVertriebsAnalyse> {
-  const key = getClaudeApiKey()
-  if (!key) {
-    throw new Error('CLAUDE_API_KEY fehlt — Vertriebs-Analyse nicht möglich.')
+  if (!kiKonfiguriert()) {
+    throw new Error('Kein KI-Schlüssel (OPENAI_API_KEY oder CLAUDE_API_KEY) — Vertriebs-Analyse nicht möglich.')
   }
 
   try {
-    const client = createAnthropicClient(key)
+    const client = kiTextClient()
     const response = await client.messages.create({
-      model: getClaudeModel(),
       max_tokens: 1800,
       system: SYSTEM,
       messages: [

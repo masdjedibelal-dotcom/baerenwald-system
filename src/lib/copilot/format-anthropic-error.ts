@@ -1,9 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 
 import { isNetlifyAiGatewayBaseUrl } from '@/lib/copilot/claude-api-key'
+import { formatKiAnbieterFehler } from '@/lib/ki/ki'
 
 /** Nutzerfreundliche Meldung statt „401 status code (no body)“. */
 export function formatAnthropicError(e: unknown): string {
+  const openAi = formatKiAnbieterFehler(e)
+  if (openAi) return openAi
   if (e instanceof Anthropic.APIError) {
     if (e.status === 401) {
       if (isNetlifyAiGatewayBaseUrl()) {
