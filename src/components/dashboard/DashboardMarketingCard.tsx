@@ -198,7 +198,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               />
             </div>
             {!data.gscOk && data.gscError ? (
-              <p className="mkt-funnel-hint">Search Console: {data.gscError}</p>
+              <p className="mkt-gsc-fehler">Search Console: {data.gscError}</p>
             ) : null}
 
             <div className="mt-4">
