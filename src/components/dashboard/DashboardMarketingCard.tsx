@@ -197,6 +197,9 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                 muted={!data.gscOk || data.gscImpressions == null}
               />
             </div>
+            {!data.gscOk && data.gscError ? (
+              <p className="mkt-funnel-hint">Search Console: {data.gscError}</p>
+            ) : null}
 
             <div className="mt-4">
               <p className="mb-2 text-[length:var(--fs-meta)] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)]">

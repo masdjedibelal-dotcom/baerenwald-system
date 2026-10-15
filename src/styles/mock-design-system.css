@@ -22787,7 +22787,15 @@ button.dok-gruppe__kopf {
   .wa-postfach.has-chat:has(textarea:focus) { padding-bottom: 0; }
   .wa-postfach.has-chat .wa-pane, .wa-postfach.has-chat .wa-chat { background: #efeae2; }
   body:has(.wa-postfach.has-chat) .bottomnav { display: none; }
-  body:has(.wa-postfach.has-chat) { overflow: hidden; }
+  /* iOS: Seite dahinter festhalten — nur der Verlauf scrollt, Kopf und Eingabe bleiben stehen */
+  html:has(.wa-postfach.has-chat), body:has(.wa-postfach.has-chat) {
+    overflow: hidden; overscroll-behavior: none; height: 100%;
+  }
+  body:has(.wa-postfach.has-chat) { position: fixed; inset: 0; width: 100%; }
+  .wa-postfach.has-chat .wa-pane { display: flex; flex-direction: column; overflow: hidden; }
+  .wa-postfach.has-chat .wa-pane__kopf, .wa-postfach.has-chat .wa-eingabe { flex-shrink: 0; }
+  .wa-postfach.has-chat .wa-chat { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  .wa-postfach.has-chat .wa-verlauf { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .wa-pane .wa-eingabe__feld { font-size: 16px; }
   .wa-postfach.has-chat .wa-pane { height: 100%; }
   .wa-postfach.has-chat .wa-pane__kopf { padding: 8px 10px; }
