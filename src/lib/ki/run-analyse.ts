@@ -8,7 +8,7 @@ export const KI_ANALYSE_SCRIPT_KEYS = KI_BEREICH_ORDER
 export async function runKiAnalyseScript(
   bereich: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (bereich !== 'claude' && !KI_ANALYSE_SCRIPT_KEYS.includes(bereich as (typeof KI_ANALYSE_SCRIPT_KEYS)[number])) {
+  if (bereich !== 'auswertung' && !KI_ANALYSE_SCRIPT_KEYS.includes(bereich as (typeof KI_ANALYSE_SCRIPT_KEYS)[number])) {
     return { ok: false, message: `Unbekannter Bereich: ${bereich}` }
   }
 

@@ -199,4 +199,4 @@ if (kErr) throw new Error(`ki_produkt_katalog: ${kErr.message}`)
 console.log(`✓ ${katRows.length} Produktkatalog-Zeilen importiert`)
 
 console.log(`\nQuelle: ${xlsxPath}`)
-console.log('KI Analytics: npm run import:historik:ki  (Import + Preise + Produkte + Claude)')
+console.log('KI Analytics: npm run import:historik:ki  (Import + Preise + Produkte + KI-Auswertung)')

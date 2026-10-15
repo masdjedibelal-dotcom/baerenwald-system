@@ -1,17 +1,14 @@
 /**
- * KI-Anbieter wählen und OpenAI ansprechen (CRM + Website via Sync). Rein: nur fetch, keine Pakete.
+ * KI über OpenAI (CRM + Website via Sync). Rein: nur fetch, keine Pakete.
  *
  * Umgebung (Netlify):
- *   OPENAI_API_KEY      gesetzt → KI läuft über OpenAI (sonst wie bisher Claude)
+ *   OPENAI_API_KEY      Pflicht — ohne Schlüssel ist die KI aus
  *   OPENAI_MODEL        optional, Standard siehe OPENAI_MODEL_STANDARD
  *   OPENAI_REASONING    optional (z. B. low, medium) — nur für Modelle mit „reasoning_effort“
- *   KI_ANBIETER         optional „claude“ erzwingt Claude trotz OpenAI-Key (Rückweg ohne Löschen)
  */
 
 export const OPENAI_MODEL_STANDARD = 'gpt-5-mini'
 const OPENAI_BASIS = 'https://api.openai.com/v1'
-
-export type KiAnbieter = 'openai' | 'claude'
 
 function saeubern(raw: string | undefined): string {
   return String(raw ?? '')
@@ -24,11 +21,6 @@ function saeubern(raw: string | undefined): string {
 
 export function getOpenAiApiKey(): string {
   return saeubern(process.env.OPENAI_API_KEY)
-}
-
-export function kiAnbieter(): KiAnbieter {
-  if (process.env.KI_ANBIETER?.trim().toLowerCase() === 'claude') return 'claude'
-  return getOpenAiApiKey() ? 'openai' : 'claude'
 }
 
 export function getOpenAiModel(): string {
@@ -56,7 +48,7 @@ export type OpenAiAntwort = {
   nachricht: Extract<OpenAiNachricht, { role: 'assistant' }>
 }
 
-/** Fehler mit HTTP-Status wie beim Anthropic-SDK (status 401/404/429 …), damit bestehende Fehlertexte greifen. */
+/** Fehler mit HTTP-Status (401/404/429 …) und Art, damit die Fehlertexte greifen. */
 export class KiAnbieterFehler extends Error {
   status: number
   type: string
@@ -124,10 +116,10 @@ export async function openAiChat(input: {
 }
 
 /**
- * Einfacher Text-Aufruf in der Form, die der bestehende Code vom Anthropic-SDK kennt
- * (`messages.create` → `{ content: [{ type: 'text', text }] }`).
+ * Einfacher Text-Aufruf: `messages.create` → `{ content: [{ type: 'text', text }] }`
+ * (Form, die der bestehende Code kennt).
  */
-export function openAiAlsClaudeClient(apiKey?: string) {
+export function openAiTextClient(apiKey?: string) {
   return {
     messages: {
       async create(p: {

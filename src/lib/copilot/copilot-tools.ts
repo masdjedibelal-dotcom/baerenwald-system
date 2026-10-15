@@ -1,4 +1,9 @@
-import type Anthropic from '@anthropic-ai/sdk'
+/** Werkzeug für den CRM-Assistenten: Name, Beschreibung, Eingabe als JSON-Schema. */
+export type CopilotWerkzeug = {
+  name: string
+  description: string
+  input_schema: Record<string, unknown>
+}
 
 const emptySchema = {
   type: 'object' as const,
@@ -6,7 +11,7 @@ const emptySchema = {
   additionalProperties: false,
 }
 
-export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
+export const COPILOT_TOOLS: CopilotWerkzeug[] = [
   {
     name: 'crm_hilfe',
     description:
@@ -457,4 +462,3 @@ export const COPILOT_CLAUDE_TOOLS: Anthropic.Tool[] = [
   },
 ]
 
-export { COPILOT_MODEL_PRIMARY, getClaudeModel } from './claude-api-key'

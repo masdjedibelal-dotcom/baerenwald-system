@@ -1,9 +1,9 @@
-import { formatAnthropicError } from '@/lib/copilot/format-anthropic-error'
+import { formatKiFehler } from '@/lib/ki/ki'
 
 /** Lesbare Fehlermeldung auch für non-Error throws (z. B. Netlify-Abbruch). */
 export function formatUnknownError(e: unknown): string {
-  const anthropic = formatAnthropicError(e)
-  if (anthropic !== 'Analyse fehlgeschlagen') return anthropic
+  const ki = formatKiFehler(e)
+  if (ki !== 'Analyse fehlgeschlagen') return ki
 
   if (e instanceof Error) {
     const msg = e.message.trim()

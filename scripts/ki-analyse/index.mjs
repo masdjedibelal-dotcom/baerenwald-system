@@ -13,7 +13,7 @@ import { computeAndSaveDauerBautagebuch } from './dauer-core.mjs'
 import { computeAndSaveBewertungen } from './bewertungen-core.mjs'
 import { computeAndSaveProduktePakete } from './produkte-core.mjs'
 import { computeAndSaveKommunikation } from './kommunikation-core.mjs'
-import { runClaudeAuswertung } from './claude-auswertung.mjs'
+import { runKiAuswertung } from './ki-auswertung.mjs'
 
 const helpers = { num, median, plzRegion, daysBetween }
 
@@ -42,11 +42,11 @@ export async function runKiBereich(bereich, supabase = createAdminClient()) {
       return computeAndSaveDauerBautagebuch(supabase)
     case 'bewertungen':
       return computeAndSaveBewertungen(supabase)
-    case 'claude':
-      return runClaudeAuswertung({ supabase })
+    case 'auswertung':
+      return runKiAuswertung({ supabase })
     default:
       throw new Error(`Unbekannter Bereich: ${bereich}`)
   }
 }
 
-export { runClaudeAuswertung }
+export { runKiAuswertung }

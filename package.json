@@ -64,7 +64,7 @@
     "db:portal-alignment": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260618120000_portal_partner_alignment.sql",
     "db:ki-viz": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/20260620120000_ki_visualisierungen.sql",
     "import:historik": "node --env-file=.env.local scripts/import-historik-xlsx.mjs",
-    "import:historik:ki": "node --env-file=.env.local scripts/import-historik-xlsx.mjs && npm run ki:analyse:preise && npm run ki:analyse:produkte && npm run ki:analyse:claude",
+    "import:historik:ki": "node --env-file=.env.local scripts/import-historik-xlsx.mjs && npm run ki:analyse:preise && npm run ki:analyse:produkte && npm run ki:analyse:auswertung",
     "ki:analyse:funnel": "node --env-file=.env.local scripts/ki-analyse/funnel.mjs",
     "ki:analyse:nachfrage": "node --env-file=.env.local scripts/ki-analyse/nachfrage.mjs",
     "ki:analyse:kommunikation": "node --env-file=.env.local scripts/ki-analyse/kommunikation.mjs",
@@ -77,12 +77,11 @@
     "ki:analyse:bewertungen": "node --env-file=.env.local scripts/ki-analyse/bewertungen.mjs",
     "ki:analyse:produkte": "node --env-file=.env.local scripts/ki-analyse/produkte.mjs",
     "ki:analyse:all": "node --env-file=.env.local scripts/ki-analyse/funnel.mjs && node --env-file=.env.local scripts/ki-analyse/nachfrage.mjs && node --env-file=.env.local scripts/ki-analyse/kommunikation.mjs && node --env-file=.env.local scripts/ki-analyse/angebot-abgleich.mjs && node --env-file=.env.local scripts/ki-analyse/preise-margen.mjs && node --env-file=.env.local scripts/ki-analyse/produkte.mjs && node --env-file=.env.local scripts/ki-analyse/gewerke.mjs && node --env-file=.env.local scripts/ki-analyse/ausfuehrung.mjs && node --env-file=.env.local scripts/ki-analyse/handwerker.mjs && node --env-file=.env.local scripts/ki-analyse/dauer.mjs && node --env-file=.env.local scripts/ki-analyse/bewertungen.mjs",
-    "ki:analyse:claude": "node --env-file=.env.local scripts/ki-analyse/claude-auswertung.mjs",
-    "ki:analyse:full": "npm run ki:analyse:all && npm run ki:analyse:claude",
+    "ki:analyse:auswertung": "node --env-file=.env.local scripts/ki-analyse/ki-auswertung.mjs",
+    "ki:analyse:full": "npm run ki:analyse:all && npm run ki:analyse:auswertung",
     "prod:smoke-readonly": "node --env-file=.env.staging scripts/staging/smoke-prod-readonly.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

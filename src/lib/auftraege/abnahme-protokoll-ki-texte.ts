@@ -1,8 +1,7 @@
 import 'server-only'
 
-import { kiKonfiguriert, kiTextClient } from '@/lib/ki/ki'
-import { formatAnthropicError } from '@/lib/copilot/format-anthropic-error'
-import { extractJsonObject } from '@/lib/visualize/claude-json'
+import { formatKiFehler, kiKonfiguriert, kiTextClient } from '@/lib/ki/ki'
+import { extractJsonObject } from '@/lib/visualize/ki-json'
 import {
   abnahmePunkteFuerDokument,
   type AbnahmeMangel,
@@ -111,7 +110,7 @@ export async function generateAbnahmeFreitexte(input: {
       .join('\n')
     return validate(extractJsonObject(text))
   } catch (e) {
-    console.warn('[generateAbnahmeFreitexte]', formatAnthropicError(e))
+    console.warn('[generateAbnahmeFreitexte]', formatKiFehler(e))
     return empty
   }
 }

@@ -25,8 +25,8 @@ const kiAnalyseRequired = [
   'handwerker-core.mjs',
   'dauer-core.mjs',
   'bewertungen-core.mjs',
-  'claude-auswertung.mjs',
-  'claude-client.mjs',
+  'ki-auswertung.mjs',
+  'ki-client.mjs',
   'upsert.mjs',
 ]
 

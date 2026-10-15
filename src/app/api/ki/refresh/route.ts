@@ -3,14 +3,14 @@ import { KI_ANALYSE_SCRIPT_KEYS, runKiAnalyseScript } from '@/lib/ki/run-analyse
 import { createClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
-/** Mehrere Analysen + Claude können >10s dauern (Netlify Pro). */
+/** Mehrere Analysen + KI-Auswertung können >10s dauern (Netlify Pro). */
 export const maxDuration = 300
 
 const ALLOWED = new Set([
   ...KI_ANALYSE_SCRIPT_KEYS,
-  'claude',
+  'auswertung',
   'all',
-  'all_claude',
+  'all_auswertung',
 ])
 
 export async function POST(req: NextRequest) {
@@ -35,15 +35,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unbekannter Bereich' }, { status: 400 })
   }
 
-  if (bereich === 'all' || bereich === 'all_claude') {
+  if (bereich === 'all' || bereich === 'all_auswertung') {
     const errors: string[] = []
     for (const key of KI_ANALYSE_SCRIPT_KEYS) {
       const result = await runKiAnalyseScript(key)
       if (!result.ok) errors.push(`${key}: ${result.message}`)
     }
-    if (bereich === 'all_claude') {
-      const claude = await runKiAnalyseScript('claude')
-      if (!claude.ok) errors.push(`claude: ${claude.message}`)
+    if (bereich === 'all_auswertung') {
+      const ki = await runKiAnalyseScript('auswertung')
+      if (!ki.ok) errors.push(`auswertung: ${ki.message}`)
     }
     if (errors.length) {
       return NextResponse.json({ error: errors.join(' · ') }, { status: 500 })

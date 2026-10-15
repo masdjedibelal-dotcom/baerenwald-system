@@ -1,8 +1,7 @@
 import 'server-only'
 
-import { kiKonfiguriert, kiTextClient } from '@/lib/ki/ki'
-import { formatAnthropicError } from '@/lib/copilot/format-anthropic-error'
-import { extractJsonObject } from '@/lib/visualize/claude-json'
+import { formatKiFehler, kiKonfiguriert, kiTextClient } from '@/lib/ki/ki'
+import { extractJsonObject } from '@/lib/visualize/ki-json'
 import type { LeadVertriebsKontext } from '@/lib/leads/lead-vertriebs-kontext'
 import { leadVertriebsKontextAlsPrompt } from '@/lib/leads/lead-vertriebs-kontext'
 
@@ -86,7 +85,7 @@ export async function generateLeadVertriebsAnalyse(
   kontext: LeadVertriebsKontext
 ): Promise<LeadVertriebsAnalyse> {
   if (!kiKonfiguriert()) {
-    throw new Error('Kein KI-Schlüssel (OPENAI_API_KEY oder CLAUDE_API_KEY) — Vertriebs-Analyse nicht möglich.')
+    throw new Error('Kein KI-Schlüssel (OPENAI_API_KEY) — Vertriebs-Analyse nicht möglich.')
   }
 
   try {
@@ -109,6 +108,6 @@ export async function generateLeadVertriebsAnalyse(
 
     return validate(extractJsonObject(text))
   } catch (e) {
-    throw new Error(formatAnthropicError(e))
+    throw new Error(formatKiFehler(e))
   }
 }

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Claude-Auswertung: liest ki_cluster_analysen (SQL-Ergebnis) und schreibt narrative.
+ * KI-Auswertung (OpenAI): liest ki_cluster_analysen (SQL-Ergebnis) und schreibt narrative.
  */
 import { pathToFileURL } from 'url'
 import { loadEnvLocal, createAdminClient } from './lib.mjs'
-import { claudeText } from './claude-client.mjs'
+import { kiText } from './ki-client.mjs'
 
 const SYSTEM = `Du bist der Analyse-Assistent für Bärenwald München — ein digitaler Generalunternehmer für Handwerk.
 
@@ -90,7 +90,7 @@ function compressErgebnis(bereich, ergebnis) {
 /**
  * @param {{ supabase?: import('@supabase/supabase-js').SupabaseClient, filterBereich?: string, log?: boolean }} opts
  */
-export async function runClaudeAuswertung({ supabase, filterBereich, log = false } = {}) {
+export async function runKiAuswertung({ supabase, filterBereich, log = false } = {}) {
   const client = supabase ?? createAdminClient()
 
   let query = client.from('ki_cluster_analysen').select('*').order('bereich')
@@ -128,8 +128,8 @@ ${JSON.stringify(payload, null, 2)}
 Schreibe die Auswertung als Fließtext für das KI-Dashboard.`
 
     try {
-      if (log) process.stdout.write(`→ Claude: ${row.bereich} … `)
-      const narrative = await claudeText({ system: SYSTEM, user, maxTokens: 700 })
+      if (log) process.stdout.write(`→ KI: ${row.bereich} … `)
+      const narrative = await kiText({ system: SYSTEM, user, maxTokens: 700 })
 
       const { error: upErr } = await client
         .from('ki_cluster_analysen')
@@ -151,7 +151,7 @@ Schreibe die Auswertung als Fließtext für das KI-Dashboard.`
 
   if (log) console.log(`\nFertig: ${ok}/${rows.length} KI-Auswertungen`)
   if (failed > 0) {
-    throw new Error(`${failed} Claude-Auswertung(en) fehlgeschlagen`)
+    throw new Error(`${failed} KI-Auswertung(en) fehlgeschlagen`)
   }
   return { ok, failed, total: rows.length }
 }
@@ -162,7 +162,7 @@ const isCli =
 if (isCli) {
   loadEnvLocal()
   const filter = process.argv[2]?.trim()
-  runClaudeAuswertung({ filterBereich: filter, log: true }).catch((err) => {
+  runKiAuswertung({ filterBereich: filter, log: true }).catch((err) => {
     console.error(err instanceof Error ? err.message : err)
     process.exitCode = 1
   })

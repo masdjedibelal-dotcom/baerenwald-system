@@ -57,7 +57,7 @@ export type KiAssistScope = {
   intro: string
   /** Placeholder im Eingabefeld */
   placeholder: string
-  /** Extra Kontext für Claude (an contextHint angehängt) */
+  /** Extra Kontext für die KI (an contextHint angehängt) */
   systemHint: string
   /** Schnellchips nur in diesem Modus */
   quickPrompts: { label: string; prompt: string }[]

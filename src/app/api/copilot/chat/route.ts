@@ -6,7 +6,7 @@ import { runCopilotChat, type CopilotChatMessage } from '@/lib/copilot/run-chat'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-/** CRM-Sidepanel-Assistent — gleiche Claude-Tools wie Telegram + UI-Links/Vorschau. */
+/** CRM-Sidepanel-Assistent — gleiche KI-Werkzeuge wie Telegram + UI-Links/Vorschau. */
 export async function POST(req: Request) {
   const supabase = createClient()
   const {
