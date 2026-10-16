@@ -35,6 +35,9 @@ export type EinsatzZeile = {
   auftrag_id: string
   handwerker_id: string
   partner_name: string
+  /** Mitarbeiter des Partners vor Ort (optional) */
+  mitarbeiter_id: string | null
+  mitarbeiter_name: string | null
   titel: string
   anweisung: string | null
   /** Fotos zur Anweisung (öffentliche URLs) */
@@ -102,7 +105,7 @@ export type EinsatzVorbelegung = {
 }
 
 const SELECT =
-  'id, auftrag_id, handwerker_id, titel, anweisung, anweisung_fotos, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, gesendet_at, angenommen_at, angenommen_von, fertig_von, rechnung_von, ablehnung_grund, fertig_at, fertig_text, fertig_dateien, rechnung_pdf_url, rechnung_betrag, rechnung_eingereicht_at, rechnung_bezahlt_at, handwerker(name, firma)'
+  'id, auftrag_id, handwerker_id, titel, anweisung, anweisung_fotos, termin_von, termin_bis, ort, kontakt_vor_ort, ek_betrag, ek_art, status, gesendet_at, angenommen_at, angenommen_von, fertig_von, rechnung_von, ablehnung_grund, fertig_at, fertig_text, fertig_dateien, rechnung_pdf_url, rechnung_betrag, rechnung_eingereicht_at, rechnung_bezahlt_at, mitarbeiter_id, handwerker(name, firma), handwerker_mitarbeiter(name)'
 
 function partnerLabel(hw: { name?: string | null; firma?: string | null } | null | undefined): string {
   return hw?.firma?.trim() || hw?.name?.trim() || 'Partner'
@@ -119,6 +122,11 @@ function mapZeile(r: Record<string, unknown>): EinsatzZeile {
     auftrag_id: String(r.auftrag_id),
     handwerker_id: String(r.handwerker_id),
     partner_name: partnerLabel(hw),
+    mitarbeiter_id: (r.mitarbeiter_id as string | null) ?? null,
+    mitarbeiter_name: (() => {
+      const m = r.handwerker_mitarbeiter as { name?: string | null } | { name?: string | null }[] | null
+      return (Array.isArray(m) ? m[0] : m)?.name ?? null
+    })(),
     titel: String(r.titel ?? ''),
     anweisung: (r.anweisung as string | null) ?? null,
     anweisung_fotos: anweisungFotos(r.anweisung_fotos),
@@ -337,6 +345,8 @@ export async function createEinsatz(input: {
   anweisung?: string | null
   /** Fotos zur Anweisung (aus FotoUploadFeld, Ordner „einsatz“) */
   fotos?: string[]
+  /** Mitarbeiter des Partners vor Ort (optional, Vorschlag — Inhaber kann beim Annehmen ändern) */
+  mitarbeiterId?: string | null
   terminVon?: string | null
   terminBis?: string | null
   ort?: string | null
@@ -359,6 +369,18 @@ export async function createEinsatz(input: {
   const fotos = anweisungFotos(input.fotos)
     .filter((u) => istEinsatzFotoUrl(u, input.auftragId))
     .slice(0, EINSATZ_FOTOS_MAX)
+  let mitarbeiterId: string | null = null
+  if (input.mitarbeiterId) {
+    const { data: m } = await gate.db
+      .from('handwerker_mitarbeiter')
+      .select('id')
+      .eq('id', input.mitarbeiterId)
+      .eq('handwerker_id', input.handwerkerId)
+      .eq('aktiv', true)
+      .maybeSingle()
+    if (!m) return { ok: false, message: 'Der Mitarbeiter gehört nicht zu diesem Partner.' }
+    mitarbeiterId = String(m.id)
+  }
 
   const { data, error } = await gate.db
     .from('einsaetze')
@@ -368,6 +390,7 @@ export async function createEinsatz(input: {
       titel,
       anweisung: input.anweisung?.trim() || null,
       anweisung_fotos: fotos,
+      mitarbeiter_id: mitarbeiterId,
       termin_von: input.terminVon || null,
       termin_bis: input.terminBis || null,
       ort: input.ort?.trim() || null,

@@ -21905,6 +21905,7 @@ display: flex;
 .einsatz-kopf { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .einsatz-kopf__meta { color: var(--text-3); font-size: var(--fs-meta); }
 .einsatz-anweisung { margin: 0; white-space: pre-wrap; line-height: 1.45; }
+.einsatz-mitarbeiter { margin: 0 0 4px; font-size: var(--fs-meta); color: var(--text-2); }
 .einsatz-fotos { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
 .einsatz-fotos img {
   width: 72px; height: 72px; object-fit: cover; display: block;

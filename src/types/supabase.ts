@@ -2883,6 +2883,7 @@ export type Database = {
       }
       einsaetze: {
         Row: {
+          mitarbeiter_id: string | null
           anweisung_fotos: Json
           antwort_token: string | null
           abgelehnt_at: string | null
@@ -2917,6 +2918,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          mitarbeiter_id?: string | null
           anweisung_fotos?: Json
           antwort_token?: string | null
           abgelehnt_at?: string | null
@@ -2951,6 +2953,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          mitarbeiter_id?: string | null
           anweisung_fotos?: Json
           antwort_token?: string | null
           abgelehnt_at?: string | null
@@ -3689,6 +3692,59 @@ export type Database = {
             columns: ["partner_kategorie_id"]
             isOneToOne: false
             referencedRelation: "partner_kategorien"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handwerker_mitarbeiter: {
+        Row: {
+          aktiv: boolean
+          auth_user_id: string | null
+          created_at: string
+          email: string | null
+          handwerker_id: string
+          id: string
+          name: string
+          portal_eingeladen_at: string | null
+          rolle: string | null
+          sort_order: number
+          telefon: string | null
+          updated_at: string
+        }
+        Insert: {
+          aktiv?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          handwerker_id: string
+          id?: string
+          name: string
+          portal_eingeladen_at?: string | null
+          rolle?: string | null
+          sort_order?: number
+          telefon?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aktiv?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          handwerker_id?: string
+          id?: string
+          name?: string
+          portal_eingeladen_at?: string | null
+          rolle?: string | null
+          sort_order?: number
+          telefon?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handwerker_mitarbeiter_handwerker_id_fkey"
+            columns: ["handwerker_id"]
+            isOneToOne: false
+            referencedRelation: "handwerker"
             referencedColumns: ["id"]
           },
         ]

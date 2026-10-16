@@ -33,6 +33,8 @@ import { FotoUploadFeld } from '@/components/ui/FotoUploadFeld'
 import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { EINSATZ_TEXT_KI } from '@/lib/einsatz/einsatz-texte'
 import { EINSATZ_FOTOS_MAX } from '@/lib/einsatz/anweisung-fotos'
+import { listPartnerMitarbeiter } from '@/app/(dashboard)/handwerker/mitarbeiter-actions'
+import type { PartnerMitarbeiter } from '@/lib/partner/mitarbeiter'
 import { safeAction } from '@/lib/actions/safe-action'
 import { formatDatum,formatEuro } from '@/lib/format/geld-datum'
 import { toast } from '@/components/ui/app-toast'
@@ -144,6 +146,8 @@ type Form = {
   anweisung: string
   /** Fotos zur Anweisung (öffentliche URLs) */
   fotos: string[]
+  /** Mitarbeiter des Partners vor Ort (optional) */
+  mitarbeiterId: string
   /** Ein Tag oder Zeitraum */
   terminArt: 'tag' | 'zeitraum'
   terminVon: string
@@ -220,6 +224,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
       titel: res.vorbelegung.titel,
       anweisung: '',
       fotos: [],
+      mitarbeiterId: '',
       terminArt:
         res.vorbelegung.termin_bis && res.vorbelegung.termin_bis !== res.vorbelegung.termin_von
           ? 'zeitraum'
@@ -243,6 +248,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         titel: form.titel,
         anweisung: form.anweisung,
         fotos: form.fotos,
+        mitarbeiterId: form.mitarbeiterId || null,
         terminVon: form.terminVon || null,
         // Ein Tag: Ende = Beginn
         terminBis: (form.terminArt === 'tag' ? form.terminVon : form.terminBis) || null,
@@ -372,6 +378,22 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
 
   const setF = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f))
   const [fotosLaden, setFotosLaden] = useState(false)
+  /** Mitarbeiter des gewählten Partners (für „Mitarbeiter vor Ort“) */
+  const [mitarbeiter, setMitarbeiter] = useState<PartnerMitarbeiter[]>([])
+  const gewaehlterPartner = form?.handwerkerId ?? ''
+  useEffect(() => {
+    setMitarbeiter([])
+    if (!gewaehlterPartner) return
+    let aktiv = true
+    safeAction(listPartnerMitarbeiter(gewaehlterPartner))
+      .then((r) => {
+        if (aktiv && r.ok) setMitarbeiter(r.liste)
+      })
+      .catch(() => undefined)
+    return () => {
+      aktiv = false
+    }
+  }, [gewaehlterPartner])
   const ok = Boolean(form?.handwerkerId && form.titel.trim()) && !fotosLaden
 
   return (
@@ -468,6 +490,9 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                     .join(' · ')}
                 </span>
               </div>
+              {detail.mitarbeiter_name ? (
+                <p className="einsatz-mitarbeiter">Vor Ort: {detail.mitarbeiter_name}</p>
+              ) : null}
               {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
               {detail.anweisung_fotos.length ? (
                 <div className="einsatz-fotos">
@@ -700,7 +725,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                           role="radio"
                           aria-checked={on}
                           className={`einsatz-partner${on ? ' is-on' : ''}`}
-                          onClick={() => setF({ handwerkerId: p.id })}
+                          onClick={() => setF({ handwerkerId: p.id, mitarbeiterId: '' })}
                         >
                           <span className="einsatz-partner__dot" aria-hidden />
                           <span className="einsatz-partner__name">{p.label}</span>
@@ -735,6 +760,29 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                   ]}
                   aria-label="Versandweg"
                 />
+              </MockField>
+            ) : null}
+            {mitarbeiter.length ? (
+              <MockField label="Mitarbeiter vor Ort" hint="Optional — der Partner kann es beim Annehmen ändern. Der Mitarbeiter sieht den Einsatz erst nach der Annahme, ohne EK.">
+                <div className="einsatz-partner-liste" role="radiogroup" aria-label="Mitarbeiter vor Ort">
+                  {[{ id: '', name: 'Kein bestimmter', rolle: null as string | null }, ...mitarbeiter].map((m) => {
+                    const on = form.mitarbeiterId === m.id
+                    return (
+                      <MockBtn
+                        key={m.id || 'keiner'}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        className={`einsatz-partner${on ? ' is-on' : ''}`}
+                        onClick={() => setF({ mitarbeiterId: m.id })}
+                      >
+                        <span className="einsatz-partner__dot" aria-hidden />
+                        <span className="einsatz-partner__name">{m.name}</span>
+                        {m.rolle ? <span className="einsatz-partner__hint">{m.rolle}</span> : null}
+                      </MockBtn>
+                    )
+                  })}
+                </div>
               </MockField>
             ) : null}
             <MockField label="Titel" required>

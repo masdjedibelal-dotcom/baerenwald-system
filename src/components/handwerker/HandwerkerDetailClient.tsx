@@ -21,6 +21,7 @@ import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { EntityHandwerkerStammdatenCard } from '@/components/crm/EntityHandwerkerStammdatenCard'
 import { EntityHandwerkerBankCard } from '@/components/crm/EntityHandwerkerBankCard'
+import { PartnerMitarbeiterCard } from '@/components/handwerker/PartnerMitarbeiterCard'
 import { HandwerkerAkteDokumente } from '@/components/handwerker/HandwerkerAkteDokumente'
 import {
 filterStandardComplianceTypen,
@@ -272,6 +273,8 @@ export function HandwerkerDetailClient({
         portalGesperrt={istPortalGesperrt}
         onInvite={() => void openPortalModal()}
       />
+
+      <PartnerMitarbeiterCard handwerkerId={hw.id} />
 
       <EntityHandwerkerBankCard handwerker={hw} gewerkeOptionen={gewerkeOptionen} />
 
