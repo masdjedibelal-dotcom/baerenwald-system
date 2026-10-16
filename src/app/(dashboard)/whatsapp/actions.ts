@@ -13,8 +13,10 @@ bautagebuchPerWhatsApp,
 imFenster,
 kontaktLaden,
 nachrichtSenden,
+tagebuchEmpfaengerListe,
 webhookVerarbeiten,
 WHATSAPP_MEDIEN_BUCKET,
+type TagebuchEmpfaenger,
 type WaKontakt,
 } from '@/lib/whatsapp/dienst'
 import { whatsappKonfig,whatsappWebhookUrl } from '@/lib/whatsapp/konfig'
@@ -495,10 +497,19 @@ export async function whatsAppAlsDokumente(input: {
 }
 
 /** Tagebuch-Eintrag dem Kunden per WhatsApp schicken (nach dem Speichern). */
+/** Tagebuch: mögliche WhatsApp-Empfänger (Kunde, Ansprechpartner, Objekt-Kontakte) mit Vorauswahl. */
+export async function tagebuchWhatsAppEmpfaenger(auftragId: string): Promise<{ ok: true; liste: TagebuchEmpfaenger[] } | Fail> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return gate
+  return { ok: true, liste: await tagebuchEmpfaengerListe(gate.db, auftragId) }
+}
+
 export async function sendeBautagebuchWhatsApp(input: {
   auftragId: string
   titel: string
   text?: string | null
+  /** IDs aus tagebuchWhatsAppEmpfaenger; leer = Vorauswahl */
+  empfaenger?: string[] | null
 }): Promise<{ ok: true } | Fail> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return gate

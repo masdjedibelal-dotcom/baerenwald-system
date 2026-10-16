@@ -14,7 +14,10 @@ import { splitTagebuchBeschreibung } from '@/lib/auftraege/tagebuch-text'
 import type { AuftragPosition } from '@/lib/types'
 import { TOAST } from '@/lib/copy'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
-import { sendeBautagebuchWhatsApp } from '@/app/(dashboard)/whatsapp/actions'
+import { sendeBautagebuchWhatsApp, tagebuchWhatsAppEmpfaenger } from '@/app/(dashboard)/whatsapp/actions'
+import type { TagebuchEmpfaenger } from '@/lib/whatsapp/dienst'
+import { waNummerAnzeige } from '@/lib/whatsapp/telefon'
+import { safeAction } from '@/lib/actions/safe-action'
 import { useWhatsAppStatus } from '@/components/whatsapp/useWhatsAppStatus'
 
 const MAX_FOTOS = 12
@@ -58,6 +61,18 @@ export function CrmPositionEintragModal({
   const wa = useWhatsAppStatus()
   /** Neuer Eintrag: Kunden zusätzlich per WhatsApp informieren (Link zur Projektseite) */
   const [perWhatsApp, setPerWhatsApp] = useState(false)
+  /** WhatsApp-Empfänger (Kunde, Ansprechpartner, Objekt-Kontakte) — geladen beim Ankreuzen */
+  const [empfaenger, setEmpfaenger] = useState<TagebuchEmpfaenger[] | null>(null)
+  const [gewaehlt, setGewaehlt] = useState<Set<string>>(new Set())
+
+  async function waUmschalten(an: boolean) {
+    setPerWhatsApp(an)
+    if (!an || empfaenger) return
+    const r = await safeAction(tagebuchWhatsAppEmpfaenger(auftragId))
+    const liste = r.ok ? r.liste : []
+    setEmpfaenger(liste)
+    setGewaehlt(new Set(liste.filter((e) => e.vor).map((e) => e.id)))
+  }
 
   const isEdit = Boolean(editEintrag?.id)
 
@@ -108,9 +123,15 @@ export function CrmPositionEintragModal({
             throw new Error(r.message)
           }
           toast.success(isEdit ? 'Eintrag aktualisiert' : 'Eintrag gespeichert')
-          if (!isEdit && perWhatsApp && wa?.sichtbar) {
-            const w = await sendeBautagebuchWhatsApp({ auftragId, titel: titel.trim(), text: beschreibung.trim() })
-            if (w.ok) toast.success('Kunde per WhatsApp informiert')
+          // Nur an die angekreuzten Empfänger (alle abgewählt = keine WhatsApp)
+          if (!isEdit && perWhatsApp && wa?.sichtbar && gewaehlt.size > 0) {
+            const w = await sendeBautagebuchWhatsApp({
+              auftragId,
+              titel: titel.trim(),
+              text: beschreibung.trim(),
+              empfaenger: Array.from(gewaehlt),
+            })
+            if (w.ok) toast.success(gewaehlt.size === 1 ? 'Per WhatsApp informiert' : `${gewaehlt.size} Empfänger per WhatsApp informiert`)
             else toast.error(`WhatsApp an den Kunden ging nicht raus: ${w.message}`)
           }
           onSaved?.()
@@ -172,13 +193,47 @@ export function CrmPositionEintragModal({
         </div>
 
         {!isEdit && wa?.sichtbar ? (
-          <label className="wa-check">
-            <MockCheckbox checked={perWhatsApp} onChange={(e) => setPerWhatsApp(e.target.checked)} />
-            <span>
-              Kunde per WhatsApp informieren
-              <span className="wa-check__sub">Kurzer Text mit Link zur Projektseite (Fotos, Details).</span>
-            </span>
-          </label>
+          <>
+            <label className="wa-check">
+              <MockCheckbox checked={perWhatsApp} onChange={(e) => waUmschalten(e.target.checked)} />
+              <span>
+                Kunde per WhatsApp informieren
+                <span className="wa-check__sub">Kurzer Text mit Link zur Projektseite (Fotos, Details).</span>
+              </span>
+            </label>
+            {perWhatsApp ? (
+              <div className="wa-empfaenger" role="group" aria-label="An">
+                <span className="lt-field-lbl">An</span>
+                {empfaenger == null ? (
+                  <span className="wa-check__sub">Wird geladen …</span>
+                ) : empfaenger.length === 0 ? (
+                  <span className="wa-check__sub">Keine Handynummer beim Kunden oder seinen Ansprechpartnern hinterlegt.</span>
+                ) : (
+                  empfaenger.map((e) => (
+                    <label key={e.id} className="wa-check">
+                      <MockCheckbox
+                        checked={gewaehlt.has(e.id)}
+                        onChange={() =>
+                          setGewaehlt((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(e.id)) next.delete(e.id)
+                            else next.add(e.id)
+                            return next
+                          })
+                        }
+                      />
+                      <span>
+                        {e.name}
+                        <span className="wa-check__sub">
+                          {e.info} · {waNummerAnzeige(e.nummer)}
+                        </span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+            ) : null}
+          </>
         ) : null}
       </div>
     </EditorSheet>

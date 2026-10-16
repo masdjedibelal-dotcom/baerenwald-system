@@ -49,6 +49,13 @@ export async function kontaktZuNummer(db: SupabaseClient, nummer: string): Promi
       return { typ: 'kunde', id: String(k.id), name: String(k.name ?? 'Kunde'), nummer: nr }
     }
   }
+  // Ansprechpartner und Objekt-Kontakte gehören zum Kunden (Antworten landen im Kunden-Chat)
+  for (const tabelle of ['kunden_ansprechpartner', 'objekt_kontakte'] as const) {
+    const { data: ap, error: aErr } = await db.from(tabelle).select('kunde_id, name, telefon').not('telefon', 'is', null)
+    if (aErr) logDbError(`lib/whatsapp/dienst:${tabelle}`, aErr)
+    const treffer = (ap ?? []).find((a) => waNummer(a.telefon) === nr)
+    if (treffer) return { typ: 'kunde', id: String(treffer.kunde_id), name: String(treffer.name ?? 'Kunde'), nummer: nr }
+  }
   return null
 }
 
@@ -457,10 +464,57 @@ export async function einsatzPerWhatsApp(
   return r
 }
 
+export type TagebuchEmpfaenger = {
+  /** „kunde“, „ap:<id>“ (Ansprechpartner) oder „ok:<id>“ (Objekt-Kontakt) */
+  id: string
+  name: string
+  info: string
+  nummer: string
+  /** vorausgewählt */
+  vor: boolean
+}
+
+/**
+ * Mögliche WhatsApp-Empfänger eines Tagebuch-Eintrags: Kunde, seine Ansprechpartner und die Kontakte
+ * des Objekts — nur mit Handynummer. Vorauswahl: Ansprechpartner der Anfrage → Haupt-Ansprechpartner → Kunde.
+ */
+export async function tagebuchEmpfaengerListe(db: SupabaseClient, auftragId: string): Promise<TagebuchEmpfaenger[]> {
+  const { data: auf } = await db.from('auftraege').select('kunde_id, lead_id').eq('id', auftragId).maybeSingle()
+  if (!auf?.kunde_id) return []
+  const kundeId = String(auf.kunde_id)
+  const { data: lead } = auf.lead_id
+    ? await db.from('leads').select('ansprechpartner_id, kunde_objekt_id').eq('id', String(auf.lead_id)).maybeSingle()
+    : { data: null }
+  const [{ data: kunde }, { data: aps }, { data: oks }] = await Promise.all([
+    db.from('kunden').select('id, name, telefon, org_telefon').eq('id', kundeId).maybeSingle(),
+    db.from('kunden_ansprechpartner').select('id, name, rolle, telefon, ist_primaer').eq('kunde_id', kundeId).order('sort_order'),
+    lead?.kunde_objekt_id
+      ? db.from('objekt_kontakte').select('id, name, rolle, telefon').eq('kunde_objekt_id', String(lead.kunde_objekt_id)).eq('aktiv', true).order('sort_order')
+      : Promise.resolve({ data: [] as { id: string; name: string; rolle: string | null; telefon: string | null }[] }),
+  ])
+  const liste: TagebuchEmpfaenger[] = []
+  const gesehen = new Set<string>()
+  const add = (e: Omit<TagebuchEmpfaenger, 'vor' | 'nummer'> & { telefon: string | null | undefined }) => {
+    const nr = waNummer(e.telefon)
+    if (!nr || gesehen.has(nr)) return
+    gesehen.add(nr)
+    liste.push({ id: e.id, name: e.name, info: e.info, nummer: nr, vor: false })
+  }
+  for (const a of aps ?? []) add({ id: `ap:${a.id}`, name: String(a.name), info: [a.rolle, 'Ansprechpartner'].filter(Boolean).join(' · '), telefon: a.telefon })
+  for (const o of oks ?? []) add({ id: `ok:${o.id}`, name: String(o.name), info: [o.rolle, 'Objekt'].filter(Boolean).join(' · '), telefon: o.telefon })
+  if (kunde) add({ id: 'kunde', name: String(kunde.name ?? 'Kunde'), info: 'Kunde', telefon: kunde.telefon ?? kunde.org_telefon })
+  const vorId =
+    (lead?.ansprechpartner_id && liste.find((e) => e.id === `ap:${lead.ansprechpartner_id}`)?.id) ||
+    liste.find((e) => e.id.startsWith('ap:') && (aps ?? []).some((a) => `ap:${a.id}` === e.id && a.ist_primaer))?.id ||
+    liste.find((e) => e.id === 'kunde')?.id ||
+    liste[0]?.id
+  return liste.map((e) => ({ ...e, vor: e.id === vorId }))
+}
+
 /** Tagebuch-Eintrag an den Kunden: kurzer Text + Link zur Projektseite (ohne Login). */
 export async function bautagebuchPerWhatsApp(
   db: SupabaseClient,
-  input: { auftragId: string; titel: string; text?: string | null; userId: string | null }
+  input: { auftragId: string; titel: string; text?: string | null; userId: string | null; empfaenger?: string[] | null }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data: auf } = await db
     .from('auftraege')
@@ -468,21 +522,28 @@ export async function bautagebuchPerWhatsApp(
     .eq('id', input.auftragId)
     .maybeSingle()
   if (!auf?.kunde_id) return { ok: false, message: 'Der Auftrag hat keinen Kunden.' }
-  const kontakt = await kontaktLaden(db, { kundeId: String(auf.kunde_id) })
-  if (!kontakt) return { ok: false, message: 'Für den Kunden ist keine Handynummer hinterlegt.' }
+  const liste = await tagebuchEmpfaengerListe(db, input.auftragId)
+  const gewaehlt = input.empfaenger?.length ? liste.filter((e) => input.empfaenger!.includes(e.id)) : liste.filter((e) => e.vor)
+  if (!gewaehlt.length) return { ok: false, message: 'Keine Handynummer beim Kunden oder seinen Ansprechpartnern hinterlegt.' }
   const { ensureKundenTokenForAuftrag } = await import('@/lib/projekt/kunden-token')
   const { projektUrlFromToken } = await import('@/lib/projekt/projekt-url')
   const token = await ensureKundenTokenForAuftrag(input.auftragId)
   if (!token) return { ok: false, message: 'Projekt-Link konnte nicht erstellt werden.' }
   const { richTextToPlain } = await import('@/lib/rich-text')
   const inhalt = [input.titel.trim(), richTextToPlain(input.text ?? '').trim()].filter(Boolean).join(' — ').slice(0, 500)
-  return nachrichtSenden(db, {
-    kontakt,
-    vorlage: {
-      name: 'bw_bautagebuch',
-      werte: [kontakt.name, String(auf.titel ?? 'Ihr Projekt'), inhalt || 'Neue Fotos und Infos', projektUrlFromToken(token)],
-    },
-    auftragId: input.auftragId,
-    userId: input.userId,
-  }).then((r) => (r.ok ? { ok: true as const } : r))
+  const fehler: string[] = []
+  for (const e of gewaehlt) {
+    // Ansprechpartner laufen im Chat des Kunden (gleiche Kunden-ID, eigene Nummer)
+    const r = await nachrichtSenden(db, {
+      kontakt: { typ: 'kunde', id: String(auf.kunde_id), name: e.name, nummer: e.nummer },
+      vorlage: {
+        name: 'bw_bautagebuch',
+        werte: [e.name, String(auf.titel ?? 'Ihr Projekt'), inhalt || 'Neue Fotos und Infos', projektUrlFromToken(token)],
+      },
+      auftragId: input.auftragId,
+      userId: input.userId,
+    })
+    if (!r.ok) fehler.push(`${e.name}: ${r.message}`)
+  }
+  return fehler.length ? { ok: false, message: fehler.join(' · ') } : { ok: true }
 }
