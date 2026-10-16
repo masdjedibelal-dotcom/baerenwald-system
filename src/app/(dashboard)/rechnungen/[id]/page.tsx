@@ -211,6 +211,7 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
         ersetzt_durch: (detailRec as { ersetzt_durch?: string | null }).ersetzt_durch,
         rechnungsnummer: detailRec.rechnungsnummer,
         brutto: detailRec.brutto ?? null,
+        created_at: (detailRec as { created_at?: string | null }).created_at ?? null,
       },
       siblingRows
     )
@@ -240,6 +241,7 @@ export default async function RechnungDetailPage({ params }: { params: { id: str
             ersetzt_durch: (detailRec as { ersetzt_durch?: string | null }).ersetzt_durch,
             rechnungsnummer: detailRec.rechnungsnummer,
             brutto: detailRec.brutto ?? null,
+            created_at: (detailRec as { created_at?: string | null }).created_at ?? null,
           },
           merged
         )

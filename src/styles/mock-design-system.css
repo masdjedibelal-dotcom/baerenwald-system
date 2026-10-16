@@ -2626,6 +2626,7 @@ font-size: var(--fs-caption);
   gap: 2px;
 }
 
+.re-kette-datum { font-weight: 400; color: var(--text-3); }
 .re-kette-role {
   font-size: var(--fs-meta);
   font-weight: 600;

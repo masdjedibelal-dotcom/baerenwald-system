@@ -9,7 +9,7 @@ import {
   type RechnungKorrekturKetteUi,
 } from '@/lib/rechnungen/rechnung-korrektur'
 import { rechnungStatusDisplay } from '@/lib/status/status-display'
-import { cn } from '@/lib/utils'
+import { cn, formatDatum } from '@/lib/utils'
 
 function memberBadgeKind(status: string): 'storniert' | 'neu' | 'aktiv' | 'warten' | 'plain' {
   const s = status.toLowerCase()
@@ -43,7 +43,7 @@ function memberStatusLabel(
 
 /**
  * Korrektur-Verlauf — wie Phasenverlauf: Text links, Betrag, Status rechts.
- * Mehrstufige Korrekturen (nochmals korrigieren) als fortlaufende Zeilen.
+ * Mehrstufige Korrekturen als Zeilen — neueste oben, Original unten, jeweils mit Anlagedatum.
  */
 export function RechnungKorrekturKetteCard({
   kette,
@@ -64,7 +64,8 @@ export function RechnungKorrekturKetteCard({
       }
     >
       <ul className="re-kette-list">
-        {kette.members.map((m) => {
+        {/* Neueste oben, Original unten */}
+        {[...kette.members].reverse().map((m) => {
           const nr =
             m.rechnungsnummer?.trim() ||
             (m.role === 'gutschrift' ? 'Gutschrift' : 'Rechnung')
@@ -79,7 +80,10 @@ export function RechnungKorrekturKetteCard({
               className={cn('re-kette-row', m.current && 're-kette-row--current')}
             >
               <div className="re-kette-text">
-                <span className="re-kette-role">{roleLabel}</span>
+                <span className="re-kette-role">
+                  {roleLabel}
+                  {m.created_at ? <span className="re-kette-datum"> · {formatDatum(m.created_at)}</span> : null}
+                </span>
                 {m.current ? (
                   <span className="re-kette-nr">
                     {nr}

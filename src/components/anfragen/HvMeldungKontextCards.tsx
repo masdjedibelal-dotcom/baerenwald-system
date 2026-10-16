@@ -239,10 +239,6 @@ export function HvMeldungKontextCards({
             <PropRow label="Hausnummer" value={leistungsort.hausnummer || '—'} />
             <PropRow label="PLZ" value={leistungsort.plz || '—'} />
             <PropRow label="Ort" value={leistungsort.ort || '—'} />
-            <PropRow
-              label="Anlage / Teil"
-              value={lead.objekt_anlagen?.bezeichnung?.trim() || '—'}
-            />
           </div>
         </div>
       </MockCard>

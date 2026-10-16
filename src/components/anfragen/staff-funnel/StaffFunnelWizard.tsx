@@ -52,7 +52,6 @@ import {
   StaffChoiceGrid,
   StaffPreisIndikation,
 } from '@/components/anfragen/staff-funnel/StaffFunnelUi'
-import { AnlageTeilPicker } from '@/components/crm/AnlageTeilPicker'
 import { CONFIRM,TOAST } from '@/lib/copy'
 import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
 
@@ -356,14 +355,6 @@ function HvMieterObjektFields({
           Objekt-Dropdown nach Auswahl eines Bestandskunden; sonst Adresse eingeben.
         </p>
       )}
-
-      <AnlageTeilPicker
-        kundeId={kundeId}
-        kundeObjektId={state.kundeObjektId}
-        value={state.objektAnlageId}
-        onChange={(objektAnlageId) => patch({ objektAnlageId })}
-        gewerke={gewerke}
-      />
 
       <MeldeadresseFields state={state} patch={patch} />
     </div>

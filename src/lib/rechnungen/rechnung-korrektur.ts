@@ -376,6 +376,8 @@ export type RechnungKorrekturKetteMember = {
   status: string
   brutto: number | null
   beleg_typ: string | null
+  /** Angelegt am (für die Anzeige neben Original/Storno/Korrektur) */
+  created_at: string | null
   current: boolean
 }
 
@@ -459,6 +461,7 @@ export function buildRechnungKorrekturKetteUi(
     ersetzt_durch?: string | null
     rechnungsnummer?: string | null
     brutto?: number | null
+    created_at?: string | null
   },
   siblings: RechnungKorrekturKetteSiblingRow[]
 ): RechnungKorrekturKetteUi | null {
@@ -514,6 +517,7 @@ export function buildRechnungKorrekturKetteUi(
       status: String(row?.status ?? 'entwurf'),
       brutto: row?.brutto ?? null,
       beleg_typ: row?.beleg_typ ?? null,
+      created_at: row?.created_at ?? null,
       current: id === current.id,
     }
   })

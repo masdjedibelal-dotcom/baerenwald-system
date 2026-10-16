@@ -2,7 +2,6 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockField, MockFormSection, MockInput, MockSelect } from '@/components/mock-ui/MockForm'
-import { AnlageTeilPicker } from '@/components/crm/AnlageTeilPicker'
 import { kundenObjektKurzlabel } from '@/lib/kunden-objekte'
 import type { Gewerk, KundenObjekt } from '@/lib/types'
 
@@ -69,14 +68,6 @@ export function MelderLeistungsortFields({
             </MockBtn>
           </div>
         ) : null}
-        <AnlageTeilPicker
-          kundeId={kundeId}
-          kundeObjektId={draft.kunde_objekt_id}
-          value={draft.objekt_anlage_id}
-          onChange={(objekt_anlage_id) => patchLeistungsort({ objekt_anlage_id })}
-          gewerke={gewerke}
-          disabled={disabled}
-        />
       </MockFormSection>
 
       {hideMelder ? null : (
