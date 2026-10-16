@@ -98,3 +98,72 @@ export function buildEinsatzPartnerMail(
     html: mailHtmlBase(content, `Neuer Einsatz: ${input.titel}`, branding, undefined, { skipMeinBaerenwaldPs: true }),
   }
 }
+
+/**
+ * Info an den Mitarbeiter des Partners nach der Annahme: was, wann, wo, Anweisung, Fotos — **ohne EK**,
+ * ohne Annehmen/Ablehnen (das macht der Inhaber). Link ins Partner-Portal.
+ */
+export function buildEinsatzMitarbeiterMail(
+  input: {
+    mitarbeiterName: string
+    partnerName: string
+    titel: string
+    anweisung: string | null
+    fotos?: string[]
+    terminVon: string | null
+    terminBis: string | null
+    ort: string | null
+    kontaktVorOrt: string | null
+    portalLink: string
+  },
+  branding: MailBranding
+): { betreff: string; html: string } {
+  const anrede = mailAnredeFromKundeTyp(null)
+  const von = datum(input.terminVon)
+  const bis = datum(input.terminBis)
+  const wann = von && bis && von !== bis ? `${von} bis ${bis}` : von || bis
+  const betreff = buildSubject({ ereignis: 'Ihr Einsatz', objekt: input.ort, nummer: null })
+  const meta = [
+    wann ? `<b>Wann:</b> ${esc(wann)}` : '',
+    input.ort ? `<b>Wo:</b> ${esc(input.ort)}` : '',
+    input.kontaktVorOrt ? `<b>Kontakt vor Ort:</b> ${esc(input.kontaktVorOrt)}` : '',
+  ]
+    .filter(Boolean)
+    .join('<br>')
+  const summary = mailSummaryBlock({ label: 'Einsatz', title: esc(input.titel), metaHtml: meta || undefined })
+  const text = input.anweisung?.trim()
+    ? `<p style="margin:16px 0;white-space:pre-wrap">${esc(input.anweisung.trim())}</p>`
+    : ''
+  const fotos = (input.fotos ?? []).filter((u) => /^https:\/\//i.test(u))
+  const fotosHtml = fotos.length
+    ? `<p style="margin:16px 0 8px;"><b>Fotos (${fotos.length})</b> — zum Vergrößern anklicken</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 8px;">
+      ${Array.from({ length: Math.ceil(fotos.length / 2) }, (_, r) =>
+        `<tr>${fotos
+          .slice(r * 2, r * 2 + 2)
+          .map(
+            (u, i) =>
+              `<td style="padding:0 8px 8px 0;vertical-align:top;"><a href="${esc(u)}" target="_blank"><img src="${esc(u)}" width="140" height="105" alt="Foto ${r * 2 + i + 1}" style="display:block;width:140px;height:105px;object-fit:cover;border-radius:8px;border:1px solid #E5E7EB;"></a></td>`
+          )
+          .join('')}</tr>`
+      ).join('')}
+    </table>`
+    : ''
+  const content = `
+    <p>${esc(mailBegruessungZeile(anrede, input.mitarbeiterName))}</p>
+    <p>${esc(input.partnerName)} hat Sie für diesen Einsatz eingeteilt. Hier alles, was Sie vor Ort brauchen:</p>
+    ${summary}
+    ${text}
+    ${fotosHtml}
+    <div style="margin:20px 0 8px;">
+      ${mailPrimaryButtonHtml('Einsatz im Portal öffnen', input.portalLink, { margin: '0 0 8px 0' })}
+    </div>
+    <p style="font-size:13px;color:#6B7280;margin:0 0 16px;">
+      Im Partner-Portal können Sie Fotos und Updates schicken und den Einsatz als erledigt melden. Beim ersten Mal bitte mit dieser E-Mail-Adresse registrieren.
+    </p>
+    <p>${mailTeamGruss(anrede, branding.firmenname ?? '')}</p>`
+  return {
+    betreff,
+    html: mailHtmlBase(content, `Ihr Einsatz: ${input.titel}`, branding, undefined, { skipMeinBaerenwaldPs: true }),
+  }
+}

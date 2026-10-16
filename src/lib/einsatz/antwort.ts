@@ -100,5 +100,9 @@ export async function einsatzBeantworten(
         : { abgelehnt_at: now, ablehnung_grund: grund?.trim().slice(0, 500) || 'Per E-Mail abgelehnt' },
   })
   if (!w.ok) return { ok: false, message: w.error }
+  if (antwort === 'annehmen') {
+    const { mitarbeiterUeberEinsatzInformieren } = await import('@/lib/einsatz/mitarbeiter-info')
+    await mitarbeiterUeberEinsatzInformieren(db, e.id).catch((err) => console.warn('[einsatz-antwort] Mitarbeiter-Info', err))
+  }
   return { ok: true, status: antwort === 'annehmen' ? 'angenommen' : 'abgelehnt' }
 }

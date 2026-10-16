@@ -49,6 +49,11 @@ export async function kontaktZuNummer(db: SupabaseClient, nummer: string): Promi
       return { typ: 'kunde', id: String(k.id), name: String(k.name ?? 'Kunde'), nummer: nr }
     }
   }
+  // Mitarbeiter eines Partners laufen im Chat des Partners
+  const { data: ma, error: mErr } = await db.from('handwerker_mitarbeiter').select('handwerker_id, name, telefon').eq('aktiv', true).not('telefon', 'is', null)
+  if (mErr) logDbError('lib/whatsapp/dienst:handwerker_mitarbeiter', mErr)
+  const maTreffer = (ma ?? []).find((m) => waNummer(m.telefon) === nr)
+  if (maTreffer) return { typ: 'handwerker', id: String(maTreffer.handwerker_id), name: String(maTreffer.name ?? 'Mitarbeiter'), nummer: nr }
   // Ansprechpartner und Objekt-Kontakte gehören zum Kunden (Antworten landen im Kunden-Chat)
   for (const tabelle of ['kunden_ansprechpartner', 'objekt_kontakte'] as const) {
     const { data: ap, error: aErr } = await db.from(tabelle).select('kunde_id, name, telefon').not('telefon', 'is', null)
@@ -245,6 +250,9 @@ async function einsatzKnopf(db: SupabaseClient, kontakt: WaKontakt, knopfId: str
   // Fotos zur Anweisung: jetzt ist das 24-Stunden-Fenster offen (der Partner hat geantwortet)
   if (k.antwort === 'annehmen' && String(e.status) === 'gesendet') {
     await einsatzFotosSenden(db, kontakt, { id: String(e.id), auftrag_id: String(e.auftrag_id) }, anweisungFotos(e.anweisung_fotos), mock)
+    // Zugeordneten Mitarbeiter informieren (dynamisch — mitarbeiter-info nutzt selbst diesen Dienst)
+    const { mitarbeiterUeberEinsatzInformieren } = await import('@/lib/einsatz/mitarbeiter-info')
+    await mitarbeiterUeberEinsatzInformieren(db, String(e.id)).catch((err) => console.warn('[whatsapp] Mitarbeiter-Info', err))
   }
 }
 

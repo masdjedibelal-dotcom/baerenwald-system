@@ -8,6 +8,7 @@ createEinsatz,
 einsatzFertigErfassen,
 einsatzRechnungErfassen,
 einsatzRegieErfassen,
+einsatzMitarbeiterSetzen,
 einsatzRueckmeldungErfassen,
 einsatzUpdateErfassen,
 einsatzUpdatesGesehen,
@@ -309,11 +310,27 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   }
 
   async function angenommenEintragen(id: string) {
-    const res = await safeAction(einsatzRueckmeldungErfassen(id, 'angenommen'))
+    // Mitarbeiter-Wahl im Blatt mitgeben (Bärenwald nimmt für den Partner an und teilt ein)
+    const res = await safeAction(
+      einsatzRueckmeldungErfassen(id, 'angenommen', undefined, detailMitarbeiter.length ? detailWahl || null : undefined)
+    )
     if (!res.ok) {
       toast.error(res.message)
       return
     }
+    if (detailWahl) toast.success('Angenommen — Mitarbeiter wird informiert')
+    await laden()
+  }
+
+  async function mitarbeiterAendern(id: string, wahl: string) {
+    setDetailWahl(wahl)
+    if (detail?.status !== 'angenommen') return
+    const res = await safeAction(einsatzMitarbeiterSetzen(id, wahl || null))
+    if (!res.ok) {
+      toast.error(res.message)
+      return
+    }
+    toast.success(wahl ? 'Mitarbeiter geändert und informiert' : 'Mitarbeiter entfernt')
     await laden()
   }
 
@@ -395,6 +412,28 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
     }
   }, [gewaehlterPartner])
   const ok = Boolean(form?.handwerkerId && form.titel.trim()) && !fotosLaden
+
+  /** Einsatz-Ansicht: Mitarbeiter des Partners und aktuelle Wahl */
+  const [detailMitarbeiter, setDetailMitarbeiter] = useState<PartnerMitarbeiter[]>([])
+  const [detailWahl, setDetailWahl] = useState('')
+  const detailPartner = detail?.handwerker_id ?? ''
+  const detailMaId = detail?.mitarbeiter_id ?? ''
+  useEffect(() => {
+    setDetailWahl(detailMaId)
+  }, [detailMaId, detailId])
+  useEffect(() => {
+    setDetailMitarbeiter([])
+    if (!detailPartner) return
+    let aktiv = true
+    safeAction(listPartnerMitarbeiter(detailPartner))
+      .then((r) => {
+        if (aktiv && r.ok) setDetailMitarbeiter(r.liste)
+      })
+      .catch(() => undefined)
+    return () => {
+      aktiv = false
+    }
+  }, [detailPartner])
 
   return (
     <>
@@ -490,7 +529,18 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                     .join(' · ')}
                 </span>
               </div>
-              {detail.mitarbeiter_name ? (
+              {detailMitarbeiter.length && (detail.status === 'gesendet' || detail.status === 'angenommen') ? (
+                <div className="einsatz-mitarbeiter-wahl">
+                  <span className="einsatz-mitarbeiter">Mitarbeiter vor Ort</span>
+                  <div className="einsatz-mitarbeiter-chips" role="radiogroup" aria-label="Mitarbeiter vor Ort">
+                    {[{ id: '', name: 'Keiner' }, ...detailMitarbeiter].map((m) => (
+                      <MockChip key={m.id || 'keiner'} active={detailWahl === m.id} onClick={() => { mitarbeiterAendern(detail.id, m.id) }}>
+                        {m.name}
+                      </MockChip>
+                    ))}
+                  </div>
+                </div>
+              ) : detail.mitarbeiter_name ? (
                 <p className="einsatz-mitarbeiter">Vor Ort: {detail.mitarbeiter_name}</p>
               ) : null}
               {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}

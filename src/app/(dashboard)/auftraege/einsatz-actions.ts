@@ -16,6 +16,7 @@ import {
 import { planAuftragStatusWrite } from '@/lib/status/write-auftrag-status'
 import { writeEinsatzStatus } from '@/lib/status/write-einsatz-status'
 import { einsatzPerWhatsApp } from '@/lib/whatsapp/dienst'
+import { mitarbeiterUeberEinsatzInformieren } from '@/lib/einsatz/mitarbeiter-info'
 import { anweisungFotos, EINSATZ_FOTOS_MAX, istEinsatzFotoUrl } from '@/lib/einsatz/anweisung-fotos'
 import { einsatzAntwortLink, neuerAntwortToken } from '@/lib/einsatz/antwort'
 import { waNummer } from '@/lib/whatsapp/telefon'
@@ -562,7 +563,9 @@ function dateienAus(formData: FormData, feld: string): File[] {
 export async function einsatzRueckmeldungErfassen(
   einsatzId: string,
   antwort: 'angenommen' | 'abgelehnt',
-  grund?: string
+  grund?: string,
+  /** Bei „angenommen“: Mitarbeiter vor Ort (undefined = unverändert, null = keiner) */
+  mitarbeiterId?: string | null
 ): Promise<ErfassenResult> {
   const gate = await requireStaffAndServiceRole()
   if (!gate.ok) return { ok: false, message: gate.message }
@@ -570,6 +573,10 @@ export async function einsatzRueckmeldungErfassen(
   if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
   const now = new Date().toISOString()
   if (antwort === 'abgelehnt' && !grund?.trim()) return { ok: false, message: 'Bitte kurz den Grund angeben.' }
+  if (antwort === 'angenommen' && mitarbeiterId !== undefined) {
+    const m = await mitarbeiterZuordnen(gate.db, einsatzId, e.handwerker_id, mitarbeiterId)
+    if (!m.ok) return m
+  }
   const w = await writeEinsatzStatus(gate.db, {
     einsatzId,
     von: 'gesendet',
@@ -587,6 +594,51 @@ export async function einsatzRueckmeldungErfassen(
       .update(planAuftragStatusWrite('in_arbeit'))
       .eq('id', e.auftrag_id)
       .eq('status', 'offen')
+    // Ab jetzt läuft der Einsatz beim Mitarbeiter: Info mit Anweisung und Fotos (ohne EK)
+    await mitarbeiterUeberEinsatzInformieren(gate.db, einsatzId).catch((err) => console.warn('[einsatz] Mitarbeiter-Info', err))
+  }
+  revalidatePath(`/auftraege/${e.auftrag_id}`)
+  return { ok: true }
+}
+
+/** Mitarbeiter prüfen (gehört zum Partner, aktiv) und am Einsatz setzen. */
+async function mitarbeiterZuordnen(
+  db: SupabaseClient,
+  einsatzId: string,
+  handwerkerId: string,
+  mitarbeiterId: string | null
+): Promise<{ ok: true; geaendert: boolean } | { ok: false; message: string }> {
+  if (mitarbeiterId) {
+    const { data: m } = await db
+      .from('handwerker_mitarbeiter')
+      .select('id')
+      .eq('id', mitarbeiterId)
+      .eq('handwerker_id', handwerkerId)
+      .eq('aktiv', true)
+      .maybeSingle()
+    if (!m) return { ok: false, message: 'Der Mitarbeiter gehört nicht zu diesem Partner.' }
+  }
+  const { data: vorher } = await db.from('einsaetze').select('mitarbeiter_id').eq('id', einsatzId).maybeSingle()
+  const alt = (vorher?.mitarbeiter_id as string | null) ?? null
+  if (alt === mitarbeiterId) return { ok: true, geaendert: false }
+  const { error } = await db.from('einsaetze').update({ mitarbeiter_id: mitarbeiterId }).eq('id', einsatzId)
+  if (error) {
+    logDbError('app/auftraege/einsatz-actions:mitarbeiter', error)
+    return { ok: false, message: 'Mitarbeiter konnte nicht zugeordnet werden.' }
+  }
+  return { ok: true, geaendert: true }
+}
+
+/** Mitarbeiter vor Ort ändern (auch nach der Annahme) — neu Zugeordneter wird informiert. */
+export async function einsatzMitarbeiterSetzen(einsatzId: string, mitarbeiterId: string | null): Promise<ErfassenResult> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const e = await ladeEinsatzKurz(gate.db, einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  const m = await mitarbeiterZuordnen(gate.db, einsatzId, e.handwerker_id, mitarbeiterId)
+  if (!m.ok) return m
+  if (m.geaendert && mitarbeiterId && e.status === 'angenommen') {
+    await mitarbeiterUeberEinsatzInformieren(gate.db, einsatzId).catch((err) => console.warn('[einsatz] Mitarbeiter-Info', err))
   }
   revalidatePath(`/auftraege/${e.auftrag_id}`)
   return { ok: true }

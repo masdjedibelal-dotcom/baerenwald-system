@@ -9,7 +9,7 @@ import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marke
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatNumber } from '@/lib/format/geld-datum'
 
-const SUCHBEGRIFFE_PRO_SEITE = 20
+const SUCHBEGRIFFE_PRO_SEITE = 10
 
 function formatNum(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
