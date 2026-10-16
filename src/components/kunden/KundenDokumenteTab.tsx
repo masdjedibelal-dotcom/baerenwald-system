@@ -1,5 +1,6 @@
 'use client'
 
+import { DokFuerWahl, DOK_FUER_FEHLT, type DokFuer } from '@/components/ui/DokFuerWahl'
 import { UPLOAD_HINWEIS, uploadVorbereiten } from '@/lib/upload-grenze'
 import { MockBtn } from '@/components/mock-ui'
 import { MockDokumenteCard } from '@/components/mock-ui/MockDetailCards'
@@ -14,6 +15,7 @@ import { useMemo, useRef, useState } from 'react'
 import {
   deleteKundeDokument,
   insertKundeDokument,
+  setKundeDokumentFuerKunde,
 } from '@/app/(dashboard)/kunden/dokumente-actions'
 import { toast } from '@/components/ui/app-toast'
 import type { KundenDokumentRow } from '@/lib/types'
@@ -123,6 +125,8 @@ export function KundenDokumenteTab({
   >({})
   const [editId, setEditId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  /** Beim Upload Pflicht: intern oder für den Kunden (keine Vorauswahl) */
+  const [uploadFuer, setUploadFuer] = useState<DokFuer | null>(null)
   const [uploading, setUploading] = useState(false)
   const [pending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -213,7 +217,7 @@ export function KundenDokumenteTab({
         quelle: 'upload',
         dokumentId: d.id,
         beschreibung: m?.beschreibung ?? '',
-        freigabe: m?.freigabe ?? false,
+        freigabe: m?.freigabe ?? Boolean(d.fuer_kunde),
         groupKey: ALLGEMEIN_KEY,
         groupTitle: ALLGEMEIN_TITLE,
       })
@@ -359,6 +363,10 @@ export function KundenDokumenteTab({
   }
 
   async function uploadFiles(files: FileList | File[]) {
+    if (!uploadFuer) {
+      toast.error(DOK_FUER_FEHLT)
+      return
+    }
     const roh = Array.from(files).slice(0, 5)
     if (!roh.length) return
     // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
@@ -391,6 +399,7 @@ export function KundenDokumenteTab({
           datei_url: json.url,
           groesse_bytes: json.groesse_bytes ?? file.size,
           typ: 'sonstiges',
+          fuerKunde: uploadFuer === 'kunde',
         })
         if (!ins.ok) throw new Error(ins.message)
       }
@@ -546,7 +555,28 @@ export function KundenDokumenteTab({
                     onClick={() => setEditId(null)}
                   />
                 ) : (
-                  <MockEntityRowMenu items={docMenuItems(d)} title="Dokument" />
+                  <>
+                    {d.quelle === 'upload' && d.dokumentId ? (
+                      <MockBtn
+                        type="button"
+                        className={cn('dok-freigabe-pill', d.freigabe ? 'dok-freigabe-kunde is-kunde' : 'dok-freigabe-intern')}
+                        title={d.freigabe ? 'Sieht der Kunde im Portal — antippen für intern' : 'Nur intern — antippen, damit der Kunde es sieht'}
+                        onClick={() => {
+                          const an = !d.freigabe
+                          upd(d.id, { freigabe: an })
+                          void setKundeDokumentFuerKunde(d.dokumentId!, kundeId, an).then((r) => {
+                            if (!r.ok) {
+                              upd(d.id, { freigabe: !an })
+                              toast.error(r.message)
+                            }
+                          })
+                        }}
+                      >
+                        {d.freigabe ? 'Kunde' : 'intern'}
+                      </MockBtn>
+                    ) : null}
+                    <MockEntityRowMenu items={docMenuItems(d)} title="Dokument" />
+                  </>
                 )}
               </div>
             </div>
@@ -559,6 +589,7 @@ export function KundenDokumenteTab({
   return (
     <>
       <MockDokumenteCard count={docs.length}>
+        {!isMobile ? <DokFuerWahl value={uploadFuer} onChange={setUploadFuer} /> : null}
         {!isMobile ? (
           <>
             <input

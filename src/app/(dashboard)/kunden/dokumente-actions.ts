@@ -29,6 +29,8 @@ export async function insertKundeDokument(input: {
   datei_url: string
   groesse_bytes?: number | null
   typ?: string
+  /** Beim Upload gewählt: im Kundenportal unter „Ihre Unterlagen“ */
+  fuerKunde: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const gate = await assertKunde(input.kundeId)
   if (!gate.ok) return gate
@@ -48,6 +50,7 @@ export async function insertKundeDokument(input: {
       datei_url: url,
       groesse_bytes: input.groesse_bytes ?? null,
       erstellt_von: gate.userId,
+      fuer_kunde: Boolean(input.fuerKunde),
     })
     .select('id')
     .single()
@@ -56,6 +59,27 @@ export async function insertKundeDokument(input: {
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
   revalidateKundeDetail(input.kundeId)
   return { ok: true, id: data.id as string }
+}
+
+/** Akte: Kunden-Dokument für den Kunden freigeben bzw. intern stellen. */
+export async function setKundeDokumentFuerKunde(
+  dokumentId: string,
+  kundeId: string,
+  fuerKunde: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await assertKunde(kundeId)
+  if (!gate.ok) return gate
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('kunden_dokumente')
+    .update({ fuer_kunde: fuerKunde })
+    .eq('id', dokumentId)
+    .eq('kunde_id', kundeId)
+  if (error) {
+    logDbError('app/kunden/dokumente-actions:fuer_kunde', error)
+    return { ok: false, message: error.message }
+  }
+  return { ok: true }
 }
 
 export async function deleteKundeDokument(

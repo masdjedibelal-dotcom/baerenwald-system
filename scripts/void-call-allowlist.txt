@@ -180,3 +180,5 @@ aktionWaehlen
 senden
 webhookEintragen
 hochladen
+setLeadDokumentFuerKunde
+setKundeDokumentFuerKunde

@@ -169,6 +169,8 @@ export type KundenDokumentRow = {
   datei_url: string | null
   groesse_bytes: number | null
   created_at: string
+  /** Im Kundenportal sichtbar („Ihre Unterlagen“) */
+  fuer_kunde?: boolean | null
 }
 
 /** Kunde eingebettet in Lead-Listenabfrage */
@@ -218,6 +220,8 @@ export type LeadDokumentRow = {
   art?: DokumentArt | null
   /** bw = CRM-Upload, partner = Partner-Portal */
   von?: 'bw' | 'partner' | null
+  /** Im Kundenportal beim Vorgang sichtbar */
+  fuer_kunde?: boolean | null
 }
 
 export const DOKUMENT_ARTEN = ['angebot', 'rechnung', 'protokoll', 'sonstiges'] as const

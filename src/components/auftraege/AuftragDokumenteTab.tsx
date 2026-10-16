@@ -1,5 +1,6 @@
 'use client'
 
+import { DokFuerWahl, DOK_FUER_FEHLT, type DokFuer } from '@/components/ui/DokFuerWahl'
 import { UPLOAD_HINWEIS, uploadVorbereiten } from '@/lib/upload-grenze'
 import { MockBtn } from '@/components/mock-ui'
 import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
@@ -42,7 +43,7 @@ vertragDokumentZeilen,
 type AuftragDokumentZeile,
 type DokumentSortKey,
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
-import { deleteLeadDokument, insertLeadDokument } from '@/app/(dashboard)/anfragen/dokumente-actions'
+import { deleteLeadDokument, insertLeadDokument, setLeadDokumentFuerKunde } from '@/app/(dashboard)/anfragen/dokumente-actions'
 import { ensureAndLoadFachdokuSlots } from '@/app/(dashboard)/auftraege/fachdoku-actions'
 import type { FachdokuSlotRow } from '@/lib/auftraege/fachdoku-slots'
 import type { RechnungAuswahlZeile } from '@/lib/rechnungen/rechnung-wizard-types'
@@ -84,6 +85,8 @@ export function AuftragDokumenteTab({
   const [uploading, setUploading] = useState(false)
   /** Art für neue Uploads: Angebot / Rechnung / Protokoll / Sonstiges */
   const [uploadArt, setUploadArt] = useState<DokumentArt>('sonstiges')
+  /** Beim Upload Pflicht: intern oder für den Kunden (keine Vorauswahl) */
+  const [uploadFuer, setUploadFuer] = useState<DokFuer | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [editRow, setEditRow] = useState<AuftragDokumentZeile | null>(null)
   const [editName, setEditName] = useState('')
@@ -170,6 +173,10 @@ export function AuftragDokumenteTab({
   }
 
   async function uploadFiles(files: FileList | File[]) {
+    if (!uploadFuer) {
+      toast.error(DOK_FUER_FEHLT)
+      return
+    }
     const roh = Array.from(files).slice(0, 5)
     if (!roh.length) return
     // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
@@ -204,6 +211,7 @@ export function AuftragDokumenteTab({
             datei_url: json.url,
             groesse_bytes: json.groesse_bytes ?? file.size,
             art: uploadArt,
+            fuerKunde: uploadFuer === 'kunde',
           })
           if (!ins.ok) throw new Error(ins.message)
         }
@@ -388,6 +396,27 @@ export function AuftragDokumenteTab({
 
   function renderFreigabe(row: AuftragDokumentZeile) {
     const ev = row.timelineId ? timelineById.get(row.timelineId) : null
+    // Hochgeladene Akte-Dokumente: intern/Kunde per Tipp umschalten (gespeichert)
+    if (row.quelle === 'lead' && row.leadDokument) {
+      const ld = row.leadDokument
+      return (
+        <MockBtn
+          className={cn('dok-freigabe-pill', row.fuerKunde ? 'dok-freigabe-kunde' : 'dok-freigabe-intern', row.fuerKunde && 'is-kunde')}
+          type="button"
+          disabled={pending}
+          onClick={(e) => {
+            e.stopPropagation()
+            startTransition(async () => {
+              const r = await setLeadDokumentFuerKunde(ld.id, ld.leadId, !row.fuerKunde)
+              if (!r.ok) toast.error(r.message)
+              else onChanged()
+            })
+          }}
+        >
+          {freigabeLabel(row)}
+        </MockBtn>
+      )
+    }
     const readOnly = row.quelle !== 'timeline' || !row.timelineId
     if (readOnly) {
       return (
@@ -544,6 +573,7 @@ export function AuftragDokumenteTab({
           />
         </div>
         ) : null}
+        {!isMobile ? <DokFuerWahl value={uploadFuer} onChange={setUploadFuer} /> : null}
         {!isMobile ? (
           <>
             <input

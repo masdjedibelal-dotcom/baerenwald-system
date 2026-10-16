@@ -1,5 +1,6 @@
 'use client'
 
+import type { DokFuer } from '@/components/ui/DokFuerWahl'
 import { uploadVorbereiten } from '@/lib/upload-grenze'
 import { MockTextarea } from '@/components/mock-ui/MockForm'
 import { MockSegment } from '@/components/mock-ui'
@@ -87,6 +88,8 @@ export function useDetailQuickActions({
   /** Vorgangs-Dokumente: nach der Dateiauswahl die Art abfragen (mobil gibt es keine Art-Leiste mehr) */
   const [artFiles, setArtFiles] = useState<File[] | null>(null)
   const [uploadArt, setUploadArt] = useState<DokumentArt>('sonstiges')
+  /** Pflichtwahl beim Upload: intern oder für den Kunden (keine Vorauswahl) */
+  const [uploadFuer, setUploadFuer] = useState<DokFuer | null>(null)
 
   useEffect(() => {
     if (!notizOpen) return
@@ -156,8 +159,9 @@ export function useDetailQuickActions({
   }, [notiz, notizText, onSaved, pending])
 
   const uploadFiles = useCallback(
-    async (files: FileList | File[], art?: DokumentArt) => {
+    async (files: FileList | File[], art?: DokumentArt, fuer?: DokFuer | null) => {
       if (!dokument || uploading) return
+      const fuerKunde = fuer === 'kunde'
       const roh = Array.from(files).slice(0, 5)
       if (!roh.length) return
       // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
@@ -193,6 +197,7 @@ export function useDetailQuickActions({
                   datei_url: json.url,
                   groesse_bytes: json.groesse_bytes ?? file.size,
                   art: art ?? 'sonstiges',
+                  fuerKunde,
                 })
                 if (!ins.ok) throw new Error(ins.message)
               }
@@ -216,6 +221,7 @@ export function useDetailQuickActions({
                   name: file.name,
                   datei_url: json.url,
                   groesse_bytes: json.groesse_bytes ?? file.size,
+                  fuerKunde,
                 })
                 if (!ins.ok) throw new Error(ins.message)
               }
@@ -265,7 +271,7 @@ export function useDetailQuickActions({
                 titel: name,
                 beschreibung: null,
                 foto_urls: urls,
-                fuerKunde: false,
+                fuerKunde,
               })
               if (!r.ok) throw new Error(r.message)
             }
@@ -338,9 +344,10 @@ export function useDetailQuickActions({
         onChange={(e) => {
           const picked = e.target.files?.length ? Array.from(e.target.files) : []
           if (!picked.length) return
-          // Vorgang: erst Art wählen, dann hochladen
-          if (dokument?.kind === 'lead') {
+          // Vorgang/Kunde/Auftrag: erst wählen (Art, intern oder Kunde), dann hochladen
+          if (dokument && dokument.kind !== 'handwerker') {
             setUploadArt('sonstiges')
+            setUploadFuer(null)
             setArtFiles(picked)
             if (fileRef.current) fileRef.current.value = ''
             return
@@ -359,23 +366,38 @@ export function useDetailQuickActions({
           label: 'Hochladen',
           icon: 'upload',
           busy: uploading,
+          disabled: !uploadFuer,
           onClick: () => {
             const list = artFiles
             setArtFiles(null)
-            if (list?.length) void uploadFiles(list, uploadArt)
+            if (list?.length) void uploadFiles(list, uploadArt, uploadFuer)
           },
         }}
       >
         <p className="dok-upload-dateien">
           {artFiles?.length === 1 ? artFiles[0]!.name : `${artFiles?.length ?? 0} Dateien`}
         </p>
+        {dokument?.kind === 'lead' ? (
+          <div className="field">
+            <div className="field-label">Art</div>
+            <MockSegment
+              value={uploadArt}
+              onChange={(v) => setUploadArt(v as DokumentArt)}
+              options={DOKUMENT_ARTEN.map((a) => ({ value: a, label: DOKUMENT_ART_LABEL[a] }))}
+              aria-label="Art des Dokuments"
+            />
+          </div>
+        ) : null}
         <div className="field">
-          <div className="field-label">Art</div>
+          <div className="field-label">Für</div>
           <MockSegment
-            value={uploadArt}
-            onChange={(v) => setUploadArt(v as DokumentArt)}
-            options={DOKUMENT_ARTEN.map((a) => ({ value: a, label: DOKUMENT_ART_LABEL[a] }))}
-            aria-label="Art des Dokuments"
+            value={uploadFuer ?? ''}
+            onChange={(v) => setUploadFuer(v as DokFuer)}
+            options={[
+              { value: 'intern', label: 'Intern' },
+              { value: 'kunde', label: 'Kunde' },
+            ]}
+            aria-label="Sichtbar für"
           />
         </div>
       </EditorSheet>

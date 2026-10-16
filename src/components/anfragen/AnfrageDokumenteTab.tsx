@@ -1,4 +1,5 @@
 'use client'
+import { DokFuerWahl, DOK_FUER_FEHLT, type DokFuer } from "@/components/ui/DokFuerWahl";
 import { UPLOAD_HINWEIS, uploadVorbereiten } from "@/lib/upload-grenze";
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
@@ -14,6 +15,7 @@ import { useTransition } from '@/components/ui/action-busy'
 import { useMemo,useRef,useState } from 'react'
 import {
 deleteLeadDokument,
+setLeadDokumentFuerKunde,
 insertLeadDokument,
 } from "@/app/(dashboard)/anfragen/dokumente-actions"
 import { toast } from "@/components/ui/app-toast"
@@ -117,6 +119,8 @@ export function AnfrageDokumenteTab({
   const [uploading, setUploading] = useState(false);
   /** Art für neue Uploads: Angebot / Rechnung / Protokoll / Sonstiges */
   const [uploadArt, setUploadArt] = useState<DokumentArt>("sonstiges");
+  /** Beim Upload Pflicht: intern oder für den Kunden (keine Vorauswahl) */
+  const [uploadFuer, setUploadFuer] = useState<DokFuer | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
@@ -133,7 +137,7 @@ export function AnfrageDokumenteTab({
         quelle: "upload",
         dokumentId: d.id,
         beschreibung: m?.beschreibung ?? "",
-        freigabe: m?.freigabe ?? false,
+        freigabe: m?.freigabe ?? Boolean(d.fuer_kunde),
         artLabel: [
           DOKUMENT_ART_LABEL[(d.art ?? "sonstiges") as DokumentArt] ?? "Sonstiges",
           d.von === "partner" ? "vom Partner" : null,
@@ -222,6 +226,10 @@ export function AnfrageDokumenteTab({
   };
 
   async function uploadFiles(files: FileList | File[]) {
+    if (!uploadFuer) {
+      toast.error(DOK_FUER_FEHLT);
+      return;
+    }
     const roh = Array.from(files).slice(0, 5);
     if (!roh.length) return;
     // Fotos verkleinern, Größe prüfen (Netlify nimmt nur ~4,5 MB je Upload an)
@@ -254,6 +262,7 @@ export function AnfrageDokumenteTab({
           datei_url: json.url,
           groesse_bytes: json.groesse_bytes ?? file.size,
           art: uploadArt,
+            fuerKunde: uploadFuer === 'kunde',
         });
         if (!ins.ok) throw new Error(ins.message);
       }
@@ -335,6 +344,7 @@ export function AnfrageDokumenteTab({
           />
         </div>
         ) : null}
+        {!isMobile ? <DokFuerWahl value={uploadFuer} onChange={setUploadFuer} /> : null}
         {!isMobile ? (
           <>
             <input
@@ -464,7 +474,17 @@ export function AnfrageDokumenteTab({
                   >
                     <MockCheckbox
                       checked={d.freigabe}
-                      onChange={(e) => upd(d.id, { freigabe: e.target.checked })}
+                      onChange={(e) => {
+                        const an = e.target.checked;
+                        upd(d.id, { freigabe: an });
+                        // Hochgeladene Dokumente: Freigabe speichern (Kundenportal)
+                        if (d.quelle === "upload" && d.dokumentId) {
+                          void setLeadDokumentFuerKunde(d.dokumentId, leadId, an).then((r) => {
+                            if (!r.ok) toast.error(r.message);
+                            else onReload();
+                          });
+                        }
+                      }}
                     />
                     <span className={d.freigabe ? "is-kunde" : undefined}>
                       {d.freigabe ? "Kunde" : "intern"}

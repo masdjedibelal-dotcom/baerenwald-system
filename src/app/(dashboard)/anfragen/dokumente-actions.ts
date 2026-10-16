@@ -31,6 +31,8 @@ export async function insertLeadDokument(input: {
   groesse_bytes?: number | null
   /** Angebot / Rechnung / Protokoll / Sonstiges */
   art?: DokumentArt | null
+  /** Beim Upload gewählt: im Kundenportal sichtbar */
+  fuerKunde: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   const gate = await assertLead(input.leadId)
   if (!gate.ok) return gate
@@ -51,6 +53,7 @@ export async function insertLeadDokument(input: {
       erstellt_von: gate.userId,
       art: input.art && DOKUMENT_ARTEN.includes(input.art) ? input.art : 'sonstiges',
       von: 'bw',
+      fuer_kunde: Boolean(input.fuerKunde),
     })
     .select('id')
     .single()
@@ -59,6 +62,28 @@ export async function insertLeadDokument(input: {
   if (error || !data) return { ok: false, message: error?.message ?? 'Speichern fehlgeschlagen' }
   revalidateLeadDetail(input.leadId)
   return { ok: true, id: data.id as string }
+}
+
+/** Akte: Dokument für den Kunden freigeben bzw. intern stellen. */
+export async function setLeadDokumentFuerKunde(
+  dokumentId: string,
+  leadId: string,
+  fuerKunde: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const gate = await assertLead(leadId)
+  if (!gate.ok) return gate
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('lead_dokumente')
+    .update({ fuer_kunde: fuerKunde })
+    .eq('id', dokumentId)
+    .eq('lead_id', leadId)
+  if (error) {
+    logDbError('app/anfragen/dokumente-actions:fuer_kunde', error)
+    return { ok: false, message: error.message }
+  }
+  revalidateLeadDetail(leadId)
+  return { ok: true }
 }
 
 export async function deleteLeadDokument(

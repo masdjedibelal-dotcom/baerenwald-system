@@ -373,7 +373,7 @@ export function leadDokumentZeilen(dokumente: LeadDokumentRow[] | null | undefin
         .filter(Boolean)
         .join(' · '),
       datum: d.created_at,
-      fuerKunde: false,
+      fuerKunde: Boolean(d.fuer_kunde),
       href: d.datei_url.trim(),
       quelle: 'lead' as const,
       leadDokument: { id: d.id, leadId: d.lead_id },
