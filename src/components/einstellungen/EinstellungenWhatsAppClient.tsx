@@ -129,18 +129,6 @@ export function EinstellungenWhatsAppClient({
         ) : null}
       </Sec>
 
-      <Sec title="Einrichtung">
-        <ol className="wa-einst-schritte">
-          <li>Im 360dialog-Hub beim Kanal der Bärenwald-Nummer einen API-Key erzeugen.</li>
-          <li>
-            In Netlify (CRM) setzen: <code>WHATSAPP_PROVIDER=360dialog</code>, <code>D360_API_KEY</code>,{' '}
-            <code>WHATSAPP_NUMMER</code> (z. B. 4989…), <code>WHATSAPP_WEBHOOK_TOKEN</code> (langer Zufallswert) — danach
-            neu veröffentlichen.
-          </li>
-          <li>Hier oben „Webhook eintragen“ drücken.</li>
-          <li>Testnachrichten löschen, dann mit einem eigenen Handy testen.</li>
-        </ol>
-      </Sec>
     </>
   )
 }
