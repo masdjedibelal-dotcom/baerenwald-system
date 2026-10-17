@@ -4,6 +4,7 @@ import { formatKiFehler, kiKonfiguriert, kiTextClient } from '@/lib/ki/ki'
 import { extractJsonObject } from '@/lib/visualize/ki-json'
 import type { LeadVertriebsKontext } from '@/lib/leads/lead-vertriebs-kontext'
 import { leadVertriebsKontextAlsPrompt } from '@/lib/leads/lead-vertriebs-kontext'
+import { MARKE } from '@/lib/marke'
 
 export type LeadVertriebsAnalyse = {
   kurzfassung: string
@@ -15,7 +16,7 @@ export type LeadVertriebsAnalyse = {
   verhalten: string
 }
 
-const SYSTEM = `Du bist Vertriebsberater für Bärenwald München (digitaler GU).
+const SYSTEM = `Du bist Vertriebsberater für ${MARKE.nameLang} (digitaler GU).
 Du analysierst Website-Anfragen für das Innendienst-Team — keine Marketing-Texte, keine Zielbild-Copy.
 
 Antwort NUR als JSON:

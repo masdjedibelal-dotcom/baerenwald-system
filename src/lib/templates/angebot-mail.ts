@@ -12,6 +12,7 @@ import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
 import type { PortalMailAudience } from '@/lib/portal-utils'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 export type AngebotMailAnrede = 'du' | 'sie'
 
@@ -113,14 +114,14 @@ sie: 'Aufgrund Ihrer erteilten Freigabeschwelle liegt dieses Angebot darunter �
 } as const
 
 export const ANGEBOT_MAIL_SCHLUSS_STANDARD = {
-  du: `${ANGEBOT_ANNAHME_HINWEIS.du}\n\nWir freuen uns von dir zu hören.\n\nViele Grüße\nDein Bärenwald Team`,
-  sie: `${ANGEBOT_ANNAHME_HINWEIS.sie}\n\nWir freuen uns auf Ihre Rückmeldung.\n\nMit freundlichen Grüßen\nIhr Bärenwald Team`,
+  du: `${ANGEBOT_ANNAHME_HINWEIS.du}\n\nWir freuen uns von dir zu hören.\n\nViele Grüße\nDein ${MARKE.name} Team`,
+  sie: `${ANGEBOT_ANNAHME_HINWEIS.sie}\n\nWir freuen uns auf Ihre Rückmeldung.\n\nMit freundlichen Grüßen\nIhr ${MARKE.name} Team`,
 } as const
 
 /** Schluss ohne Annahme-Aufforderung (HV unter Schwelle). */
 export const ANGEBOT_MAIL_SCHLUSS_UNTER_SCHWELLE = {
-  du: 'Wir freuen uns, wenn du im Portal mitliest.\n\nViele Grüße\nDein Bärenwald Team',
-  sie: 'Wir freuen uns, wenn Sie im Portal mitlesen.\n\nMit freundlichen Grüßen\nIhr Bärenwald Team',
+  du: `Wir freuen uns, wenn du im Portal mitliest.\n\nViele Grüße\nDein ${MARKE.name} Team`,
+  sie: `Wir freuen uns, wenn Sie im Portal mitlesen.\n\nMit freundlichen Grüßen\nIhr ${MARKE.name} Team`,
 } as const
 
 /** Standard-Einleitung (Fließtext nach „Hallo …“) — in Schritt 2 vorausgefüllt und in der Vorschau sichtbar. */

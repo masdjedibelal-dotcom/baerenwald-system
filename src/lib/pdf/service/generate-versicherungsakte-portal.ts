@@ -1,6 +1,7 @@
 import { PDFDocument,StandardFonts,rgb,type PDFFont,type PDFPage } from "pdf-lib";
 
 import { formatDatum } from "@/lib/format/geld-datum";
+import { MARKE } from '@/lib/marke'
 
 export type VersicherungPdfPhase = "meldung" | "ursache";
 
@@ -102,7 +103,7 @@ function drawFooter(ctx: DrawCtx) {
     font: ctx.font,
     color: MUTED,
   });
-  ctx.page.drawText("Ein Service von Bärenwald", {
+  ctx.page.drawText(`Ein Service von ${MARKE.name}`, {
     x: MARGIN,
     y: 26,
     size: 7,

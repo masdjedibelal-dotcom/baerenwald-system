@@ -3,11 +3,13 @@
  * Einzige erlaubte Hex-Quelle außerhalb globals.css / mock-design-system.css (P5-19).
  * Werte spiegeln :root in src/app/globals.css.
  */
+import { istTeo } from '@/lib/marke'
+
 export const C = {
-  /* Brand / Mock */
-  green: '#2e7d52',
-  greenDark: '#1a3d2b',
-  green50: '#e7f1e9',
+  /* Brand / Mock — Servus TEO: Blau statt Grün (NEXT_PUBLIC_MARKE=teo) */
+  green: istTeo ? '#1e5fa8' : '#2e7d52',
+  greenDark: istTeo ? '#0b1f3a' : '#1a3d2b',
+  green50: istTeo ? '#dce4ee' : '#e7f1e9',
   greenSoft: '#eaf3de',
   greenSoftBorder: '#c5ddb0',
   greenSoftBorder2: '#a8c5a0',

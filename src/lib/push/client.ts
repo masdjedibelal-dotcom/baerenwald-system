@@ -1,5 +1,7 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -61,7 +63,7 @@ export async function showLocalTestNotification(): Promise<void> {
   // Titel leer: sonst „Bärenwald from Bärenwald“ (Safari/PWA hängt den App-Namen an).
   await reg.showNotification('', {
     body: 'Test erfolgreich — Push ist auf diesem Gerät aktiv.',
-    icon: '/icons/pwa-192.png',
+    icon: istTeo ? '/icons/teo/pwa-192.png' : '/icons/pwa-192.png',
     tag: 'crm-push-test',
     data: { url: '/login?next=/einstellungen/benachrichtigungen', deep: '/einstellungen/benachrichtigungen' },
   })

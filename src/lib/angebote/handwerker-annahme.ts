@@ -18,6 +18,7 @@ import { sendCrmPushToStaff } from '@/lib/push/send'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { planAngebotStatusWrite } from '@/lib/status/write-angebot-status'
 import { writeAngebotHandwerkerStatus } from '@/lib/status/write-angebot-handwerker-status'
+import { MARKE } from '@/lib/marke'
 
 export const HW_ZUWEISUNG_STATUS_AKZEPTIERT = 'akzeptiert' as const
 export const HW_ZUWEISUNG_STATUS_ABGELEHNT = 'abgelehnt' as const
@@ -284,9 +285,9 @@ export async function acceptHandwerkerZuweisung(
     const { data: einRows, error } = await supabaseAdmin.from('einstellungen').select('key, value')
     if (error) logDbError('lib/angebote/handwerker-annahme:einstellungen', error)
     const einMap = new Map((einRows ?? []).map((x) => [x.key as string, String(x.value ?? '')]))
-    const internTo = einMap.get('email')?.trim() || 'info@baerenwaldmuenchen.de'
+    const internTo = einMap.get('email')?.trim() || MARKE.infoEmail
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://crm.baerenwaldmuenchen.de'
+      process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || MARKE.crmUrl
     const dashboardPath = hrefCrmNachHwAntwort({ leadId, angebotId, partnerEinholung })
     const dashboardUrl = `${baseUrl}${dashboardPath}`
 

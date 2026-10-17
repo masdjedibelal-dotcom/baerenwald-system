@@ -44,6 +44,7 @@ import { resolveRechnungLeistungsortIn } from '@/lib/kunden-objekte'
 import type { AngebotPosition,Auftrag,Gewerk,Kunde,KundenObjekt,Rechnung } from '@/lib/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatDatum } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
 function formatDatumDe(iso: string | null | undefined): string {
   if (!iso?.trim()) return '—'
@@ -286,7 +287,7 @@ export function buildRechnungHtmlInput(
     projekt_titel: projektTitel || null,
     firmen_logo_url: resolveAngebotPdfLogoSrc(firm.logo_url),
     mail_anrede: anrede,
-    firmenname: firm.firmenname?.trim() || 'Bärenwald München',
+    firmenname: firm.firmenname?.trim() || MARKE.firma.firmenname,
     firmen_rechtsform: firm.rechtsform?.trim() || null,
     geschaeftsfuehrer: firm.geschaeftsfuehrer?.trim() || null,
     firmen_adresse: firmZeileAdresse(firm),

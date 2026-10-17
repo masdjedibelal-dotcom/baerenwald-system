@@ -1,6 +1,7 @@
 /** Statische Vertragsparagraphen (Projekt-Nachunternehmervertrag) */
 
 import { COPY_ROLE } from '@/lib/copy'
+import { MARKE } from '@/lib/marke'
 
 export type VertragParagraph = { nr: string; title: string; body: string }
 
@@ -96,7 +97,7 @@ export const RAHMEN_PARAGRAPHEN: VertragParagraph[] = [
     nr: '§1',
     title: 'Vertragsgegenstand und Partnerschaft',
     body:
-      'Zwischen dem Auftraggeber Bärenwald München (nachfolgend „Auftraggeber“) und dem Partner (nachfolgend „Nachunternehmer“) wird eine dauerhafte Zusammenarbeit als Nachunternehmer vereinbart. Der Nachunternehmer erbringt handwerkliche Leistungen im Rahmen einzelner Bauprojekte des Auftraggebers. Für jedes Projekt wird ein gesonderter Projekt-Nachunternehmervertrag mit konkretem Leistungs- und Vergütungsumfang geschlossen, der ergänzend zu diesem Rahmenvertrag gilt.',
+      `Zwischen dem Auftraggeber ${MARKE.firma.firmenname} (nachfolgend „Auftraggeber“) und dem Partner (nachfolgend „Nachunternehmer“) wird eine dauerhafte Zusammenarbeit als Nachunternehmer vereinbart. Der Nachunternehmer erbringt handwerkliche Leistungen im Rahmen einzelner Bauprojekte des Auftraggebers. Für jedes Projekt wird ein gesonderter Projekt-Nachunternehmervertrag mit konkretem Leistungs- und Vergütungsumfang geschlossen, der ergänzend zu diesem Rahmenvertrag gilt.`,
   },
   {
     nr: '§2',

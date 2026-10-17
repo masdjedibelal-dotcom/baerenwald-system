@@ -13,6 +13,7 @@ import {
   newMailCatcherId,
 } from '@/lib/mail/mail-catcher'
 import { htmlToPlainText } from '@/lib/mail/html-to-plain-text'
+import { MARKE } from '@/lib/marke'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -21,9 +22,9 @@ function getResend() {
 }
 
 const FROM_DEFAULT =
-  process.env.RESEND_FROM_EMAIL ?? 'Bärenwald München <info@baerenwaldmuenchen.de>'
+  process.env.RESEND_FROM_EMAIL ?? `${MARKE.nameLang} <info@${MARKE.websiteHost}>`
 const FROM_ANFRAGEN =
-  process.env.RESEND_FROM_ANFRAGEN ?? 'Bärenwald München <anfragen@baerenwaldmuenchen.de>'
+  process.env.RESEND_FROM_ANFRAGEN ?? `${MARKE.nameLang} <anfragen@${MARKE.websiteHost}>`
 
 /** Kunden-Mails: automatische BCC-Kopie ans interne Postfach. */
 const KUNDE_MAIL_BCC_TYPEN = new Set([

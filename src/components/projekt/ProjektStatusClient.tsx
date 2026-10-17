@@ -15,6 +15,7 @@ import { betragAnzeige } from '@/lib/angebot-einfach'
 import { formatDatum } from '@/lib/utils'
 import { aktuellePhaseIndexFromEntities } from '@/lib/auftraege/projekt-phasen'
 import { formatEuro,formatDatumZeit } from '@/lib/format/geld-datum'
+import { MARKE } from '@/lib/marke'
 
 function statusProgress(status: AuftragStatus): number {
   switch (status) {
@@ -395,7 +396,7 @@ export function ProjektStatusClient({
       </main>
 
       <footer className="mt-10 border-t border-bw-border bg-bw-bg-soft px-4 py-6 text-center text-xs text-muted">
-        Bärenwald Handwerksgruppe München
+        {MARKE.nameLang}
         <br />
         {siteFooter ? (
           <>

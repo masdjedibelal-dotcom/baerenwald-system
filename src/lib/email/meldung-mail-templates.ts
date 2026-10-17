@@ -5,6 +5,7 @@ import { buildSubject } from '@/lib/mail/build-subject'
 import type { LeadAnlass } from '@/lib/types'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 function esc(s: string): string {
   return s
@@ -215,7 +216,7 @@ export function mailOrgNotfallDirektInfo(
   b: MailBranding
 ): { betreff: string; html: string } {
   const objekt = data.objektTitel.trim() || 'Ihr Objekt'
-  const firma = b.firmenname.trim() || 'Bärenwald'
+  const firma = b.firmenname.trim() || MARKE.name
   const betreff = buildSubject({
     objekt,
     ereignis: 'Direktauftrag',
@@ -270,7 +271,7 @@ export function mailOrgFreigabeErgebnis(
     <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">Guten Tag,</p>
     <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;"><strong>${esc(data.orgName)}</strong> hat die Freigabe für <strong>${esc(data.objektTitel)}</strong> <strong>${aktionLabel}</strong>.</p>
     ${data.notiz?.trim() ? `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;"><strong>Notiz:</strong> ${esc(data.notiz.trim())}</p>` : ''}
-    <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">Bärenwald setzt den Vorgang im CRM fort.</p>
+    <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${MARKE.name} setzt den Vorgang im CRM fort.</p>
   `
   return {
     betreff,

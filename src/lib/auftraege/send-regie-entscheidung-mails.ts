@@ -127,7 +127,7 @@ export async function sendRegieEntscheidungMailsAfterWrite(input: {
   const auftragTitel = String(auftrag?.titel ?? '').trim() || 'Auftrag'
   const positionTitel = String(pos.leistung_name ?? '').trim() || 'Weitere Arbeit'
   const beschreibung = String(pos.beschreibung ?? '')
-    .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch Bärenwald\.?\s*$/i, '')
+    .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch (?:Bärenwald|Servus TEO)\.?\s*$/i, '')
     .trim()
 
   const stunden = regieMengeStunden(

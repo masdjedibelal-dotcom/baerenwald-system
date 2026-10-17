@@ -34,6 +34,7 @@ import {
 } from '@/lib/rich-text'
 import { kiVisualisierungPdfHtml } from '@/lib/visualize/pdf-html'
 import type { KiVizPdfPage } from '@/lib/visualize/pdf-data'
+import { MARKE } from '@/lib/marke'
 
 const PROJEKT_ACCENT = C.greenDark
 const PROJEKT_TINT = C.greenTint
@@ -190,10 +191,10 @@ function esc(s: string): string {
 const FACHBETRIEB_GLOBAL_BLOCK = `
   <div class="avoid-fuss-overlap" style="margin:20px 0 0;padding:10pt 12pt;border:1pt solid ${C.blue3};border-radius:4pt;background:${C.blueBg2};font-size:9pt;color:${TEXT_PRIMARY};line-height:1.55;font-weight:400;page-break-inside:avoid;">
     <strong style="font-weight:700;">Hinweis zur Leistungserbringung:</strong>
-    Bärenwald München führt das Vorhaben als Generalunternehmer aus. Einzelne Leistungen
+    ${MARKE.nameLang} führt das Vorhaben als Generalunternehmer aus. Einzelne Leistungen
     können durch zugelassene und geprüfte Fachbetriebe ausgeführt werden.
     Koordination, Qualitätskontrolle und Haftung gegenüber dem Auftraggeber
-    liegen vollständig bei Bärenwald München.
+    liegen vollständig bei ${MARKE.nameLang}.
   </div>`
 
 function positionRowHtml(p: AngebotTemplatePosition): string {
@@ -542,7 +543,7 @@ function angebotAnnahmeCardHtml(props: AngebotHtmlInput): string {
 
 function angebotPdfAbschlussHtml(props: AngebotHtmlInput): string {
   const teamLabel =
-    mailAnredeAusProps(props) === 'du' ? 'Dein Bärenwald Team' : 'Ihr Bärenwald Team'
+    mailAnredeAusProps(props) === 'du' ? `Dein ${MARKE.name} Team` : `Ihr ${MARKE.name} Team`
   const anrede = mailAnredeAusProps(props)
   const custom = props.schlusstext?.trim()
   const customPlain = custom ? richTextToPlain(custom) : ''
@@ -873,9 +874,9 @@ function parseFusszeileKontakt(props: AngebotHtmlInput): {
   for (const line of steuerLines) {
     if (/^www\./i.test(line) && !web) web = line.replace(/^https?:\/\//i, '')
   }
-  if (!web) web = 'www.baerenwaldmuenchen.de'
+  if (!web) web = MARKE.firma.website
   if (!tel) tel = '+49 163 7316161'
-  if (!email) email = 'info@baerenwaldmuenchen.de'
+  if (!email) email = MARKE.infoEmail
   return { tel, email, web }
 }
 

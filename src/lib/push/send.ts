@@ -11,11 +11,12 @@ import {
   CRM_PUSH_PREF_DEFAULTS,
 } from '@/lib/push/prefs'
 import type { CrmNotificationTyp } from '@/app/(dashboard)/notifications/actions'
+import { MARKE } from '@/lib/marke'
 
 function configureVapid(): boolean {
   const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()
   const priv = process.env.VAPID_PRIVATE_KEY?.trim()
-  const subject = process.env.VAPID_SUBJECT?.trim() || 'mailto:crm@baerenwaldmuenchen.de'
+  const subject = process.env.VAPID_SUBJECT?.trim() || `mailto:crm@${MARKE.websiteHost}`
   if (!pub || !priv) return false
   webpush.setVapidDetails(subject, pub, priv)
   return true

@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockTextarea } from '@/components/mock-ui/MockForm'
+import { MARKE } from '@/lib/marke'
 
 /** Bestätigen auf der Einsatz-Seite: erst dieser Klick ändert den Status (Mail-Scanner öffnen Links automatisch). */
 export function EinsatzAntwortClient({
@@ -47,7 +48,7 @@ export function EinsatzAntwortClient({
     return (
       <div className="einsatz-antwort__ergebnis is-ok">
         <strong>Danke, der Einsatz ist angenommen.</strong>
-        <span>Bärenwald ist informiert. Updates und Fotos können Sie im Partner-Portal oder per WhatsApp schicken.</span>
+        <span>{MARKE.name} ist informiert. Updates und Fotos können Sie im Partner-Portal oder per WhatsApp schicken.</span>
       </div>
     )
   }

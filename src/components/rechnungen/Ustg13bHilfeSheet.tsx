@@ -23,15 +23,15 @@ const AUSGANG = {
     'Hausverwaltungen (verwalten Gebäude, bauen nicht)',
     'Gewerbekunden ohne Baugewerbe (Büro, Praxis, Laden …)',
   ],
-  fuss: 'Im Zweifel: aus lassen und mit 19 % abrechnen. Das ist bei Bärenwald der Normalfall — §13b ist hier die seltene Ausnahme.',
+  fuss: 'Im Zweifel: aus lassen und mit 19 % abrechnen. Das ist bei uns der Normalfall — §13b ist hier die seltene Ausnahme.',
 } as const
 
 const EINGANG = {
   title: '§13b UStG — Partner-Rechnung ohne Umsatzsteuer',
   merksatz:
-    'Entscheidend ist die Leistung des Partners — nicht, ob wir selbst ausführen. Bärenwald ist als Generalunternehmer Bauleister. Erbringt der Partner eine Bauleistung, geht die Steuerschuld auf uns über.',
+    'Entscheidend ist die Leistung des Partners — nicht, ob wir selbst ausführen. Wir sind als Generalunternehmer Bauleister. Erbringt der Partner eine Bauleistung, geht die Steuerschuld auf uns über.',
   wirkung:
-    'Bei aktivem Haken muss der Partner seine Rechnung an Bärenwald netto ohne USt stellen, mit Hinweis auf §13b. Wir melden die Steuer selbst an. Weist der Partner trotzdem USt aus, ist die Rechnung falsch → zurückweisen und korrigieren lassen, sonst kein Vorsteuerabzug.',
+    'Bei aktivem Haken muss der Partner seine Rechnung an uns netto ohne USt stellen, mit Hinweis auf §13b. Wir melden die Steuer selbst an. Weist der Partner trotzdem USt aus, ist die Rechnung falsch → zurückweisen und korrigieren lassen, sonst kein Vorsteuerabzug.',
   aktivTitle:
     'Aktivieren, wenn der Partner am Gebäude etwas einbaut, austauscht, repariert oder entfernt',
   aktiv: [

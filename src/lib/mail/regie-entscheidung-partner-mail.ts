@@ -10,6 +10,7 @@ import { formatEuro, formatNumber } from '@/lib/format/geld-datum'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 function esc(s: string): string {
   return s
@@ -225,8 +226,8 @@ export function buildRegieEntscheidungPartnerMail(
   } else if (input.fall === 'angenommen_korrigiert') {
     intro =
       anrede === 'du'
-        ? 'deine weitere Arbeit wurde <strong>angenommen</strong> — mit Anpassungen durch Bärenwald. Bitte prüfe die geänderten Angaben.'
-        : 'Ihre weitere Arbeit wurde <strong>angenommen</strong> — mit Anpassungen durch Bärenwald. Bitte prüfen Sie die geänderten Angaben.'
+        ? `deine weitere Arbeit wurde <strong>angenommen</strong> — mit Anpassungen durch ${MARKE.name}. Bitte prüfe die geänderten Angaben.`
+        : `Ihre weitere Arbeit wurde <strong>angenommen</strong> — mit Anpassungen durch ${MARKE.name}. Bitte prüfen Sie die geänderten Angaben.`
   } else {
     intro =
       anrede === 'du'

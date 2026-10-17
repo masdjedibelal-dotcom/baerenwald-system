@@ -3,6 +3,7 @@ import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { formatDatum, formatDatumZeitraum, formatMonatNummerJahr } from '@/lib/utils'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 /** Identisch zu Angebot/Abnahme — Bericht ist Bärenwald-Service-Dokument */
 export const VERSAMMLUNG_ACCENT = C.greenDark
@@ -180,8 +181,8 @@ export function buildVersammlungsberichtViewModel(
   const bwLogo = resolveAngebotPdfLogoSrc(null)
   const logoHtml =
     bwLogo && (bwLogo.startsWith('data:') || /^https?:\/\//i.test(bwLogo))
-      ? `<img src="${bwLogo.replace(/"/g, '&quot;')}" alt="Bärenwald" class="cover-logo" />`
-      : `<div class="cover-logo-fallback">Bärenwald</div>`
+      ? `<img src="${bwLogo.replace(/"/g, '&quot;')}" alt="${MARKE.name}" class="cover-logo" />`
+      : `<div class="cover-logo-fallback">${MARKE.name}</div>`
 
   const zeitraumLabel = fmtRange(p.zeitraumVon, p.zeitraumBis)
   const erstelltAmLabel = formatDatum(p.erstelltAm)

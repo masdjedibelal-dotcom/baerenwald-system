@@ -8,10 +8,11 @@ import { useState } from 'react'
 import { BrandAvatar } from '@/components/brand/BrandAvatar'
 import { abmelden } from '@/lib/auth/abmelden-client'
 import { MEHR_TILE_NAV } from '@/lib/nav-config'
+import { MARKE } from '@/lib/marke'
 
 export function MehrScreenClient({
-  userName = 'Beran Bärenwald',
-  userRole = 'Inhaber · Bärenwald München',
+  userName = 'Team',
+  userRole = `Inhaber · ${MARKE.nameLang}`,
 }: {
   userName?: string
   userRole?: string

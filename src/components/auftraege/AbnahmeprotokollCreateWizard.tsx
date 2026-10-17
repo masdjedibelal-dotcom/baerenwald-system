@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils'
 import { heuteYmd } from '@/lib/angebot-einfach'
 import { CONFIRM,COPY_BUTTON,TOAST } from '@/lib/copy'
 import { useFormZwischenstand } from '@/lib/surfaces/form-zwischenstand'
+import { MARKE } from '@/lib/marke'
 
 /** Spec §8 / Mock: drei Schritte im Abnahme-Canvas */
 const SECTIONS = [
@@ -725,7 +726,7 @@ export function AbnahmeprotokollCreateWizard({
           sheetTitle="Personen bearbeiten"
           overview={
             <dl className="space-y-2.5">
-              <MobileOverviewField label="Bärenwald vor Ort" value={meta.vertreter_an.trim() || '—'} />
+              <MobileOverviewField label={`${MARKE.name} vor Ort`} value={meta.vertreter_an.trim() || '—'} />
               <MobileOverviewField
                 label="Kunde vor Ort"
                 value={meta.ansprechpartner_kunde.trim() || '—'}
@@ -734,7 +735,7 @@ export function AbnahmeprotokollCreateWizard({
           }
         >
           <div className="space-y-3">
-            <MockField label="Bärenwald vor Ort">
+            <MockField label={`${MARKE.name} vor Ort`}>
               <MockInput
                 value={meta.vertreter_an}
                 onChange={(e) => patchMeta({ vertreter_an: e.target.value })}
@@ -760,7 +761,7 @@ export function AbnahmeprotokollCreateWizard({
           overview={
             <dl className="space-y-2.5">
               <MobileOverviewField
-                label="Bärenwald"
+                label={MARKE.name}
                 value={
                   meta.ohne_unterschrift_hw
                     ? 'Nicht vor Ort — Unterschrift folgt'
@@ -806,8 +807,8 @@ export function AbnahmeprotokollCreateWizard({
                   value: 'an',
                   label:
                     meta.ohne_unterschrift_hw || meta.signature_hw_url
-                      ? 'Bärenwald · ✓'
-                      : 'Bärenwald',
+                      ? `${MARKE.name} · ✓`
+                      : MARKE.name,
                 },
                 {
                   value: 'kunde',
@@ -1049,7 +1050,7 @@ export function AbnahmeprotokollCreateWizard({
             label="Übergabe"
             value={`${abnahmeDatum.slice(0, 10).split('-').reverse().join('.')}${meta.uebergabe_uhrzeit ? ` · ${meta.uebergabe_uhrzeit} Uhr` : ''} · ${meta.uebergabe_ort || '—'}`}
           />
-          <MobileOverviewField label="Bärenwald vor Ort" value={meta.vertreter_an || '—'} />
+          <MobileOverviewField label={`${MARKE.name} vor Ort`} value={meta.vertreter_an || '—'} />
           <MobileOverviewField label="Vorhaben" value={meta.projektbezeichnung || '—'} />
           <MobileOverviewField label="Leistungen" value={String(ausgewaehlt)} />
           <MobileOverviewField label="Fotos" value={String(meta.uebergabe_foto_urls.length)} />

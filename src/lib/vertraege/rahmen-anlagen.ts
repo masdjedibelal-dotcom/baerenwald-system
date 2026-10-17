@@ -2,6 +2,7 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import type { VertragHandwerkerSnapshot } from '@/lib/vertraege/types'
 import { handwerkerAnzeigename, handwerkerVertreterName } from '@/lib/vertraege/build-vertrag-texte'
 import type { VertragParagraph } from '@/lib/vertraege/klauseln'
+import { MARKE } from '@/lib/marke'
 
 /** Platzhalter für RV-Anlagen (Firmen- + Partnerdaten aus PDF-Payload). */
 export function rahmenVertragPlatzhalter(
@@ -13,7 +14,7 @@ export function rahmenVertragPlatzhalter(
     .filter(Boolean)
     .join(', ')
   return {
-    auftraggeber: agName || 'Bärenwald München',
+    auftraggeber: agName || MARKE.firma.firmenname,
     auftraggeber_adresse: agAdr || '—',
     auftraggeber_vertreter: firm.geschaeftsfuehrer?.trim() || firm.firmenname?.trim() || 'Geschäftsführung',
     partner: handwerkerAnzeigename(hw),

@@ -4,22 +4,26 @@
  */
 
 import { getPublicAppUrl } from '@/lib/utils'
+import { istTeo, MARKE } from '@/lib/marke'
 
-export const BRAND_ALT = 'Bärenwald München'
+export const BRAND_ALT = MARKE.nameLang
+
+/** Servus TEO: eigene Logo-Dateien unter /public/brand/teo/ */
+const LOGO_DIR = istTeo ? '/brand/teo' : '/brand'
 
 /** Grün auf hellem Hintergrund (Login, helle Flächen) — transparentes PNG */
-export const BRAND_LOGO_GREEN = '/brand/logo-mark-green.png'
+export const BRAND_LOGO_GREEN = `${LOGO_DIR}/logo-mark-green.png`
 
 /**
  * Grün auf opaken weißem Hintergrund — für PDF/Print (Chrome flacht Alpha sonst oft schwarz).
  */
-export const BRAND_LOGO_GREEN_ON_WHITE = '/brand/logo-mark-green-on-white.png'
+export const BRAND_LOGO_GREEN_ON_WHITE = `${LOGO_DIR}/logo-mark-green-on-white.png`
 
 /** Weiß auf dunklem Hintergrund (Sidebar, E-Mail-Kopf, Status-Seiten) */
-export const BRAND_LOGO_WHITE = '/brand/logo-mark-white.png'
+export const BRAND_LOGO_WHITE = `${LOGO_DIR}/logo-mark-white.png`
 
 /** Logo auf grünem Badge — für Avatare / Profilbild */
-export const BRAND_LOGO_BADGE = '/brand/logo-badge-green-bg.png'
+export const BRAND_LOGO_BADGE = `${LOGO_DIR}/logo-badge-green-bg.png`
 
 export type BrandLogoVariant = 'green' | 'white'
 
@@ -28,7 +32,7 @@ export function brandLogoPath(variant: BrandLogoVariant): string {
 }
 
 /** Öffentliche Website — einzige stabile Quelle für Remote-Logos in Mails. */
-const WEBSITE_LOGO_HOST = 'https://baerenwaldmuenchen.de'
+const WEBSITE_LOGO_HOST = MARKE.portalUrl
 
 function isPublicLogoHost(raw: string): boolean {
   try {
@@ -55,7 +59,8 @@ function emailLogoHostFallback(): string {
 
 function websiteLogoPath(variant: BrandLogoVariant): string {
   // Kleine Mail-Variante (~14 KB) — besser für Clients als logo-mark (~90 KB)
-  return variant === 'white' ? '/mail-logo-white.png' : '/mail-logo-green.png'
+  const dir = istTeo ? '/brand/teo' : ''
+  return variant === 'white' ? `${dir}/mail-logo-white.png` : `${dir}/mail-logo-green.png`
 }
 
 /**

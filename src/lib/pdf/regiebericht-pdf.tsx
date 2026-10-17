@@ -12,6 +12,7 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer'
 import type { Kunde } from '@/lib/types'
+import { MARKE } from '@/lib/marke'
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 10, fontFamily: 'Helvetica' },
@@ -91,7 +92,7 @@ export function RegieberichtPdfDocument(props: RegieberichtPdfInput) {
 
   const betragZeile = stunden * stundensatz
   const fmt = (n: number) => formatEuro(n, { suffix: false })
-  const absender = (firmenname ?? '').trim() || 'Bärenwald München'
+  const absender = (firmenname ?? '').trim() || MARKE.firma.firmenname
 
   return (
     <Document>

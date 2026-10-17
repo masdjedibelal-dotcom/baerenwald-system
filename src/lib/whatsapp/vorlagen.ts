@@ -1,3 +1,4 @@
+import { MARKE } from '@/lib/marke'
 /**
  * WhatsApp-Vorlagen (Message Templates). Außerhalb des 24-Stunden-Fensters darf ein Unternehmen
  * nur freigegebene Vorlagen schicken. Diese Vorlagen werden einmal im 360dialog-Hub (WhatsApp Manager →
@@ -23,19 +24,19 @@ export const VORLAGEN: Record<VorlagenName, VorlagenDefinition> = {
   bw_einsatz_neu: {
     name: 'bw_einsatz_neu',
     text:
-      'Hallo {{1}}, Bärenwald hat einen neuen Einsatz für Sie:\n\n*{{2}}*\nTermin: {{3}}\nOrt: {{4}}\nEK: {{5}}\n\nHinweise: {{6}}\n\nBitte nehmen Sie den Einsatz an oder lehnen Sie ihn ab.',
+      `Hallo {{1}}, ${MARKE.name} hat einen neuen Einsatz für Sie:\n\n*{{2}}*\nTermin: {{3}}\nOrt: {{4}}\nEK: {{5}}\n\nHinweise: {{6}}\n\nBitte nehmen Sie den Einsatz an oder lehnen Sie ihn ab.`,
     knoepfe: ['Annehmen', 'Ablehnen'],
     beschreibung: 'Neuer Einsatz an einen Partner, mit Annehmen/Ablehnen.',
   },
   bw_bautagebuch: {
     name: 'bw_bautagebuch',
     text:
-      'Guten Tag {{1}}, es gibt ein neues Update zu Ihrem Projekt „{{2}}“:\n\n{{3}}\n\nFotos und alle Details: {{4}}\n\nIhr Bärenwald-Team',
+      `Guten Tag {{1}}, es gibt ein neues Update zu Ihrem Projekt „{{2}}“:\n\n{{3}}\n\nFotos und alle Details: {{4}}\n\nIhr ${MARKE.name}-Team`,
     beschreibung: 'Bautagebuch-Eintrag an den Kunden, mit Link zur Projektseite.',
   },
   bw_nachricht: {
     name: 'bw_nachricht',
-    text: 'Nachricht von Bärenwald:\n\n{{1}}\n\nSie können direkt hier antworten.',
+    text: `Nachricht von ${MARKE.name}:\n\n{{1}}\n\nSie können direkt hier antworten.`,
     beschreibung: 'Freie Nachricht, wenn der Kontakt seit über 24 Stunden nicht geschrieben hat.',
   },
 }

@@ -42,6 +42,7 @@ import { toast } from '@/components/ui/app-toast'
 import { useRouter } from 'next/navigation'
 import { nachrichtenHref } from '@/lib/whatsapp/schluessel'
 import { useWhatsAppStatus } from '@/components/whatsapp/useWhatsAppStatus'
+import { MARKE } from '@/lib/marke'
 
 // Farben: gesendet blau · in Auftrag gelb · fertig grün · abgelehnt/entzogen rot
 const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
@@ -52,7 +53,7 @@ const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
 }
 
 /** Grund, den „Partner entziehen“ setzt — Anzeige „Entzogen“ statt „Abgelehnt“. */
-const ENTZOGEN_GRUND = 'Von Bärenwald entzogen'
+const ENTZOGEN_GRUND = `Von ${MARKE.name} entzogen`
 
 function statusAnzeige(e: { status: EinsatzStatus; ablehnung_grund: string | null }) {
   if (e.status === 'abgelehnt' && e.ablehnung_grund === ENTZOGEN_GRUND) {
@@ -95,7 +96,7 @@ type VerlaufEintrag = {
 
 /** Alles, was zu einem Einsatz passiert ist, neueste Meldung oben. */
 function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
-  const vonBw = (v: 'partner' | 'bw' | null | undefined) => (v === 'bw' ? ' · von Bärenwald eingetragen' : '')
+  const vonBw = (v: 'partner' | 'bw' | null | undefined) => (v === 'bw' ? ` · von ${MARKE.name} eingetragen` : '')
   const liste: VerlaufEintrag[] = [
     {
       key: 'gesendet',
@@ -112,7 +113,7 @@ function verlauf(e: EinsatzZeile): VerlaufEintrag[] {
   if (e.status === 'abgelehnt') {
     liste.push(
       e.ablehnung_grund === ENTZOGEN_GRUND
-        ? { key: 'abgelehnt', at: e.gesendet_at, art: 'Von Bärenwald entzogen', text: '', dateien: [], neu: false }
+        ? { key: 'abgelehnt', at: e.gesendet_at, art: ENTZOGEN_GRUND, text: '', dateien: [], neu: false }
         : { key: 'abgelehnt', at: e.gesendet_at, art: 'Abgelehnt', text: e.ablehnung_grund ?? '', dateien: [], neu: false }
     )
   }

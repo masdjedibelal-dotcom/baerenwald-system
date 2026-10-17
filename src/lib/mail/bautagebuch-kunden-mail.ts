@@ -19,6 +19,7 @@ import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import type { AuftragBautagebuchEintrag, AuftragPosition } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 function esc(s: string): string {
   return s
@@ -112,8 +113,8 @@ function updateBlock(
   const fotoHinweis =
     fotos.length > 0
       ? anrede === 'du'
-        ? `<p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in MeinBärenwald ansehen.</p>`
-        : `<p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in MeinBärenwald ansehen.</p>`
+        ? `<p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in ${MARKE.portalName} ansehen.</p>`
+        : `<p style="font-size:13px;color:${C.gray500};margin:12px 0 0;line-height:1.5;">${fotos.length} Foto${fotos.length === 1 ? '' : 's'} im Update — in ${MARKE.portalName} ansehen.</p>`
       : ''
 
   return `${mailSummaryBlock({
@@ -142,11 +143,11 @@ export function defaultBautagebuchKundenNachricht(
   if (anrede === 'du') {
     return `es gibt ein neues Update zu ${projekt} (${formatDatum(eintrag.datum)}): „${eintrag.titel.trim()}“.
 
-Details, Fotos und den Verlauf findest du in MeinBärenwald.`
+Details, Fotos und den Verlauf findest du in ${MARKE.portalName}.`
   }
   return `es gibt ein neues Update zu ${projekt} (${formatDatum(eintrag.datum)}): „${eintrag.titel.trim()}“.
 
-Details, Fotos und den Verlauf finden Sie in MeinBärenwald.`
+Details, Fotos und den Verlauf finden Sie in ${MARKE.portalName}.`
 }
 
 export function bautagebuchKundenMailBetreff(

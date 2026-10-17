@@ -17,6 +17,7 @@ import {
 import type { VersammlungsberichtPayload } from '@/lib/objektakte/load-versammlungsbericht-data'
 import { pdfFussPuppeteerTemplate } from '@/lib/pdf/chrome'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 const ACCENT = VERSAMMLUNG_ACCENT
 const TINT = VERSAMMLUNG_TINT
@@ -54,7 +55,7 @@ function buildCover(vm: VersammlungsberichtViewModel): string {
       <p class="cover-meta">Erstellt für die Eigentümerversammlung</p>
       <p class="cover-meta cover-meta--strong">${esc(vm.orgName)}</p>
       <p class="cover-meta">Erstellt am: ${esc(vm.erstelltAmLabel)}</p>
-      <p class="cover-meta">Erstellt mit Bärenwald</p>
+      <p class="cover-meta">Erstellt mit ${MARKE.name}</p>
     </div>
     <div class="cover-toc">
       <p class="cover-toc-title">Inhalt</p>
@@ -244,7 +245,7 @@ function buildOffen(vm: VersammlungsberichtViewModel): string {
       <p>Dieser Bericht wurde automatisch aus der Objektdokumentation erstellt.<br/>
       Alle Maßnahmen sind mit Fotos, Protokollen und Rechnungen hinterlegt und können bei der Verwaltung eingesehen werden.</p>
       <p class="abbinder-org">${esc(vm.orgName)}${vm.orgKontakt ? ` · ${esc(vm.orgKontakt)}` : ''}</p>
-      <p class="abbinder-brand">Erstellt mit Bärenwald</p>
+      <p class="abbinder-brand">Erstellt mit ${MARKE.name}</p>
     </div>
   </section>`
 }

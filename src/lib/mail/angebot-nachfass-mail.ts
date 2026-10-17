@@ -3,6 +3,7 @@ import { buildSubject } from '@/lib/mail/build-subject'
 import { mailHtmlBase } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 function esc(s: string): string {
   return s
@@ -58,8 +59,8 @@ export function buildAngebotNachfassMail(
 
   const gruss =
     anrede === 'du'
-      ? 'Viele Grüße<br/><strong>Dein Bärenwald Team</strong>'
-      : 'Mit freundlichen Grüßen<br/><strong>Ihr Bärenwald Team</strong>'
+      ? `Viele Grüße<br/><strong>Dein ${MARKE.name} Team</strong>`
+      : `Mit freundlichen Grüßen<br/><strong>Ihr ${MARKE.name} Team</strong>`
 
   const disclaimer =
     anrede === 'du'

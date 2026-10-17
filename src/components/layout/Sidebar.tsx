@@ -9,6 +9,7 @@ import { BrandLogo } from '@/components/brand/BrandLogo'
 import { SIDEBAR_NAV_GROUPS,navItemIsActive } from '@/lib/nav-config'
 import { cn } from '@/lib/utils'
 import { useWhatsAppStatus,useWhatsAppUngelesen } from '@/components/whatsapp/useWhatsAppStatus'
+import { MARKE } from '@/lib/marke'
 
 const SIDEBAR_EXPANDED_KEY = 'bw-sidebar-expanded'
 
@@ -60,11 +61,11 @@ export function Sidebar({
   return (
     <nav className="sidebar" aria-label="Hauptnavigation">
       <div className="sidebar-top">
-        <Link href="/" className="sidebar-brand" title="Bärenwald CRM">
+        <Link href="/" className="sidebar-brand" title={`${MARKE.name} CRM`}>
           <div className="sidebar-logo">
             <BrandLogo variant="white" height={18} />
           </div>
-          <span className="sidebar-brandname">Bärenwald</span>
+          <span className="sidebar-brandname">{MARKE.name}</span>
         </Link>
         <MockBtn className="sidebar-toggle" type="button" title={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'} aria-label={expanded ? 'Sidebar einklappen' : 'Sidebar ausklappen'} aria-expanded={expanded} onClick={toggleExpanded}>
           <MockIcon

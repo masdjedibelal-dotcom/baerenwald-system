@@ -1,3 +1,4 @@
+import { MARKE } from '@/lib/marke'
 /**
  * CRM-Wissen für den Assistenten — erklärt Funktionen wie im Dashboard
  * (Auskunft), unabhängig von Live-Daten (search_crm / get_entity).
@@ -21,7 +22,7 @@ export const CRM_WISSEN: CrmWissenThema[] = [
     aliases: ['crm', 'überblick', 'ueberblick', 'hilfe', 'was kannst du', 'dashboard'],
     titel: 'CRM-Überblick',
     route: '/',
-    kurz: 'Bärenwald-CRM: Anfragen → Angebote → Aufträge → Rechnungen. Partner = Partner, Netzwerk = separate Partner-Tabelle.',
+    kurz: `${MARKE.name}-CRM: Anfragen → Angebote → Aufträge → Rechnungen. Partner = Partner, Netzwerk = separate Partner-Tabelle.`,
     soFunktioniertEs: [
       'Vorgänge laufen über Anfrage (Lead), Angebot, Auftrag, Rechnung.',
       'Kunden sind Stammdaten; Anfragen hängen oft an einem Kunden.',

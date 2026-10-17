@@ -6,6 +6,7 @@
 import { logNotifyEmailResult } from '@/lib/kommunikation/log-notify-email-result'
 import { buildInternSubject } from '@/lib/mail/build-subject'
 import { partnerVorgangRelativeLink } from '@/lib/portal-utils'
+import { MARKE } from '@/lib/marke'
 
 export type PartnerNotifyTyp =
   | 'neu'
@@ -20,7 +21,7 @@ function partnerSiteBaseUrl(): string {
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
     process.env.FRONTEND_URL?.trim() ||
     process.env.NEXT_PUBLIC_WEBSEITE_URL?.trim() ||
-    'https://baerenwaldmuenchen.de'
+    MARKE.portalUrl
   ).replace(/\/$/, '')
 }
 

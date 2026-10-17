@@ -41,6 +41,7 @@ import {
 } from '@/lib/portal-utils'
 import { C } from '@/lib/tokens/colors'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
+import { MARKE } from '@/lib/marke'
 
 /** Website-Lead: Bestätigungsmail; mit `force` auch für manuell erfasste Anfragen (Checkbox). */
 export async function sendAnfrageBestaetigung(
@@ -553,8 +554,8 @@ function kundenPortalMailHtml(input: {
         ? 'Du erhältst diese E-Mail mit Einladung zum Auftraggeber-Portal.'
         : 'Sie erhalten diese E-Mail mit Einladung zum Auftraggeber-Portal.'
       : input.anrede === 'du'
-        ? 'Du erhältst diese E-Mail mit Einladung zu MeinBärenwald.'
-        : 'Sie erhalten diese E-Mail mit Einladung zu MeinBärenwald.'
+        ? `Du erhältst diese E-Mail mit Einladung zu ${MARKE.portalName}.`
+        : `Sie erhalten diese E-Mail mit Einladung zu ${MARKE.portalName}.`
   const content = `
     <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${greeting}</p>
     ${body}

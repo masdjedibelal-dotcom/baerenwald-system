@@ -7,8 +7,9 @@ import {
   type AbnahmeMangel,
   type AbnahmePunkt,
 } from '@/lib/auftraege/abnahme-protokoll-types'
+import { MARKE } from '@/lib/marke'
 
-const SYSTEM = `Du formulierst kurze Kundentexte für ein Abnahmeprotokoll (Garten- und Landschaftsbau / Handwerk, Bärenwald München).
+const SYSTEM = `Du formulierst kurze Kundentexte für ein Abnahmeprotokoll (Garten- und Landschaftsbau / Handwerk, ${MARKE.nameLang}).
 
 Antwort NUR als JSON:
 {

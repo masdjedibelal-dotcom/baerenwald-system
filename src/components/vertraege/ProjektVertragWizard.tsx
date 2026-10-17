@@ -31,6 +31,7 @@ import type { NachtragPositionDraft,ProjektVertragWizardBootstrap,ProjektVertrag
 import { cn } from '@/lib/utils'
 import { COPY_BUTTON,TOAST } from '@/lib/copy'
 import { useFieldErrors } from '@/lib/validation/form-schema'
+import { MARKE } from '@/lib/marke'
 
 /** Sichtbare Phasen ≤3: Partner · Inhalt (+ Unterlagen bei Accept) · PDF */
 const PHASES = [
@@ -550,7 +551,7 @@ export function ProjektVertragWizard({
                   ? 'Der Vertrag wird erzeugt. Im Partner-Portal erscheint er unter Vorgänge zum Download bzw. zur verbindlichen Zustimmung sowie die gewählten Unterlagen. Eine separate Vertrags-Mail wird nicht versendet.'
                   : nachtragMode
                     ? 'Die Ergänzungsvereinbarung wird erzeugt. Der Nachunternehmervertrag wird still aktualisiert. Der Partner erhält dieselbe Auftrags-Mail wie bei einer neuen Zuweisung — Betreff: „Neue Änderungsanfrage“.'
-                    : 'Der Vertrag wird im Bärenwald-Design erzeugt und automatisch in den Auftragsdokumenten gespeichert.'}
+                    : `Der Vertrag wird im ${MARKE.name}-Design erzeugt und automatisch in den Auftragsdokumenten gespeichert.`}
               </p>
               {nachtragMode ? (
                 <label className="flex cursor-pointer items-start gap-2 rounded-card border border-bw-border p-3">

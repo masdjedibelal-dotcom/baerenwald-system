@@ -4,6 +4,7 @@
  */
 
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 const GOLD = C.accentGold3
 
 export type AushangHtmlInput = {
@@ -103,7 +104,7 @@ export function buildAushangHtml(p: AushangHtmlInput): string {
 
     <footer style="padding:12px 4px 0;border-top:1px solid ${C.gray200};font-size:7.5pt;color:${C.grayNeutral4};line-height:1.4;display:flex;justify-content:space-between;gap:12px;">
       <div><strong>Kein Smartphone?</strong><br/>Melden Sie sich bei Ihrer Hausverwaltung: ${esc(kontakt)}</div>
-      <div style="text-align:right;max-width:220px;">Datenschutz: Angaben nur zur Schadenbearbeitung.<br/><span style="font-size:6.5pt;color:${C.grayNeutral3};">Ein Service von Bärenwald</span></div>
+      <div style="text-align:right;max-width:220px;">Datenschutz: Angaben nur zur Schadenbearbeitung.<br/><span style="font-size:6.5pt;color:${C.grayNeutral3};">Ein Service von ${MARKE.name}</span></div>
     </footer>
   </div>
 </body></html>`

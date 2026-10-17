@@ -8,6 +8,7 @@ buildRechnungHtmlAusDetail,
 loadRechnungDetailForPdf,
 } from '@/lib/rechnungen/rechnung-html-payload'
 import { renderRechnungPdfForDetail } from '@/lib/rechnungen/render-rechnung-pdf-for-detail'
+import { MARKE } from '@/lib/marke'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -74,7 +75,7 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="Rechnung_${nr}_Baerenwald.pdf"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="Rechnung_${nr}_${MARKE.dateiKurz}.pdf"`,
       },
     })
   } catch (e) {

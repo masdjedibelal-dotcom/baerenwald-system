@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { toast } from '@/components/ui/app-toast'
 import { EinstellungenSectionHeading } from '@/components/einstellungen/EinstellungenUi'
+import { MARKE } from '@/lib/marke'
 
 const INTEGRATIONEN = [
   { name: 'DATEV Export', desc: 'Buchhaltungs-Schnittstelle', on: true },
   { name: 'GMX / Web.de Mail', desc: 'SMTP für Rechnungsversand', on: true },
-  { name: 'Webformular Lead-Sync', desc: 'baerenwald-bau.de Kontaktformular', on: true },
+  { name: 'Webformular Lead-Sync', desc: `${MARKE.websiteHost} Kontaktformular`, on: true },
   { name: 'Telekom CallCenter', desc: 'Anruf-Logging & Anrufnotizen', on: false },
   { name: 'Google Calendar', desc: 'Termine synchronisieren', on: true },
   { name: 'WhatsApp Business', desc: 'Kundenkommunikation', on: false },

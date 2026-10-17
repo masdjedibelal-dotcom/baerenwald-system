@@ -28,6 +28,7 @@ import { filterAdressRueckfragen,type VorOrtRueckfrage } from '@/lib/anfrage-adr
 import { anfrageBetreffNachAnlass } from '@/lib/email/meldung-mail-templates'
 import { formatEuro,formatEuroSpanne } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 function esc(s: string): string {
   return s
@@ -37,7 +38,7 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-const MAIL_MARKENNAME = 'Bärenwald'
+const MAIL_MARKENNAME = MARKE.name
 
 /** Logo + Markenname „Bärenwald“ (grüner oder heller Kopf). */
 export function mailLogoMitMarkenname(
@@ -191,7 +192,7 @@ export function mailKundenStandardOptions(
 /** @deprecated Portal-Button gehört in den P.S.-Footer — nutze mailKundenStandardOptions(). */
 export function mailKundenPortalTop(link?: string | null): string {
   const url = link?.trim() || buildPortalLoginLink()
-  return `<p style="margin:0 0 20px;">${mailPrimaryButtonHtml('Zu MeinBärenwald →', url, { margin: '0' })}</p>`
+  return `<p style="margin:0 0 20px;">${mailPrimaryButtonHtml(`Zu ${MARKE.portalName} →`, url, { margin: '0' })}</p>`
 }
 
 export function mailKundenContactLine(anrede: 'du' | 'sie', telefon: string): string {
@@ -204,8 +205,8 @@ export function mailKundenContactLine(anrede: 'du' | 'sie', telefon: string): st
 
 export function mailKundenGruss(anrede: 'du' | 'sie'): string {
   return anrede === 'du'
-    ? 'Viele Grüße<br/><strong>Dein Bärenwald Team</strong>'
-    : 'Mit freundlichen Grüßen<br/><strong>Ihr Bärenwald Team</strong>'
+    ? `Viele Grüße<br/><strong>Dein ${MARKE.name} Team</strong>`
+    : `Mit freundlichen Grüßen<br/><strong>Ihr ${MARKE.name} Team</strong>`
 }
 
 function btn(text: string, url: string): string {
@@ -767,7 +768,7 @@ export function mailHandwerkerAnfrage(
     })
     .join('')
   const notizBlock = data.notiz?.trim()
-    ? `<p style="font-size:15px;line-height:1.6;margin:16px 0;"><strong>Hinweis von Bärenwald:</strong><br/>${esc(data.notiz.trim()).replace(/\n/g, '<br/>')}</p>`
+    ? `<p style="font-size:15px;line-height:1.6;margin:16px 0;"><strong>Hinweis von ${MARKE.name}:</strong><br/>${esc(data.notiz.trim()).replace(/\n/g, '<br/>')}</p>`
     : ''
   const betreffSuffix =
     posCount > 1 ? `${data.gewerk} (${posCount} Positionen)` : data.gewerk

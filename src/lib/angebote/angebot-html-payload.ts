@@ -41,6 +41,7 @@ import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { resolveAngebotLeistungsumfang } from '@/lib/angebote/resolve-angebot-leistungsumfang'
 import type { AngebotDetail, AngebotPosition, Gewerk, KundenObjekt } from '@/lib/types'
 import type { KiVizPdfPage } from '@/lib/visualize/pdf-data'
+import { MARKE } from '@/lib/marke'
 
 function firstJoin<T>(raw: T | T[] | null | undefined): T | null {
   if (raw == null) return null
@@ -179,7 +180,7 @@ export function buildAngebotHtmlInputAusDetail(
     return {
       firmen_logo_url: resolveAngebotPdfLogoSrc(firm.logo_url),
       mail_anrede: anrede,
-      firmenname: firm.firmenname?.trim() || 'Bärenwald München',
+      firmenname: firm.firmenname?.trim() || MARKE.firma.firmenname,
       firmen_rechtsform: firm.rechtsform?.trim() || null,
       geschaeftsfuehrer: firm.geschaeftsfuehrer?.trim() || null,
       firmen_adresse: firmZeileAdresse(firm),
@@ -279,7 +280,7 @@ export function buildAngebotHtmlInputAusDetail(
   const payload: AngebotHtmlInput = {
     firmen_logo_url: resolveAngebotPdfLogoSrc(firm.logo_url),
     mail_anrede: anrede,
-    firmenname: firm.firmenname?.trim() || 'Bärenwald München',
+    firmenname: firm.firmenname?.trim() || MARKE.firma.firmenname,
     firmen_rechtsform: firm.rechtsform?.trim() || null,
     geschaeftsfuehrer: firm.geschaeftsfuehrer?.trim() || null,
     firmen_adresse: firmZeileAdresse(firm),

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { STAGING_WEBSITE_ORIGIN } from '@/lib/auth/staging-admin'
 import { publicWebsiteBaseUrl } from '@/lib/portal-utils'
+import { MARKE } from '@/lib/marke'
 
 type Props = {
   open: boolean
@@ -52,7 +53,7 @@ export function HvWarteFreigabeSheet({
     >
       <div className="space-y-4 text-sm leading-relaxed text-bw-text">
         <p className="m-0">
-          Mieter-Meldungen starten mit <strong>hv_meldung_status = neu</strong>. Bärenwald darf erst
+          Mieter-Meldungen starten mit <strong>hv_meldung_status = neu</strong>. {MARKE.name} darf erst
           disponieren, wenn die Hausverwaltung im <strong>Auftraggeber-Portal</strong> freigegeben hat
           oder die Hausmeister-Prüfung abgeschlossen ist.
         </p>
@@ -68,7 +69,7 @@ export function HvWarteFreigabeSheet({
           <p className="m-0 mb-2 font-semibold">Nächste Schritte (HV-Portal)</p>
           <ol className="m-0 list-decimal space-y-2 pl-5">
             <li>
-              <strong>An Bärenwald übergeben</strong> (<code>angebot_einfordern</code>) — setzt Status
+              <strong>An {MARKE.name} übergeben</strong> (<code>angebot_einfordern</code>) — setzt Status
               auf <em>angebot_eingefordert</em>; danach erscheint im CRM „Angebot erstellen“.
             </li>
             <li>

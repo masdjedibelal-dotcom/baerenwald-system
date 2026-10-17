@@ -13,6 +13,7 @@ import {
 } from '@/lib/mail-templates'
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 function esc(s: string): string {
   return s
@@ -63,13 +64,13 @@ export function buildAuftragsbestaetigungMail(
 
   const stepsDu = [
     'Wir planen Termine und koordinieren die Gewerke für dich.',
-    'Pro Meilenstein oder abgeschlossenem Gewerk erhältst du per E-Mail ein Update — Details, Fotos und Verlauf siehst du in MeinBärenwald.',
+    `Pro Meilenstein oder abgeschlossenem Gewerk erhältst du per E-Mail ein Update — Details, Fotos und Verlauf siehst du in ${MARKE.portalName}.`,
     'Wir führen die Arbeiten gemäß Angebot aus.',
     'Zum Abschluss: Abnahme, Abschlussdokumentation und Rechnung.',
   ]
   const stepsSie = [
     'Wir planen Termine und koordinieren die Gewerke für Sie.',
-    'Pro Meilenstein oder abgeschlossenem Gewerk erhalten Sie per E-Mail ein Update — Details, Fotos und Verlauf finden Sie in MeinBärenwald.',
+    `Pro Meilenstein oder abgeschlossenem Gewerk erhalten Sie per E-Mail ein Update — Details, Fotos und Verlauf finden Sie in ${MARKE.portalName}.`,
     'Wir führen die Arbeiten gemäß Angebot aus.',
     'Zum Abschluss: Abnahme, Abschlussdokumentation und Rechnung.',
   ]

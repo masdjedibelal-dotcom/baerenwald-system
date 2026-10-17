@@ -1,12 +1,14 @@
 
+import { istTeo, MARKE } from '@/lib/marke'
 /**
  * Mail-Logos als HTTPS auf baerenwaldmuenchen.de — kein CID-Anhang.
  * Apple Mail zeigt CID oft als Büroklammer + kaputtes Bild.
  */
 
-export const MAIL_LOGO_HOST = 'https://baerenwaldmuenchen.de'
-export const MAIL_LOGO_URL_GREEN = `${MAIL_LOGO_HOST}/mail-logo-green.png`
-export const MAIL_LOGO_URL_WHITE = `${MAIL_LOGO_HOST}/mail-logo-white.png`
+export const MAIL_LOGO_HOST = MARKE.portalUrl
+const MAIL_LOGO_DIR = istTeo ? '/brand/teo' : ''
+export const MAIL_LOGO_URL_GREEN = `${MAIL_LOGO_HOST}${MAIL_LOGO_DIR}/mail-logo-green.png`
+export const MAIL_LOGO_URL_WHITE = `${MAIL_LOGO_HOST}${MAIL_LOGO_DIR}/mail-logo-white.png`
 
 /** Alle Logo-src → stabile HTTPS-URLs (kein cid:). */
 export function rewriteMailLogoUrlsToHosted(html: string): string {

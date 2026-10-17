@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { formatEuro } from "@/lib/format/geld-datum";
+import { MARKE } from '@/lib/marke'
 
 export type EigentuemerBerichtInput = {
   orgName: string;
@@ -89,7 +90,7 @@ export async function generateEigentuemerBerichtPdf(
   }
 
   y = 80;
-  page.drawText("Ein Service von Bärenwald", {
+  page.drawText(`Ein Service von ${MARKE.name}`, {
     x: 48,
     y,
     size: 8,

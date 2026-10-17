@@ -18,6 +18,7 @@ import {
   pdfTitelzeileHtml,
 } from '@/lib/pdf/chrome'
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 const ACCENT = C.greenDark
 const TEXT = C.gray900
@@ -152,7 +153,7 @@ function fotosHtml(urls: string[], captions: string[] = []): string {
 }
 
 function partiesRowHtml(p: AbnahmeProtokollHtmlInput): string {
-  const an = partyBox('Bärenwald', [
+  const an = partyBox(MARKE.name, [
     { label: 'Firma', value: p.firmenname },
     { label: 'Adresse', value: p.firmen_adresse.replace(/\n/g, ', ') },
     { label: 'Vor Ort', value: p.meta.vertreter_an },
@@ -405,7 +406,7 @@ function unterschriftenHtml(p: AbnahmeProtokollHtmlInput): string {
   return `${sectionHeading('5', 'Unterschriften')}
     <div style="display:flex;gap:16px;margin-top:8px;">
       ${block(
-        'Bärenwald',
+        MARKE.name,
         hwName,
         formatOrtDatumZeile(p.meta.unterschrift_ort_datum_an),
         hwSig,

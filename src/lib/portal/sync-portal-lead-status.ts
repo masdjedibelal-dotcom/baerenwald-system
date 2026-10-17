@@ -8,6 +8,7 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import type { AuftragStatus } from '@/lib/types'
+import { MARKE } from '@/lib/marke'
 
 type SyncEvent =
   | 'angebot_gesendet'
@@ -21,7 +22,7 @@ function partnerSiteBaseUrl(): string {
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
     process.env.FRONTEND_URL?.trim() ||
     process.env.NEXT_PUBLIC_WEBSEITE_URL?.trim() ||
-    'https://baerenwaldmuenchen.de'
+    MARKE.portalUrl
   ).replace(/\/$/, '')
 }
 

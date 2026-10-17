@@ -5,6 +5,7 @@
  */
 
 import { C } from '@/lib/tokens/colors'
+import { MARKE } from '@/lib/marke'
 
 /** PDF-Typografie (Vorschlag 3.1 / App-Stufen). */
 export const PDF_FS = {
@@ -257,7 +258,7 @@ export function pdfFussPuppeteerTemplate(input: PdfFussInput): string {
 
   const service =
     input.serviceVonBaerenwald && input.variant === 'hv-wl'
-      ? `<div style="text-align:center;font-size:6.5pt;color:${C.text3};margin-top:2px;">Ein Service von Bärenwald</div>`
+      ? `<div style="text-align:center;font-size:6.5pt;color:${C.text3};margin-top:2px;">Ein Service von ${MARKE.name}</div>`
       : ''
 
   const pageN = input.previewPage
@@ -332,7 +333,7 @@ export function pdfAbsenderFromFirm(firm: {
   accent?: string | null
 }): PdfAbsender {
   return {
-    name: firm.firmenname?.trim() || 'Bärenwald München',
+    name: firm.firmenname?.trim() || MARKE.firma.firmenname,
     adresseZeilen: (firm.adresse || '')
       .split('\n')
       .map((z) => z.trim())
@@ -384,7 +385,7 @@ export function pdfAbsenderFromReportFirm(p: {
     if (st) steuernummer = st[1].replace(/\s/g, '')
   }
   return {
-    name: name || 'Bärenwald München',
+    name: name || MARKE.firma.firmenname,
     adresseZeilen: p.firmen_adresse
       .split('\n')
       .map((z) => z.trim())

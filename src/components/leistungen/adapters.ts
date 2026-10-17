@@ -106,7 +106,7 @@ function anfrageLabelForPosition(
 function parseNachtragBegruendung(beschreibung: string | null | undefined): string | null {
   const plain = richTextToPlain(beschreibung ?? '') || ''
   const cleaned = plain
-    .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch Bärenwald\.?\s*$/i, '')
+    .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch (?:Bärenwald|Servus TEO)\.?\s*$/i, '')
     .trim()
   return cleaned || null
 }

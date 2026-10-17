@@ -1,8 +1,9 @@
 import type { User } from '@supabase/supabase-js'
 import { isStagingAdminEmail } from '@/lib/auth/staging-admin'
 import { COPY_ROLE } from '@/lib/copy'
+import { MARKE } from '@/lib/marke'
 
-const BAERENWALD_PRIMARY_STAFF_EMAIL = 'info@baerenwald-muenchen.de'
+const BAERENWALD_PRIMARY_STAFF_EMAIL = MARKE.infoEmail
 
 export function isBaerenwaldPrimaryStaffEmail(email: string | null | undefined): boolean {
   return email?.trim().toLowerCase() === BAERENWALD_PRIMARY_STAFF_EMAIL
@@ -38,7 +39,7 @@ export function crmRoleFromUser(user: User | null | undefined): 'admin' | 'manag
 }
 
 export const CRM_LOGIN_PORTAL_ONLY_MESSAGE =
-  `Diese E-Mail ist für MeinBärenwald / das ${COPY_ROLE.partnerPortal} registriert, nicht für das CRM. ` +
-  'Für das CRM nutze die Einladungs-E-Mail (z. B. info@baerenwald-muenchen.de mit Bindestrich) oder bitte einen Admin um CRM-Zugang.'
+  `Diese E-Mail ist für ${MARKE.portalName} / das ${COPY_ROLE.partnerPortal} registriert, nicht für das CRM. ` +
+  `Für das CRM nutze die Einladungs-E-Mail (z. B. ${MARKE.infoEmail}) oder bitte einen Admin um CRM-Zugang.`
 
 export const CRM_LOGIN_INVALID_MESSAGE = 'E-Mail oder Passwort falsch.'

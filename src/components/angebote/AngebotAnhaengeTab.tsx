@@ -9,6 +9,7 @@ import { parseProjektFotos } from '@/lib/angebote/angebot-projekt-fotos'
 import type { AngebotDetail, LeadDokumentRow } from '@/lib/types'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { formatDatum } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
 const COLS = 'minmax(0, 1fr) auto auto'
 
@@ -22,7 +23,7 @@ type DocRow = {
 
 function angebotPdfDateiname(detail: AngebotDetail): string {
   const nr = detail.angebotsnr?.trim() || `AN-${detail.id.slice(0, 8).toUpperCase()}`
-  return `Angebot_${nr.replace(/\s+/g, '_')}_Baerenwald.pdf`
+  return `Angebot_${nr.replace(/\s+/g, '_')}_${MARKE.dateiKurz}.pdf`
 }
 
 function openDokumentDatei(url: string) {

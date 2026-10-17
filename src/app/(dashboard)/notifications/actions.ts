@@ -6,6 +6,7 @@ import {
 isHwZuweisungAkzeptiertLenient,
 normalizeHwZuweisungStatus,
 } from '@/lib/angebote/handwerker-annahme'
+import { MARKE } from '@/lib/marke'
 
 export type CrmNotificationTyp =
   | 'neue_anfrage'
@@ -179,7 +180,7 @@ function typHint(typ: CrmNotificationTyp): string {
     case 'neue_anfrage':
       return 'Neue Anfrage aus dem Meldeformular oder Portal. Öffnen Sie die Anfrage, um Kontakt und Details zu prüfen.'
     case 'hm_befund_freigabe':
-      return 'Der Hausmeister hat die Prüfung abgeschlossen und an Bärenwald übergeben (Angebot oder Akut). Vorbefund liegt am Vorgang.'
+      return `Der Hausmeister hat die Prüfung abgeschlossen und an ${MARKE.name} übergeben (Angebot oder Akut). Vorbefund liegt am Vorgang.`
     case 'handwerker_update':
       return 'Der Partner hat ein Update zu einer Leistung geschickt (Text und/oder Fotos). Unter Leistungen sehen Sie den Eintrag.'
     case 'handwerker_angenommen':

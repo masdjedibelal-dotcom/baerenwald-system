@@ -9,6 +9,7 @@ import { toast } from '@/components/ui/app-toast'
 import { openConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { safeAction } from '@/lib/actions/safe-action'
 import { waNummerAnzeige } from '@/lib/whatsapp/telefon'
+import { MARKE } from '@/lib/marke'
 
 function Sec({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -80,7 +81,7 @@ export function EinstellungenWhatsAppClient({
         <div className="setting-row">
           <div>
             <div className="lbl">Nummer</div>
-            <div className="sub">{nummer ? waNummerAnzeige(nummer) : 'Bärenwald-Nummer (nach Anbindung)'}</div>
+            <div className="sub">{nummer ? waNummerAnzeige(nummer) : `${MARKE.name}-Nummer (nach Anbindung)`}</div>
           </div>
         </div>
         <div className="setting-row">

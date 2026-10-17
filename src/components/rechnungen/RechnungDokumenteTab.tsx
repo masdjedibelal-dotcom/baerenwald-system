@@ -19,12 +19,13 @@ import {
 } from '@/lib/auftraege/auftrag-dokumente-helpers'
 import type { AuftragDetail, LeadDokumentRow, Rechnung } from '@/lib/types'
 import { formatDatum } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
 const COLS = 'minmax(0, 1fr) auto auto'
 
 function pdfName(detail: Rechnung): string {
   const nr = detail.rechnungsnummer?.trim() || `RE-${detail.id.slice(0, 8).toUpperCase()}`
-  return `Rechnung_${nr.replace(/\s+/g, '_')}_Baerenwald.pdf`
+  return `Rechnung_${nr.replace(/\s+/g, '_')}_${MARKE.dateiKurz}.pdf`
 }
 
 type RechnungKurz = {

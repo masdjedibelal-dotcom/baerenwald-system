@@ -14,6 +14,7 @@ import {
 import { splitStrasseHausnummer } from '@/lib/kunde-stammdaten'
 import { toast } from '@/components/ui/app-toast'
 import { TOAST } from '@/lib/copy'
+import { MARKE } from '@/lib/marke'
 
 /** IBAN lesbar mit Leerzeichen (DE12 3456 …), Speichern ohne. */
 function formatIbanAnzeige(iban: string): string {
@@ -182,7 +183,7 @@ export function FirmaBrandingForm({ initial }: { initial: FirmenEinstellungen })
               <MockInput value={draft.geschaeftsfuehrer} onChange={(e) => setDraft((d) => ({ ...d, geschaeftsfuehrer: e.target.value }))} />
             </MockField>
             <MockField label="Straße">
-              <MockInput value={draft.strasse} onChange={(e) => setDraft((d) => ({ ...d, strasse: e.target.value }))} placeholder="Bärenwaldstraße" autoComplete="address-line1" />
+              <MockInput value={draft.strasse} onChange={(e) => setDraft((d) => ({ ...d, strasse: e.target.value }))} placeholder={MARKE.firma.strasse} autoComplete="address-line1" />
             </MockField>
             <MockField label="Hausnummer">
               <MockInput value={draft.hausnummer} onChange={(e) => setDraft((d) => ({ ...d, hausnummer: e.target.value }))} placeholder="20" autoComplete="address-line2" />

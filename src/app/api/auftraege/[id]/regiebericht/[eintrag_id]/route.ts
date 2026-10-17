@@ -8,6 +8,7 @@ import { fetchFirmenEinstellungen } from '@/lib/firmen-einstellungen'
 import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import type { FormularEintrag, FormularTemplate, Kunde } from '@/lib/types'
 import { regieBetragPartner, roundBetrag2 } from '@/lib/shared-domain/regie-betrag'
+import { MARKE } from '@/lib/marke'
 
 export async function GET(
   _request: Request,
@@ -88,7 +89,7 @@ export async function GET(
   const materialBezeichnung = str(daten.material_bezeichnung)
 
   const firm = await fetchFirmenEinstellungen(supabase)
-  const firmenname = firm.firmenname?.trim() || 'Bärenwald München'
+  const firmenname = firm.firmenname?.trim() || MARKE.firma.firmenname
   const auftraggeberName = firmenname
   const auftraggeberAdresse = firmZeileAdresse(firm) || 'München'
 

@@ -458,7 +458,7 @@ export async function decideWeitereArbeitMitNotify(input: {
           ? Number(pos.stundensatz)
           : null
     const begruendung = String(pos.beschreibung ?? '')
-      .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch Bärenwald\.?\s*$/i, '')
+      .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch (?:Bärenwald|Servus TEO)\.?\s*$/i, '')
       .trim()
 
     // Kundenpreis: stundensatz_kunde, Fallback Partnersatz (Altdaten)
@@ -583,7 +583,7 @@ export async function decideWeitereArbeitMitNotify(input: {
   if (pos?.auftrag_id) {
     const name = String(pos.leistung_name ?? 'Nachtrag').trim() || 'Nachtrag'
     const begruendung = String(pos.beschreibung ?? '')
-      .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch Bärenwald\.?\s*$/i, '')
+      .replace(/\n*Nachtrag\s*\/\s*Regie\s*[—\-–]\s*wartet auf Freigabe durch (?:Bärenwald|Servus TEO)\.?\s*$/i, '')
       .trim()
     await insertAuftragTimelineEvent({
       auftrag_id: String(pos.auftrag_id),

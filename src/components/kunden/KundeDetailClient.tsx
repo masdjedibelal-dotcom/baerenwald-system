@@ -605,7 +605,7 @@ export function KundeDetailClient({
       >
         <div className="space-y-3">
           <MockField label="An"><MockInput value={portalTo} onChange={(e) => setPortalTo(e.target.value)} placeholder="kunde@beispiel.de; weitere@beispiel.de" /></MockField>
-          <MockField label="CC (optional)"><MockInput value={portalCc} onChange={(e) => setPortalCc(e.target.value)} placeholder="intern@baerenwald.de; team@baerenwald.de" /></MockField>
+          <MockField label="CC (optional)"><MockInput value={portalCc} onChange={(e) => setPortalCc(e.target.value)} placeholder="intern@firma.de; team@firma.de" /></MockField>
           <KiAssistFieldLabel
             label="Betreff"
             value={portalBetreff}

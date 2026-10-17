@@ -19,6 +19,7 @@ import {
 } from '@/lib/vertraege/rahmen-anlagen'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
+import { MARKE } from '@/lib/marke'
 
 const GRUEN = C.greenDark
 const TEXT_PRIMARY = C.gray900
@@ -90,7 +91,7 @@ const styles = StyleSheet.create({
 })
 
 function firmenName(firm: FirmenEinstellungen) {
-  return firm.firmenname?.trim() || 'Bärenwald München'
+  return firm.firmenname?.trim() || MARKE.firma.firmenname
 }
 
 function formatSteuernummer(nr: string | null | undefined): string | null {
@@ -177,7 +178,7 @@ function PdfFooter({ firm }: { firm: FirmenEinstellungen }) {
   const adrLines = firmAdresseBlock(firm)
   const tel = firm.telefon?.trim() ? `Tel.: ${firm.telefon.trim()}` : null
   const email = firm.email?.trim() || null
-  const web = firm.website?.trim()?.replace(/^https?:\/\//i, '') || 'www.baerenwaldmuenchen.de'
+  const web = firm.website?.trim()?.replace(/^https?:\/\//i, '') || MARKE.firma.website
   const ust = firm.ust_id?.trim() ? `USt-IdNr.: ${firm.ust_id.trim()}` : null
   const st = formatSteuernummer(firm.steuernummer)
   const steuernr = st ? `Steuernummer: ${st}` : null

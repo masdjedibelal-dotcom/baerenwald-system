@@ -1,5 +1,6 @@
 import { mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 import { isStagingSupabase,STAGING_WEBSITE_ORIGIN } from '@/lib/auth/staging-admin'
+import { MARKE } from '@/lib/marke'
 
 /** Kundenportal vs. Auftraggeber-Portal — steuert Button- und P.S.-Text in Mails. */
 export type PortalMailAudience = 'privat' | 'organisation'
@@ -13,7 +14,7 @@ export function portalAudienceFromKunde(
 export function portalMailButtonLabel(audience: PortalMailAudience): string {
   return audience === 'organisation'
     ? 'Zum Auftraggeber-Portal →'
-    : 'Zu MeinBärenwald →'
+    : `Zu ${MARKE.portalName} →`
 }
 
 export function portalMailPsIntro(audience: PortalMailAudience, anrede: 'du' | 'sie'): string {
@@ -23,8 +24,8 @@ export function portalMailPsIntro(audience: PortalMailAudience, anrede: 'du' | '
       : 'Im <strong>Auftraggeber-Portal</strong> sehen Sie Meldungen, Freigaben, Angebote und Dokumente.'
   }
   return anrede === 'du'
-    ? 'In <strong>MeinBärenwald</strong> siehst du dein Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.'
-    : 'In <strong>MeinBärenwald</strong> sehen Sie Ihr Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.'
+    ? `In <strong>${MARKE.portalName}</strong> siehst du dein Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.`
+    : `In <strong>${MARKE.portalName}</strong> sehen Sie Ihr Projekt digital — Anfrage, Angebote, Dokumente, Bautagebuch und Updates jederzeit im Blick.`
 }
 
 export function defaultPortalInviteBetreff(
@@ -34,7 +35,7 @@ export function defaultPortalInviteBetreff(
   if (opts?.organisation) {
     return 'Auftraggeber-Portal – Zugang bereit'
   }
-  return 'MeinBärenwald – Zugang bereit'
+  return `${MARKE.portalName} – Zugang bereit`
 }
 
 export function defaultPortalInviteText(
@@ -54,12 +55,12 @@ export function defaultPortalInviteText(
   }
   if (anrede === 'du') {
     return (
-      'hier ist dein Zugang zu MeinBärenwald, deinem Kundenportal von Bärenwald.\n\n' +
+      `hier ist dein Zugang zu ${MARKE.portalName}, deinem Kundenportal von ${MARKE.name}.\n\n` +
       'Registriere dich mit dieser E-Mail-Adresse — danach siehst du deine Aufträge, Angebote und Dokumente.'
     )
   }
   return (
-    'hier ist Ihr Zugang zu MeinBärenwald, Ihrem Kundenportal von Bärenwald.\n\n' +
+    `hier ist Ihr Zugang zu ${MARKE.portalName}, Ihrem Kundenportal von ${MARKE.name}.\n\n` +
     'Registrieren Sie sich mit dieser E-Mail-Adresse — danach sehen Sie Ihre Aufträge, Angebote und Dokumente.'
   )
 }
@@ -70,7 +71,7 @@ export function defaultPartnerPortalInviteBetreff(): string {
 
 export function defaultPartnerPortalInviteText(): string {
   return (
-    'hier ist Ihr Zugang zum Partner-Portal von Bärenwald.\n\n' +
+    `hier ist Ihr Zugang zum Partner-Portal von ${MARKE.name}.\n\n` +
     'Registrieren Sie sich mit Ihrer bei uns hinterlegten E-Mail-Adresse. Danach sehen Sie Anfragen, Aufträge, Angebote und Dokumente.'
   )
 }
@@ -90,7 +91,7 @@ export function publicWebsiteBaseUrl(): string {
     process.env.FRONTEND_URL ??
     process.env.NEXT_PUBLIC_WEBSEITE_URL ??
     process.env.NEXT_PUBLIC_SITE_URL ??
-    'https://baerenwaldmuenchen.de'
+    MARKE.portalUrl
   ).replace(/\/$/, '')
 }
 
@@ -136,6 +137,6 @@ export function buildPartnerPortalButton(portalLink: string): string {
   margin:0 0 16px;
   line-height:1.6;
   font-family:Arial,Helvetica,sans-serif;">
-  Melde dich mit deiner bei Bärenwald hinterlegten Partner-E-Mail an — danach siehst du Auftrag und Leistungen.
+  Melde dich mit deiner bei ${MARKE.name} hinterlegten Partner-E-Mail an — danach siehst du Auftrag und Leistungen.
 </p>`
 }

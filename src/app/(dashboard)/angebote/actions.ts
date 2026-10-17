@@ -126,6 +126,7 @@ writeAngebotStatusEinfach,
 } from '@/lib/status/write-angebot-status'
 import { writeAngebotHandwerkerStatus } from '@/lib/status/write-angebot-handwerker-status'
 import { formatEuro } from '@/lib/format/geld-datum'
+import { MARKE } from '@/lib/marke'
 
 function angebotMailSummen(
   positionen: AngebotPosition[],
@@ -2059,7 +2060,7 @@ export async function sendAngebotToKunde(
       )
 
   const pdfAttachmentName = angebotNr
-    ? `Angebot_${angebotNr}_Baerenwald.pdf`
+    ? `Angebot_${angebotNr}_${MARKE.dateiKurz}.pdf`
     : `angebot-${angebotId}.pdf`
 
   const mail = await sendMail({

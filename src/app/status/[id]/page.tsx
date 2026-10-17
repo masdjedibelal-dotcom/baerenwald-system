@@ -4,6 +4,7 @@ import { BRAND_ALT, resolveBrandLogoUrl } from '@/lib/brand'
 import { TokenLinkInvalid } from '@/components/public/TokenLinkInvalid'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { C } from '@/lib/tokens/colors'
+import { MARKE, MARKE_WEBSITE_URL } from '@/lib/marke'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +15,7 @@ export default async function LeadStatusPublicPage({ params }: { params: { id: s
   const siteFooter =
     process.env.NEXT_PUBLIC_WEBSITE_URL?.replace(/\/$/, '') ||
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
-    'https://baerenwald-muenchen.de'
+    MARKE_WEBSITE_URL
 
   const {data: lead, error} = await supabaseAdmin
     .from('leads')
@@ -56,7 +57,7 @@ export default async function LeadStatusPublicPage({ params }: { params: { id: s
         </a>
       </main>
       <footer className="mt-auto border-t border-bw-border bg-bw-bg-soft px-4 py-6 text-center text-xs text-muted">
-        Bärenwald Handwerksgruppe München
+        {MARKE.nameLang}
         <br />
         <a href={`${siteFooter}/datenschutz`} className="text-bw-primary underline">
           Datenschutz

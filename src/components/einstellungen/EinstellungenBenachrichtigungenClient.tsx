@@ -31,6 +31,7 @@ import {
 } from '@/lib/push/prefs'
 import { TOAST } from '@/lib/copy'
 import { useFieldErrors } from '@/lib/validation/form-schema'
+import { MARKE } from '@/lib/marke'
 
 function Sec({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -59,7 +60,7 @@ function statusCopy(status: PushCapabilityStatus, hasSub: boolean): {
     case 'permission_denied':
       return {
         title: 'Berechtigung blockiert',
-        sub: 'In den System-/Browser-Einstellungen für Bärenwald Benachrichtigungen erlauben.',
+        sub: `In den System-/Browser-Einstellungen für ${MARKE.name} Benachrichtigungen erlauben.`,
       }
     case 'permission_default':
       return {

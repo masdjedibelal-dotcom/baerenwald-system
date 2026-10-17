@@ -20,6 +20,7 @@ import { mitarbeiterUeberEinsatzInformieren } from '@/lib/einsatz/mitarbeiter-in
 import { anweisungFotos, EINSATZ_FOTOS_MAX, istEinsatzFotoUrl } from '@/lib/einsatz/anweisung-fotos'
 import { einsatzAntwortLink, neuerAntwortToken } from '@/lib/einsatz/antwort'
 import { waNummer } from '@/lib/whatsapp/telefon'
+import { MARKE } from '@/lib/marke'
 
 /** Bucket der Partner-Uploads (Portal `PARTNER_UPLOAD_BUCKET`). */
 const PARTNER_UPLOAD_BUCKET = 'handwerker-uploads'
@@ -494,7 +495,7 @@ export async function zurueckziehenEinsatz(
       einsatzId,
       von: 'angenommen',
       nach: 'abgelehnt',
-      extra: { abgelehnt_at: new Date().toISOString(), ablehnung_grund: 'Von Bärenwald entzogen' },
+      extra: { abgelehnt_at: new Date().toISOString(), ablehnung_grund: `Von ${MARKE.name} entzogen` },
     })
     if (!w.ok) return { ok: false, message: w.error }
     revalidatePath(`/auftraege/${String(row.auftrag_id)}`)

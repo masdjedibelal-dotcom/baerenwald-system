@@ -1,3 +1,4 @@
+import { MARKE_WEBSITE_URL } from '@/lib/marke'
 /**
  * Einheitliche neutrale Fehlerseite für öffentliche Token-Routen
  * (Status, HW-Anfrage, Projekt, Nachtrag, Formular).
@@ -12,7 +13,7 @@ function websiteOrigin(): string {
   return (
     process.env.NEXT_PUBLIC_WEBSITE_URL?.replace(/\/$/, '') ||
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
-    'https://baerenwald-muenchen.de'
+    MARKE_WEBSITE_URL
   )
 }
 

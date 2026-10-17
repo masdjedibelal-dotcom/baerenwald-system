@@ -10,6 +10,7 @@ import { finalizeRahmenVertrag } from '@/app/(dashboard)/vertraege/wizard-action
 import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
 import type { RahmenVertragWizardBootstrap } from '@/lib/vertraege/types'
 import { TOAST } from '@/lib/copy'
+import { MARKE } from '@/lib/marke'
 
 /** Rahmenvertrag — DocumentCanvas, eine Scroll-Seite mit Anchors (P5.4). */
 export function RahmenvertragWizard({
@@ -130,7 +131,7 @@ export function RahmenvertragWizard({
       >
         <h2 className="text-[length:var(--fs-head)] font-semibold">PDF</h2>
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">
-          Der Rahmenvertrag wird im Bärenwald-Design erzeugt und als PDF gespeichert.
+          Der Rahmenvertrag wird im {MARKE.name}-Design erzeugt und als PDF gespeichert.
         </p>
         <p className="text-[length:var(--fs-text)] text-bw-text-muted">Vertrags-Nr. {vertragsNr}</p>
         {pdfUrl ? (

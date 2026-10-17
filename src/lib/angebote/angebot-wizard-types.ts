@@ -19,6 +19,7 @@ import type { Zahlungsplan } from '@/lib/rechnungen/zahlungsplan'
 import type { AngebotPosition,AngebotStatus } from '@/lib/types'
 import { neuePositionsId } from '@/lib/angebot-positionen'
 import { formatEuroSpanne } from '@/lib/format/geld-datum'
+import { MARKE } from '@/lib/marke'
 
 export type AngebotDokumentTyp = 'einfach' | 'projekt'
 
@@ -351,7 +352,7 @@ export function defaultProjektBeschreibungText(projektTitel: string): string {
   return (
     `Geplant ist die Umsetzung von „${t}“ gemäß Fotodokumentation und Aufmaß.\n\n` +
     'Die handwerkliche Ausführung erfolgt durch geprüfte Fach- und Subunternehmen. ' +
-    'Bärenwald München übernimmt Projektkoordination, Ablaufplanung und Qualitätskontrolle.'
+    `${MARKE.nameLang} übernimmt Projektkoordination, Ablaufplanung und Qualitätskontrolle.`
   )
 }
 

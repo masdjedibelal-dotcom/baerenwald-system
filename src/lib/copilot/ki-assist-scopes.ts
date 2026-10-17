@@ -1,3 +1,4 @@
+import { MARKE } from '@/lib/marke'
 /** Kontext-Modi für KI-Hilfe in Editoren (Positionen, Mails, Dokumente, Portal, …). */
 
 export type KiAssistScopeId =
@@ -77,7 +78,7 @@ Erlaubte JSON-Formen:
 - Mängel-Liste: {"type":"maengel","text":"Zeile1\\nZeile2"}
 - Kunden-Mail: {"type":"mail","betreff":"…","text":"Nachrichtentext ohne HTML"}
 
-Nur ein bw-apply-Block. Ton: Bärenwald Handwerk, klar, freundlich, ohne Marketing-Floskeln.
+Nur ein bw-apply-Block. Ton: ${MARKE.name} Handwerk, klar, freundlich, ohne Marketing-Floskeln.
 `.trim()
 
 export const KI_ASSIST_SCOPES: Record<KiAssistScopeId, KiAssistScope> = {
@@ -87,7 +88,7 @@ export const KI_ASSIST_SCOPES: Record<KiAssistScopeId, KiAssistScope> = {
     intro:
       'Beschreib mir die **Position** — was gemacht wird, **Menge/Einheit** und idealerweise den **Netto-Preis**. Ich formuliere daraus eine klare Positions-Card zum Speichern.',
     placeholder: 'z. B. „Wandfliesen Bad 12 m², inkl. Verlegen, 85 €/m²“…',
-    systemHint: `Modus: EINE Position für Angebot/Rechnung (Handwerk Bärenwald).
+    systemHint: `Modus: EINE Position für Angebot/Rechnung (Handwerk ${MARKE.name}).
 Frage bei Bedarf kurz nach fehlenden Angaben (Menge, Einheit, Preis).
 Erzeuge Bezeichnung, Beschreibung, Menge, Einheit und Preis (netto, Zahl ohne €-Zeichen).
 Zeige die Position klar strukturiert; am Ende immer bw-apply type position.
@@ -116,7 +117,7 @@ ${BW_APPLY_HINT}`,
     intro:
       'Beschreib die **Arbeiten** (Umfang, Räume, Mengen). Ich zerlege das in **mehrere Positionen** — danach kannst du alle auf einmal übernehmen.',
     placeholder: 'z. B. „Komplettbad renovieren, ca. 8 m², inkl. Sanitär und Fliesen“…',
-    systemHint: `Modus: Mehrere Kalkulationspositionen für Angebot/Rechnung (Handwerk Bärenwald).
+    systemHint: `Modus: Mehrere Kalkulationspositionen für Angebot/Rechnung (Handwerk ${MARKE.name}).
 Warte auf die Beschreibung des Nutzers — keine Positionen erfinden, bevor er den Auftragsumfang nennt.
 Zerlege in konkrete, kalkulierbare Positionen (Bezeichnung, Menge, Einheit, kurze Beschreibung, Netto-Preis wenn schätzbar).
 Am Ende IMMER genau einen bw-apply-Block type "positionen" mit items-Array (mind. 2 wenn sinnvoll, sonst so viele wie nötig).
@@ -225,7 +226,7 @@ Nutze type "text".`,
     label: 'Feld',
     intro:
       'Schreib den **Text für genau dieses Feld**. Sag mir im Chat, was geändert oder neu formuliert werden soll — danach übernimmst du den fertigen Text.',
-    placeholder: 'z. B. „Kürzer, Bärenwald macht alles selbst, ohne Subunternehmer“…',
+    placeholder: `z. B. „Kürzer, ${MARKE.name} macht alles selbst, ohne Subunternehmer“…`,
     systemHint: `Modus: Genau EIN Formularfeld umschreiben oder neu schreiben.
 Im Zusatzkontext stehen Feldname und aktueller Text.
 Deine Aufgabe: den kompletten neuen Feldinhalt erzeugen (nicht nur Diff/Hinweise).
@@ -254,7 +255,7 @@ ${BW_APPLY_HINT}`,
     intro:
       'Ich formuliere eine **E-Mail an den Kunden** (Betreff + Nachricht). Beschreib den Anlass — ich schreibe freundlich, klar und handwerklich seriös. Kein HTML, nur Fließtext.',
     placeholder: 'z. B. „Termin morgen 10 Uhr bestätigen, Parkplatzhinweis“…',
-    systemHint: `Modus: Kunden-E-Mail (Bärenwald München).
+    systemHint: `Modus: Kunden-E-Mail (${MARKE.nameLang}).
 Schreib Betreff und Nachrichtentext (Du/Sie je nach Kontext-Hinweis; Standard: Sie, wenn unklar).
 Kein HTML, keine Platzhalter-Syntax außer wenn im Entwurf schon vorhanden.
 ${BW_APPLY_HINT}

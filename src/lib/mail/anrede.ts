@@ -2,6 +2,7 @@ import {
   kundeAngebotBegruessung,
   type KundeAnredeKontext,
 } from '@/lib/kunde-rechnungsempfaenger'
+import { MARKE } from '@/lib/marke'
 
 export type MailAnrede = 'du' | 'sie'
 
@@ -42,7 +43,7 @@ export function mailBegruessungZeile(
 }
 
 export function mailTeamGruss(anrede: MailAnrede, firmenname: string): string {
-  const team = firmenname.trim() || 'Bärenwald'
+  const team = firmenname.trim() || MARKE.name
   return anrede === 'du'
     ? `Viele Grüße<br/><strong>Dein ${team} Team</strong>`
     : `Mit freundlichen Grüßen<br/><strong>Ihr ${team} Team</strong>`

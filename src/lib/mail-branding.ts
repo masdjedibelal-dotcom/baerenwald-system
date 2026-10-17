@@ -2,6 +2,7 @@ import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { firmZeileAdresse } from '@/lib/einstellungen-keys'
 import { resolveBrandLogoUrl } from '@/lib/brand'
 import { FESTNETZ_TELEFON_DEFAULT, telefonFuerKundenMail } from '@/lib/telefon-kunden-mail'
+import { MARKE } from '@/lib/marke'
 
 export type MailBranding = {
   firmenname: string
@@ -17,11 +18,11 @@ export type MailBranding = {
 
 export function envMailBranding(): MailBranding {
   return {
-    firmenname: 'Bärenwald München',
+    firmenname: MARKE.firma.firmenname,
     telefon: telefonFuerKundenMail(process.env.EMAIL_FIRMEN_TEL ?? process.env.NEXT_PUBLIC_EMAIL_TEL),
     adresseZeile: 'München',
     iban: process.env.EMAIL_FIRMEN_IBAN ?? '',
-    website: 'www.baerenwaldmuenchen.de',
+    website: MARKE.firma.website,
     logoUrl: resolveBrandLogoUrl('white'),
     logoUrlOnLight: resolveBrandLogoUrl('green'),
   }

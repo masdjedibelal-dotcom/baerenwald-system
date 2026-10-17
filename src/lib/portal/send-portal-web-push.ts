@@ -7,6 +7,7 @@ import { safeVoidNotify } from '@/lib/errors/safe-void-notify'
 import webpush from 'web-push'
 
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { MARKE } from '@/lib/marke'
 
 let vapidReady = false
 
@@ -17,7 +18,7 @@ function ensureVapid(): boolean {
     ''
   const priv = process.env.VAPID_PRIVATE_KEY?.trim() || ''
   const subject =
-    process.env.VAPID_SUBJECT?.trim() || 'mailto:system@baerenwaldmuenchen.de'
+    process.env.VAPID_SUBJECT?.trim() || `mailto:system@${MARKE.websiteHost}`
   if (!pub || !priv) return false
   if (!vapidReady) {
     webpush.setVapidDetails(subject, pub, priv)

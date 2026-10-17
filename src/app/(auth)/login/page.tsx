@@ -24,6 +24,7 @@ import {
 } from '@/lib/auth/staging-admin'
 import { peekRateLimit, recordRateLimitFailure } from '@/lib/rate-limit'
 import { cn } from '@/lib/utils'
+import { MARKE } from '@/lib/marke'
 
 /** App-seitige Login-Drosselung — siehe docs/auth/LOGIN-RATE-LIMIT.md */
 const LOGIN_RL_LIMIT = 5
@@ -189,7 +190,7 @@ function LoginPageContent() {
             <BrandLogo variant="green" height={22} priority />
           </div>
           <div>
-            <div className="crm-login__brand-name">Bärenwald</div>
+            <div className="crm-login__brand-name">{MARKE.name}</div>
             <div className="crm-login__brand-sub">CRM · München</div>
           </div>
         </div>
@@ -224,7 +225,7 @@ function LoginPageContent() {
               <BrandLogo variant="green" height={22} priority />
             </div>
             <div>
-              <div className="crm-login__brand-name">Bärenwald</div>
+              <div className="crm-login__brand-name">{MARKE.name}</div>
               <div className="crm-login__brand-sub">CRM · München</div>
             </div>
           </div>
@@ -249,7 +250,7 @@ function LoginPageContent() {
                   </label>
                   <div className="crm-login__input-wrap">
                     <MockIcon ctx="btn" n="mail" size={16} className="crm-login__input-ico" />
-                    <MockInput id="crm-login-email" className="crm-login__input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="b.baerenwald@crm.de" autoComplete="email" onKeyDown={(e) => e.key === 'Enter' && void handleLogin()} />
+                    <MockInput id="crm-login-email" className="crm-login__input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@firma.de" autoComplete="email" onKeyDown={(e) => e.key === 'Enter' && void handleLogin()} />
                   </div>
                 </div>
 
@@ -318,7 +319,7 @@ function LoginPageContent() {
                   </label>
                   <div className="crm-login__input-wrap">
                     <MockIcon ctx="btn" n="mail" size={16} className="crm-login__input-ico" />
-                    <MockInput id="crm-forgot-email" className="crm-login__input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="b.baerenwald@crm.de" autoComplete="email" />
+                    <MockInput id="crm-forgot-email" className="crm-login__input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@firma.de" autoComplete="email" />
                   </div>
                 </div>
 

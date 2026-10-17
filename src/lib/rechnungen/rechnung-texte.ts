@@ -1,4 +1,5 @@
 import type { AngebotMailAnrede } from '@/lib/templates/angebot-mail'
+import { MARKE } from '@/lib/marke'
 
 /** Standard-Einleitung im Rechnungs-PDF (nach der Anrede, vor der Positionstabelle). */
 export const RECHNUNG_EINLEITUNG_STANDARD: Record<AngebotMailAnrede, string> = {
@@ -8,7 +9,7 @@ export const RECHNUNG_EINLEITUNG_STANDARD: Record<AngebotMailAnrede, string> = {
 
 /** Frei editierbarer Hinweisblock im Wizard (z. B. Fachbetrieb / Koordination). */
 export const RECHNUNG_HINWEISE_STANDARD =
-  'Sofern Fachgewerke von Partner-Fachbetrieben ausgeführt wurden, erfolgte die Ausführung unter Projektkoordination von Bärenwald München.'
+  `Sofern Fachgewerke von Partner-Fachbetrieben ausgeführt wurden, erfolgte die Ausführung unter Projektkoordination von ${MARKE.nameLang}.`
 
 /** Kurzer Abschluss nach Zahlungsbedingungen und Bankverbindung. */
 export const RECHNUNG_SCHLUSS_STANDARD: Record<AngebotMailAnrede, string> = {

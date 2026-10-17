@@ -30,7 +30,7 @@ function userDisplay(user: User): { name: string; email: string } {
     meta?.full_name?.trim() ||
     meta?.name?.trim() ||
     user.email?.split('@')[0]?.trim() ||
-    'Beran Bärenwald'
+    'Team'
   return {
     name: raw,
     email: user.email?.trim() || '',

@@ -13,7 +13,7 @@ export default async function MehrPage() {
   } = await supabase.auth.getUser()
 
   const meta = (user?.user_metadata ?? {}) as { name?: string }
-  const name = meta.name?.trim() || user?.email?.split('@')[0] || 'Beran Bärenwald'
+  const name = meta.name?.trim() || user?.email?.split('@')[0] || 'Team'
   const initials = name
     .split(' ')
     .map((s) => s[0])

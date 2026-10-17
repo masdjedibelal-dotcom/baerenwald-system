@@ -7,6 +7,7 @@ import { loadAngebotDetailAdmin } from '@/app/(dashboard)/angebote/actions'
 import { buildAngebotHtmlAusDetailAsync } from '@/lib/angebote/angebot-html-payload'
 import { loadGewerkeAusfuehrung } from '@/lib/gewerke-ausfuehrung'
 import { renderAngebotPdfForDetail } from '@/lib/angebote/render-angebot-pdf-for-detail'
+import { MARKE } from '@/lib/marke'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="Angebot_${nr}_Baerenwald.pdf"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="Angebot_${nr}_${MARKE.dateiKurz}.pdf"`,
       },
     })
   } catch (e) {

@@ -1,3 +1,4 @@
+import { MARKE } from '@/lib/marke'
 /** Keys in Tabelle `einstellungen` */
 export const EINSTELLUNG_KEYS = {
   firmenname: 'firmenname',
@@ -35,15 +36,15 @@ export type FirmenEinstellungen = Record<EinstellungKey, string>
 
 export function defaultFirmenEinstellungen(): FirmenEinstellungen {
   return {
-    firmenname: 'Bärenwald München',
+    firmenname: MARKE.firma.firmenname,
     rechtsform: '',
-    strasse: 'Bärenwaldstraße',
+    strasse: MARKE.firma.strasse,
     hausnummer: '20',
     plz: '81737',
     ort: 'München',
     telefon: '089 8095 5726',
-    email: 'info@baerenwald-muenchen.de',
-    website: 'www.baerenwaldmuenchen.de',
+    email: MARKE.firma.email,
+    website: MARKE.firma.website,
     ust_id: 'DE362198001',
     steuernummer: '14417721070',
     iban: '',

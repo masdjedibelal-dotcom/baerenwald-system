@@ -3,6 +3,8 @@ import { join } from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 import { formatDatum, formatEuro } from "@/lib/format/geld-datum";
+import { MARKE } from '@/lib/marke'
+import { istTeo } from '@/lib/marke'
 
 /** Payload vom Portal (kein DB-Load im PDF-Service). */
 export type VersammlungsberichtPdfVorgang = {
@@ -90,9 +92,9 @@ function cell(v: string | null | undefined): string {
 
 function loadBwLogoBytes(): Uint8Array | null {
   for (const name of [
-    "brand/logo-mark-green-on-white.png",
-    "brand/logo-mark-green.png",
-    "brand/mail-logo-green.png",
+    `${istTeo ? "brand/teo" : "brand"}/logo-mark-green-on-white.png`,
+    `${istTeo ? "brand/teo" : "brand"}/logo-mark-green.png`,
+    `${istTeo ? "brand/teo" : "brand"}/mail-logo-green.png`,
   ]) {
     try {
       const p = join(process.cwd(), "public", name);
@@ -349,7 +351,7 @@ export async function generateVersammlungsberichtPdf(
     logo.draw(ctx.page, MARGIN, ctx.y - logo.height + 8);
     ctx.y -= logo.height + 18;
   } else {
-    drawText(ctx, "Bärenwald", { bold: true, size: 14, color: ACCENT });
+    drawText(ctx, MARKE.name, { bold: true, size: 14, color: ACCENT });
     ctx.y -= 8;
   }
 
@@ -410,7 +412,7 @@ export async function generateVersammlungsberichtPdf(
   }
 
   ctx.y = 72;
-  drawText(ctx, "Ein Service von Bärenwald", {
+  drawText(ctx, `Ein Service von ${MARKE.name}`, {
     size: 8,
     color: MUTED,
   });
@@ -683,7 +685,7 @@ export async function generateVersammlungsberichtPdf(
   );
   ctx.y -= 4;
   drawText(ctx, p.orgName, { bold: true, size: 9, color: TEXT });
-  drawText(ctx, "Ein Service von Bärenwald", { size: 8, color: MUTED });
+  drawText(ctx, `Ein Service von ${MARKE.name}`, { size: 8, color: MUTED });
 
   drawRunningFooter(ctx);
   return pdf.save();

@@ -438,7 +438,7 @@ export function HandwerkerDetailClient({
       >
         <div className="space-y-3">
           <MockField label="An"><MockInput value={portalTo} onChange={(e) => setPortalTo(e.target.value)} placeholder="partner@beispiel.de; weitere@beispiel.de" /></MockField>
-          <MockField label="CC (optional)"><MockInput value={portalCc} onChange={(e) => setPortalCc(e.target.value)} placeholder="intern@baerenwald.de; team@baerenwald.de" /></MockField>
+          <MockField label="CC (optional)"><MockInput value={portalCc} onChange={(e) => setPortalCc(e.target.value)} placeholder="intern@firma.de; team@firma.de" /></MockField>
           <MockField label="Betreff"><MockInput value={portalBetreff} onChange={(e) => setPortalBetreff(e.target.value)} /></MockField>
           <MockField label="Text"><RichTextEditor value={typeof (portalText) === 'string' ? (portalText) : ''} onChange={(__v) => setPortalText(__v)} minHeight={144} aria-label="Text" /></MockField>
           <div>

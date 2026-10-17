@@ -9,11 +9,12 @@ import { ensureUnifiedTeamAccount } from '@/lib/auth/unified-team-account'
 import { isDevAuthSkipEnabled } from '@/lib/dev-auth'
 import { DashboardProviders } from '@/components/layout/DashboardProviders'
 import { DashboardShell } from '@/components/layout/DashboardShell'
+import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | Bärenwald CRM',
-    default: 'Dashboard | Bärenwald CRM',
+    template: `%s | ${MARKE.name} CRM`,
+    default: `Dashboard | ${MARKE.name} CRM`,
   },
 }
 

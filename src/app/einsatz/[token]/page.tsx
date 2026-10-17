@@ -6,11 +6,12 @@ import { BRAND_ALT, resolveBrandLogoUrl } from '@/lib/brand'
 import { einsatzPerToken } from '@/lib/einsatz/antwort'
 import { formatDatum, formatEuro } from '@/lib/format/geld-datum'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { MARKE } from '@/lib/marke'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Einsatz — Bärenwald',
+  title: `Einsatz — ${MARKE.name}`,
   robots: { index: false, follow: false },
 }
 
