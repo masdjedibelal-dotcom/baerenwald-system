@@ -3,7 +3,7 @@
  *
  * Gesetzt über `NEXT_PUBLIC_MARKE` (Netlify). Ohne Variable: Bärenwald (unverändert).
  * Texte/Domains/Logos/Firmen-Vorgaben kommen von hier; Funktionen nur für eine Marke über `funktionAn()`.
- * Gegenstück im Website/Portal-Repo: src/lib/marke.ts (gleiche Felder).
+ * Wird per `npm run sync:shared-domain` 1:1 ins Website/Portal-Repo kopiert (src/lib/marke.ts).
  */
 
 export type MarkeId = 'baerenwald' | 'teo'
@@ -26,6 +26,8 @@ type Marke = {
   websiteHost: string
   /** Name des Kundenportals */
   portalName: string
+  /** Name des KI-Assistenten im Portal */
+  kiName: string
   /** Portal-Adresse (Fallback, wenn NEXT_PUBLIC_PORTAL_URL fehlt) */
   portalUrl: string
   /** CRM-Adresse (Fallback, wenn NEXT_PUBLIC_APP_URL fehlt) */
@@ -47,6 +49,10 @@ type Marke = {
   }
   /** Theme-Farbe Browser/PWA */
   themeColor: string
+  /** Website/Portal-Repo: Marketing-Seiten (Startseite, Leistungen, Ratgeber, Rechner …) an? Aus → Start = Portal */
+  marketingSeite: boolean
+  /** Rechtstexte (absolut oder Pfad) */
+  recht: { impressum: string; datenschutz: string; agb: string }
   funktionen: Record<MarkeFunktion, boolean>
 }
 
@@ -59,13 +65,14 @@ const MARKEN: Record<MarkeId, Marke> = {
     team: 'Ihr Bärenwald Team',
     websiteHost: 'baerenwaldmuenchen.de',
     portalName: 'MeinBärenwald',
+    kiName: 'BärenwaldGPT',
     portalUrl: 'https://baerenwaldmuenchen.de',
     crmUrl: 'https://baerenwald-backend.netlify.app',
     dateiKurz: 'Baerenwald',
     infoEmail: 'info@baerenwald-muenchen.de',
     firma: {
       firmenname: 'Bärenwald München',
-      inhaber: '',
+      inhaber: 'Beran Cakmak',
       strasse: 'Bärenwaldstraße',
       hausnummer: '20',
       plz: '81737',
@@ -74,6 +81,8 @@ const MARKEN: Record<MarkeId, Marke> = {
       website: 'www.baerenwaldmuenchen.de',
     },
     themeColor: '#1a3d2b',
+    marketingSeite: true,
+    recht: { impressum: '/impressum', datenschutz: '/datenschutz', agb: '/agb' },
     funktionen: { hvRollen: false },
   },
   teo: {
@@ -84,6 +93,7 @@ const MARKEN: Record<MarkeId, Marke> = {
     team: 'Ihr Servus TEO Team',
     websiteHost: 'servus-teo.de',
     portalName: 'MeinTEO',
+    kiName: 'TEO-Assistent',
     portalUrl: 'https://app.servus-teo.de',
     crmUrl: 'https://crm.servus-teo.de',
     dateiKurz: 'ServusTEO',
@@ -99,6 +109,12 @@ const MARKEN: Record<MarkeId, Marke> = {
       website: 'www.servus-teo.de',
     },
     themeColor: '#0b1f3a',
+    marketingSeite: false,
+    recht: {
+      impressum: 'https://servus-teo.de/impressum',
+      datenschutz: 'https://servus-teo.de/datenschutz',
+      agb: 'https://servus-teo.de/agb',
+    },
     funktionen: { hvRollen: false },
   },
 }

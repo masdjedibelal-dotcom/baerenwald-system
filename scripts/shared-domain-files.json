@@ -2,6 +2,10 @@
   "header": "// SYNCED FROM CRM — do not edit\n",
   "files": [
     {
+      "crm": "src/lib/marke.ts",
+      "portal": "src/lib/marke.ts"
+    },
+    {
       "crm": "src/lib/status/status-map.ts",
       "portal": "src/lib/shared-domain/status-map.ts"
     },
