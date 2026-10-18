@@ -441,6 +441,8 @@ export type RankingZeile = {
   umsatz: number
   /** Partner: Summe Einkaufspreis Zuweisung */
   ek?: number
+  /** Kunden: kunden.typ (privat | gewerbe | hausverwaltung …) */
+  typ?: string | null
 }
 
 export function buildHandwerkerRanking(
@@ -505,63 +507,67 @@ export function buildHandwerkerRanking(
     .slice(0, 8)
 }
 
-/** Top-Kunden: Auftragssumme pro Auftrag; nur Rechnungen ohne Auftrag extra (keine Doppelzählung). */
+/**
+ * Kunden-Ranking = dieselbe Quelle wie der Umsatz (istUmsatzRechnung): Netto je Kunde,
+ * `vorgaenge` = Anzahl Umsatz-Rechnungen. Alle Kunden (UI zeigt Top N + „Übrige“ + Gesamt).
+ */
 export function buildKundenRanking(
   rows: Array<{
     kunde_id: string
     kunde_name: string
-    auftrag_id?: string | null
-    auftrag_netto?: number
-    rechnung_id?: string | null
-    rechnung_netto?: number
-    /** Rechnung gehört zu diesem Auftrag → nicht zum Umsatz zählen. */
-    rechnung_auftrag_id?: string | null
+    kunde_typ?: string | null
+    rechnung_id: string
+    rechnung_netto: number
   }>
 ): RankingZeile[] {
-  type Acc = {
-    name: string
-    auftraege: Set<string>
-    freieRechnungen: Set<string>
-    umsatz: number
-  }
-  const map = new Map<string, Acc>()
-
+  const map = new Map<string, { name: string; typ: string | null; rechnungen: Set<string>; umsatz: number }>()
   for (const r of rows) {
     let acc = map.get(r.kunde_id)
     if (!acc) {
-      acc = {
-        name: r.kunde_name,
-        auftraege: new Set(),
-        freieRechnungen: new Set(),
-        umsatz: 0,
-      }
+      acc = { name: r.kunde_name, typ: r.kunde_typ ?? null, rechnungen: new Set(), umsatz: 0 }
       map.set(r.kunde_id, acc)
     }
     if (r.kunde_name && r.kunde_name !== 'Kunde') acc.name = r.kunde_name
-    const auftragId = (r.auftrag_id ?? '').trim()
-    if (auftragId && !acc.auftraege.has(auftragId)) {
-      acc.auftraege.add(auftragId)
-      acc.umsatz += Number(r.auftrag_netto) || 0
-    }
-    const rechnungId = (r.rechnung_id ?? '').trim()
-    const linkedAuftrag = (r.rechnung_auftrag_id ?? '').trim()
-    if (rechnungId && !linkedAuftrag && !acc.freieRechnungen.has(rechnungId)) {
-      acc.freieRechnungen.add(rechnungId)
-      acc.umsatz += Number(r.rechnung_netto) || 0
-    }
+    if (!acc.typ && r.kunde_typ) acc.typ = r.kunde_typ
+    const id = (r.rechnung_id ?? '').trim()
+    if (!id || acc.rechnungen.has(id)) continue
+    acc.rechnungen.add(id)
+    acc.umsatz += Number(r.rechnung_netto) || 0
   }
-
   return Array.from(map.entries())
-    .map(([id, a]) => ({
-      id,
-      name: a.name,
-      sub: '',
-      vorgaenge: a.auftraege.size + a.freieRechnungen.size,
-      umsatz: a.umsatz,
-    }))
+    .map(([id, a]) => ({ id, name: a.name, sub: '', vorgaenge: a.rechnungen.size, umsatz: a.umsatz, typ: a.typ }))
     .filter((r) => r.vorgaenge > 0)
     .sort((a, b) => b.umsatz - a.umsatz || b.vorgaenge - a.vorgaenge)
-    .slice(0, 8)
+}
+
+export type KundenTypAnteil = { typ: string; label: string; umsatz: number; anteil: number; kunden: number }
+
+const KUNDEN_TYP_LABEL: Record<string, string> = {
+  gewerbe: 'Gewerbe',
+  privat: 'Privat',
+  hausverwaltung: 'Hausverwaltung',
+}
+
+/** Umsatz nach Kundentyp (Summe = Kunden-Ranking gesamt). */
+export function buildKundenTypAufteilung(kunden: RankingZeile[]): KundenTypAnteil[] {
+  const gesamt = kunden.reduce((s, k) => s + (Number(k.umsatz) || 0), 0)
+  const map = new Map<string, { umsatz: number; kunden: number }>()
+  for (const k of kunden) {
+    const t = String(k.typ ?? '').trim().toLowerCase() || 'ohne'
+    const acc = map.get(t) ?? { umsatz: 0, kunden: 0 }
+    acc.umsatz += Number(k.umsatz) || 0
+    acc.kunden += 1
+    map.set(t, acc)
+  }
+  return Array.from(map.entries())
+    .map(([typ, v]) => ({
+      typ,
+      label: KUNDEN_TYP_LABEL[typ] ?? 'Ohne Typ',
+      umsatz: v.umsatz,
+      kunden: v.kunden,
+      anteil: gesamt > 0 ? Math.round((v.umsatz / gesamt) * 100) : 0,
+    }))
+    .sort((a, b) => b.umsatz - a.umsatz)
 }
 
 export type FunnelStufe = {

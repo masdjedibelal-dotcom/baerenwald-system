@@ -183,7 +183,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
             `
             id, status, created_at, faellig_am, kunde_id, auftrag_id, netto, brutto, ersetzt_durch,
             beleg_typ, rechnungsdatum,
-            kunden(id, name, vorname, nachname)
+            kunden(id, name, vorname, nachname, typ)
           `
           )
           .order('created_at', { ascending: false })
@@ -427,21 +427,8 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
 
   const rankingHandwerker = buildHandwerkerRanking(hwRows.filter((r) => r.auftrag_id || r.angebot_id || r.lead_id))
 
+  // Kunden-Ranking aus derselben Quelle wie der Umsatz (gestellte Rechnungen im Zeitraum)
   const kundenRows: Parameters<typeof buildKundenRanking>[0] = []
-  for (const a of auftraegeZ) {
-    const kid = a.kunde_id as string | null
-    if (!kid) continue
-    if (String(a.status ?? '') === 'storniert') continue
-    const k = Array.isArray(a.kunden) ? a.kunden[0] : a.kunden
-    const name = k ? kundeDisplayName(k as never) : 'Kunde'
-    kundenRows.push({
-      kunde_id: kid,
-      kunde_name: name,
-      auftrag_id: String(a.id),
-      // Umsatz kommt nur aus Rechnungen (istUmsatzRechnung) — Auftrag zählt als Vorgang
-      auftrag_netto: 0,
-    })
-  }
   for (const r of rechnungenZ) {
     if (
       !istUmsatzRechnung({
@@ -457,9 +444,9 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     kundenRows.push({
       kunde_id: kid,
       kunde_name: name,
+      kunde_typ: (k as { typ?: string | null } | null)?.typ ?? null,
       rechnung_id: r.id,
       rechnung_netto: Number(r.netto) || 0,
-      rechnung_auftrag_id: null,
     })
   }
   const rankingKunden = buildKundenRanking(kundenRows)

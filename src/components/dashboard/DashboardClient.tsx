@@ -15,6 +15,7 @@ import {
   type FunnelStufe,
   type GewerkUmsatzZeile,
   type RankingZeile,
+  buildKundenTypAufteilung,
   type UmsatzMonat,
   umsatzMonatGesamt,
 } from '@/lib/dashboard/dashboard-analytics'
@@ -233,6 +234,12 @@ function GewerkUmsatzCard({
 
 const TOP_RANKING_LIMIT = 8
 
+const TYP_FARBE: Record<string, string> = {
+  gewerbe: 'var(--green)',
+  privat: 'var(--blue-tx)',
+  hausverwaltung: 'var(--yel-tx)',
+}
+
 function TopRankingCard({
   handwerker,
   kunden,
@@ -241,12 +248,20 @@ function TopRankingCard({
   kunden: RankingZeile[]
 }) {
   const isMobile = useIsMobile()
-  const [mode, setMode] = useState<'handwerker' | 'kunden'>('handwerker')
-  const rows = (mode === 'handwerker' ? (handwerker ?? []) : (kunden ?? [])).slice(
-    0,
-    TOP_RANKING_LIMIT
-  )
+  // Kunden zuerst: Umsatz-Sicht (gleiche Quelle wie „Umsatzverlauf“)
+  const [mode, setMode] = useState<'handwerker' | 'kunden'>('kunden')
+  const alle = mode === 'handwerker' ? (handwerker ?? []) : (kunden ?? [])
+  const rows = alle.slice(0, TOP_RANKING_LIMIT)
   const maxUmsatz = rows.length ? Math.max(1, ...rows.map((r) => Number(r.umsatz) || 0)) : 1
+  const istKunden = mode === 'kunden'
+  const uebrige = istKunden ? alle.slice(TOP_RANKING_LIMIT) : []
+  const uebrigeSumme = uebrige.reduce((s, r) => s + (Number(r.umsatz) || 0), 0)
+  const gesamt = alle.reduce((s, r) => s + (Number(r.umsatz) || 0), 0)
+  const typen = istKunden ? buildKundenTypAufteilung(kunden ?? []) : []
+  const zaehlLabel = istKunden ? 'Rechnungen' : 'Vorgänge'
+  const zaehlText = (n: number) =>
+    istKunden ? `${n} ${n === 1 ? 'Rechnung' : 'Rechnungen'}` : `${n} ${n === 1 ? 'Vorgang' : 'Vorgänge'}`
+  const grid = '2rem minmax(8.75rem, 1.5fr) 4.5rem minmax(5.5rem, 0.85fr)'
 
   return (
     <MockCard
@@ -254,15 +269,32 @@ function TopRankingCard({
       icon="trophy"
       actions={
         <div className="seg" role="group" aria-label="Ranking-Modus">
-          <MockBtn className={mode === 'handwerker' ? 'on' : undefined} type="button" onClick={() => setMode('handwerker')}>
-            Partner
-          </MockBtn>
           <MockBtn className={mode === 'kunden' ? 'on' : undefined} type="button" onClick={() => setMode('kunden')}>
             Kunden
+          </MockBtn>
+          <MockBtn className={mode === 'handwerker' ? 'on' : undefined} type="button" onClick={() => setMode('handwerker')}>
+            Partner
           </MockBtn>
         </div>
       }
     >
+        {istKunden && typen.length > 0 && gesamt > 0 ? (
+          <div className="mb-3">
+            <div className="flex h-2 overflow-hidden rounded-pill bg-[var(--bg-2)]" aria-hidden>
+              {typen.map((t) => (
+                <div key={t.typ} style={{ width: `${(t.umsatz / gesamt) * 100}%`, background: TYP_FARBE[t.typ] ?? 'var(--gray-tx)' }} />
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[length:var(--fs-meta)] text-[var(--text-2)]">
+              {typen.map((t) => (
+                <span key={t.typ} className="inline-flex items-center gap-1.5 tabular-nums">
+                  <span className="inline-block h-2 w-2 rounded-pill" style={{ background: TYP_FARBE[t.typ] ?? 'var(--gray-tx)' }} aria-hidden />
+                  {t.label} · {formatEuro(t.umsatz, { rounded: true, decimals: 0 })} · {t.anteil} %
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {rows.length === 0 ? (
           <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">
             Keine Daten im Zeitraum.
@@ -280,37 +312,42 @@ function TopRankingCard({
                     <span className="whitespace-nowrap font-medium tabular-nums text-[var(--text)]">
                       {formatEuro(r.umsatz, { rounded: true, decimals: 0 })}
                     </span>
-                    <span className="tabular-nums text-[var(--text-3)]">
-                      {r.vorgaenge} {r.vorgaenge === 1 ? 'Vorgang' : 'Vorgänge'}
-                    </span>
+                    <span className="tabular-nums text-[var(--text-3)]">{zaehlText(r.vorgaenge)}</span>
                   </div>
                 </div>
               </li>
             ))}
+            {uebrige.length > 0 ? (
+              <li className="flex gap-3 text-[length:var(--fs-meta)] text-[var(--text-2)]">
+                <span className="w-5 shrink-0" />
+                <span className="flex-1">
+                  Übrige {uebrige.length} {uebrige.length === 1 ? 'Kunde' : 'Kunden'} ·{' '}
+                  <span className="tabular-nums">{formatEuro(uebrigeSumme, { rounded: true, decimals: 0 })}</span>
+                </span>
+              </li>
+            ) : null}
+            {istKunden ? (
+              <li className="flex gap-3 border-t border-[var(--border)] pt-2 text-[length:var(--fs-text)] font-medium">
+                <span className="w-5 shrink-0" />
+                <span className="flex-1">
+                  Gesamt · <span className="tabular-nums">{formatEuro(gesamt, { rounded: true, decimals: 0 })}</span>
+                </span>
+              </li>
+            ) : null}
           </ul>
         ) : (
           <div className="overflow-x-auto">
-            <div
-              className="list-row head"
-              style={{
-                gridTemplateColumns: '2rem minmax(8.75rem, 1.5fr) 4.5rem minmax(5.5rem, 0.85fr)',
-                gap: 8,
-              }}
-            >
+            <div className="list-row head" style={{ gridTemplateColumns: grid, gap: 8 }}>
               <div>#</div>
               <div>{mode === 'handwerker' ? 'Partner' : 'Kunde'}</div>
-              <div>Vorgänge</div>
+              <div>{zaehlLabel}</div>
               <div>Umsatz</div>
             </div>
             {rows.map((r, i) => (
               <div
                 key={r.id}
                 className="list-row"
-                style={{
-                  gridTemplateColumns: '2rem minmax(8.75rem, 1.5fr) 4.5rem minmax(5.5rem, 0.85fr)',
-                  gap: 8,
-                  alignItems: 'center',
-                }}
+                style={{ gridTemplateColumns: grid, gap: 8, alignItems: 'center' }}
               >
                 <div className="text-[length:var(--fs-meta)] tabular-nums text-[var(--text-3)]">
                   {i + 1}
@@ -328,13 +365,39 @@ function TopRankingCard({
                       className="h-full rounded-pill"
                       style={{
                         width: `${Math.round((r.umsatz / maxUmsatz) * 100)}%`,
-                        background: 'var(--green)',
+                        background: istKunden ? (TYP_FARBE[String(r.typ ?? '')] ?? 'var(--gray-tx)') : 'var(--green)',
                       }}
                     />
                   </div>
                 </div>
               </div>
             ))}
+            {uebrige.length > 0 ? (
+              <div className="list-row" style={{ gridTemplateColumns: grid, gap: 8, alignItems: 'center' }}>
+                <div />
+                <div className="text-[length:var(--fs-text)] text-[var(--text-2)]">
+                  Übrige {uebrige.length} {uebrige.length === 1 ? 'Kunde' : 'Kunden'}
+                </div>
+                <div className="text-[length:var(--fs-text)] tabular-nums text-[var(--text-2)]">
+                  {uebrige.reduce((s, r) => s + r.vorgaenge, 0)}
+                </div>
+                <div className="whitespace-nowrap text-[length:var(--fs-meta)] tabular-nums text-[var(--text-2)]">
+                  {formatEuro(uebrigeSumme, { rounded: true, decimals: 0 })}
+                </div>
+              </div>
+            ) : null}
+            {istKunden ? (
+              <div className="list-row" style={{ gridTemplateColumns: grid, gap: 8, alignItems: 'center' }}>
+                <div />
+                <div className="text-[length:var(--fs-text)] font-semibold">Gesamt</div>
+                <div className="text-[length:var(--fs-text)] font-semibold tabular-nums">
+                  {alle.reduce((s, r) => s + r.vorgaenge, 0)}
+                </div>
+                <div className="whitespace-nowrap text-[length:var(--fs-meta)] font-semibold tabular-nums">
+                  {formatEuro(gesamt, { rounded: true, decimals: 0 })}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
     </MockCard>
