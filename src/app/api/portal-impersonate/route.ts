@@ -90,34 +90,18 @@ export async function POST(request: Request) {
       )
     }
     if (!kunde.auth_user_id) {
-      const { isBaerenwaldPrimaryStaffEmail } = await import(
-        '@/lib/auth/crm-access'
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'Kunde hat noch kein Portal-Konto. Nutzen Sie die „Mieter-Ansicht“ bei einer Meldung mit Status-Link.',
+        },
+        { status: 422 }
       )
-      const emailLower = kunde.email.trim().toLowerCase()
-      const isHmStaff =
-        kunde.portal_modus === 'hausmeister' &&
-        isBaerenwaldPrimaryStaffEmail(emailLower)
-      if (!isHmStaff) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error:
-              'Kunde hat noch kein Portal-Konto. Nutzen Sie die „Mieter-Ansicht“ bei einer Meldung mit Status-Link.',
-          },
-          { status: 422 }
-        )
-      }
     }
     email = kunde.email.trim().toLowerCase()
     roleLabel =
-      kunde.portal_modus === 'organisation'
-        ? `Hausverwaltung: ${kunde.name}`
-        : kunde.portal_modus === 'hausmeister'
-          ? `Hausmeister: ${kunde.name}`
-          : `Kunde: ${kunde.name}`
-    if (kunde.portal_modus === 'hausmeister') {
-      redirectPath = '/portal?view=hausmeister'
-    }
+      kunde.portal_modus === 'organisation' ? `Hausverwaltung: ${kunde.name}` : `Kunde: ${kunde.name}`
   } else {
     const {data: hw, error} = await supabaseAdmin
       .from('handwerker')

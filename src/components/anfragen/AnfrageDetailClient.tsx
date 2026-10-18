@@ -57,7 +57,6 @@ import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCa
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { MeldungsdetailsCard } from '@/components/anfragen/MeldungsdetailsCard'
 import { HvWarteFreigabeSheet } from '@/components/anfragen/HvWarteFreigabeSheet'
-import { LeadBefundCrmCard } from '@/components/anfragen/LeadBefundCrmCard'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
 import { AnfrageHandwerkerAnfragenSheet } from '@/components/anfragen/AnfrageHandwerkerAnfragenSheet'
 import { AnfragePartnerEinholungCards } from '@/components/anfragen/AnfragePartnerEinholungCards'
@@ -818,7 +817,6 @@ export function AnfrageDetailClient({
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
       <MeldungsdetailsCard lead={lead} />
       <HvMeldungKontextCards lead={lead} onSaved={() => refresh()} />
-      <LeadBefundCrmCard leadId={lead.id} hvMeldungStatus={lead.hv_meldung_status} />
     </>
   )
 

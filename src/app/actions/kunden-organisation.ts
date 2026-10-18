@@ -192,7 +192,6 @@ export async function saveKundeFreigabeRegeln(
     freigabe_schwelle_eur?: number | null
     notfall_direkt: boolean
     freigabe_modus?: FreigabeModus
-    hm_auto_zuweisen?: boolean
     akut_fall_ids?: string[] | null
   }
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -220,9 +219,6 @@ export async function saveKundeFreigabeRegeln(
     freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
     notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
   }
-  if (input.hm_auto_zuweisen !== undefined) {
-    payload.hm_auto_zuweisen = Boolean(input.hm_auto_zuweisen)
-  }
   if (input.akut_fall_ids !== undefined) {
     payload.akut_fall_ids = normalizeAkutFallIds(input.akut_fall_ids)
   }
@@ -238,18 +234,7 @@ export async function saveKundeFreigabeRegeln(
           'Sofortmaßnahme-Fälle konnten nicht gespeichert werden (Spalte akut_fall_ids fehlt oder Schema-Cache). Bitte Migration anwenden bzw. API neu laden.',
       }
     }
-    let nextPayload = payload
-    if (/hm_auto_zuweisen/i.test(msg)) {
-      const { hm_auto_zuweisen: _drop, ...withoutHm } = nextPayload
-      void _drop
-      nextPayload = withoutHm
-    }
-    if (nextPayload !== payload) {
-      const retry = await (() => { const db = createClient(); return db.from('kunden').update(nextPayload).eq('id', id) })()
-      if (retry.error) return { ok: false, message: retry.error.message }
-    } else {
-      return { ok: false, message: error.message }
-    }
+    return { ok: false, message: error.message }
   }
 
   revalidateKundeDetail(id)

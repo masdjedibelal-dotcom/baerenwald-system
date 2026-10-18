@@ -26,7 +26,6 @@ export type FreigabeSettingsValue = {
   notfall_direkt: boolean | null
   freigabe_schwelle_eur: number | null
   /** Nur HV-Kunde (Org), nicht Objekt-Override */
-  hm_auto_zuweisen?: boolean | null
   /** Nur HV-Kunde: Whitelist Sofortmaßnahme-Fälle */
   akut_fall_ids?: string[] | null
 }
@@ -59,8 +58,6 @@ type Props = {
   /** Objekt: true = DB NULL (erben) */
   erben?: boolean
   onErbenChange?: (erben: boolean) => void
-  /** HV-Kunde: Hausmeister-Auto-Zuweisung anzeigen/speichern */
-  showHmAuto?: boolean
   /** HV-Kunde: Sofortmaßnahme-Fall-Auswahl (nicht am Objekt) */
   showAkutFaelle?: boolean
   onSave: (next: FreigabeSettingsValue) => Promise<{ ok: true } | { ok: false; message: string }>
@@ -74,7 +71,6 @@ export function FreigabeSettingsCard({
   kundeDefaults,
   erben = false,
   onErbenChange,
-  showHmAuto = false,
   showAkutFaelle = false,
   onSave,
   onSaved,
@@ -88,7 +84,6 @@ export function FreigabeSettingsCard({
   const [akut, setAkut] = useState(parsed.akut)
   const [schwelleAn, setSchwelleAn] = useState(parsed.schwelleAn)
   const [schwelle, setSchwelle] = useState(parsed.schwelle)
-  const [hmAuto, setHmAuto] = useState(Boolean(value.hm_auto_zuweisen))
   const [akutFaelle, setAkutFaelle] = useState<AkutFallId[]>(parsed.akutFaelle)
 
   // Inhalt vergleichen — nicht Array-Referenz (Parent liefert oft `?? []` neu).
@@ -110,9 +105,6 @@ export function FreigabeSettingsCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Sync nur bei Wertänderung, nicht bei neuer []-Referenz
   }, [editSource.notfall_direkt, editSource.freigabe_schwelle_eur, akutFaelleSyncKey, erben])
 
-  useEffect(() => {
-    setHmAuto(Boolean(value.hm_auto_zuweisen))
-  }, [value.hm_auto_zuweisen])
 
   const disabled = erben || pending
   const baseline = parseEditorState(erben && kundeDefaults ? kundeDefaults : value)
@@ -121,14 +113,12 @@ export function FreigabeSettingsCard({
     (akut !== baseline.akut ||
       schwelleAn !== baseline.schwelleAn ||
       (schwelleAn && schwelle !== baseline.schwelle) ||
-      (showHmAuto && hmAuto !== Boolean(value.hm_auto_zuweisen)) ||
       (showAkutFaelle && !akutFallIdsEqual(akutFaelle, baseline.akutFaelle)))
 
   function buildPayload(): FreigabeSettingsValue {
     return {
       notfall_direkt: akut,
       freigabe_schwelle_eur: schwelleAn ? snapSchwelle(schwelle) || null : null,
-      ...(showHmAuto ? { hm_auto_zuweisen: hmAuto } : {}),
       ...(showAkutFaelle ? { akut_fall_ids: akutFaelle } : {}),
     }
   }
@@ -287,26 +277,6 @@ export function FreigabeSettingsCard({
           </div>
         ) : null}
 
-        {showHmAuto && !erben ? (
-          <div className="freigabe-settings__row">
-            <div className="freigabe-settings__row-text">
-              <div className="freigabe-settings__label">Automatisch an Hausmeister</div>
-              <div className="freigabe-settings__hint">
-                {hmAuto
-                  ? 'Aktiv: Neue Meldungen (nicht Sofortmaßnahme) gehen direkt in die Hausmeister-Prüfung.'
-                  : 'Aus: Hausmeister-Pfad manuell am Vorgang starten.'}
-              </div>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={hmAuto}
-              disabled={pending}
-              className={cn('switch', hmAuto && 'on')}
-              onClick={() => setHmAuto((v) => !v)}
-            />
-          </div>
-        ) : null}
       </div>
     </MockCard>
   )

@@ -224,13 +224,11 @@ export function KundeDetailClient({
       notfall_direkt: kunde.notfall_direkt ?? true,
       freigabe_schwelle_eur:
         kunde.freigabe_schwelle_eur != null ? Number(kunde.freigabe_schwelle_eur) : null,
-      hm_auto_zuweisen: Boolean(kunde.hm_auto_zuweisen),
       akut_fall_ids: normalizeAkutFallIds(kunde.akut_fall_ids),
     }),
     [
       kunde.notfall_direkt,
       kunde.freigabe_schwelle_eur,
-      kunde.hm_auto_zuweisen,
       kunde.akut_fall_ids,
     ]
   )

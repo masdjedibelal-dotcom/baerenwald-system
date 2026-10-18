@@ -6,11 +6,9 @@ import {
 isHwZuweisungAkzeptiertLenient,
 normalizeHwZuweisungStatus,
 } from '@/lib/angebote/handwerker-annahme'
-import { MARKE } from '@/lib/marke'
 
 export type CrmNotificationTyp =
   | 'neue_anfrage'
-  | 'hm_befund_freigabe'
   | 'handwerker_update'
   | 'handwerker_angenommen'
   | 'handwerker_abgelehnt'
@@ -60,8 +58,6 @@ function typLabel(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
       return 'Neue Anfrage'
-    case 'hm_befund_freigabe':
-      return 'Hausmeister-Vorbefund'
     case 'handwerker_update':
       return 'Update zu Leistung'
     case 'handwerker_angenommen':
@@ -109,8 +105,6 @@ function typIcon(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
       return 'inbox'
-    case 'hm_befund_freigabe':
-      return 'clipboard-check'
     case 'handwerker_update':
     case 'partner_positions_meldung':
     case 'partner_weitere_arbeit':
@@ -143,7 +137,6 @@ function typIcon(typ: CrmNotificationTyp): string {
 function ctaLabel(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
-    case 'hm_befund_freigabe':
       return 'Anfrage öffnen'
     case 'handwerker_update':
       return 'Leistungen öffnen'
@@ -179,8 +172,6 @@ function typHint(typ: CrmNotificationTyp): string {
   switch (typ) {
     case 'neue_anfrage':
       return 'Neue Anfrage aus dem Meldeformular oder Portal. Öffnen Sie die Anfrage, um Kontakt und Details zu prüfen.'
-    case 'hm_befund_freigabe':
-      return `Der Hausmeister hat die Prüfung abgeschlossen und an ${MARKE.name} übergeben (Angebot oder Akut). Vorbefund liegt am Vorgang.`
     case 'handwerker_update':
       return 'Der Partner hat ein Update zu einer Leistung geschickt (Text und/oder Fotos). Unter Leistungen sehen Sie den Eintrag.'
     case 'handwerker_angenommen':
@@ -272,10 +263,6 @@ function pushLead(
 
   // Mieter-Meldung: CRM-Glocke erst nach HV-Freigabe (oder sofort bei Akut)
   if (isMieterMeldung && !istAkut && (hvStatus === 'neu' || hvStatus === '')) {
-    return
-  }
-  // Während / nach reiner HM-Prüfung ohne Freigabe an BW — eigene Quelle hm_befund_freigabe
-  if (hvStatus === 'hm_pruefung' || hvStatus === 'hm_erledigt') {
     return
   }
 
@@ -405,7 +392,6 @@ async function collectCrmNotificationItems(opts?: {
 
   const [
     leadsRes,
-    hmBefundRes,
     peRes,
     hwAntwortRes,
     hwEinreichungRes,
@@ -432,17 +418,6 @@ async function collectCrmNotificationItems(opts?: {
       .is('geloescht_am', null)
       .gte('created_at', since)
       .order('created_at', { ascending: false })
-      .limit(PER_SOURCE_LIMIT),
-    supabase
-      .from('lead_befunde')
-      .select(
-        `id, lead_id, ergebnis, abgeschlossen_at,
-         leads:lead_id(id, kontakt_name, melder_name, situation, plz)`
-      )
-      .in('ergebnis', ['fachfirma_angebot', 'fachfirma_akut'])
-      .not('abgeschlossen_at', 'is', null)
-      .gte('abgeschlossen_at', since)
-      .order('abgeschlossen_at', { ascending: false })
       .limit(PER_SOURCE_LIMIT),
     supabase
       .from('position_eintraege')
@@ -587,7 +562,6 @@ async function collectCrmNotificationItems(opts?: {
 
   for (const [ctx, res] of [
     ['leads', leadsRes],
-    ['lead_befunde', hmBefundRes],
     ['position_eintraege', peRes],
     ['angebot_handwerker_antwort', hwAntwortRes],
     ['angebot_handwerker_einreichung', hwEinreichungRes],
@@ -624,69 +598,6 @@ async function collectCrmNotificationItems(opts?: {
     leadRows = []
   }
   for (const row of leadRows) pushLead(items, row)
-
-  // ── Hausmeister-Vorbefund an Bärenwald (Angebot / Akut) ───────
-  if (!hmBefundRes.error) {
-    for (const row of hmBefundRes.data ?? []) {
-      const lead = one(
-        row.leads as
-          | {
-              id?: string
-              kontakt_name?: string | null
-              melder_name?: string | null
-              situation?: string | null
-              plz?: string | null
-            }
-          | {
-              id?: string
-              kontakt_name?: string | null
-              melder_name?: string | null
-              situation?: string | null
-              plz?: string | null
-            }[]
-          | null
-      )
-      const leadId = String(row.lead_id ?? lead?.id ?? '').trim()
-      if (!leadId) continue
-      const ergebnis = String(row.ergebnis ?? '').trim().toLowerCase()
-      const istAkut = ergebnis === 'fachfirma_akut'
-      const name =
-        lead?.melder_name?.trim() ||
-        lead?.kontakt_name?.trim() ||
-        null
-      const meta = [lead?.situation?.trim(), lead?.plz?.trim()]
-        .filter(Boolean)
-        .join(' · ')
-      const title = istAkut
-        ? name
-          ? `HM-Vorbefund — Akut (${name})`
-          : 'HM-Vorbefund — Akut'
-        : name
-          ? `HM-Vorbefund — Angebot erstellen (${name})`
-          : 'HM-Vorbefund — Angebot erstellen'
-      items.push({
-        sourceKey: `hm_befund_freigabe:${row.id}`,
-        typ: 'hm_befund_freigabe',
-        title,
-        subtitle: meta || null,
-        href: `/anfragen/${leadId}`,
-        createdAt: String(row.abgeschlossen_at ?? since),
-        gelesen: false,
-      })
-    }
-    // Keine doppelte „Neue Anfrage“ für denselben Lead nach HM-Übergabe
-    const hmLeadHrefs = new Set(
-      items
-        .filter((i) => i.typ === 'hm_befund_freigabe')
-        .map((i) => i.href)
-    )
-    for (let i = items.length - 1; i >= 0; i--) {
-      const it = items[i]
-      if (it?.typ === 'neue_anfrage' && hmLeadHrefs.has(it.href)) {
-        items.splice(i, 1)
-      }
-    }
-  }
 
   // HW-Eingangsrechnung (alt, angebot_handwerker) entfällt — Partner-Rechnungen kommen über Einsätze.
   void hwRechnungRes

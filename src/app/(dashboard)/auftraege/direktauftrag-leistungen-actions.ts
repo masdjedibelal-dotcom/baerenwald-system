@@ -134,14 +134,6 @@ export async function createDirektauftragMitLeistungen(input: {
     sichtbar_fuer_kunde: false,
   })
 
-  try {
-    const { spiegelLeadBefundNachAuftrag } = await import('@/lib/org/spiegel-lead-befund')
-    const sp = await spiegelLeadBefundNachAuftrag({ leadId, auftragId })
-    if (!sp.ok) console.warn('[createDirektauftragMitLeistungen] befund-spiegel:', sp.message)
-  } catch (e) {
-    console.warn('[createDirektauftragMitLeistungen] befund-spiegel:', e)
-  }
-
   // Informative Direktauftrag-Mail nur bei Akut-Bypass ohne vorherige HV-Aktion.
   // Nach „Direkt Bärenwald“ / „Hausmeister“ kommt die Portal-Mail „Wir kümmern uns …“.
   const { hvHatBereitsMeldungGewaehlt } = await import(

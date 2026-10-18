@@ -1,6 +1,5 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
-import { listOrgHausmeister,loadHausmeisterForObjekt } from '@/lib/org/org-hausmeister'
 import type {
   AktenNotiz,
   EinheitBewohner,
@@ -196,7 +195,7 @@ export async function loadObjektAkteDetail(
 
   const supabase = createClient()
 
-  const [kontakteRes, einheitenRes, anlagenRes, readOnly, orgHausmeisterListe, hausmeisterAmObjekt] =
+  const [kontakteRes, einheitenRes, anlagenRes, readOnly] =
     await Promise.all([
       supabase
         .from('objekt_kontakte')
@@ -212,8 +211,6 @@ export async function loadObjektAkteDetail(
         .order('sort_order', { ascending: true }),
       loadObjektAnlagen(supabase, kid, oid),
       loadReadOnlyAkte(supabase, kid, oid),
-      listOrgHausmeister(kid),
-      loadHausmeisterForObjekt(oid),
     ])
 
   const einheiten = (einheitenRes.data ?? []) as ObjektEinheit[]
@@ -269,8 +266,6 @@ export async function loadObjektAkteDetail(
     einheiten,
     bewohner,
     anlagen: anlagenRes,
-    orgHausmeisterListe,
-    hausmeisterAmObjekt,
     ...readOnly,
   }
 }

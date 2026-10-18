@@ -1,4 +1,3 @@
-import type { HausmeisterAmObjekt,OrgHausmeister } from '@/lib/org/org-hausmeister-types'
 
 export type ObjektKontaktRolle = 'hausmeister' | 'ansprechpartner' | 'beirat' | 'dienstleister' | 'notfall' | 'sonstiges'
 
@@ -187,8 +186,6 @@ export type ObjektAkteDetailPayload = ObjektAkteReadOnlyPayload & {
   einheiten: ObjektEinheit[]
   bewohner: EinheitBewohner[]
   anlagen: ObjektAnlage[]
-  orgHausmeisterListe: OrgHausmeister[]
-  hausmeisterAmObjekt: HausmeisterAmObjekt | null
 }
 
 export type ObjektKontaktInput = {
