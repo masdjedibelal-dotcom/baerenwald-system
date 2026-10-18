@@ -1,4 +1,5 @@
 'use client'
+import { funktionAn } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import {
   DetailShell,
@@ -670,6 +671,7 @@ export function AngebotDetailPageClient({
         />
       ) : null}
       {lead?.id &&
+      funktionAn('hvWorkflow') &&
       (lead.org_freigabe_status || (lead.org_freigabe_log?.length ?? 0) > 0) ? (
         <AngebotOrgFreigabeBanner
           leadId={lead.id}

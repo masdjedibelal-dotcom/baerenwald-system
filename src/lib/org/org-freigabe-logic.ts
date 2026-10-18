@@ -20,6 +20,7 @@ mailOrgFreigabeAngefordert,
 import { sendMail } from '@/lib/mail-service'
 import { buildPortalLoginLink } from '@/lib/portal-utils'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
+import { funktionAn } from '@/lib/marke'
 import type { Kunde,Lead,LeadAnlass,LeadErfassungVon,OrgFreigabeStatus } from '@/lib/types'
 
 /** Await + ehrliches Ergebnis — kein void/Fire-and-forget (F-179). */
@@ -95,7 +96,8 @@ export function resolveEffektiveFreigabeRegeln(
   freigabe_schwelle_eur: number | null | undefined
   notfall_direkt: boolean | null | undefined
 } {
-  if (!org) {
+  // Ohne HV-Ablauf (Bärenwald): keine Freigabe, keine Schwelle, kein Akut-Direktweg
+  if (!org || !funktionAn('hvWorkflow')) {
     return { freigabe_modus: null, freigabe_schwelle_eur: null, notfall_direkt: null }
   }
   return {

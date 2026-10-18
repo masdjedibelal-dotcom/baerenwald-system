@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { logDbError } from '@/lib/errors/log-db-error'
+import { funktionAn } from '@/lib/marke'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import {
   orgFreigabeBlockiertPartner,
@@ -22,6 +23,7 @@ export async function assertPartnerVersandOrgFreigabe(input: {
   leadId?: string | null
   auftragId?: string | null
 }): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!funktionAn('hvWorkflow')) return { ok: true }
   const lead = await resolveLeadFreigabe(input)
   if (!lead) return { ok: true }
 

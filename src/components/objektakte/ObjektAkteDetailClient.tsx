@@ -1,5 +1,6 @@
 'use client'
 
+import { funktionAn } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { normalizeAkutFallIds } from '@/lib/org/sofortmassnahme-faelle'
 import {
@@ -88,7 +89,7 @@ export function ObjektAkteDetailClient({
   const orgSlug = kunde.org_kennung?.trim().toLowerCase() || null
   const objektMeldeSlug = objektState.melde_slug?.trim() || null
   const zeigtMeldeLinks = Boolean(orgSlug && objektMeldeSlug)
-  const zeigtFreigabe = Boolean(orgSlug)
+  const zeigtFreigabe = Boolean(orgSlug) && funktionAn('hvWorkflow')
 
   const kundeFreigabeDefaults = {
     akut_fall_ids: normalizeAkutFallIds(kunde.akut_fall_ids),

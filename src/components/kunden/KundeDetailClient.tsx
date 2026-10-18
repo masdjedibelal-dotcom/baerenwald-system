@@ -1,5 +1,6 @@
 'use client'
 
+import { funktionAn } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import {
 DetailShell,
@@ -394,7 +395,7 @@ export function KundeDetailClient({
           }}
         />
       ) : null}
-      {zeigtOrganisationTab ? (
+      {zeigtOrganisationTab && funktionAn('hvWorkflow') ? (
         <FreigabeSettingsCard
           showAkutFaelle
           value={freigabeSettingsValue}

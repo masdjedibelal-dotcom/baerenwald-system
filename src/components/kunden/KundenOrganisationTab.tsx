@@ -1,4 +1,5 @@
 'use client'
+import { funktionAn } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField, MockFormSection, MockInput } from '@/components/mock-ui/MockForm'
@@ -330,20 +331,22 @@ if (!res.ok || !json.url) {
           </MockField>
         </MockFormSection>
 
-        <FreigabeRegelnEditor
-          className="mt-5"
-          disabled={pending}
-          value={{
-            freigabe_modus: freigabeModus,
-            freigabe_schwelle_eur: schwelle,
-            notfall_direkt: notfallDirekt,
-          }}
-          onChange={(next) => {
-            setFreigabeModus(next.freigabe_modus)
-            setSchwelle(next.freigabe_schwelle_eur)
-            setNotfallDirekt(next.notfall_direkt)
-          }}
-        />
+        {funktionAn('hvWorkflow') ? (
+          <FreigabeRegelnEditor
+            className="mt-5"
+            disabled={pending}
+            value={{
+              freigabe_modus: freigabeModus,
+              freigabe_schwelle_eur: schwelle,
+              notfall_direkt: notfallDirekt,
+            }}
+            onChange={(next) => {
+              setFreigabeModus(next.freigabe_modus)
+              setSchwelle(next.freigabe_schwelle_eur)
+              setNotfallDirekt(next.notfall_direkt)
+            }}
+          />
+        ) : null}
 
         {err ? (
           <p className="mt-3 text-sm" style={{ color: `var(--red-tx, ${C.redTx2})` }}>

@@ -1,5 +1,6 @@
 'use client'
 
+import { funktionAn } from '@/lib/marke'
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
@@ -94,7 +95,7 @@ export function HvMeldungKontextCards({
     objekt?.id && agKundeId ? `/kunden/${agKundeId}/objekte/${objekt.id}` : null
   const objektTitel = objekt?.titel?.trim() || null
 
-  const freigabe = lead.org_freigabe_status
+  const freigabe = lead.org_freigabe_status && funktionAn('hvWorkflow')
     ? FREIGABE_BADGE[lead.org_freigabe_status]
     : null
   const notfallAutopass = (lead.hv_meldung_status ?? '').trim() === 'notmassnahme'
