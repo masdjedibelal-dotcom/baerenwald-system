@@ -2,7 +2,7 @@
 
 import { funktionAn } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
-import { normalizeAkutFallIds } from '@/lib/org/sofortmassnahme-faelle'
+import { normalizeAkutFallIds } from '@/teo/hv/sofortmassnahme-faelle'
 import {
 DetailShell,
 EntityDetailLayout,
@@ -15,7 +15,7 @@ import Link from 'next/link'
 import { Suspense,useEffect,useMemo,useState } from 'react'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
-import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
+import { FreigabeSettingsCard } from '@/teo/hv/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'

@@ -86,7 +86,7 @@ kundeRechnungsempfaengerAusStammdaten
 } from '@/lib/kunde-rechnungsempfaenger'
 import { resolveAngebotDokumentEmpfaenger } from '@/lib/angebote/angebot-html-payload'
 import { LEAD_STATUS_VOR_ANGEBOT,leadStatusVorAngebot } from '@/lib/lead-angebot-funnel'
-import { syncAngebotMitOrgFreigabe } from '@/lib/org/hv-lead-actions'
+import { syncAngebotMitOrgFreigabe } from '@/teo/hv/hv-lead-actions'
 import { supersedeLeadAngebote } from '@/lib/angebote/supersede-lead-angebote'
 import { insertLeadTimelineEvent } from '@/lib/lead-timeline'
 import { auftragsbestaetigungMailFromEmpfaenger } from '@/lib/mail/auftragsbestaetigung-mail'

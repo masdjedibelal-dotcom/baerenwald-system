@@ -53,7 +53,7 @@ import { AngebotStammdatenCard } from '@/components/angebote/AngebotStammdatenCa
 import { AngebotLeistungenTab } from '@/components/angebote/AngebotDetailsTab'
 import { AngebotZahlungTab } from '@/components/angebote/AngebotZahlungTab'
 import { resolveCumulativeDetailTabAlias } from '@/lib/entity-detail/cumulative-detail-tabs'
-import { AngebotOrgFreigabeBanner } from '@/components/angebote/AngebotOrgFreigabeBanner'
+import { AngebotOrgFreigabeBanner } from '@/teo/hv/AngebotOrgFreigabeBanner'
 import { AngebotVersandSection } from '@/components/angebote/AngebotVersandSection'
 import { AngebotHandwerkerPartnerSection } from '@/components/angebote/AngebotHandwerkerPartnerSection'
 import { AngebotWizard } from '@/components/angebote/AngebotWizard'

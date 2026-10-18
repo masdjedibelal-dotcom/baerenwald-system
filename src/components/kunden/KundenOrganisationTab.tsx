@@ -10,7 +10,7 @@ import { C } from '@/lib/tokens/colors'
 
 import { useEffect, useRef, useState } from 'react'
 import { saveKundeOrganisation } from '@/app/actions/kunden-organisation'
-import { FreigabeRegelnEditor } from '@/components/org/FreigabeRegelnEditor'
+import { FreigabeRegelnEditor } from '@/teo/hv/FreigabeRegelnEditor'
 import {
   normalizeOrgHttpUrl,
   orgMeldeLegalUrlsReady,

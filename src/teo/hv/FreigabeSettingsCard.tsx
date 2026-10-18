@@ -4,13 +4,13 @@ import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { useEffect, useRef, useState } from 'react'
 import { useTransition } from '@/components/ui/action-busy'
-import { SofortmassnahmeFaelleEditor } from '@/components/org/SofortmassnahmeFaelleEditor'
+import { SofortmassnahmeFaelleEditor } from '@/teo/hv/SofortmassnahmeFaelleEditor'
 import { toast } from '@/components/ui/app-toast'
 import {
   akutFallIdsEqual,
   normalizeAkutFallIds,
   type AkutFallId,
-} from '@/lib/org/sofortmassnahme-faelle'
+} from '@/teo/hv/sofortmassnahme-faelle'
 import { cn } from '@/lib/utils'
 import { LIST } from '@/lib/crm-labels'
 import { formatEuro } from '@/lib/format/geld-datum'

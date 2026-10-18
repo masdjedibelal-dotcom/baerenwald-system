@@ -196,7 +196,7 @@ export async function saveKundeFreigabeRegeln(
         ? 'direkt'
         : 'freigabe'
 
-  const { normalizeAkutFallIds } = await import('@/lib/org/sofortmassnahme-faelle')
+  const { normalizeAkutFallIds } = await import('@/teo/hv/sofortmassnahme-faelle')
 
   const payload: Record<string, unknown> = {
     freigabe_modus: freigabeModus,

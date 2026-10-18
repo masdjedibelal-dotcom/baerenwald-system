@@ -10,7 +10,7 @@ import { ensureAngebotHandwerkerGewerkId } from '@/lib/auftraege/auftrag-positio
 import { filterHandwerkerFuerGewerkSlug } from '@/lib/handwerker/gewerk-match'
 import type { AuftragHandwerkerZuweisungStatus } from '@/lib/auftraege/auftrag-handwerker-status'
 import { notifyPartnerUnified,partnerVorgangLink } from '@/lib/partner/notify-partner-unified'
-import { assertPartnerVersandOrgFreigabe } from '@/lib/org/assert-partner-versand-org-freigabe'
+import { assertPartnerVersandOrgFreigabe } from '@/teo/hv/assert-partner-versand-org-freigabe'
 import {
 listHandwerkerFuerGewerk,type HandwerkerGewerkListeEintrag
 } from '@/app/(dashboard)/angebote/actions'

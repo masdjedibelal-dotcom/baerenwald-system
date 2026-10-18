@@ -57,7 +57,7 @@ async function main() {
   const db = createClient(url, key, { auth: { persistSession: false } })
 
   const { erneutOrgFreigabeAnfordernNachAblehnung } = await import(
-    '@/lib/org/org-freigabe-logic'
+    '@/teo/hv/org-freigabe-logic'
   )
 
   await db.from('leads').update({ org_freigabe_status: 'abgelehnt' }).eq('id', LEAD)

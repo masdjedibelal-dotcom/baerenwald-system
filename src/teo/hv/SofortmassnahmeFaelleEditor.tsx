@@ -11,7 +11,7 @@ import {
   SOFORTMASSNAHME_FAELLE_POPUP_TITLE,
   sofortmassnahmeFaelleGruppen,
   type AkutFallId,
-} from '@/lib/org/sofortmassnahme-faelle'
+} from '@/teo/hv/sofortmassnahme-faelle'
 import { cn } from '@/lib/utils'
 
 type Props = {

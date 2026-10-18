@@ -9,7 +9,7 @@ import { writeAuditEvent } from '@/lib/audit/write-audit-event'
 import {
   erneutOrgFreigabeAnfordernNachAblehnung as erneutOrgFreigabeCore,
   syncOrgFreigabeNachAngebot,
-} from '@/lib/org/org-freigabe-logic'
+} from '@/teo/hv/org-freigabe-logic'
 import { leadIstHavarie } from '@/lib/org/hv-lead-helpers'
 
 async function requireCrmStaffDb() {

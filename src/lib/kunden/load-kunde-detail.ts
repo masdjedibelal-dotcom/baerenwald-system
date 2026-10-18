@@ -1,6 +1,6 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
-import { normalizeAkutFallIds } from '@/lib/org/sofortmassnahme-faelle'
+import { normalizeAkutFallIds } from '@/teo/hv/sofortmassnahme-faelle'
 import { kundeAuftraggeberLeadsEmbed, kundeLeadsEmbed } from '@/lib/supabase/lead-kunde-embed'
 import type { Kunde, KundenDokumentRow, KundenNotizRow, Lead, AuftragStatus } from '@/lib/types'
 
