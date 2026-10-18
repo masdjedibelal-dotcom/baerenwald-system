@@ -68,6 +68,16 @@ const VORGAENGE_LEAD_SELECT = `
   ${leadAuftraggeberEmbed('id, name, vorname, nachname, typ, org_anzeigename')}
 `
 
+/** Lead nur als Vorgangsträger für ein Direkt-Angebot aus dem CRM angelegt (`funnel_daten.quelle`). */
+export function istDirektAngebotTraeger(funnelDaten: unknown): boolean {
+  return (
+    !!funnelDaten &&
+    typeof funnelDaten === 'object' &&
+    !Array.isArray(funnelDaten) &&
+    (funnelDaten as { quelle?: unknown }).quelle === 'crm_direkt_angebot'
+  )
+}
+
 /** Erstes Foto einer Meldung (`funnel_daten.fotos`) für die Listen-Vorschau. */
 function ersteFotoUrl(funnelDaten: unknown): string | null {
   const fd = funnelDaten && typeof funnelDaten === 'object' ? (funnelDaten as Record<string, unknown>) : null
@@ -645,6 +655,15 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
   for (const lead of leads) {
     // Meldungen, die HV/Hausmeister noch nicht an uns weitergegeben haben, erst zeigen, wenn sie freigegeben sind
     if (leadWartetAufHvStartFreigabe(lead)) continue
+    // Hilfs-Anfrage eines Direkt-Angebots ohne Angebot/Auftrag/Rechnung (Angebot gelöscht oder Wizard
+    // ohne „Abbrechen“ verlassen) — kein echter Vorgang, sonst graue Zeile ohne Inhalt
+    if (
+      istDirektAngebotTraeger(lead.funnel_daten) &&
+      !angeboteByLead.get(lead.id)?.length &&
+      !auftraegeByLead.get(lead.id)?.length &&
+      !rechnungenByLead.get(lead.id)?.length
+    )
+      continue
     const kundeName = leadKontaktAnzeigeName(lead, '') || null
     const kundeId = leadVertragsKundeId(lead)
 

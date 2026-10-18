@@ -127,6 +127,7 @@ writeAngebotStatusEinfach,
 import { writeAngebotHandwerkerStatus } from '@/lib/status/write-angebot-handwerker-status'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { MARKE } from '@/lib/marke'
+import { discardOrphanDirektAngebotLead } from '@/app/(dashboard)/neu/fab-neu-actions'
 
 function angebotMailSummen(
   positionen: AngebotPosition[],
@@ -3324,7 +3325,12 @@ export async function deleteAngebot(
   if (error4) return { error: error4.message }
   revalidateAngebotDetail(angebotId)
   const leadId = (ang as { lead_id?: string | null } | null)?.lead_id
-  if (leadId) revalidateLeadDetail(leadId)
+  if (leadId) {
+    // Letztes Angebot eines Direkt-Angebots gelöscht → Hilfs-Anfrage mit aufräumen (nur crm_direkt_angebot)
+    const aufgeraeumt = await discardOrphanDirektAngebotLead(leadId)
+    if (!aufgeraeumt.ok) console.warn('[deleteAngebot] Hilfs-Anfrage nicht aufgeräumt:', aufgeraeumt.message)
+    revalidateLeadDetail(leadId)
+  }
   return { success: true }
 }
 
