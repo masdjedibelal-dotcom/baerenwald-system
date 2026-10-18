@@ -239,14 +239,31 @@ export type BuildUmsatzverlaufOpts = {
  * Eine Wahrheit für Umsatz (30.09.2026): Netto gestellter Rechnungen (offen oder bezahlt),
  * nach Rechnungsdatum. Stornierte Rechnungen und Storno-Gutschriften heben sich auf und
  * fallen beide heraus; Entwürfe zählen nicht.
+ * Echte Gutschriften (Bezugsrechnung nicht storniert, z. B. Preisnachlass) mindern den Umsatz
+ * mit ihrem negativen Netto.
  */
-export function istUmsatzRechnung(r: {
-  status?: string | null
-  beleg_typ?: string | null
-}): boolean {
+export function istUmsatzRechnung(
+  r: {
+    status?: string | null
+    beleg_typ?: string | null
+    bezug_rechnung_id?: string | null
+  },
+  stornierteIds?: ReadonlySet<string>
+): boolean {
   const st = String(r.status ?? '').toLowerCase()
+  if (st !== 'gesendet' && st !== 'bezahlt') return false
   const typ = String(r.beleg_typ ?? 'rechnung').toLowerCase()
-  return typ === 'rechnung' && (st === 'gesendet' || st === 'bezahlt')
+  if (typ === 'rechnung') return true
+  if (typ !== 'gutschrift') return false
+  const bezug = r.bezug_rechnung_id?.trim()
+  return !(bezug && stornierteIds?.has(bezug))
+}
+
+/** Ids stornierter Rechnungen — Gutschriften dazu sind Storno-Belege (zählen nicht). */
+export function stornierteRechnungIds(
+  rechnungen: Array<{ id: string; status?: string | null }>
+): Set<string> {
+  return new Set(rechnungen.filter((r) => String(r.status ?? '').toLowerCase() === 'storniert').map((r) => r.id))
 }
 
 export function buildUmsatzAusRechnungen(
@@ -256,14 +273,15 @@ export function buildUmsatzAusRechnungen(
     rechnungsdatum?: string | null
     created_at: string
     netto?: number | null
+    bezug_rechnung_id?: string | null
   }>,
-  opts: BuildUmsatzverlaufOpts = {}
+  opts: BuildUmsatzverlaufOpts & { stornierteIds?: ReadonlySet<string> } = {}
 ): UmsatzMonat[] {
   const now = opts.now ?? new Date()
   const months = buildMonthBuckets(opts.range, opts.monateCount ?? 6, now)
   const byKey = new Map(months.map((m) => [m.key, m]))
   for (const r of rechnungen) {
-    if (!istUmsatzRechnung(r)) continue
+    if (!istUmsatzRechnung(r, opts.stornierteIds)) continue
     const d = new Date(String(r.rechnungsdatum || r.created_at))
     if (Number.isNaN(d.getTime())) continue
     const bucket = byKey.get(monthKey(d))
@@ -271,6 +289,13 @@ export function buildUmsatzAusRechnungen(
     const netto = Number(r.netto) || 0
     if (String(r.status).toLowerCase() === 'bezahlt') bucket.abgeschlossen += netto
     else bucket.offen += netto
+  }
+  // Gutschriften können „offen“ ins Minus drücken — Rest mindert den bezahlten Teil (Diagramm stapelt)
+  for (const m of months) {
+    if (m.offen < 0) {
+      m.abgeschlossen += m.offen
+      m.offen = 0
+    }
   }
   return months
 }
@@ -389,18 +414,20 @@ function addScaledToGewerkMap(
   anteile: Map<string, number>,
   sollNetto: number
 ) {
-  if (!(sollNetto > 0)) return
+  if (!sollNetto) return
+  // Gutschriften (sollNetto < 0) haben oft negative Positionen → Anteile über den Betrag
+  const wert = (amt: number) => (sollNetto > 0 ? amt : Math.abs(amt))
   let partsSum = 0
   for (const amt of anteile.values()) {
-    if (amt > 0) partsSum += amt
+    if (wert(amt) > 0) partsSum += wert(amt)
   }
   if (partsSum <= 0) {
     target.set('Sonstiges', (target.get('Sonstiges') ?? 0) + sollNetto)
     return
   }
   for (const [name, amt] of anteile) {
-    if (!(amt > 0)) continue
-    target.set(name, (target.get(name) ?? 0) + sollNetto * (amt / partsSum))
+    if (!(wert(amt) > 0)) continue
+    target.set(name, (target.get(name) ?? 0) + sollNetto * (wert(amt) / partsSum))
   }
 }
 
@@ -411,15 +438,17 @@ export function buildGewerkUmsatzAusRechnungen(
     status?: string | null
     beleg_typ?: string | null
     netto?: number | null
+    bezug_rechnung_id?: string | null
   }>,
-  gewerkeKatalog: DashboardGewerkKatalog[] = []
+  gewerkeKatalog: DashboardGewerkKatalog[] = [],
+  stornierteIds?: ReadonlySet<string>
 ): { zeilen: GewerkUmsatzZeile[]; gesamt: number } {
   const lookup = buildGewerkLookup(gewerkeKatalog)
   const map = new Map<string, number>()
   for (const r of rechnungen) {
-    if (!istUmsatzRechnung(r)) continue
+    if (!istUmsatzRechnung(r, stornierteIds)) continue
     const netto = Number(r.netto) || 0
-    if (!(netto > 0)) continue
+    if (!netto) continue
     addScaledToGewerkMap(map, gewerkAnteileFromPositionen(r.positionen, lookup), netto)
   }
   const gesamt = Array.from(map.values()).reduce((x, y) => x + y, 0)
@@ -520,19 +549,25 @@ export function buildKundenRanking(
     rechnung_netto: number
   }>
 ): RankingZeile[] {
-  const map = new Map<string, { name: string; typ: string | null; rechnungen: Set<string>; umsatz: number }>()
+  const map = new Map<
+    string,
+    { name: string; typ: string | null; rechnungen: Set<string>; gesehen: Set<string>; umsatz: number }
+  >()
   for (const r of rows) {
     let acc = map.get(r.kunde_id)
     if (!acc) {
-      acc = { name: r.kunde_name, typ: r.kunde_typ ?? null, rechnungen: new Set(), umsatz: 0 }
+      acc = { name: r.kunde_name, typ: r.kunde_typ ?? null, rechnungen: new Set(), gesehen: new Set(), umsatz: 0 }
       map.set(r.kunde_id, acc)
     }
     if (r.kunde_name && r.kunde_name !== 'Kunde') acc.name = r.kunde_name
     if (!acc.typ && r.kunde_typ) acc.typ = r.kunde_typ
     const id = (r.rechnung_id ?? '').trim()
-    if (!id || acc.rechnungen.has(id)) continue
-    acc.rechnungen.add(id)
-    acc.umsatz += Number(r.rechnung_netto) || 0
+    if (!id || acc.gesehen.has(id)) continue
+    acc.gesehen.add(id)
+    const netto = Number(r.rechnung_netto) || 0
+    // Gutschriften mindern den Umsatz, zählen aber nicht als Rechnung
+    if (netto > 0) acc.rechnungen.add(id)
+    acc.umsatz += netto
   }
   return Array.from(map.entries())
     .map(([id, a]) => ({ id, name: a.name, sub: '', vorgaenge: a.rechnungen.size, umsatz: a.umsatz, typ: a.typ }))

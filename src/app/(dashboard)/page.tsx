@@ -9,6 +9,7 @@ import {
   buildKundenRanking,
   buildUmsatzAusRechnungen,
   istUmsatzRechnung,
+  stornierteRechnungIds,
   buildVertriebsFunnel,getDashboardZeitraumRange,
   inZeitraum,
   parseDashboardZeitraum,
@@ -182,7 +183,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
           .select(
             `
             id, status, created_at, faellig_am, kunde_id, auftrag_id, netto, brutto, ersetzt_durch,
-            beleg_typ, rechnungsdatum,
+            beleg_typ, rechnungsdatum, bezug_rechnung_id,
             kunden(id, name, vorname, nachname, typ)
           `
           )
@@ -193,7 +194,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     safeRows(async () =>
       (() => { const db = createClient(); return db
           .from('rechnungen')
-          .select('id, status, created_at, rechnungsdatum, beleg_typ, auftrag_id, ersetzt_durch, positionen, netto')
+          .select('id, status, created_at, rechnungsdatum, beleg_typ, bezug_rechnung_id, auftrag_id, ersetzt_durch, positionen, netto')
           .neq('status', 'storniert')
           .neq('status', 'entwurf')
           .order('created_at', { ascending: false })
@@ -298,16 +299,19 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     },
   ]
 
-  // Umsatz = gestellte Rechnungen (eine Quelle, siehe istUmsatzRechnung)
+  // Umsatz = gestellte Rechnungen minus echte Gutschriften (eine Quelle, siehe istUmsatzRechnung)
+  const stornierteIds = stornierteRechnungIds(rechnungen)
+  const bezugVon = (r: object) => (r as { bezug_rechnung_id?: string | null }).bezug_rechnung_id ?? null
   const umsatzMonate = buildUmsatzAusRechnungen(
     rechnungen.map((r) => ({
       status: r.status,
       beleg_typ: (r as { beleg_typ?: string | null }).beleg_typ ?? null,
+      bezug_rechnung_id: bezugVon(r),
       rechnungsdatum: (r as { rechnungsdatum?: string | null }).rechnungsdatum ?? null,
       created_at: r.created_at,
       netto: r.netto,
     })),
-    { range: zeitraumRange, monateCount: 6 }
+    { range: zeitraumRange, monateCount: 6, stornierteIds }
   )
 
   // Funnel = eine Gruppe: Anfragen aus dem Zeitraum (inkl. abgesagte) → davon mit gesendetem
@@ -354,9 +358,11 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
       positionen: r.positionen,
       status: r.status,
       beleg_typ: (r as { beleg_typ?: string | null }).beleg_typ ?? null,
+      bezug_rechnung_id: bezugVon(r),
       netto: r.netto,
     })),
-    gewerkeKatalog
+    gewerkeKatalog,
+    stornierteIds
   )
 
   // Handwerker-Ranking aus Zuweisungen (Zeitraum über Auftrag.created_at)
@@ -431,10 +437,14 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
   const kundenRows: Parameters<typeof buildKundenRanking>[0] = []
   for (const r of rechnungenZ) {
     if (
-      !istUmsatzRechnung({
-        status: r.status,
-        beleg_typ: (r as { beleg_typ?: string | null }).beleg_typ ?? null,
-      })
+      !istUmsatzRechnung(
+        {
+          status: r.status,
+          beleg_typ: (r as { beleg_typ?: string | null }).beleg_typ ?? null,
+          bezug_rechnung_id: bezugVon(r),
+        },
+        stornierteIds
+      )
     )
       continue
     const kid = (r.kunde_id ?? '').trim()
