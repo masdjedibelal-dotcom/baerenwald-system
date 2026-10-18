@@ -1,7 +1,9 @@
 'use client'
 
+import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { useMemo } from 'react'
+import { EditorSheet } from '@/components/surfaces/EditorSheet'
+import { useMemo, useState } from 'react'
 
 import { buildFunnelBedarfExtraRows } from '@/lib/anfragen/funnel-bedarf-rows'
 import { meldeBereichLabel } from '@/lib/anfragen/melde-fachdetail-labels'
@@ -46,6 +48,26 @@ function freitextFromLead(lead: LeadDetail): string | null {
   return null
 }
 
+/** Fotos/Videos aus der Meldung bzw. Website-Anfrage (`funnel_daten.fotos`: URL oder { url }). */
+function fotosFromLead(lead: LeadDetail): string[] {
+  const fd =
+    lead.funnel_daten && typeof lead.funnel_daten === 'object' && !Array.isArray(lead.funnel_daten)
+      ? (lead.funnel_daten as Record<string, unknown>)
+      : {}
+  const raw = Array.isArray(fd.fotos) ? fd.fotos : []
+  const urls: string[] = []
+  for (const f of raw) {
+    const url =
+      typeof f === 'string' ? f : f && typeof f === 'object' ? (f as { url?: unknown }).url : null
+    if (typeof url === 'string' && /^https?:\/\//.test(url) && !urls.includes(url)) urls.push(url)
+  }
+  return urls
+}
+
+function istVideo(url: string): boolean {
+  return /\.(mp4|mov|webm)(\?|$)/i.test(url)
+}
+
 /** Nur Anzeige — Funnel-/Meldedaten aus Website- oder Staff-Funnel. */
 export function MeldungsdetailsCard({ lead }: { lead: LeadDetail }) {
   const bedarf = useMemo(() => buildFunnelBedarfExtraRows(lead), [lead])
@@ -68,9 +90,11 @@ export function MeldungsdetailsCard({ lead }: { lead: LeadDetail }) {
     norm?.labels.dringlichkeit?.trim() ??
     null
   const freitext = freitextFromLead(lead)
+  const fotos = useMemo(() => fotosFromLead(lead), [lead])
+  const [grossUrl, setGrossUrl] = useState<string | null>(null)
 
   const hatInhalt = Boolean(
-    situation || bereiche || umfang || zeitraum || dringlichkeit || freitext
+    situation || bereiche || umfang || zeitraum || dringlichkeit || freitext || fotos.length
   )
 
   if (!hatInhalt) return null
@@ -85,6 +109,42 @@ export function MeldungsdetailsCard({ lead }: { lead: LeadDetail }) {
         <PropRow label="Dringlichkeit" value={dringlichkeit} />
         <PropRow label="Freitext Melder" value={freitext} />
       </div>
+      {fotos.length ? (
+        <div className="mt-3">
+          <div className="prop-l mb-2">Fotos ({fotos.length})</div>
+          <div className="flex flex-wrap gap-2">
+            {fotos.map((url) =>
+              istVideo(url) ? (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="link text-[length:var(--fs-meta)]">
+                  Video öffnen
+                </a>
+              ) : (
+                <MockBtn
+                  key={url}
+                  type="button"
+                  onClick={() => setGrossUrl(url)}
+                  className="h-[54px] w-[72px] cursor-pointer overflow-hidden rounded-[var(--r-sm)] border border-[var(--border)] bg-[var(--bg)] p-0"
+                  aria-label="Foto vergrößern"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                </MockBtn>
+              )
+            )}
+          </div>
+        </div>
+      ) : null}
+      <EditorSheet
+        open={!!grossUrl}
+        onClose={() => setGrossUrl(null)}
+        title="Foto"
+        secondary={{ label: 'Schließen', onClick: () => setGrossUrl(null) }}
+      >
+        {grossUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={grossUrl} alt="Foto zur Meldung" className="block w-full rounded-[var(--r-sm)]" />
+        ) : null}
+      </EditorSheet>
     </MockCard>
   )
 }
