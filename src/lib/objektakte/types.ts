@@ -185,7 +185,6 @@ export type ObjektAkteDetailPayload = ObjektAkteReadOnlyPayload & {
   kontakte: ObjektKontakt[]
   einheiten: ObjektEinheit[]
   bewohner: EinheitBewohner[]
-  anlagen: ObjektAnlage[]
 }
 
 export type ObjektKontaktInput = {

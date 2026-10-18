@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { ObjektAkteDetailClient } from '@/components/objektakte/ObjektAkteDetailClient'
-import { computeObjektKpis } from '@/lib/objektakte/compute-objekt-kpis'
 import { loadObjektHistorie } from '@/lib/objektakte/load-objekt-historie'
 import { loadKundeDetail } from '@/lib/kunden/load-kunde-detail'
 import { loadKundenObjektForAkte,loadObjektAkteDetail } from '@/lib/objektakte/load-objekt-akte'
@@ -44,8 +43,6 @@ export default async function ObjektAktePage({
   const objekt = await loadKundenObjektForAkte(kundeId, objektId)
   if (!objekt) notFound()
 
-  const kpis = computeObjektKpis(historie.rows, akte.anlagen.length)
-
   return (
     <ObjektAkteDetailClient
       kunde={kunde}
@@ -53,7 +50,6 @@ export default async function ObjektAktePage({
       akte={akte}
       historieRows={historie.rows}
       objektLeadIds={historie.leadIds}
-      kpis={kpis}
       vorgaengeRows={vorgaenge.rows}
       gewerke={gewerke}
     />

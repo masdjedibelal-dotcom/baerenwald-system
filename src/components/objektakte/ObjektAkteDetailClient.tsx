@@ -22,7 +22,6 @@ import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import { updateKundenObjektFreigabe } from '@/app/actions/kunden-objekte'
 import { kundenObjektStrasseZeile } from '@/lib/kunden-objekte'
-import type { ObjektKpiSnapshot } from '@/lib/objektakte/compute-objekt-kpis'
 import type { ObjektAkteDetailPayload,ObjektHistorieRow } from '@/lib/objektakte/types'
 import type { Gewerk,Kunde,KundenObjekt } from '@/lib/types'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
@@ -39,7 +38,6 @@ export function ObjektAkteDetailClient({
   akte,
   historieRows = [],
   objektLeadIds = [],
-  kpis,
   vorgaengeRows = [],
   gewerke = [],
 }: {
@@ -60,7 +58,6 @@ export function ObjektAkteDetailClient({
   akte: ObjektAkteDetailPayload
   historieRows?: ObjektHistorieRow[]
   objektLeadIds?: string[]
-  kpis?: ObjektKpiSnapshot
   vorgaengeRows?: VorgangListeRow[]
   gewerke?: Gewerk[]
 }) {
