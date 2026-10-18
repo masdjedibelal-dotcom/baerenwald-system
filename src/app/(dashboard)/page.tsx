@@ -2,13 +2,14 @@ import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import { DashboardClient } from '@/components/dashboard/DashboardClient'
 import { filterOutLegacyDemoLeads } from '@/lib/legacy-demo-data'
+import { istGewerkBeschreibungLeistungName } from '@/lib/dokument-zeilen'
 import { kundeDisplayName } from '@/lib/kunde-stammdaten'
 import {
-  buildGewerkUmsatzAusRechnungen,
+  buildGewerkUmsatz,
   buildHandwerkerRanking,
   buildKundenRanking,
-  buildUmsatzAusRechnungen,
-  istUmsatzRechnung,
+  buildUmsatzPosten,
+  buildUmsatzverlauf,
   stornierteRechnungIds,
   buildVertriebsFunnel,getDashboardZeitraumRange,
   inZeitraum,
@@ -170,7 +171,8 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
             id, status, kunde_id, lead_id, angebot_id, created_at, titel, ist_wiederkehrend,
             letzte_aktivitaet, fortschritt,
             angebote(id, gesamt_fix, gesamt_min, gesamt_max),
-            kunden(id, name, vorname, nachname)
+            kunden(id, name, vorname, nachname, typ),
+            auftrag_positionen(preis_fix, aenderung_typ, leistung_name, gewerk_slug, gewerk_name)
           `
           )
           .order('created_at', { ascending: false })
@@ -183,7 +185,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
           .select(
             `
             id, status, created_at, faellig_am, kunde_id, auftrag_id, netto, brutto, ersetzt_durch,
-            beleg_typ, rechnungsdatum, bezug_rechnung_id,
+            beleg_typ, rechnungsdatum, bezug_rechnung_id, rechnung_art,
             kunden(id, name, vorname, nachname, typ)
           `
           )
@@ -257,9 +259,6 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     netto?: number | null
   }>
   const auftraegeZ = auftraege.filter((a) => inZeitraum(String(a.created_at ?? ''), zeitraumRange))
-  const rechnungenZ = rechnungen.filter((r) =>
-    inZeitraum(String((r as { rechnungsdatum?: string | null }).rechnungsdatum || r.created_at), zeitraumRange)
-  )
 
   // Offen-Zahlen = genau das, was die Vorgänge-Liste unter „Offen“ zeigt (eine Quelle, kein Zeitraum:
   // „offen“ ist ein Stand, kein Zeitraum).
@@ -299,20 +298,65 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     },
   ]
 
-  // Umsatz = gestellte Rechnungen minus echte Gutschriften (eine Quelle, siehe istUmsatzRechnung)
+  // Umsatz = je Auftrag eine Zahl (abgerechnet → Rechnungssumme, sonst Auftragswert), im Monat der
+  // Beauftragung; Rechnungen ohne Auftrag im Rechnungsmonat. Eine Quelle für Verlauf, Gewerk, Kunden.
   const stornierteIds = stornierteRechnungIds(rechnungen)
-  const bezugVon = (r: object) => (r as { bezug_rechnung_id?: string | null }).bezug_rechnung_id ?? null
-  const umsatzMonate = buildUmsatzAusRechnungen(
-    rechnungen.map((r) => ({
-      status: r.status,
-      beleg_typ: (r as { beleg_typ?: string | null }).beleg_typ ?? null,
-      bezug_rechnung_id: bezugVon(r),
-      rechnungsdatum: (r as { rechnungsdatum?: string | null }).rechnungsdatum ?? null,
-      created_at: r.created_at,
-      netto: r.netto,
-    })),
-    { range: zeitraumRange, monateCount: 6, stornierteIds }
+  const positionenJeRechnung = new Map(rechnungenGewerk.map((r) => [r.id, r.positionen]))
+  const kundeVon = (k: unknown) => {
+    const row = (Array.isArray(k) ? k[0] : k) as
+      | { id?: string; name?: string | null; vorname?: string | null; nachname?: string | null; typ?: string | null }
+      | null
+      | undefined
+    return { name: row ? kundeDisplayName(row as never) : null, typ: row?.typ ?? null }
+  }
+  const umsatzPosten = buildUmsatzPosten(
+    auftraege.map((a) => {
+      const aktivePos = ((a.auftrag_positionen as Array<Record<string, unknown>> | null) ?? []).filter(
+        (p) =>
+          String(p.aenderung_typ ?? '').toLowerCase() !== 'entfernt' &&
+          !istGewerkBeschreibungLeistungName(String(p.leistung_name ?? ''))
+      )
+      const posNetto = aktivePos.reduce((s, p) => s + (Number(p.preis_fix) || 0), 0)
+      const k = kundeVon(a.kunden)
+      return {
+        id: String(a.id),
+        status: String(a.status ?? ''),
+        datum: String(a.created_at ?? ''),
+        netto: posNetto > 0 ? posNetto : auftragNetto({ angebote: a.angebote as never }),
+        kunde_id: (a.kunde_id as string | null) ?? null,
+        kunde_name: k.name,
+        kunde_typ: k.typ,
+        positionen: aktivePos.map((p) => ({
+          gewerk_slug: p.gewerk_slug,
+          gewerk_name: p.gewerk_name,
+          leistung_name: p.leistung_name,
+          gesamt_min: Number(p.preis_fix) || 0,
+          menge: 1,
+        })),
+      }
+    }),
+    rechnungen.map((r) => {
+      const k = kundeVon(r.kunden)
+      const x = r as { beleg_typ?: string | null; bezug_rechnung_id?: string | null; rechnung_art?: string | null; rechnungsdatum?: string | null }
+      return {
+        id: r.id,
+        status: r.status,
+        beleg_typ: x.beleg_typ ?? null,
+        bezug_rechnung_id: x.bezug_rechnung_id ?? null,
+        rechnung_art: x.rechnung_art ?? null,
+        auftrag_id: r.auftrag_id ?? null,
+        datum: String(x.rechnungsdatum || r.created_at),
+        netto: r.netto,
+        kunde_id: r.kunde_id ?? null,
+        kunde_name: k.name,
+        kunde_typ: k.typ,
+        positionen: positionenJeRechnung.get(r.id),
+      }
+    }),
+    stornierteIds
   )
+  const umsatzPostenZ = umsatzPosten.filter((p) => inZeitraum(p.datum, zeitraumRange))
+  const umsatzMonate = buildUmsatzverlauf(umsatzPosten, { range: zeitraumRange, monateCount: 6 })
 
   // Funnel = eine Gruppe: Anfragen aus dem Zeitraum (inkl. abgesagte) → davon mit gesendetem
   // Angebot → davon beauftragt. So ist jede Stufe eine Teilmenge der vorherigen.
@@ -342,9 +386,6 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     auftraege: leadsMitAuftrag.size,
   })
 
-  const rechnungenGewerkZ = rechnungenGewerk.filter((r) =>
-    inZeitraum(String((r as { rechnungsdatum?: string | null }).rechnungsdatum || r.created_at), zeitraumRange)
-  )
   const gewerkeKatalog = (gewerkeKatalogRaw as Array<{ id?: string; name?: string; slug?: string }>).map(
     (g) => ({
       id: String(g.id ?? ''),
@@ -353,17 +394,7 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
     })
   )
 
-  const gewerk = buildGewerkUmsatzAusRechnungen(
-    rechnungenGewerkZ.map((r) => ({
-      positionen: r.positionen,
-      status: r.status,
-      beleg_typ: (r as { beleg_typ?: string | null }).beleg_typ ?? null,
-      bezug_rechnung_id: bezugVon(r),
-      netto: r.netto,
-    })),
-    gewerkeKatalog,
-    stornierteIds
-  )
+  const gewerk = buildGewerkUmsatz(umsatzPostenZ, gewerkeKatalog)
 
   // Handwerker-Ranking aus Zuweisungen (Zeitraum über Auftrag.created_at)
   const hwRows: Parameters<typeof buildHandwerkerRanking>[0] = []
@@ -433,30 +464,17 @@ async function DashboardDataInner({ zeitraumFilter }: { zeitraumFilter: Dashboar
 
   const rankingHandwerker = buildHandwerkerRanking(hwRows.filter((r) => r.auftrag_id || r.angebot_id || r.lead_id))
 
-  // Kunden-Ranking aus derselben Quelle wie der Umsatz (gestellte Rechnungen im Zeitraum)
+  // Kunden-Ranking aus denselben Umsatz-Posten (je Auftrag bzw. direkter Rechnung eine Zeile)
   const kundenRows: Parameters<typeof buildKundenRanking>[0] = []
-  for (const r of rechnungenZ) {
-    if (
-      !istUmsatzRechnung(
-        {
-          status: r.status,
-          beleg_typ: (r as { beleg_typ?: string | null }).beleg_typ ?? null,
-          bezug_rechnung_id: bezugVon(r),
-        },
-        stornierteIds
-      )
-    )
-      continue
-    const kid = (r.kunde_id ?? '').trim()
+  for (const p of umsatzPostenZ) {
+    const kid = (p.kunde_id ?? '').trim()
     if (!kid) continue
-    const k = Array.isArray(r.kunden) ? r.kunden[0] : r.kunden
-    const name = k ? kundeDisplayName(k as never) : 'Kunde'
     kundenRows.push({
       kunde_id: kid,
-      kunde_name: name,
-      kunde_typ: (k as { typ?: string | null } | null)?.typ ?? null,
-      rechnung_id: r.id,
-      rechnung_netto: Number(r.netto) || 0,
+      kunde_name: p.kunde_name || 'Kunde',
+      kunde_typ: p.kunde_typ,
+      rechnung_id: p.id,
+      rechnung_netto: p.netto,
     })
   }
   const rankingKunden = buildKundenRanking(kundenRows)

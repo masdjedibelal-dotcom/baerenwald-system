@@ -258,9 +258,9 @@ function TopRankingCard({
   const uebrigeSumme = uebrige.reduce((s, r) => s + (Number(r.umsatz) || 0), 0)
   const gesamt = alle.reduce((s, r) => s + (Number(r.umsatz) || 0), 0)
   const typen = istKunden ? buildKundenTypAufteilung(kunden ?? []) : []
-  const zaehlLabel = istKunden ? 'Rechnungen' : 'Vorgänge'
+  const zaehlLabel = istKunden ? 'Aufträge' : 'Vorgänge'
   const zaehlText = (n: number) =>
-    istKunden ? `${n} ${n === 1 ? 'Rechnung' : 'Rechnungen'}` : `${n} ${n === 1 ? 'Vorgang' : 'Vorgänge'}`
+    istKunden ? `${n} ${n === 1 ? 'Auftrag' : 'Aufträge'}` : `${n} ${n === 1 ? 'Vorgang' : 'Vorgänge'}`
   const grid = '2rem minmax(8.75rem, 1.5fr) 4.5rem minmax(5.5rem, 0.85fr)'
 
   return (
