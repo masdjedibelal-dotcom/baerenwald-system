@@ -1,5 +1,6 @@
 'use client'
 
+import { funktionAn } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField,MockInput } from '@/components/mock-ui/MockForm'
@@ -75,7 +76,7 @@ export function MeldeLinksCard({
     : `melde-qr-${orgSlug}.png`
 
   useEffect(() => {
-    if (!legalReady) {
+    if (!legalReady || !funktionAn('hvWorkflow')) {
       setQrDataUrl(null)
       return
     }
@@ -180,7 +181,9 @@ export function MeldeLinksCard({
           </p>
         ) : !legalReady ? (
           <p className="text-fs-text leading-relaxed" style={{ color: 'var(--text-3)', margin: 0 }}>
-            Beide Links speichern — danach sind Melde-Link, QR und Aushang verfügbar.
+            {funktionAn('hvWorkflow')
+              ? 'Beide Links speichern — danach sind Melde-Link, QR und Aushang verfügbar.'
+              : 'Beide Links speichern — danach ist der Melde-Link verfügbar.'}
           </p>
         ) : null}
       </div>
@@ -196,6 +199,8 @@ export function MeldeLinksCard({
         </div>
       ) : null}
 
+      {/* QR-Code und Aushang nur mit HV-Ablauf (TEO) — Bärenwald: nur der Link */}
+      {funktionAn('hvWorkflow') ? (
       <div className="objekte-links__actions">
         <MockBtn
           sm
@@ -230,6 +235,7 @@ export function MeldeLinksCard({
           )
         ) : null}
       </div>
+      ) : null}
     </MockCard>
   )
 }
