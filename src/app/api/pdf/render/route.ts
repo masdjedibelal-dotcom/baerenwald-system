@@ -1,17 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { renderHtmlToPdfBuffer } from '@/lib/angebote/render-angebot-html-pdf'
-import { generateBautagebuchVersicherungPdf } from '@/lib/pdf/service/generate-bautagebuch-versicherung-pdf'
-import { generateEigentuemerBerichtPdf } from '@/lib/pdf/service/generate-eigentuemer-bericht-pdf'
 import { generatePartnerDokumentPdf } from '@/lib/pdf/service/generate-partner-dokument-pdf'
-import {
-  generateVersammlungsberichtPdf,
-  type VersammlungsberichtPdfPayload,
-} from '@/lib/pdf/service/generate-versammlungsbericht-pdf'
-import {
-  generateVersicherungsTeilPdf,
-  type VersicherungsTeilPdfInput,
-} from '@/lib/pdf/service/generate-versicherungsakte-portal'
 import { buildAushangHtml } from '@/lib/templates/aushang-template'
 
 export const runtime = 'nodejs'
@@ -135,54 +125,6 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: 'meldeUrl fehlt' }, { status: 400 })
         }
         return pdfResponse(await renderAushang(data))
-      }
-      case 'versammlung': {
-        return pdfResponse(
-          await generateVersammlungsberichtPdf(data as unknown as VersammlungsberichtPdfPayload)
-        )
-      }
-      case 'eigentuemer-bericht': {
-        return pdfResponse(
-          await generateEigentuemerBerichtPdf({
-            orgName: String(data.orgName ?? 'Verwaltung'),
-            objektTitel: String(data.objektTitel ?? 'Objekt'),
-            objektAdresse:
-              data.objektAdresse != null ? String(data.objektAdresse) : undefined,
-            jahr: Number(data.jahr),
-            bruttoGesamt: Number(data.bruttoGesamt ?? 0),
-            nachTraeger: (data.nachTraeger as Record<string, number>) ?? {},
-            anzahlVorgaenge: Number(data.anzahlVorgaenge ?? 0),
-            anzahlRechnungen: Number(data.anzahlRechnungen ?? 0),
-            pruefpflichtenFaellig: Number(data.pruefpflichtenFaellig ?? 0),
-          })
-        )
-      }
-      case 'versicherung-teil': {
-        return pdfResponse(
-          await generateVersicherungsTeilPdf(data as unknown as VersicherungsTeilPdfInput)
-        )
-      }
-      case 'bautagebuch-versicherung': {
-        return pdfResponse(
-          await generateBautagebuchVersicherungPdf({
-            orgName: String(data.orgName ?? 'Verwaltung'),
-            objektTitel: String(data.objektTitel ?? 'Vorgang'),
-            objektAdresse:
-              data.objektAdresse != null ? String(data.objektAdresse) : null,
-            versicherungsNr:
-              data.versicherungsNr != null ? String(data.versicherungsNr) : null,
-            schadenNr: data.schadenNr != null ? String(data.schadenNr) : null,
-            eintraege: Array.isArray(data.eintraege)
-              ? (data.eintraege as Array<{
-                  datum: string
-                  titel: string
-                  text: string
-                  fotoCount: number
-                  typ?: string | null
-                }>)
-              : [],
-          })
-        )
       }
       case 'partner-dokument': {
         return pdfResponse(

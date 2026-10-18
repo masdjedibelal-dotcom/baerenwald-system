@@ -16,7 +16,6 @@ import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/components/org/FreigabeSettingsCard'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
-import { VersammlungsberichtDialog } from '@/components/objektakte/VersammlungsberichtDialog'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
@@ -66,7 +65,6 @@ export function ObjektAkteDetailClient({
   gewerke?: Gewerk[]
 }) {
   const [tab, setTab] = useState<ObjektAkteTab>('uebersicht')
-  const [berichtOpen, setBerichtOpen] = useState(false)
   const [objektModalOpen, setObjektModalOpen] = useState(false)
   const [freigabeErben, setFreigabeErben] = useState(() => objektErbtFreigabe(objekt))
   const [objektState, setObjektState] = useState(objekt)
@@ -136,7 +134,6 @@ export function ObjektAkteDetailClient({
 
   const overview = (
     <div className="space-y-4">
-      {/* Kennzahlen und Versammlungsbericht entfallen (Entlastung 01.10.2026) */}
       <MockCard
         title="Objektdaten"
         actions={
@@ -286,12 +283,6 @@ export function ObjektAkteDetailClient({
         groups={detailShellGroups}
         value={tab}
         onChange={(id) => setTab(id as ObjektAkteTab)}
-      />
-      <VersammlungsberichtDialog
-        open={berichtOpen}
-        onClose={() => setBerichtOpen(false)}
-        objektId={objektState.id}
-        kundeId={kunde.id}
       />
       <KundenObjektModal
         open={objektModalOpen}
