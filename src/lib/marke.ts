@@ -49,9 +49,9 @@ type Marke = {
   }
   /** Theme-Farbe Browser/PWA */
   themeColor: string
-  /** Website/Portal-Repo: Marketing-Seiten (Startseite, Leistungen, Ratgeber, Rechner …) an? Aus → Start = Portal */
+  /** Website/Portal-Repo: volle Marketing-Seiten (Leistungen, Ratgeber, Galerie …)? Aus (TEO) → eigene Startseite + Rechner + Rechtstexte, Rest → Portal */
   marketingSeite: boolean
-  /** Rechtstexte (absolut oder Pfad) */
+  /** Rechtstexte (absolut oder Pfad auf der Website/Portal-Domain) */
   recht: { impressum: string; datenschutz: string; agb: string }
   funktionen: Record<MarkeFunktion, boolean>
 }
@@ -110,11 +110,7 @@ const MARKEN: Record<MarkeId, Marke> = {
     },
     themeColor: '#0b1f3a',
     marketingSeite: false,
-    recht: {
-      impressum: 'https://servus-teo.de/impressum',
-      datenschutz: 'https://servus-teo.de/datenschutz',
-      agb: 'https://servus-teo.de/agb',
-    },
+    recht: { impressum: '/impressum', datenschutz: '/datenschutz', agb: '/agb' },
     funktionen: { hvRollen: false },
   },
 }
