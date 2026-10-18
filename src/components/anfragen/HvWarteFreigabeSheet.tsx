@@ -18,9 +18,7 @@ type Props = {
 
 const HV_STATUS_LABEL: Record<string, string> = {
   neu: 'Neu — wartet auf HV-Entscheidung',
-  hm_pruefung: 'Hausmeister prüft vor Ort',
   angebot_eingefordert: 'Angebot eingefordert — BW kann disponieren',
-  kleinreparatur: 'Kleinreparatur (Mieter-Weg)',
   abgelehnt: 'Abgelehnt durch HV',
   notmassnahme: 'Notmaßnahme',
 }
@@ -73,13 +71,7 @@ export function HvWarteFreigabeSheet({
               auf <em>angebot_eingefordert</em>; danach erscheint im CRM „Angebot erstellen“.
             </li>
             <li>
-              <strong>Hausmeister begutachten</strong> (<code>hm_begutachten</code>) — Status{' '}
-              <em>hm_pruefung</em>; nach Befund durch HM oder Override durch HV → ebenfalls{' '}
-              <em>angebot_eingefordert</em>.
-            </li>
-            <li>
-              Optional: <strong>Kleinreparatur</strong> oder <strong>Ablehnen</strong> (nur aus{' '}
-              <em>neu</em>).
+              Optional: <strong>Ablehnen</strong> (nur aus <em>neu</em>).
             </li>
           </ol>
         </div>

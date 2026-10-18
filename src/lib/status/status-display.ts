@@ -66,12 +66,7 @@ export function anfrageStatusDisplay(
     hvMeldungStatus?: string | null
   }
 ): StatusDisplay {
-  const hv = String(opts?.hvMeldungStatus ?? '')
-    .trim()
-    .toLowerCase()
-  if (hv === 'hm_erledigt') {
-    return { label: 'Vom Hausmeister erledigt', variant: 'success' }
-  }
+  void opts?.hvMeldungStatus
   void opts?.orgFreigabeStatus
   const key = String(status ?? '')
     .trim()

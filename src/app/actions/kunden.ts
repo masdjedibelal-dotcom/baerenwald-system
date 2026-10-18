@@ -73,7 +73,6 @@ function applyHausverwaltungDefaults(
     // Explizit true: Akut/Notfall → Direktauftrag (kein NULL-Drift mit „unset = an“)
     payload.notfall_direkt = true
     payload.akut_fall_ids = []
-    payload.kleinreparaturen_ohne_angebot = false
     const n = typeof payload.name === 'string' ? payload.name.trim() : ''
     if (n && !String(payload.org_anzeigename ?? '').trim()) {
       payload.org_anzeigename = n

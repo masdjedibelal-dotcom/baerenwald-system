@@ -195,7 +195,7 @@ export async function syncPortalLeadStatusAfterAuftragChange(input: {
       updated_at: new Date().toISOString(),
     }
     const prevHv = (lead.hv_meldung_status as string | null)?.trim()
-    if (patch.clearHv && (prevHv === 'abgeschlossen' || prevHv === 'hm_erledigt' || !prevHv)) {
+    if (patch.clearHv && (prevHv === 'abgeschlossen' || !prevHv)) {
       update.hv_meldung_status = null
     } else if (event === 'auftrag_abgeschlossen' || event === 'auftrag_storniert' || prevHv) {
       if (patch.hv_meldung_status) update.hv_meldung_status = patch.hv_meldung_status

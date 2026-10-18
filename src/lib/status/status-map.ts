@@ -39,7 +39,6 @@ export const ANFRAGE_STATUS_MAP = {
   angebot: { label: 'Neu' },
   auftrag: { label: 'Beauftragt' },
   abgeschlossen: { label: 'Beauftragt' },
-  hm_erledigt: { label: 'Erledigt' },
   abgebrochen: { label: 'Abgesagt' },
   storniert: { label: 'Abgesagt' },
 } as const satisfies Record<string, StatusMapEntry>
@@ -151,7 +150,7 @@ export function unterstatusLabelFromMap(
 }
 
 export const PHASE_UNTERSTATUS_VALUES: Record<VorgangPhaseKey, readonly string[]> = {
-  anfrage: ['neu', 'kontaktiert', 'termin', 'abgebrochen', 'storniert', 'hm_erledigt', 'abgeschlossen'],
+  anfrage: ['neu', 'kontaktiert', 'termin', 'abgebrochen', 'storniert', 'abgeschlossen'],
   angebot: [
     'entwurf',
     'gesendet_handwerker',

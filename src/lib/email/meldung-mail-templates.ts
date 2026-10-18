@@ -243,14 +243,10 @@ export function mailOrgNotfallDirektInfo(
   }
 }
 
-/** HV hat bereits freigegeben / Hausmeister / Direkt beauftragt — keine Info-Direktauftrag-Mail. */
+/** HV hat bereits freigegeben — keine Info-Direktauftrag-Mail. */
 export function hvHatBereitsMeldungGewaehlt(hvMeldungStatus: string | null | undefined): boolean {
   const s = (hvMeldungStatus ?? '').trim().toLowerCase()
-  return (
-    s === 'angebot_eingefordert' ||
-    s === 'hm_pruefung' ||
-    s === 'kleinreparatur'
-  )
+  return s === 'angebot_eingefordert'
 }
 
 export function mailOrgFreigabeErgebnis(

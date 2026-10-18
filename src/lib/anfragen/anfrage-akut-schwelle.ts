@@ -38,8 +38,7 @@ export function leadWartetAufHvStartFreigabe(lead: AkutSchwelleLeadSlice): boole
   if (!leadIstMieterMeldung(lead)) return false
   if (leadIstAkut(lead)) return false
   const st = (lead.hv_meldung_status ?? 'neu').trim().toLowerCase()
-  // Auch während Hausmeister-Prüfung: BW darf nicht disponieren
-  return st === 'neu' || st === '' || st === 'hm_pruefung'
+  return st === 'neu' || st === ''
 }
 
 /** Effektive Schwelle / Notfall-Direkt: Objekt überschreibt Org (NULL = erben). */

@@ -17,7 +17,6 @@ export type SaveKundeOrganisationInput = {
   freigabe_modus: FreigabeModus
   freigabe_schwelle_eur?: number | null
   notfall_direkt: boolean
-  kleinreparaturen_ohne_angebot?: boolean
 }
 
 function parseSchwelle(raw: number | null | undefined): number | null {
@@ -114,27 +113,12 @@ export async function saveKundeOrganisation(
     freigabe_modus: freigabeModus,
     freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
     notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
-    kleinreparaturen_ohne_angebot: Boolean(input.kleinreparaturen_ohne_angebot),
   }
   if (impressumUrl !== undefined) payload.impressum_url = impressumUrl
   if (datenschutzUrl !== undefined) payload.datenschutz_url = datenschutzUrl
 
   const { error } = await (() => { const db = createClient(); return db.from('kunden').update(payload).eq('id', id) })()
-  if (error) {
-    // Migration ggf. noch nicht angewendet — ohne neues Flag erneut speichern
-    const msg = error.message ?? ''
-    if (
-      input.kleinreparaturen_ohne_angebot != null &&
-      (msg.includes('kleinreparaturen_ohne_angebot') || msg.includes('PGRST204'))
-    ) {
-      const { kleinreparaturen_ohne_angebot: _drop, ...ohneFlag } = payload
-      void _drop
-      const retry = await (() => { const db = createClient(); return db.from('kunden').update(ohneFlag).eq('id', id) })()
-      if (retry.error) return { ok: false, message: retry.error.message }
-    } else {
-      return { ok: false, message: error.message }
-    }
-  }
+  if (error) return { ok: false, message: error.message }
 
   revalidateKundeDetail(id)
   return { ok: true }

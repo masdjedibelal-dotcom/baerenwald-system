@@ -28,11 +28,11 @@ export function vorgangStatusKind(row: VorgangListeRow): string {
   ) {
     return 'storniert'
   }
-  if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen' || u === 'hm_erledigt') {
+  if (u === 'bezahlt' || u === 'abgeschlossen' || u === 'angenommen') {
     return 'fertig'
   }
   // Anfrage kennt nur „Neu“ — eine Farbe, egal ob kontaktiert/Termin
-  if (row.phase === 'anfrage' && u !== 'hm_erledigt') return 'neu'
+  if (row.phase === 'anfrage') return 'neu'
   if (u === 'neu' || u === 'entwurf' || u === 'offen') return 'neu'
   if (u === 'gesendet') return 'warten'
   return 'aktiv'

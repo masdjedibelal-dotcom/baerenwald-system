@@ -533,8 +533,6 @@ export function AnfrageDetailClient({
   const matrixCta = primaryCta('anfrage', lead.status)
   const istAkut = leadIstAkut(lead)
   const wartetAufHvFreigabe = leadWartetAufHvStartFreigabe(lead)
-  const hmSelbstErledigt =
-    String(lead.hv_meldung_status ?? '').trim().toLowerCase() === 'hm_erledigt'
   const hatAuftrag = Boolean(leadStatusData.auftrag_id)
 
   const openHvWarteHinweis = useCallback(() => {
@@ -569,7 +567,6 @@ export function AnfrageDetailClient({
   }, [matrixCta, openAngebotErstellen, openHvWarteHinweis, wartetAufHvFreigabe])
 
   const detailPrimary = useMemo(() => {
-    if (hmSelbstErledigt) return null
     if (hatAuftrag) return null
     if (istAkut) {
       return {
@@ -588,7 +585,6 @@ export function AnfrageDetailClient({
       disabled: pending,
     }
   }, [
-    hmSelbstErledigt,
     hatAuftrag,
     istAkut,
     wartetAufHvFreigabe,
@@ -605,7 +601,6 @@ export function AnfrageDetailClient({
 
   // Aktionsmodell: „Ohne Angebot beauftragen“ steht im „…“, nicht als zweiter Knopf.
   const kannOhneAngebotBeauftragen =
-    !hmSelbstErledigt &&
     !hatAuftrag &&
     !istAkut &&
     !wartetAufHvFreigabe &&
@@ -833,9 +828,7 @@ export function AnfrageDetailClient({
       phase="anfrage"
       rows={leistungRows}
       onOpenDokument={
-        hmSelbstErledigt
-          ? undefined
-          : istAkut
+        istAkut
           ? openDirektBeauftragen
           : wartetAufHvFreigabe
             ? () =>

@@ -135,17 +135,12 @@ function leadAnfrageUnterstatus(
   hvMeldungStatus?: string | null
 ): string {
   if (forceStorniert) return 'storniert'
-  const hv = String(hvMeldungStatus ?? '')
-    .trim()
-    .toLowerCase()
-  // HM selbst erledigt — auch wenn lead.status noch „neu“ (Alt-/Inkonsistenz)
-  if (hv === 'hm_erledigt') return 'hm_erledigt'
-
+  void hvMeldungStatus
   const s = leadStatus.trim().toLowerCase()
   if (s === 'neu' || s === 'kontaktiert' || s === 'termin' || s === 'abgebrochen') return s
   // Lead schon weiter (Angebot/Auftrag/…) — nicht als offene Anfrage „Neu“ anzeigen
-  if (s === 'angebot' || s === 'auftrag' || s === 'abgeschlossen' || s === 'hm_erledigt') {
-    return s === 'hm_erledigt' ? 'hm_erledigt' : 'abgeschlossen'
+  if (s === 'angebot' || s === 'auftrag' || s === 'abgeschlossen') {
+    return 'abgeschlossen'
   }
   return 'neu'
 }

@@ -124,7 +124,6 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         freigabe_modus: freigabeModus,
         freigabe_schwelle_eur: schwelleNum,
         notfall_direkt: notfallDirekt,
-        kleinreparaturen_ohne_angebot: false,
       })
       if (!r.ok) {
         setErr(r.message)

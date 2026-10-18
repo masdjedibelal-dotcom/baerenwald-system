@@ -18,7 +18,6 @@ export const LEAD_WRITE_STATUSES = [
   'auftrag',
   'abgeschlossen',
   'abgebrochen',
-  'hm_erledigt',
   'storniert',
 ] as const
 

@@ -119,8 +119,6 @@ export type Kunde = {
   notfall_direkt?: boolean | null
   /** HV: Whitelist Sofortmaßnahme-Fall-IDs; leer = nichts geht direkt */
   akut_fall_ids?: string[] | null
-  /** HV: Kleinreparaturen bis Schwelle ohne vorheriges Angebot */
-  kleinreparaturen_ohne_angebot?: boolean | null
   /** HV: neue Meldungen (nicht akut) automatisch in HM-Prüfung */
   hm_auto_zuweisen?: boolean | null
   /** Spam: kein Rechner, kein Portal-Login/-Register mit dieser E-Mail */

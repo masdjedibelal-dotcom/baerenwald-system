@@ -104,7 +104,7 @@ export async function notifyInterneNeueMeldung(
   const pushTitle = istAkut ? 'Akut — Direkt beauftragen' : 'Angebot erstellen'
   const pushBody = istAkut
     ? `${melderName} · ${objektTitel} — Sofortmaßnahme, Direktauftrag möglich.`
-    : hvStatus === 'angebot_eingefordert' || hvStatus === 'kleinreparatur'
+    : hvStatus === 'angebot_eingefordert'
       ? `${melderName} · ${objektTitel} — HV hat freigegeben.`
       : `${melderName} · ${objektTitel}`
   const subject = `${pushTitle} — ${objektTitel}`
