@@ -70,13 +70,11 @@ const STRIP_ALWAYS = new Set([
   'cover_url',
   'logo_url',
   'org_logo_url',
-  'org_hero_url',
   'abnahme_protokoll_url',
   'abschlussdokumentation_url',
   'versicherungsakte_pdf_url',
   'datei_url',
   'datei_urls',
-  'av_text_snapshot',
   'mail_einleitung',
   'mail_betreff',
 ])
@@ -385,8 +383,6 @@ function anonymizeKunde(row) {
         ? prodsimEmail(`mieter:${id}`)
         : row.mieter_kontakt_email,
       mieter_kontakt_hinweis: scrubFreeText(row.mieter_kontakt_hinweis, `mieterh:${id}`, 60),
-      av_akzeptiert_von: null,
-      wl_ansprache_am: row.wl_ansprache_am,
     })
   )
 }

@@ -134,28 +134,14 @@ const KUNDE_DETAIL_RELATIONS = `
       )
     `
 
-const KUNDE_DETAIL_SELECT_BASE = `
-      id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
-      notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
-      gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
-      ${KUNDE_DETAIL_RELATIONS}
-    `
-
 const KUNDE_ORG_FIELDS = `
       portal_modus, org_kennung, org_anzeigename, org_logo_url,
       impressum_url, datenschutz_url,
-      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, akut_fall_ids, hm_auto_zuweisen,
-      kleinreparaturen_ohne_angebot,
+      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, akut_fall_ids,
       ist_spam, spam_markiert_am,
     `
 
-const KUNDE_ORG_FIELDS_WITHOUT_KLEINREPARATUREN = `
-      portal_modus, org_kennung, org_anzeigename, org_logo_url,
-      impressum_url, datenschutz_url,
-      freigabe_modus, freigabe_schwelle_eur, notfall_direkt, akut_fall_ids, hm_auto_zuweisen,
-      ist_spam, spam_markiert_am,
-    `
-
+/** Ein Select — alle Datenbanken (BW/TEO, Staging/Prod) haben dieselbe Struktur. */
 const KUNDE_DETAIL_SELECT = `
       id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
       notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
@@ -164,79 +150,15 @@ const KUNDE_DETAIL_SELECT = `
       ${KUNDE_DETAIL_RELATIONS}
     `
 
-const KUNDE_DETAIL_SELECT_WITHOUT_KLEINREPARATUREN = `
-      id, name, vorname, nachname, email, telefon, adresse, strasse, hausnummer, plz, ort, typ,
-      notizen, created_at, updated_at, ansprechpartner, webseite, geburtstag, kundennummer, quelle,
-      gesamt_umsatz, letzte_aktivitaet, ust_id, auth_user_id,
-      ${KUNDE_ORG_FIELDS_WITHOUT_KLEINREPARATUREN}
-      ${KUNDE_DETAIL_RELATIONS}
-    `
-
-function isMissingKundeColumnError(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false
-  const msg = (error.message ?? '').toLowerCase()
-  return (
-    error.code === '42703' ||
-    error.code === 'PGRST204' ||
-    msg.includes('does not exist') ||
-    msg.includes('could not find') ||
-    (msg.includes('column') && msg.includes('schema cache'))
-  )
-}
-
 async function fetchKundeDetailRow(
   id: string
 ): Promise<{ data: KundeDetailPayload | null; error: { message: string } | null }> {
-  const full = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_DETAIL_SELECT).eq('id', id).maybeSingle() })()
-  if (!full.error) {
-    return { data: (full.data as KundeDetailPayload | null) ?? null, error: null }
+  const { data, error } = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_DETAIL_SELECT).eq('id', id).maybeSingle() })()
+  if (error) {
+    logDbError('lib/kunden/load-kunde-detail:kunden', error)
+    return { data: null, error: { message: error.message } }
   }
-
-  if (isMissingKundeColumnError(full.error)) {
-    const msg = (full.error.message ?? '').toLowerCase()
-    if (msg.includes('hm_auto_zuweisen') || msg.includes('akut_fall_ids')) {
-      console.warn(
-        '[loadKundeDetail] Spalte hm_auto_zuweisen/akut_fall_ids fehlt — Fallback:',
-        full.error.message
-      )
-      let withoutOptional = KUNDE_DETAIL_SELECT
-      if (msg.includes('hm_auto_zuweisen')) {
-        withoutOptional = withoutOptional.replace(/,?\s*hm_auto_zuweisen/g, '')
-      }
-      if (msg.includes('akut_fall_ids')) {
-        withoutOptional = withoutOptional.replace(/,?\s*akut_fall_ids/g, '')
-      }
-      const midHm = await (() => { const db = createClient(); return db.from('kunden').select(withoutOptional).eq('id', id).maybeSingle() })()
-      if (!midHm.error) {
-        return { data: (midHm.data as KundeDetailPayload | null) ?? null, error: null }
-      }
-    }
-    if (msg.includes('kleinreparaturen_ohne_angebot')) {
-      console.warn(
-        '[loadKundeDetail] Spalte kleinreparaturen_ohne_angebot fehlt — Fallback ohne Flag:',
-        full.error.message
-      )
-      const mid = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_DETAIL_SELECT_WITHOUT_KLEINREPARATUREN).eq('id', id).maybeSingle() })()
-      if (!mid.error) {
-        return { data: (mid.data as KundeDetailPayload | null) ?? null, error: null }
-      }
-      if (!isMissingKundeColumnError(mid.error)) {
-        return { data: null, error: { message: mid.error.message } }
-      }
-    }
-
-    console.warn(
-      '[loadKundeDetail] Optionale Spalten fehlen — Fallback ohne Org-Portal-Felder:',
-      full.error.message
-    )
-    const fallback = await (() => { const db = createClient(); return db.from('kunden').select(KUNDE_DETAIL_SELECT_BASE).eq('id', id).maybeSingle() })()
-    return {
-      data: (fallback.data as KundeDetailPayload | null) ?? null,
-      error: fallback.error ? { message: fallback.error.message } : null,
-    }
-  }
-
-  return { data: null, error: { message: full.error.message } }
+  return { data: (data as KundeDetailPayload | null) ?? null, error: null }
 }
 
 export async function loadKundeDetail(id: string): Promise<KundeDetailPayload | null> {

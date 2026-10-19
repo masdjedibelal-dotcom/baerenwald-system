@@ -120,7 +120,6 @@ export type Kunde = {
   /** HV: Whitelist Sofortmaßnahme-Fall-IDs; leer = nichts geht direkt */
   akut_fall_ids?: string[] | null
   /** HV: neue Meldungen (nicht akut) automatisch in HM-Prüfung */
-  hm_auto_zuweisen?: boolean | null
   /** Spam: kein Rechner, kein Portal-Login/-Register mit dieser E-Mail */
   ist_spam?: boolean | null
   spam_markiert_am?: string | null
