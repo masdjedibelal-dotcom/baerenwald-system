@@ -626,20 +626,6 @@ export async function createAnfrage(
   }
 
   const objektId = payload.kunde_objekt_id?.trim() || null
-  if (istHausverwaltung && hvAuftraggeberId && objektId && melderName) {
-    try {
-      const { createObjektMieter } = await import('@/app/actions/objektakte-actions')
-      const bew = await createObjektMieter(hvAuftraggeberId, objektId, {
-        name: melderName,
-        email: melderEmail,
-        telefon: melderTelefon,
-      })
-      if (!bew.ok) console.warn('createAnfrage createObjektMieter:', bew.message)
-    } catch (e) {
-      console.warn('createAnfrage createObjektMieter:', e)
-    }
-  }
-
   const isHvMeldung = istHausverwaltung && Boolean(hvAuftraggeberId)
 
   const { data: leadRow, error: leadErr } = await supabase
