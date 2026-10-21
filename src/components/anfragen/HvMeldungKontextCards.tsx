@@ -149,7 +149,6 @@ export function HvMeldungKontextCards({
         melder_telefon: draft.melder_telefon || null,
         melder_einheit: draft.melder_einheit || null,
         kunde_objekt_id: draft.kunde_objekt_id,
-        objekt_anlage_id: draft.objekt_anlage_id,
         angebotId: angebotId ?? null,
       })
       if (!r.ok) {

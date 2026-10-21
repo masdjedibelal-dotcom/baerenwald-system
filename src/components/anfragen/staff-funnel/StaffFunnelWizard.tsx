@@ -154,7 +154,6 @@ const MIETER_OBJEKT_CLEAR = {
   mieterTelefon: '',
   mieterKundeId: null as string | null,
   kundeObjektId: null as string | null,
-  objektAnlageId: null as string | null,
   objektPlz: '',
   objektOrt: '',
   objektStrasse: '',
@@ -202,7 +201,6 @@ function HvMieterObjektFields({
     if (!id) {
       patch({
         kundeObjektId: null,
-        objektAnlageId: null,
         objektStrasse: '',
         objektHausnummer: '',
         objektPlz: '',
@@ -212,12 +210,11 @@ function HvMieterObjektFields({
     }
     const o = objekte.find((x) => x.id === id)
     if (!o) {
-      patch({ kundeObjektId: id, objektAnlageId: null })
+      patch({ kundeObjektId: id })
       return
     }
     patch({
       kundeObjektId: o.id,
-      objektAnlageId: null,
       objektStrasse: o.strasse ?? '',
       objektHausnummer: o.hausnummer ?? '',
       objektPlz: o.plz ?? '',

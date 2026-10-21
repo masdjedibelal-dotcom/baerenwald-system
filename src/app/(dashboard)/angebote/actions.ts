@@ -372,7 +372,6 @@ export type CreateAngebotInput = {
   wichtige_hinweise?: string | null
   kunde_objekt_id?: string | null
   /** Anlage/Teil am Ausführungsort — mit Lead durch Pipeline mitgeführt. */
-  objekt_anlage_id?: string | null
   /** Optionaler Ansprechpartner (Versand / Anrede / PDF z. Hd.) */
   ansprechpartner_id?: string | null
   /** Notizen pro gewerk_id für angebot_handwerker.aufgabe_notiz */
@@ -512,7 +511,6 @@ export async function createAngebot(
       varianten: input.varianten ?? null,
       wichtige_hinweise: input.wichtige_hinweise?.trim() || null,
       kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
-      objekt_anlage_id: input.objekt_anlage_id?.trim() || null,
       ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
       ist_wiederkehrend: input.ist_wiederkehrend === true,
       wiederkehr_turnus:
@@ -758,9 +756,6 @@ export async function updateAngebot(
       ...(input.zahlungsplan !== undefined ? { zahlungsplan: input.zahlungsplan } : {}),
       ...(input.kunde_objekt_id !== undefined
         ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
-        : {}),
-      ...(input.objekt_anlage_id !== undefined
-        ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
         : {}),
       ...(input.ansprechpartner_id !== undefined
         ? { ansprechpartner_id: input.ansprechpartner_id?.trim() || null }

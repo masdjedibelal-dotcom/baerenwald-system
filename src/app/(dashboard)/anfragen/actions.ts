@@ -251,7 +251,6 @@ export type NeueAnfragePayload = {
   /** HV: Gebäude/Objekt der Meldung */
   kunde_objekt_id?: string | null
   /** HV: Anlage/Teil am Objekt */
-  objekt_anlage_id?: string | null
   /** HV: Mieter-/Meldername (Vor- + Nachname) */
   melder_name?: string | null
   melder_email?: string | null
@@ -307,7 +306,7 @@ export type MieterSuchTreffer = {
   name: string
   email: string | null
   telefon: string | null
-  quelle: 'kunde' | 'bewohner'
+  quelle: 'kunde'
 }
 
 /** Mieter-Suche für HV-Anfrage: Privatkunden + Bewohner an HV-Objekten. */
@@ -322,18 +321,15 @@ export async function searchMieterFuerHv(
   const pattern = `%${esc}%`
   const supabase = createClient()
 
-  const [{ data: kunden }, { data: objekte }] = await Promise.all([
-    supabase
-      .from('kunden')
-      .select('id, name, vorname, nachname, email, telefon, portal_modus')
-      .eq('typ', 'privat')
-      .or(
-        `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},email.ilike.${pattern}`
-      )
-      .order('nachname')
-      .limit(10),
-    supabase.from('kunden_objekte').select('id').eq('kunde_id', hv).limit(80),
-  ])
+  const { data: kunden } = await supabase
+    .from('kunden')
+    .select('id, name, vorname, nachname, email, telefon, portal_modus')
+    .eq('typ', 'privat')
+    .or(
+      `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},email.ilike.${pattern}`
+    )
+    .order('nachname')
+    .limit(10)
   const out: MieterSuchTreffer[] = []
   const seen = new Set<string>()
 
@@ -356,49 +352,6 @@ export async function searchMieterFuerHv(
       telefon: (k.telefon as string | null) ?? null,
       quelle: 'kunde',
     })
-  }
-
-  const objektIds = (objekte ?? []).map((o) => o.id as string).filter(Boolean)
-  if (objektIds.length) {
-    const { data: einheiten, error } = await supabase
-      .from('objekt_einheiten')
-      .select('id')
-      .in('kunde_objekt_id', objektIds)
-      .eq('aktiv', true)
-    if (error) logDbError('app/anfragen/actions:objekt_einheiten', error)
-    const einheitIds = (einheiten ?? []).map((e) => e.id as string).filter(Boolean)
-    if (einheitIds.length) {
-      const { data: bewohner, error } = await supabase
-        .from('einheit_bewohner')
-        .select('id, name, email, telefon')
-        .eq('kunde_id', hv)
-        .in('objekt_einheit_id', einheitIds)
-        .eq('aktiv', true)
-        .is('anonymisiert_am', null)
-        .ilike('name', pattern)
-        .limit(10)
-      if (error) logDbError('app/anfragen/actions:einheit_bewohner', error)
-      for (const b of bewohner ?? []) {
-        const key = `bew:${b.id}`
-        if (seen.has(key)) continue
-        const full = String(b.name ?? '').trim()
-        if (!full) continue
-        // Skip if already matched as kunde by same email
-        const mail = (b.email as string | null)?.trim().toLowerCase()
-        if (mail && out.some((x) => x.email?.trim().toLowerCase() === mail)) continue
-        seen.add(key)
-        const parts = full.split(/\s+/).filter(Boolean)
-        out.push({
-          id: key,
-          vorname: parts[0] ?? null,
-          nachname: parts.slice(1).join(' ') || null,
-          name: full,
-          email: (b.email as string | null) ?? null,
-          telefon: (b.telefon as string | null) ?? null,
-          quelle: 'bewohner',
-        })
-      }
-    }
   }
 
   return out.slice(0, 12)
@@ -635,7 +588,6 @@ export async function createAnfrage(
       ansprechpartner_id: ansprechpartnerId,
       auftraggeber_kunde_id: hvAuftraggeberId,
       kunde_objekt_id: objektId,
-      objekt_anlage_id: payload.objekt_anlage_id?.trim() || null,
       melder_name: melderName,
       melder_email: melderEmail,
       melder_telefon: melderTelefon,
@@ -929,7 +881,6 @@ export async function updateLeadMelderUndLeistungsort(
     melder_telefon?: string | null
     melder_einheit?: string | null
     kunde_objekt_id?: string | null
-    objekt_anlage_id?: string | null
     /** Optional: Angebot mit gleichem Objekt synchronisieren */
     angebotId?: string | null
   }
@@ -942,10 +893,6 @@ export async function updateLeadMelderUndLeistungsort(
     data.kunde_objekt_id === undefined
       ? undefined
       : data.kunde_objekt_id?.trim() || null
-  const anlageId =
-    data.objekt_anlage_id === undefined
-      ? undefined
-      : data.objekt_anlage_id?.trim() || null
 
   const patch: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -959,7 +906,6 @@ export async function updateLeadMelderUndLeistungsort(
     patch.melder_einheit = data.melder_einheit?.trim() || null
   }
   if (objektId !== undefined) patch.kunde_objekt_id = objektId
-  if (anlageId !== undefined) patch.objekt_anlage_id = anlageId
 
   // HV-Pipeline sicherstellen, falls Lead aus CRM-FAB ohne Auftraggeber kam
   const { data: leadRow, error } = await supabase
@@ -1028,10 +974,6 @@ export async function updateLeadMelderUndLeistungsort(
   let syncAngebot = false
   if (objektId !== undefined) {
     angebotPatch.kunde_objekt_id = objektId
-    syncAngebot = true
-  }
-  if (anlageId !== undefined) {
-    angebotPatch.objekt_anlage_id = anlageId
     syncAngebot = true
   }
   if (angebotId && syncAngebot) {

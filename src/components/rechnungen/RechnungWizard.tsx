@@ -168,9 +168,6 @@ export function RechnungWizard({
   const [kundeObjektId, setKundeObjektId] = useState<string | null>(
     () => bootstrap.kundeObjektId?.trim() || null
   )
-  const [objektAnlageId, setObjektAnlageId] = useState<string | null>(
-    () => bootstrap.objektAnlageId?.trim() || null
-  )
   const [apRows, setApRows] = useState<KundeAnsprechpartner[]>([])
   const [hvObjekte, setHvObjekte] = useState<KundenObjekt[]>([])
   const [objektNeuOpen, setObjektNeuOpen] = useState(false)
@@ -182,7 +179,6 @@ export function RechnungWizard({
     melder_email: '',
     melder_einheit: '',
     kunde_objekt_id: kundeObjektId,
-    objekt_anlage_id: objektAnlageId,
   }
   const gewaehltesObjekt =
     (kundeObjektId ? hvObjekte.find((o) => o.id === kundeObjektId) : null) ?? null
@@ -599,7 +595,6 @@ export function RechnungWizard({
         zahlfristDatum,
         ansprechpartnerId,
         kundeObjektId,
-        objektAnlageId,
       }),
     [
       zeilen,
@@ -613,7 +608,6 @@ export function RechnungWizard({
       zahlfristDatum,
       ansprechpartnerId,
       kundeObjektId,
-      objektAnlageId,
     ]
   )
   useEffect(() => {
@@ -692,7 +686,6 @@ export function RechnungWizard({
           kunde_id: kundeId,
           ansprechpartner_id: ansprechpartnerId,
           kunde_objekt_id: kundeObjektId,
-          objekt_anlage_id: objektAnlageId,
           positionen: positionenBerechnet,
           meta: nextMeta,
           modus: planAktiv || (hatAuftrag && rechnungsart === 'abschlag') ? 'abschlag' : 'voll',
@@ -752,7 +745,6 @@ export function RechnungWizard({
       kundeId,
       ansprechpartnerId,
       kundeObjektId,
-      objektAnlageId,
       rechnungId,
       bootstrap.auftragId,
       bootstrap.angebotId,
@@ -812,7 +804,6 @@ export function RechnungWizard({
         kunde_id: kundeId,
         ansprechpartner_id: ansprechpartnerId,
         kunde_objekt_id: kundeObjektId,
-        objekt_anlage_id: objektAnlageId,
         positionen: positionenBerechnet,
         meta: nextMeta,
         zahlungsplan: plan,
@@ -850,7 +841,6 @@ export function RechnungWizard({
     kundeId,
     ansprechpartnerId,
     kundeObjektId,
-    objektAnlageId,
     planOk,
     plan,
     positionenBerechnet,
@@ -974,7 +964,6 @@ export function RechnungWizard({
         kunde_id: kundeId,
         ansprechpartner_id: ansprechpartnerId,
         kunde_objekt_id: kundeObjektId,
-        objekt_anlage_id: objektAnlageId,
         meta: nextMeta,
       })
       if (!sync?.ok) {
@@ -1531,13 +1520,6 @@ export function RechnungWizard({
               onChange={(patch) => {
                 if (patch.kunde_objekt_id !== undefined) {
                   setKundeObjektId(patch.kunde_objekt_id)
-                  if (patch.objekt_anlage_id === undefined) {
-                    setObjektAnlageId(null)
-                  }
-                  setDraftDirty(true)
-                }
-                if (patch.objekt_anlage_id !== undefined) {
-                  setObjektAnlageId(patch.objekt_anlage_id)
                   setDraftDirty(true)
                 }
               }}
@@ -1572,7 +1554,6 @@ export function RechnungWizard({
               return [...prev, objekt]
             })
             setKundeObjektId(objekt.id)
-            setObjektAnlageId(null)
             setDraftDirty(true)
             setObjektNeuOpen(false)
           }}

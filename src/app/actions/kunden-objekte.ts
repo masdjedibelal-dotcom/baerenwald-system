@@ -54,76 +54,6 @@ export async function fetchKundenObjekte(kundeId: string): Promise<KundenObjekt[
   return (data ?? []) as KundenObjekt[]
 }
 
-export type KundenObjektListenStats = {
-  /** @deprecated Alias für mieterTotal — UI zeigt Mieter */
-  einheitenTotal: number
-  einheitenVermietet: number
-  mieterTotal: number
-}
-
-/** Mieter-/Einheiten-Zähler für Objekte-Liste. */
-export async function fetchKundenObjektListenStats(
-  kundeId: string,
-  objektIds: string[]
-): Promise<Record<string, KundenObjektListenStats>> {
-  const kid = kundeId?.trim()
-  const ids = objektIds.map((x) => x.trim()).filter(Boolean)
-  if (!kid || ids.length === 0) return {}
-
-  const supabase = createClient()
-  const { data: owned, error } = await supabase
-    .from('kunden_objekte')
-    .select('id')
-    .eq('kunde_id', kid)
-    .in('id', ids)
-  if (error) logDbError('app/actions/kunden-objekte:kunden_objekte', error)
-  const allowed = new Set((owned ?? []).map((r) => r.id as string))
-  if (allowed.size === 0) return {}
-
-  const { data: einheiten, error: error2 } = await supabase
-    .from('objekt_einheiten')
-    .select('id, kunde_objekt_id')
-    .in('kunde_objekt_id', Array.from(allowed))
-    .eq('aktiv', true)
-  if (error2) logDbError('app/actions/kunden-objekte:objekt_einheiten', error2)
-
-  const units = einheiten ?? []
-  const einheitIds = units.map((e) => e.id as string)
-  const bewohnerByEinheit = new Map<string, number>()
-  if (einheitIds.length > 0) {
-    const { data: bewohner, error } = await supabase
-      .from('einheit_bewohner')
-      .select('objekt_einheit_id')
-      .in('objekt_einheit_id', einheitIds)
-      .eq('aktiv', true)
-      .is('anonymisiert_am', null)
-    if (error) logDbError('app/actions/kunden-objekte:einheit_bewohner', error)
-    for (const b of bewohner ?? []) {
-      const eid = b.objekt_einheit_id as string
-      if (!eid) continue
-      bewohnerByEinheit.set(eid, (bewohnerByEinheit.get(eid) ?? 0) + 1)
-    }
-  }
-
-  const next: Record<string, KundenObjektListenStats> = {}
-  for (const id of Array.from(allowed)) {
-    const u = units.filter((e) => e.kunde_objekt_id === id)
-    let mieterTotal = 0
-    let vermietet = 0
-    for (const e of u) {
-      const n = bewohnerByEinheit.get(e.id as string) ?? 0
-      mieterTotal += n
-      if (n > 0) vermietet += 1
-    }
-    next[id] = {
-      einheitenTotal: mieterTotal,
-      einheitenVermietet: vermietet,
-      mieterTotal,
-    }
-  }
-  return next
-}
-
 export async function createKundenObjekt(
   kundeId: string,
   input: KundenObjektInput
@@ -234,13 +164,6 @@ export async function deleteKundenObjekt(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = createClient()
 
-  const {
-    collectPortalKundeIdsForObjekt,
-    cleanupOrphanHvPortalKunden,
-  } = await import('@/lib/objektakte/cleanup-orphan-portal-kunden')
-
-  const portalKundeIds = await collectPortalKundeIdsForObjekt(supabase, objektId)
-
   const { error } = await supabase
     .from('kunden_objekte')
     .delete()
@@ -249,8 +172,6 @@ export async function deleteKundenObjekt(
   if (error) logDbError('app/actions/kunden-objekte:kunden_objekte', error)
 
   if (error) return { ok: false, message: error.message }
-
-  await cleanupOrphanHvPortalKunden(supabase, portalKundeIds)
 
   revalidateKundeDetail(kundeId)
   revalidateLeadList()

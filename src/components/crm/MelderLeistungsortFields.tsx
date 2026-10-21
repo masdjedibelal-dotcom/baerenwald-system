@@ -11,7 +11,6 @@ export type MelderLeistungsortDraft = {
   melder_email: string
   melder_einheit: string
   kunde_objekt_id: string | null
-  objekt_anlage_id: string | null
 }
 
 export function MelderLeistungsortFields({
@@ -36,14 +35,6 @@ export function MelderLeistungsortFields({
   gewerke?: Gewerk[]
 }) {
   function patchLeistungsort(p: Partial<MelderLeistungsortDraft>) {
-    if (
-      p.kunde_objekt_id !== undefined &&
-      p.kunde_objekt_id !== draft.kunde_objekt_id &&
-      p.objekt_anlage_id === undefined
-    ) {
-      onChange({ ...p, objekt_anlage_id: null })
-      return
-    }
     onChange(p)
   }
 
@@ -96,7 +87,6 @@ export function draftFromLeadMelder(lead: {
   melder_email?: string | null
   melder_einheit?: string | null
   kunde_objekt_id?: string | null
-  objekt_anlage_id?: string | null
   kontakt_telefon?: string | null
   kontakt_email?: string | null
 }): MelderLeistungsortDraft {
@@ -106,6 +96,5 @@ export function draftFromLeadMelder(lead: {
     melder_email: lead.melder_email?.trim() || lead.kontakt_email?.trim() || '',
     melder_einheit: lead.melder_einheit?.trim() || '',
     kunde_objekt_id: lead.kunde_objekt_id?.trim() || null,
-    objekt_anlage_id: lead.objekt_anlage_id?.trim() || null,
   }
 }

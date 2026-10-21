@@ -198,7 +198,6 @@ export type AngebotWizardMeta = {
   /** Verwaltungsobjekt (Gewerbe/Hausverwaltung) — PDF „Durchführung in“ / WEG-Kopf */
   kunde_objekt_id?: string | null
   /** Anlage/Teil am Ausführungsort */
-  objekt_anlage_id?: string | null
   /** Optionaler Ansprechpartner (Anrede / z. Hd. / Mail) */
   ansprechpartner_id?: string | null
 }

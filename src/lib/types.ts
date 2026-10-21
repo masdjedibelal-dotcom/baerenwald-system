@@ -235,7 +235,6 @@ export type Lead = {
   /** Ausgewähltes Verwaltungsobjekt (Gewerbe/Hausverwaltung) */
   kunde_objekt_id?: string | null
   /** Optionale Zuordnung zu Anlage/Teil am Objekt */
-  objekt_anlage_id?: string | null
   /** Optionaler Ansprechpartner (Empfänger) */
   ansprechpartner_id?: string | null
   kanal: LeadKanal
@@ -363,7 +362,6 @@ export type LeadDetail = Lead & {
   kunden?: Kunde | null
   auftraggeber?: LeadAuftraggeberEmbed | null
   kunden_objekte?: KundenObjekt | null
-  objekt_anlagen?: { id: string; bezeichnung: string; gewerke?: { name: string } | null } | null
   org_freigabe_log?: OrgFreigabeLogRow[] | null
   leads_status_history?: LeadStatusHistory[] | null
   vorab_formulare?: VorabFormular[] | null
@@ -481,7 +479,6 @@ export type Angebot = {
   /** Ausführungsort (Verwaltungsobjekt) */
   kunde_objekt_id?: string | null
   /** Anlage/Teil am Ausführungsort */
-  objekt_anlage_id?: string | null
   /** Optionaler Ansprechpartner (Versand-Empfänger) */
   ansprechpartner_id?: string | null
   status: AngebotStatus
@@ -1339,7 +1336,6 @@ export type Rechnung = {
   /** Ausführungsort / Verwaltungsobjekt (PDF „Durchführung in“). */
   kunde_objekt_id?: string | null
   /** Anlage/Teil am Ausführungsort */
-  objekt_anlage_id?: string | null
   beleg_typ?: RechnungBelegTyp
   bezug_rechnung_id?: string | null
   /** Spec Ketten */

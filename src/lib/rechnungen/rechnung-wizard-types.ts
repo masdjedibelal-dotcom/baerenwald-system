@@ -58,7 +58,6 @@ export type RechnungWizardBootstrap = {
   /** Ausführungsort / Verwaltungsobjekt (HV/Gewerbe). */
   kundeObjektId?: string | null
   /** Anlage/Teil am Ausführungsort. */
-  objektAnlageId?: string | null
   /** Direktrechnung von /rechnungen/neu (ohne Anfrage/Angebot/Auftrag) */
   standalone?: boolean
   kunde: Pick<

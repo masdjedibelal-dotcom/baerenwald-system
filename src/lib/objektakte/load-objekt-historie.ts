@@ -8,18 +8,7 @@ import type { VorgangPhase } from '@/lib/vorgang/types'
 type LeadHistorieMeta = {
   melder_einheit: string | null
   bereiche: string[] | null
-  objekt_anlage_id: string | null
-  anlageLabel: string | null
   gewerkLabel: string | null
-}
-
-function normalizeGewerkJoin(
-  raw: { name?: string } | { name?: string }[] | null | undefined
-): string | null {
-  if (!raw) return null
-  const row = Array.isArray(raw) ? raw[0] : raw
-  const name = row?.name?.trim()
-  return name || null
 }
 
 function gewerkFromLead(meta: LeadHistorieMeta): string | null {
@@ -33,12 +22,6 @@ function einheitLabelFromMeta(meta: LeadHistorieMeta): string | null {
   return e || null
 }
 
-function isAnlageJoinSchemaError(message: string): boolean {
-  return /objekt_anlage|objekt_anlagen|does not exist|Could not find|schema cache/i.test(
-    message
-  )
-}
-
 async function loadLeadHistorieMeta(
   supabase: ReturnType<typeof createClient>,
   leadIds: string[]
@@ -46,47 +29,17 @@ async function loadLeadHistorieMeta(
   const metaByLead = new Map<string, LeadHistorieMeta>()
   if (!leadIds.length) return metaByLead
 
-  const fullSelect =
-    'id, melder_einheit, bereiche, objekt_anlage_id, objekt_anlagen(id, bezeichnung, status, gewerke(name))'
-  const idOnlySelect = 'id, melder_einheit, bereiche, objekt_anlage_id'
-  const legacySelect = 'id, melder_einheit, bereiche'
+  const { data, error } = await supabase
+    .from('leads')
+    .select('id, melder_einheit, bereiche')
+    .in('id', leadIds)
+  if (error) logDbError('lib/objektakte/load-objekt-historie:leads', error)
 
-  let rows: Array<Record<string, unknown>> = []
-
-  const full = await supabase.from('leads').select(fullSelect).in('id', leadIds)
-  if (!full.error) {
-    rows = (full.data ?? []) as Array<Record<string, unknown>>
-  } else if (isAnlageJoinSchemaError(full.error.message)) {
-    const idOnly = await supabase.from('leads').select(idOnlySelect).in('id', leadIds)
-    if (!idOnly.error) {
-      rows = (idOnly.data ?? []) as Array<Record<string, unknown>>
-    } else if (isAnlageJoinSchemaError(idOnly.error.message)) {
-      const legacy = await supabase.from('leads').select(legacySelect).in('id', leadIds)
-      if (!legacy.error) {
-        rows = (legacy.data ?? []) as Array<Record<string, unknown>>
-      } else {
-        console.warn('loadObjektHistorie leads:', legacy.error.message)
-      }
-    } else {
-      console.warn('loadObjektHistorie leads:', idOnly.error.message)
-    }
-  } else {
-    console.warn('loadObjektHistorie leads:', full.error.message)
-  }
-
-  for (const row of rows) {
-    const anlageRaw = row.objekt_anlagen as
-      | { bezeichnung?: string; gewerke?: { name?: string } | { name?: string }[] | null }
-      | { bezeichnung?: string; gewerke?: { name?: string } | { name?: string }[] | null }[]
-      | null
-      | undefined
-    const anlage = Array.isArray(anlageRaw) ? anlageRaw[0] : anlageRaw
+  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
     metaByLead.set(String(row.id), {
       melder_einheit: (row.melder_einheit as string | null) ?? null,
       bereiche: (row.bereiche as string[] | null) ?? null,
-      objekt_anlage_id: (row.objekt_anlage_id as string | null) ?? null,
-      anlageLabel: anlage?.bezeichnung?.trim() || null,
-      gewerkLabel: normalizeGewerkJoin(anlage?.gewerke ?? null),
+      gewerkLabel: null,
     })
   }
 
@@ -190,8 +143,6 @@ export async function loadObjektHistorie(
     const meta = metaByLead.get(v.leadId) ?? {
       melder_einheit: null,
       bereiche: null,
-      objekt_anlage_id: null,
-      anlageLabel: null,
       gewerkLabel: null,
     }
     const kosten = resolveObjektVorgangKosten({
@@ -216,8 +167,6 @@ export async function loadObjektHistorie(
       datum: v.updatedAt || new Date().toISOString(),
       titel: v.titel,
       einheitLabel: einheitLabelFromMeta(meta),
-      anlageLabel: meta.anlageLabel,
-      anlageId: meta.objekt_anlage_id,
       gewerkLabel: gewerkFromLead(meta),
       phase,
       unterstatus: v.unterstatus,

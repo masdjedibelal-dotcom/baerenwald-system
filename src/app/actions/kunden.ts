@@ -735,12 +735,8 @@ export async function getKundeDeletePreview(
  *
  * Bei Hausverwaltung (und generell) entfernt das:
  * 1. Vorgänge (Leads → Angebote/Aufträge/Rechnungen)
- * 2. Objekte → Einheiten → Mieter/Eigentümer (einheit_bewohner) → Kontakte vor Ort
- *    (DB-CASCADE über kunden_objekte / objekt_einheiten)
- * 3. Org-Hausmeister + Objekt-Zuordnung (CASCADE über org_hausmeister)
- * 4. CRM-Ansprechpartner, Mitglieder, Notizen, Dokumente (CASCADE bzw. explizit)
- * 5. Portal-Stubs (Mieter/Eigentümer/Hausmeister-Login) + Auth-User
- *    (sonst blockieren alte Logins neue Einladungen)
+ * 2. Objekte → Kontakte vor Ort (DB-CASCADE über kunden_objekte)
+ * 3. CRM-Ansprechpartner, Mitglieder, Notizen, Dokumente (CASCADE bzw. explizit)
  */
 export async function deleteKunde(
   kundeId: string
@@ -781,13 +777,6 @@ export async function deleteKunde(
         .filter(Boolean)
     )
   )
-
-  // Vor Cascade: HM-/Mieter-/Eigentümer-Stubs merken (org_hausmeister fällt mit HV weg)
-  const {
-    collectPortalKundeIdsForOrg,
-    cleanupOrphanHvPortalKunden,
-  } = await import('@/lib/objektakte/cleanup-orphan-portal-kunden')
-  const portalStubIds = await collectPortalKundeIdsForOrg(supabaseAdmin, id)
 
   const { hardDeleteLeadCascade } = await import('@/lib/portal/soft-delete-lead')
   const vorgangErrors: string[] = []
@@ -852,14 +841,10 @@ export async function deleteKunde(
     'kunden_notizen',
     'kunden_dokumente',
     'kunden_ansprechpartner',
-    'kunden_objekte', // Cascade: Einheiten, Bewohner, Kontakte, HM-Zuordnung, …
+    'kunden_objekte', // Cascade: Kontakte vor Ort
     'kunden_mitglieder',
-    'org_hausmeister', // explizit vor Kunde (sonst CASCADE); Stub-IDs bereits gesammelt
   ] as const) {
-    const { error } = await supabaseAdmin.from(table).delete().eq(
-      table === 'org_hausmeister' ? 'org_kunde_id' : 'kunde_id',
-      id
-    )
+    const { error } = await supabaseAdmin.from(table).delete().eq('kunde_id', id)
     if (error) logDbError('app/actions/kunden:query', error)
     if (error && !/does not exist|relation|schema cache/i.test(error.message)) {
       return { ok: false, message: `${table}: ${error.message}` }
@@ -941,9 +926,6 @@ export async function deleteKunde(
   const { error: delErr } = await supabaseAdmin.from('kunden').delete().eq('id', id)
   if (delErr) logDbError('app/actions/kunden:kunden', delErr)
   if (delErr) return { ok: false, message: delErr.message }
-
-  // Portal-Stubs (Hausmeister/Mieter/Eigentümer) + deren Auth-User
-  await cleanupOrphanHvPortalKunden(supabaseAdmin, portalStubIds)
 
   revalidateKundeDetail(id)
   revalidateLeadList()

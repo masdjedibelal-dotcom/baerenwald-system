@@ -47,7 +47,6 @@ export async function createAnfrageFuerKunde(
     melder_telefon?: string | null
     melder_einheit?: string | null
     kunde_objekt_id?: string | null
-    objekt_anlage_id?: string | null
   }
 ): Promise<{ ok: true; leadId: string } | { ok: false; message: string }> {
   const id = kundeId.trim()
@@ -101,7 +100,6 @@ export async function createAnfrageFuerKunde(
     melder_telefon: opts?.melder_telefon ?? null,
     melder_einheit: opts?.melder_einheit ?? null,
     kunde_objekt_id: opts?.kunde_objekt_id ?? null,
-    objekt_anlage_id: opts?.objekt_anlage_id ?? null,
     funnel_daten: {
       quelle: 'crm_direkt_angebot',
       direkt_dokument: 'angebot',

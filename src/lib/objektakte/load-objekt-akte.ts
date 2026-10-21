@@ -2,12 +2,8 @@ import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
 import type {
   AktenNotiz,
-  EinheitBewohner,
-  FremdVorgang,
   ObjektAkteDetailPayload,
   ObjektAkteReadOnlyPayload,
-  ObjektDokument,
-  ObjektEinheit,
   ObjektKontakt,
 } from '@/lib/objektakte/types'
 import type { KundenObjekt } from '@/lib/types'
@@ -57,22 +53,9 @@ async function loadReadOnlyAkte(
     )
   }
 
-  const [objektNotizenRes, vorgangNotizenRes, dokumenteRes, fremdRes] = await Promise.all([
+  const [objektNotizenRes, vorgangNotizenRes] = await Promise.all([
     notizenQueries[0],
     leadId ? notizenQueries[1] : Promise.resolve({ data: [], error: null }),
-    supabase
-      .from('objekt_dokumente')
-      .select('id, kunde_id, kunde_objekt_id, kategorie, titel, storage_url, ablauf_datum, status, created_at')
-      .eq('kunde_id', kundeId)
-      .eq('kunde_objekt_id', objektId)
-      .eq('status', 'aktiv')
-      .order('ablauf_datum', { ascending: true, nullsFirst: false }),
-    supabase
-      .from('fremd_vorgaenge')
-      .select('*')
-      .eq('kunde_id', kundeId)
-      .eq('kunde_objekt_id', objektId)
-      .order('datum', { ascending: false }),
   ])
 
   const notizen = [
@@ -83,17 +66,9 @@ async function loadReadOnlyAkte(
   if (objektNotizenRes.error) {
     console.warn('loadReadOnlyAkte notizen:', objektNotizenRes.error.message)
   }
-  if (dokumenteRes.error) {
-    console.warn('loadReadOnlyAkte dokumente:', dokumenteRes.error.message)
-  }
-  if (fremdRes.error) {
-    console.warn('loadReadOnlyAkte fremd:', fremdRes.error.message)
-  }
 
   return {
     notizen,
-    dokumente: (dokumenteRes.data ?? []) as ObjektDokument[],
-    fremdVorgaenge: (fremdRes.data ?? []) as FremdVorgang[],
   }
 }
 
@@ -110,75 +85,22 @@ export async function loadObjektAkteDetail(
 
   const supabase = createClient()
 
-  const [kontakteRes, einheitenRes, readOnly] =
-    await Promise.all([
-      supabase
-        .from('objekt_kontakte')
-        .select('*')
-        .eq('kunde_objekt_id', oid)
-        .eq('aktiv', true)
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('objekt_einheiten')
-        .select('*')
-        .eq('kunde_objekt_id', oid)
-        .eq('aktiv', true)
-        .order('sort_order', { ascending: true }),
-      loadReadOnlyAkte(supabase, kid, oid),
-    ])
-
-  const einheiten = (einheitenRes.data ?? []) as ObjektEinheit[]
-  const einheitIds = einheiten.map((e) => e.id)
-
-  let bewohner: EinheitBewohner[] = []
-  if (einheitIds.length) {
-    const { data: bewohnerData, error: bewohnerErr } = await supabase
-      .from('einheit_bewohner')
-      .select(
-        '*, objekt_einheiten(bezeichnung, etage)'
-      )
-      .eq('kunde_id', kid)
-      .in('objekt_einheit_id', einheitIds)
+  const [kontakteRes, readOnly] = await Promise.all([
+    supabase
+      .from('objekt_kontakte')
+      .select('*')
+      .eq('kunde_objekt_id', oid)
       .eq('aktiv', true)
-      .is('anonymisiert_am', null)
-      .order('created_at', { ascending: true })
-    if (bewohnerErr) logDbError('lib/objektakte/load-objekt-akte:einheit_bewohner', bewohnerErr)
-
-    if (bewohnerErr) {
-      // etage-Embed optional (ältere DBs ohne Spalte)
-      if (/etage/i.test(bewohnerErr.message)) {
-        const fallback = await supabase
-          .from('einheit_bewohner')
-          .select('*, objekt_einheiten(bezeichnung)')
-          .eq('kunde_id', kid)
-          .in('objekt_einheit_id', einheitIds)
-          .eq('aktiv', true)
-          .is('anonymisiert_am', null)
-          .order('created_at', { ascending: true })
-        if (fallback.error) {
-          console.warn('loadObjektAkteDetail bewohner:', fallback.error.message)
-        } else {
-          bewohner = (fallback.data ?? []) as EinheitBewohner[]
-        }
-      } else {
-        console.warn('loadObjektAkteDetail bewohner:', bewohnerErr.message)
-      }
-    } else {
-      bewohner = (bewohnerData ?? []) as EinheitBewohner[]
-    }
-  }
+      .order('sort_order', { ascending: true }),
+    loadReadOnlyAkte(supabase, kid, oid),
+  ])
 
   if (kontakteRes.error) {
     console.warn('loadObjektAkteDetail kontakte:', kontakteRes.error.message)
   }
-  if (einheitenRes.error) {
-    console.warn('loadObjektAkteDetail einheiten:', einheitenRes.error.message)
-  }
 
   return {
     kontakte: (kontakteRes.data ?? []) as ObjektKontakt[],
-    einheiten,
-    bewohner,
     ...readOnly,
   }
 }

@@ -47,7 +47,6 @@ const TABLE_ORDER = [
   'kunden',
   'kunden_ansprechpartner',
   'kunden_objekte',
-  'objekt_einheiten',
   'leads',
   'angebote',
   'angebot_handwerker',
@@ -69,10 +68,8 @@ const STRIP_ALWAYS = new Set([
   'visualisierung_ids',
   'cover_url',
   'logo_url',
-  'org_logo_url',
   'abnahme_protokoll_url',
   'abschlussdokumentation_url',
-  'versicherungsakte_pdf_url',
   'datei_url',
   'datei_urls',
   'mail_einleitung',
@@ -83,7 +80,6 @@ const STRIP_ALWAYS = new Set([
 const FK_MAP = {
   kunden_ansprechpartner: [{ col: 'kunde_id', parent: 'kunden', required: true }],
   kunden_objekte: [{ col: 'kunde_id', parent: 'kunden', required: true }],
-  objekt_einheiten: [{ col: 'kunde_objekt_id', parent: 'kunden_objekte', required: true }],
   leads: [
     { col: 'kunde_id', parent: 'kunden', required: false },
     { col: 'auftraggeber_kunde_id', parent: 'kunden', required: false },
@@ -405,21 +401,10 @@ function anonymizeObjekt(row) {
         : row.melde_slug,
       einheiten_hinweis: scrubFreeText(row.einheiten_hinweis, `eh:${id}`, 60),
       notizen_intern: scrubFreeText(row.notizen_intern, `oin:${id}`),
-      versicherer: row.versicherer ? `${PREFIX}Versicherer` : row.versicherer,
-      versicherungs_nr: row.versicherungs_nr
-        ? `PS-${hashHex(row.versicherungs_nr, 8)}`
-        : row.versicherungs_nr,
       created_by: createdBy,
     }),
     { keepRequiredCreatedBy: true }
   )
-}
-
-function anonymizeEinheit(row) {
-  return nullAuthUserFks({
-    ...row,
-    bezeichnung: withPrefix(row.bezeichnung || 'WE', `ein:${row.id}`),
-  })
 }
 
 function anonymizeAnsprechpartner(row) {
@@ -463,9 +448,6 @@ function anonymizeLead(row) {
       melde_tracking_token: row.melde_tracking_token
         ? rotateToken('melde', id)
         : row.melde_tracking_token,
-      versicherungs_nr: row.versicherungs_nr
-        ? `PS-${hashHex(row.versicherungs_nr, 8)}`
-        : row.versicherungs_nr,
       storniert_grund: scrubFreeText(row.storniert_grund, `sg:${id}`, 60),
       wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `wv:${id}`, 60),
       // duplikat_hinweis ist boolean — nicht als Text scrubben
@@ -529,9 +511,6 @@ function anonymizeAuftrag(row) {
       bau_nachunternehmer_firma: row.bau_nachunternehmer_firma
         ? `${PREFIX}NU ${fakerLast(id)}`
         : row.bau_nachunternehmer_firma,
-      versicherungs_nr: row.versicherungs_nr
-        ? `PS-${hashHex(row.versicherungs_nr, 8)}`
-        : row.versicherungs_nr,
       wiedervorlage_notiz: scrubFreeText(row.wiedervorlage_notiz, `aufwv:${id}`, 60),
       naechster_schritt: scrubFreeText(row.naechster_schritt, `ns:${id}`, 60),
     })
@@ -600,7 +579,6 @@ const ANON = {
   kunden: anonymizeKunde,
   kunden_ansprechpartner: anonymizeAnsprechpartner,
   kunden_objekte: anonymizeObjekt,
-  objekt_einheiten: anonymizeEinheit,
   leads: anonymizeLead,
   angebote: anonymizeAngebot,
   angebot_handwerker: anonymizeAngebotHw,
@@ -646,7 +624,6 @@ function applyFkAnomalies(tables, stagingGewerkeIds, anomalies) {
     kunden: idSet(tables.kunden),
     kunden_ansprechpartner: idSet(tables.kunden_ansprechpartner),
     kunden_objekte: idSet(tables.kunden_objekte),
-    objekt_einheiten: idSet(tables.objekt_einheiten),
     leads: idSet(tables.leads),
     angebote: idSet(tables.angebote),
     angebot_handwerker: idSet(tables.angebot_handwerker),
@@ -731,8 +708,7 @@ async function exportAndAnonymize(prod) {
     'kunden',
     'kunden_ansprechpartner',
     'kunden_objekte',
-    'objekt_einheiten',
-    'leads',
+      'leads',
     'angebote',
     'angebot_handwerker',
     'auftraege',

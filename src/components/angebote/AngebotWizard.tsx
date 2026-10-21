@@ -357,15 +357,6 @@ export function AngebotWizard({
       : leadState.kunde_objekt_id
         ? { ...base, kunde_objekt_id: leadState.kunde_objekt_id }
         : base
-    if (bootstrap?.meta?.objekt_anlage_id || leadState.objekt_anlage_id) {
-      return {
-        ...withObjekt,
-        objekt_anlage_id:
-          bootstrap?.meta?.objekt_anlage_id?.trim() ||
-          leadState.objekt_anlage_id?.trim() ||
-          null,
-      }
-    }
     return withObjekt
   })
   const [dokumentTyp, setDokumentTyp] = useState<AngebotDokumentTyp>(
@@ -522,21 +513,10 @@ export function AngebotWizard({
   function patchMelderDraft(patch: Partial<MelderLeistungsortDraft>) {
     setMelderDraft((prev) => {
       const next = { ...prev, ...patch }
-      if (
-        patch.kunde_objekt_id !== undefined &&
-        patch.kunde_objekt_id !== prev.kunde_objekt_id &&
-        patch.objekt_anlage_id === undefined
-      ) {
-        next.objekt_anlage_id = null
-      }
       setMeta((m) => ({
         ...m,
         ...(patch.kunde_objekt_id !== undefined
           ? { kunde_objekt_id: next.kunde_objekt_id }
-          : {}),
-        ...(patch.objekt_anlage_id !== undefined ||
-        (patch.kunde_objekt_id !== undefined && next.objekt_anlage_id === null)
-          ? { objekt_anlage_id: next.objekt_anlage_id }
           : {}),
       }))
       return next
@@ -793,7 +773,6 @@ export function AngebotWizard({
       melder_telefon: melderDraft.melder_telefon || null,
       melder_einheit: melderDraft.melder_einheit || null,
       kunde_objekt_id: melderDraft.kunde_objekt_id,
-      objekt_anlage_id: melderDraft.objekt_anlage_id,
     })
     if (!r?.ok) {
       toast.error(
@@ -813,7 +792,6 @@ export function AngebotWizard({
       melder_telefon: melderDraft.melder_telefon || null,
       melder_einheit: melderDraft.melder_einheit || null,
       kunde_objekt_id: melderDraft.kunde_objekt_id,
-      objekt_anlage_id: melderDraft.objekt_anlage_id,
     }))
     return r.leadId
   }, [deferredLeadCreate, leadState, melderDraft])
@@ -922,7 +900,6 @@ export function AngebotWizard({
             melder_telefon: melderDraft.melder_telefon || null,
             melder_einheit: melderDraft.melder_einheit || null,
             kunde_objekt_id: melderDraft.kunde_objekt_id,
-            objekt_anlage_id: melderDraft.objekt_anlage_id,
             angebotId: res.angebotId,
           })
           if (!sync?.ok) {
@@ -939,7 +916,6 @@ export function AngebotWizard({
               melder_telefon: melderDraft.melder_telefon || null,
               melder_einheit: melderDraft.melder_einheit || null,
               kunde_objekt_id: melderDraft.kunde_objekt_id,
-              objekt_anlage_id: melderDraft.objekt_anlage_id,
             }))
           }
         }

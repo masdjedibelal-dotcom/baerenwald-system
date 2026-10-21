@@ -85,7 +85,6 @@ export type RechnungEntwurfPayload = {
   /** Ausführungsort / Verwaltungsobjekt. */
   kunde_objekt_id?: string | null
   /** Anlage/Teil am Ausführungsort. */
-  objekt_anlage_id?: string | null
 }
 
 async function validateVorSpeichern(
@@ -155,7 +154,6 @@ export async function createRechnungEntwurf(input: {
       rechnungsnummer: null,
       ansprechpartner_id: input.ansprechpartner_id?.trim() || null,
       kunde_objekt_id: input.kunde_objekt_id?.trim() || null,
-      objekt_anlage_id: input.objekt_anlage_id?.trim() || null,
       status: 'entwurf' as RechnungStatus,
       positionen,
       leistungszeitraum_von: input.leistungszeitraum_von,
@@ -233,9 +231,6 @@ export async function updateRechnungEntwurf(
         : {}),
       ...(input.kunde_objekt_id !== undefined
         ? { kunde_objekt_id: input.kunde_objekt_id?.trim() || null }
-        : {}),
-      ...(input.objekt_anlage_id !== undefined
-        ? { objekt_anlage_id: input.objekt_anlage_id?.trim() || null }
         : {}),
       ...(input.rechnung_art ? { rechnung_art: input.rechnung_art } : {}),
       ...(input.abschlag_index != null ? { abschlag_index: input.abschlag_index } : {}),
@@ -479,7 +474,6 @@ export async function korrigiereRechnung(rechnungId: string): Promise<
       mail_betreff: null,
       ansprechpartner_id: orig.ansprechpartner_id ?? null,
       kunde_objekt_id: orig.kunde_objekt_id ?? null,
-      objekt_anlage_id: orig.objekt_anlage_id ?? null,
       reverse_charge_13b: Boolean(orig.reverse_charge_13b),
       hinweis_35a: orig.hinweis_35a ?? null,
       rechnung_art: orig.rechnung_art ?? 'voll',

@@ -9,7 +9,6 @@ EntityDetailLayout,
 type DetailShellGroup,
 } from '@/components/layout/EntityDetailLayout'
 import { MockCard } from '@/components/mock-ui/MockCard'
-import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import Link from 'next/link'
 import { Suspense,useEffect,useMemo,useState } from 'react'
@@ -109,18 +108,7 @@ export function ObjektAkteDetailClient({
     afterServerActionRefresh()
   }
 
-  const einheiten = useMemo(
-    () => akte.einheiten.filter((e) => e.aktiv !== false),
-    [akte.einheiten]
-  )
-
-  const flaecheGesamt = useMemo(
-    () =>
-      einheiten.reduce((s, e) => s + (e.wohnflaeche_m2 != null ? Number(e.wohnflaeche_m2) : 0), 0),
-    [einheiten]
-  )
-
-  const akteCount = akte.notizen.length + akte.dokumente.length + akte.fremdVorgaenge.length
+  const akteCount = akte.notizen.length
 
   const kundeVorgaenge = useMemo(
     () =>
@@ -147,14 +135,6 @@ export function ObjektAkteDetailClient({
         <div className="vgid">
           <div className="vgid-name">{objektState.titel}</div>
           {adresse ? <div className="vgid-meta">{adresse}</div> : null}
-          <div className="vgid-chips" style={{ marginTop: 10 }}>
-            {flaecheGesamt > 0 ? (
-              <span className="vgid-chip ghost">
-                <MockIcon ctx="default" n="building" size={14} />
-                {Math.round(flaecheGesamt)} m²
-              </span>
-            ) : null}
-          </div>
         </div>
         <p style={{ marginTop: 12, fontSize: 'var(--fs-meta)', color: 'var(--text-3)' }}>
           Verwaltung:{' '}

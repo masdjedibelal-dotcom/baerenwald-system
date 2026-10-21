@@ -424,32 +424,6 @@ const objektSuedId = await upsertBy(
   }
 )
 
-const einheitId = await upsertBy(
-  'objekt_einheiten',
-  { kunde_objekt_id: objektNordId, bezeichnung: 'WE 12 (Staging)' },
-  {
-    kunde_objekt_id: objektNordId,
-    bezeichnung: 'WE 12 (Staging)',
-    sort_order: 12,
-    aktiv: true,
-  }
-)
-
-await upsertBy(
-  'einheit_bewohner',
-  { objekt_einheit_id: einheitId, email: 'mieter-muster@example.test' },
-  {
-    kunde_id: hvNordId,
-    objekt_einheit_id: einheitId,
-    name: 'Mia Muster',
-    email: 'mieter-muster@example.test',
-    telefon: '089 2222 0001',
-    rolle: 'mieter',
-    aktiv: true,
-    portal_kunde_id: mieterId,
-  }
-)
-
 const handwerkerSpecs = [
   {
     email: 'partner-elektro@example.test',

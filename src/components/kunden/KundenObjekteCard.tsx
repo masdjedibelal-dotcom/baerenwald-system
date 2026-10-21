@@ -12,8 +12,6 @@ import { useRouter } from 'next/navigation'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
 import {
   deleteKundenObjekt,
-  fetchKundenObjektListenStats,
-  type KundenObjektListenStats,
 } from '@/app/actions/kunden-objekte'
 import {
   filterObjekteFuerKunde,
@@ -30,7 +28,7 @@ import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { TOAST } from '@/lib/copy'
 
-const OBJEKT_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.7fr) 44px'
+const OBJEKT_LIST_COLS = '28px minmax(0, 1.2fr) minmax(0, 1.4fr) 44px'
 
 type Props = {
   kundeId: string
@@ -60,7 +58,6 @@ export function KundenObjekteCard({
   const [modalOpen, setModalOpen] = useState(false)
   const [editObjekt, setEditObjekt] = useState<KundenObjekt | null>(null)
   const [localObjekte, setLocalObjekte] = useState(() => filterObjekteFuerKunde(objekte, kundeId))
-  const [statsById, setStatsById] = useState<Record<string, KundenObjektListenStats>>({})
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
@@ -97,20 +94,6 @@ export function KundenObjekteCard({
       return changed ? next : prev
     })
   }, [liste])
-
-  useEffect(() => {
-    if (variant !== 'full' || liste.length === 0) return
-    let cancelled = false
-    void fetchKundenObjektListenStats(
-      kundeId,
-      liste.map((o) => o.id)
-    ).then((next) => {
-      if (!cancelled) setStatsById(next)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [liste, variant, kundeId])
 
   const selectOptions = useMemo(
     () => [
@@ -196,24 +179,11 @@ export function KundenObjekteCard({
     ]
   }
 
-  function statsLabel(o: KundenObjekt): string {
-    const st = statsById[o.id]
-    if (!st) return '—'
-    if (st.mieterTotal > 0) {
-      return `${st.mieterTotal} ${st.mieterTotal === 1 ? 'Mieter' : 'Mieter'}`
-    }
-    if (st.einheitenTotal > 0) {
-      return `${st.einheitenTotal} ${st.einheitenTotal === 1 ? 'Einheit' : 'Einheiten'}`
-    }
-    return '—'
-  }
-
   function objektRow(o: KundenObjekt) {
     const strasse = kundenObjektStrasseZeile(o) || '—'
     const ort = [o.plz?.trim(), o.ort?.trim()].filter(Boolean).join(' ')
     const adresse = [strasse !== '—' ? strasse : null, ort || null].filter(Boolean).join(', ') || '—'
     const isChecked = Boolean(selected[o.id])
-    const bezug = statsLabel(o)
 
     return (
       <div
@@ -237,13 +207,11 @@ export function KundenObjekteCard({
                 <span className="ap-mobile-card__name">{o.titel}</span>
               </div>
               <div className="ap-mobile-card__meta">{adresse}</div>
-              {bezug !== '—' ? <div className="ap-mobile-card__meta">{bezug}</div> : null}
             </>
           ) : (
             <>
               <span className="ap-list__name-cell">{o.titel}</span>
               <span className="ap-list__dim">{adresse}</span>
-              <span className="ap-list__dim">{bezug}</span>
             </>
           )}
         </MockBtn>
@@ -396,7 +364,6 @@ export function KundenObjekteCard({
               <span aria-hidden />
               <span>Objekt</span>
               <span>Adresse</span>
-              <span>Bezug</span>
               <span aria-hidden />
             </div>
             {liste.map(objektRow)}
