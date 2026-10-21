@@ -51,6 +51,10 @@ export type WaNachricht = {
   auftrag_titel: string | null
   einsatz_titel: string | null
   ungelesen: boolean
+  /** Herkunft: WhatsApp oder anderer Weg (Tagebuch an Kunden, Einsatz an Partner, Update vom Partner) — nur Anzeige */
+  quelle: 'whatsapp' | 'tagebuch' | 'einsatz' | 'mitteilung'
+  /** Kurzlabel für andere Wege, z. B. „Tagebuch · Badsanierung“ */
+  quelle_label: string | null
 }
 
 export type WaLaufend = { id: string; auftrag_id: string; titel: string; status: string; auftrag_titel: string }
@@ -116,9 +120,137 @@ async function mapNachrichten(db: SupabaseClient, rows: Record<string, unknown>[
         auftrag_titel: one(r.auftraege as { titel?: string | null } | null)?.titel ?? null,
         einsatz_titel: one(r.einsaetze as { titel?: string | null } | null)?.titel ?? null,
         ungelesen: r.richtung === 'ein' && !r.gelesen_at,
+        quelle: 'whatsapp' as const,
+        quelle_label: null,
       }
     })
   )
+}
+
+const MITTEILUNG_LABEL: Record<string, string> = { update: 'Update', regie: 'Regie', behinderung: 'Behinderung' }
+
+/** Fünf Minuten: Tagebuch-Eintrag und seine WhatsApp-Vorlage gelten als dieselbe Nachricht */
+const GLEICHZEITIG_MS = 5 * 60 * 1000
+
+function andereNachricht(
+  basis: Pick<WaNachricht, 'id' | 'created_at' | 'richtung' | 'text' | 'medium' | 'auftrag_id' | 'einsatz_id' | 'auftrag_titel' | 'einsatz_titel' | 'quelle' | 'quelle_label'>
+): WaNachricht {
+  return { ...basis, art: 'text', knoepfe: [], knopf_id: null, vorlage: null, status: '', fehler: null, markierung: null, ungelesen: false }
+}
+
+function fotoMedium(urls: unknown): WaNachricht['medium'] {
+  const url = Array.isArray(urls) ? urls.find((u): u is string => typeof u === 'string' && /^https?:\/\//.test(u)) : null
+  return url ? { url, download: url, name: 'Foto', mime: 'image/jpeg' } : null
+}
+
+/**
+ * Kommunikation außerhalb von WhatsApp, damit der Chat den ganzen Verlauf zeigt:
+ * Kunde → für ihn freigegebene Tagebuch-Einträge; Partner → gesendete Einsätze (Anweisung) und seine Updates.
+ * Was schon als WhatsApp im Verlauf steht (Einsatz-/Tagebuch-Vorlage, aus WhatsApp übernommene Updates), kommt nicht doppelt.
+ */
+async function andereWege(db: SupabaseClient, ziel: WaZiel, wa: WaNachricht[]): Promise<WaNachricht[]> {
+  const { richTextToPlain } = await import('@/lib/rich-text')
+  const out: WaNachricht[] = []
+  if (ziel.kundeId) {
+    const { data, error } = await db
+      .from('auftrag_timeline')
+      .select('id, auftrag_id, titel, beschreibung, foto_urls, created_at, freigegeben_at, auftraege!inner(titel, kunde_id)')
+      .eq('auftraege.kunde_id', ziel.kundeId)
+      .eq('fuer_kunde_freigegeben', true)
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (error) logDbError('app/whatsapp/actions:tagebuch', error)
+    const vorlagen = wa.filter((n) => n.richtung === 'aus' && n.vorlage === 'bw_bautagebuch')
+    for (const r of data ?? []) {
+      const at = String(r.freigegeben_at ?? r.created_at)
+      const auftragId = String(r.auftrag_id)
+      const schonPerWa = vorlagen.some(
+        (n) => n.auftrag_id === auftragId && Math.abs(Date.parse(n.created_at) - Date.parse(at)) < GLEICHZEITIG_MS
+      )
+      if (schonPerWa) continue
+      const auftragTitel = one(r.auftraege as { titel?: string | null } | null)?.titel ?? null
+      const fotos = Array.isArray(r.foto_urls) ? r.foto_urls.length : 0
+      const text = [String(r.titel ?? '').trim(), richTextToPlain(String(r.beschreibung ?? '')).trim()]
+        .filter(Boolean)
+        .join('\n')
+      out.push(
+        andereNachricht({
+          id: `tagebuch:${r.id}`,
+          created_at: at,
+          richtung: 'aus',
+          text: fotos > 1 ? `${text}\n(${fotos} Fotos)` : text || null,
+          medium: fotoMedium(r.foto_urls),
+          auftrag_id: auftragId,
+          einsatz_id: null,
+          auftrag_titel: auftragTitel,
+          einsatz_titel: null,
+          quelle: 'tagebuch',
+          quelle_label: ['Tagebuch', auftragTitel].filter(Boolean).join(' · '),
+        })
+      )
+    }
+  }
+  if (ziel.handwerkerId) {
+    const [einsaetze, mitteilungen] = await Promise.all([
+      db
+        .from('einsaetze')
+        .select('id, auftrag_id, titel, anweisung, gesendet_at, auftraege(titel)')
+        .eq('handwerker_id', ziel.handwerkerId)
+        .not('gesendet_at', 'is', null)
+        .order('gesendet_at', { ascending: false })
+        .limit(200),
+      db
+        .from('einsatz_mitteilungen')
+        .select('id, einsatz_id, auftrag_id, typ, text, stunden, created_at, einsaetze(titel)')
+        .eq('handwerker_id', ziel.handwerkerId)
+        .or('erfasst_von.is.null,erfasst_von.neq.bw')
+        .order('created_at', { ascending: false })
+        .limit(200),
+    ])
+    if (einsaetze.error) logDbError('app/whatsapp/actions:einsaetze', einsaetze.error)
+    if (mitteilungen.error) logDbError('app/whatsapp/actions:mitteilungen', mitteilungen.error)
+    const perWa = new Set(wa.filter((n) => n.richtung === 'aus' && n.einsatz_id && n.vorlage).map((n) => n.einsatz_id))
+    for (const e of einsaetze.data ?? []) {
+      if (perWa.has(String(e.id))) continue
+      const auftragTitel = one(e.auftraege as { titel?: string | null } | null)?.titel ?? null
+      const text = [String(e.titel ?? '').trim(), richTextToPlain(String(e.anweisung ?? '')).trim()].filter(Boolean).join('\n')
+      out.push(
+        andereNachricht({
+          id: `einsatz:${e.id}`,
+          created_at: String(e.gesendet_at),
+          richtung: 'aus',
+          text: text || null,
+          medium: null,
+          auftrag_id: String(e.auftrag_id),
+          einsatz_id: String(e.id),
+          auftrag_titel: auftragTitel,
+          einsatz_titel: (e.titel as string | null) ?? null,
+          quelle: 'einsatz',
+          quelle_label: ['Einsatz', auftragTitel].filter(Boolean).join(' · '),
+        })
+      )
+    }
+    for (const m of mitteilungen.data ?? []) {
+      const einsatzTitel = one(m.einsaetze as { titel?: string | null } | null)?.titel ?? null
+      const stunden = m.stunden != null ? `${String(m.stunden).replace('.', ',')} Std. · ` : ''
+      out.push(
+        andereNachricht({
+          id: `mitteilung:${m.id}`,
+          created_at: String(m.created_at),
+          richtung: 'ein',
+          text: `${stunden}${String(m.text ?? '').trim()}` || null,
+          medium: null,
+          auftrag_id: String(m.auftrag_id),
+          einsatz_id: String(m.einsatz_id),
+          auftrag_titel: null,
+          einsatz_titel: einsatzTitel,
+          quelle: 'mitteilung',
+          quelle_label: [MITTEILUNG_LABEL[String(m.typ)] ?? 'Update', einsatzTitel, 'im Partnerportal'].filter(Boolean).join(' · '),
+        })
+      )
+    }
+  }
+  return out
 }
 
 async function laufendLaden(db: SupabaseClient, kontakt: WaKontakt | null, ziel: WaZiel): Promise<WaLaufend[]> {
@@ -179,11 +311,15 @@ export async function ladeWhatsAppVerlauf(
         .in('id', ungelesen.map((r) => String(r.id)))
     }
   }
+  const wa = await mapNachrichten(gate.db, rows)
+  const nachrichten = [...wa, ...(await andereWege(gate.db, ziel, wa))].sort(
+    (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)
+  )
   return {
     ok: true,
     kontakt,
     ohneNummer: !kontakt,
-    nachrichten: await mapNachrichten(gate.db, rows),
+    nachrichten,
     laufend: await laufendLaden(gate.db, kontakt, ziel),
     imFenster: kontakt ? await imFenster(gate.db, kontakt.nummer) : false,
     modus: whatsappKonfig().modus,
@@ -683,7 +819,52 @@ export async function ladeWhatsAppPostfach(): Promise<{ ok: true; gespraeche: Wa
     if (r.richtung === 'ein' && !r.gelesen_at) g.ungelesen += 1
     if (r.richtung === 'ein' && !r.auftrag_id && !r.markierung) g.offen += 1
   }
-  return { ok: true, gespraeche: [...map.values()] }
+  await andereWegeImPostfach(gate.db, map)
+  return {
+    ok: true,
+    gespraeche: [...map.values()].sort((a, b) => Date.parse(b.letzte.at) - Date.parse(a.letzte.at)),
+  }
+}
+
+/** Kontakte mit Tagebuch-Einträgen bzw. gesendeten Einsätzen gehören auch ins Postfach; die neueste Nachricht zählt. */
+async function andereWegeImPostfach(db: SupabaseClient, map: Map<string, WaGespraech>): Promise<void> {
+  const [tagebuch, einsaetze] = await Promise.all([
+    db
+      .from('auftrag_timeline')
+      .select('titel, created_at, freigegeben_at, auftraege!inner(kunde_id, kunden(name))')
+      .eq('fuer_kunde_freigegeben', true)
+      .not('auftraege.kunde_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(500),
+    db
+      .from('einsaetze')
+      .select('titel, gesendet_at, handwerker_id, handwerker(name, firma)')
+      .not('gesendet_at', 'is', null)
+      .order('gesendet_at', { ascending: false })
+      .limit(500),
+  ])
+  if (tagebuch.error) logDbError('app/whatsapp/actions:postfach-tagebuch', tagebuch.error)
+  if (einsaetze.error) logDbError('app/whatsapp/actions:postfach-einsaetze', einsaetze.error)
+  const eintragen = (ziel: WaZiel, typ: 'handwerker' | 'kunde', name: string, text: string, at: string) => {
+    const key = gespraechSchluessel(ziel)
+    const g = map.get(key)
+    if (!g) {
+      map.set(key, { schluessel: key, ziel, typ, name, letzte: { text, at, richtung: 'aus', status: '' }, ungelesen: 0, offen: 0 })
+    } else if (Date.parse(at) > Date.parse(g.letzte.at)) {
+      g.letzte = { text, at, richtung: 'aus', status: '' }
+    }
+  }
+  for (const r of tagebuch.data ?? []) {
+    const auf = one(r.auftraege as { kunde_id?: string | null; kunden?: unknown } | null)
+    if (!auf?.kunde_id) continue
+    const kd = one(auf.kunden as { name?: string | null } | null)
+    eintragen({ kundeId: String(auf.kunde_id) }, 'kunde', kd?.name?.trim() || 'Kunde', `Tagebuch: ${String(r.titel ?? '').trim()}`, String(r.freigegeben_at ?? r.created_at))
+  }
+  for (const e of einsaetze.data ?? []) {
+    if (!e.handwerker_id) continue
+    const hw = one(e.handwerker as { name?: string | null; firma?: string | null } | null)
+    eintragen({ handwerkerId: String(e.handwerker_id) }, 'handwerker', hw?.firma?.trim() || hw?.name?.trim() || 'Partner', `Einsatz: ${String(e.titel ?? '').trim()}`, String(e.gesendet_at))
+  }
 }
 
 /** Menü-Zähler: ungelesene eingehende Nachrichten. */

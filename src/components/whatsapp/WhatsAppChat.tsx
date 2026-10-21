@@ -341,12 +341,14 @@ export function WhatsAppChat({
               const trenner = t !== letzterTag
               letzterTag = t
               const ein = n.richtung === 'ein'
+              // Tagebuch, Einsatz, Partner-Update: nur Anzeige, nicht auswählbar
+              const waehlbar = istPartner && n.quelle === 'whatsapp'
               return (
                 <div key={n.id} className="wa-zeile-wrap">
                   {trenner ? <div className="wa-tag">{t}</div> : null}
                   <div className={cn('wa-zeile', ein ? 'wa-zeile--ein' : 'wa-zeile--aus')}>
                     {/* div statt Button: Videos, Audio und Links in der Blase bleiben bedienbar */}
-                    {auswahl ? (
+                    {auswahl && waehlbar ? (
                       <MockCheckbox
                         className="wa-zeile__wahl"
                         checked={auswahl.has(n.id)}
@@ -360,9 +362,10 @@ export function WhatsAppChat({
                         ein ? 'wa-blase--ein' : 'wa-blase--aus',
                         n.ungelesen && 'is-neu',
                         auswahl?.has(n.id) && 'is-gewaehlt',
-                        istPartner && 'is-waehlbar'
+                        waehlbar && 'is-waehlbar',
+                        n.quelle !== 'whatsapp' && 'wa-blase--anderer-weg'
                       )}
-                      {...(istPartner
+                      {...(waehlbar
                         ? {
                             role: 'button',
                             tabIndex: 0,
@@ -378,6 +381,7 @@ export function WhatsAppChat({
                         : {})}
                     >
                       {n.vorlage ? <span className="wa-vorlage">Vorlage</span> : null}
+                      {n.quelle_label ? <span className="wa-vorlage">{n.quelle_label}</span> : null}
                       {n.medium ? <Medium m={n.medium} onLoad={nachUnten} /> : null}
                       {n.text ? <span className="wa-text">{n.text}</span> : null}
                       {n.knoepfe.length ? (
@@ -391,7 +395,7 @@ export function WhatsAppChat({
                       ) : null}
                       <span className="wa-meta">
                         <span>{uhrzeit(n.created_at)}</span>
-                        {!ein ? <Haken status={n.status} /> : null}
+                        {!ein && n.quelle === 'whatsapp' ? <Haken status={n.status} /> : null}
                       </span>
                       {n.markierung ? <span className="wa-markierung">{MARKIERUNG[n.markierung]}</span> : null}
                       {n.fehler ? <span className="wa-fehler">{n.fehler}</span> : null}
