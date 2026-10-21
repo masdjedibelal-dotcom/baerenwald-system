@@ -99,7 +99,7 @@ export function CrmPositionEintragModal({
   useEffect(() => {
     if (!open || isEdit || !waSichtbar) return
     let aktiv = true
-    void safeAction(tagebuchWhatsAppEmpfaenger(auftragId)).then((r) => {
+    safeAction(tagebuchWhatsAppEmpfaenger(auftragId)).then((r) => {
       if (!aktiv) return
       const liste = r.ok ? r.liste : []
       setEmpfaenger(liste)
