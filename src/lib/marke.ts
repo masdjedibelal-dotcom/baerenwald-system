@@ -96,7 +96,7 @@ const MARKEN: Record<MarkeId, Marke> = {
     websiteHost: 'servus-teo.de',
     portalName: 'MeinTEO',
     kiName: 'TEO-Assistent',
-    portalUrl: 'https://app.servus-teo.de',
+    portalUrl: 'https://servus-teo.de',
     crmUrl: 'https://crm.servus-teo.de',
     dateiKurz: 'ServusTEO',
     infoEmail: 'info@servus-teo.de',
