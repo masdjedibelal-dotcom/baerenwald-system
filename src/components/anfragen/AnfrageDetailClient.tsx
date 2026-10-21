@@ -57,6 +57,8 @@ import { AnfrageStammdatenCard } from '@/components/anfragen/AnfrageStammdatenCa
 import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCards'
 import { MeldungsdetailsCard } from '@/components/anfragen/MeldungsdetailsCard'
 import { HvWarteFreigabeSheet } from '@/teo/hv/HvWarteFreigabeSheet'
+import { VerwaltungNachrichtenCard } from '@/teo/hv/VerwaltungNachrichtenCard'
+import { funktionAn } from '@/lib/marke'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
 import { AnfrageHandwerkerAnfragenSheet } from '@/components/anfragen/AnfrageHandwerkerAnfragenSheet'
 import { AnfragePartnerEinholungCards } from '@/components/anfragen/AnfragePartnerEinholungCards'
@@ -812,6 +814,7 @@ export function AnfrageDetailClient({
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
       <MeldungsdetailsCard lead={lead} />
       <HvMeldungKontextCards lead={lead} onSaved={() => refresh()} />
+      {funktionAn('hvWorkflow') && lead.auftraggeber_kunde_id ? <VerwaltungNachrichtenCard leadId={lead.id} /> : null}
     </>
   )
 

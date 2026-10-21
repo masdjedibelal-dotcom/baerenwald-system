@@ -22856,3 +22856,12 @@ button.dok-gruppe__kopf {
 }
 .lt-foto-zone__hinweis { display: block; font-size: var(--fs-caption); color: var(--text-3); }
 .dok-upload-zone__hinweis { display: block; width: 100%; font-size: var(--fs-caption); color: var(--text-3); }
+
+/* TEO: Nachrichten mit der Verwaltung (Anfrage-Detail) */
+.vw-nachrichten { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.vw-nachricht { padding: 10px 12px; border-radius: var(--r-sm); background: var(--bg-soft); }
+.vw-nachricht--teo { background: var(--green-50); }
+.vw-nachricht__kopf { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-meta); color: var(--text-3); }
+.vw-nachricht__kopf strong { color: var(--text); }
+.vw-nachricht__text { margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vw-nachrichten__fuss { display: flex; justify-content: flex-end; margin-top: 8px; }
