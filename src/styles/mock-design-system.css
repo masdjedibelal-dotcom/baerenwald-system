@@ -22766,8 +22766,6 @@ button.dok-gruppe__kopf {
 .wa-pane .wa-blase--aus { background: var(--wa-aus); border-top-right-radius: 0; }
 .wa-pane .wa-meta { color: var(--wa-meta); font-size: 11px; }
 .wa-pane .wa-vorlage { background: transparent; padding: 0; color: var(--wa-meta); font-size: 11px; }
-/* Tagebuch, Einsatz, Partner-Update: anderer Weg als WhatsApp — gestrichelter Rand */
-.wa-pane .wa-blase--anderer-weg { border: 1px dashed var(--border-strong); cursor: default; }
 .wa-pane__kopf { gap: 10px; background: var(--card); }
 .wa-pane__kopf .wa-kontakt__avatar { width: 36px; height: 36px; }
 .wa-pane__titel { flex: 1; }
