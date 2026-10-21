@@ -84,6 +84,7 @@ export function CrmPositionEintragModal({
       setTitel(split.titel)
       setBeschreibung(split.beschreibung)
       setFotoPaths(editEintrag.fotoPaths.filter(Boolean))
+      setPerWhatsApp(false)
       return
     }
     setSelectedIds([])
@@ -92,6 +93,23 @@ export function CrmPositionEintragModal({
     setFotoPaths((vorbelegung?.fotoPaths ?? []).slice(0, MAX_FOTOS))
     setPerWhatsApp(false)
   }, [open, editEintrag, vorbelegung])
+
+  // Neuer Eintrag: „per WhatsApp informieren“ vorab angekreuzt, sobald jemand mit Handynummer da ist
+  const waSichtbar = Boolean(wa?.sichtbar)
+  useEffect(() => {
+    if (!open || isEdit || !waSichtbar) return
+    let aktiv = true
+    void safeAction(tagebuchWhatsAppEmpfaenger(auftragId)).then((r) => {
+      if (!aktiv) return
+      const liste = r.ok ? r.liste : []
+      setEmpfaenger(liste)
+      setGewaehlt(new Set(liste.filter((e) => e.vor).map((e) => e.id)))
+      setPerWhatsApp(liste.length > 0)
+    })
+    return () => {
+      aktiv = false
+    }
+  }, [open, isEdit, waSichtbar, auftragId])
 
 
 
@@ -123,8 +141,8 @@ export function CrmPositionEintragModal({
             throw new Error(r.message)
           }
           toast.success(isEdit ? 'Eintrag aktualisiert' : 'Eintrag gespeichert')
-          // Nur an die angekreuzten Empfänger (alle abgewählt = keine WhatsApp)
-          if (!isEdit && perWhatsApp && wa?.sichtbar && gewaehlt.size > 0) {
+          // Nur an die angekreuzten Empfänger (alle abgewählt = keine WhatsApp); beim Bearbeiten nachträglich
+          if (perWhatsApp && wa?.sichtbar && gewaehlt.size > 0) {
             const w = await sendeBautagebuchWhatsApp({
               auftragId,
               titel: titel.trim(),
@@ -192,12 +210,12 @@ export function CrmPositionEintragModal({
           />
         </div>
 
-        {!isEdit && wa?.sichtbar ? (
+        {wa?.sichtbar ? (
           <>
             <label className="wa-check">
               <MockCheckbox checked={perWhatsApp} onChange={(e) => waUmschalten(e.target.checked)} />
               <span>
-                Kunde per WhatsApp informieren
+                {isEdit ? 'Kunde jetzt per WhatsApp informieren' : 'Kunde per WhatsApp informieren'}
                 <span className="wa-check__sub">Kurzer Text mit Link zur Projektseite (Fotos, Details).</span>
               </span>
             </label>
