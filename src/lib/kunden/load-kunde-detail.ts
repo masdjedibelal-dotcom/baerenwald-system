@@ -135,7 +135,7 @@ const KUNDE_DETAIL_RELATIONS = `
     `
 
 const KUNDE_ORG_FIELDS = `
-      portal_modus, org_kennung, org_anzeigename, org_logo_url,
+      portal_modus, org_kennung, org_anzeigename,
       impressum_url, datenschutz_url,
       freigabe_modus, freigabe_schwelle_eur, notfall_direkt, akut_fall_ids,
       ist_spam, spam_markiert_am,

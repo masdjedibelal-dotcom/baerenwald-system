@@ -110,7 +110,6 @@ export type Kunde = {
   /** URL-Slug → /melden/{org_kennung} */
   org_kennung?: string | null
   org_anzeigename?: string | null
-  org_logo_url?: string | null
   /** Absolute URL — Pflicht für Melde-Link / QR / Aushang (Mieter). */
   impressum_url?: string | null
   datenschutz_url?: string | null
@@ -279,9 +278,6 @@ export type Lead = {
   service_modus?: ServiceModus | null
   /** HV-Plattform: Meldungs-Workflow-Status */
   hv_meldung_status?: string | null
-  kostentraeger?: string | null
-  kostentraeger_vorgeschlagen?: boolean | null
-  versicherungs_nr?: string | null
   duplikat_hinweis?: boolean | null
   /** Nutzer hat Duplikat-Band geschlossen — Zusammenführen bleibt im ⋯ */
   duplikat_band_dismissed?: boolean | null
@@ -680,10 +676,6 @@ export type Auftrag = {
   ist_notfall?: boolean
   /** Nur aufwand (Spec Q3) */
   notfall_verguetung?: 'aufwand' | string | null
-  /** HV-Plattform: Kostenträger (Rechnung/Versicherungsakte) */
-  kostentraeger?: string | null
-  versicherungs_nr?: string | null
-  versicherungsakte_pdf_url?: string | null
   kunden?: Kunde
 }
 

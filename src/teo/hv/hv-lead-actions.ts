@@ -145,55 +145,6 @@ export async function disponiereHavarieNotmassnahme(
   return { ok: true, auftragId }
 }
 
-/** CRM: Kostenträger-Vorschlag an HV (z. B. Versicherung/SE). */
-export async function schlageKostentraegerVor(
-  leadId: string,
-  kostentraeger: string,
-  versicherungsNr?: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const gate = await requireCrmStaffDb()
-  if (!gate.ok) return { ok: false, message: gate.message }
-  const db = gate.db
-  const id = leadId?.trim()
-  const kt = kostentraeger?.trim()
-  if (!id || !kt) return { ok: false, message: 'Lead oder Kostenträger fehlt.' }
-
-  const { data: lead, error } = await db
-    .from('leads')
-    .select('id, auftraggeber_kunde_id, kostentraeger')
-    .eq('id', id)
-    .maybeSingle()
-  if (error) logDbError('lib/org/hv-lead-actions:leads', error)
-
-  if (!lead?.auftraggeber_kunde_id) {
-    return { ok: false, message: 'Kein HV-Vorgang.' }
-  }
-
-  const uid = gate.user.id
-  const patch: Record<string, unknown> = {
-    kostentraeger: kt,
-    kostentraeger_vorgeschlagen: true,
-    updated_at: new Date().toISOString(),
-  }
-  if (versicherungsNr?.trim()) patch.versicherungs_nr = versicherungsNr.trim()
-
-  const { error: __dbErr3 } = await db.from('leads').update(patch).eq('id', id)
-  if (__dbErr3) logDbError('lib/org/hv-lead-actions:leads', __dbErr3)
-
-  await writeAuditEvent({
-    entityType: 'lead',
-    entityId: id,
-    aktion: 'kostentraeger_vorgeschlagen',
-    actorId: uid,
-    actorRolle: 'crm',
-    kundeId: lead.auftraggeber_kunde_id,
-    payload: { von: lead.kostentraeger, nach: kt },
-  })
-
-  revalidateLeadDetail(id)
-  return { ok: true }
-}
-
 /** CRM: Angebot erstellt → Org-Freigabe + Audit. */
 export async function syncAngebotMitOrgFreigabe(input: {
   leadId: string

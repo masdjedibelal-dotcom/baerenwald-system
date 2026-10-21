@@ -8,7 +8,7 @@ import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 import { useTransition } from '@/components/ui/action-busy'
 import { C } from '@/lib/tokens/colors'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { saveKundeOrganisation } from '@/app/actions/kunden-organisation'
 import { FreigabeRegelnEditor } from '@/teo/hv/FreigabeRegelnEditor'
 import {
@@ -29,7 +29,6 @@ type Props = {
     | 'name'
     | 'org_kennung'
     | 'org_anzeigename'
-    | 'org_logo_url'
     | 'impressum_url'
     | 'datenschutz_url'
     | 'freigabe_modus'
@@ -41,12 +40,9 @@ type Props = {
 
 export function KundenOrganisationTab({ kunde, onSaved }: Props) {
   const [pending, startTransition] = useTransition()
-  const [logoUploading, setLogoUploading] = useState(false)
-  const logoInputRef = useRef<HTMLInputElement>(null)
 
   const [orgKennung, setOrgKennung] = useState(kunde.org_kennung ?? '')
   const [orgAnzeigename, setOrgAnzeigename] = useState(kunde.org_anzeigename ?? '')
-  const [orgLogoUrl, setOrgLogoUrl] = useState(kunde.org_logo_url ?? '')
   const [impressumUrl, setImpressumUrl] = useState(kunde.impressum_url ?? '')
   const [datenschutzUrl, setDatenschutzUrl] = useState(kunde.datenschutz_url ?? '')
   const [freigabeModus, setFreigabeModus] = useState<FreigabeModus>(kunde.freigabe_modus ?? 'freigabe')
@@ -60,7 +56,6 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
   useEffect(() => {
     setOrgKennung(kunde.org_kennung ?? '')
     setOrgAnzeigename(kunde.org_anzeigename ?? '')
-    setOrgLogoUrl(kunde.org_logo_url ?? '')
     setImpressumUrl(kunde.impressum_url ?? '')
     setDatenschutzUrl(kunde.datenschutz_url ?? '')
     setFreigabeModus(kunde.freigabe_modus ?? 'freigabe')
@@ -118,7 +113,6 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         portal_modus: 'organisation',
         org_kennung: orgKennung,
         org_anzeigename: orgAnzeigename || null,
-        org_logo_url: orgLogoUrl || null,
         impressum_url: impressumNorm,
         datenschutz_url: datenschutzNorm,
         freigabe_modus: freigabeModus,
@@ -143,37 +137,13 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
     }
   }
 
-  async function uploadLogo(file: File) {
-    setLogoUploading(true)
-    setErr(null)
-    try {
-      const fd = new FormData()
-      fd.set('file', file)
-      fd.set('filename', file.name || 'org-logo.png')
-      const res = await fetch('/api/einstellungen/logo', { method: 'POST', body: fd })
-      const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
-if (!res.ok || !json.url) {
-        throw new Error(json.error || 'Upload fehlgeschlagen')
-      }
-      setOrgLogoUrl(json.url)
-      toast.success(TOAST.logo_hochgeladen)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Upload fehlgeschlagen'
-      setErr(msg)
-      toast.error(msg)
-    } finally {
-      setLogoUploading(false)
-      if (logoInputRef.current) logoInputRef.current.value = ''
-    }
-  }
-
   return (
     <>
       <MockCard
         title="Organisation & Portal"
         icon="building"
         actions={
-          <MockBtn kind="primary" sm disabled={pending || logoUploading} onClick={requestSpeichern}>
+          <MockBtn kind="primary" sm disabled={pending} onClick={requestSpeichern}>
             {pending ? 'Speichern…' : 'Speichern'}
           </MockBtn>
         }
@@ -199,66 +169,6 @@ if (!res.ok || !json.url) {
             hint="Erscheint in den Portalen (HV, Melde, Mieter) — nicht nur der CRM-Kundenname."
           >
             <MockInput className="txt" placeholder="z. B. Muster Hausverwaltung GmbH" value={orgAnzeigename} onChange={(e) => setOrgAnzeigename(e.target.value)} disabled={pending} />
-          </MockField>
-
-          <MockField label="Logo" full>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 10,
-                  border: '0.03125rem solid var(--border)',
-                  background: 'var(--bg-soft)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  flexShrink: 0,
-                }}
-              >
-                {orgLogoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={orgLogoUrl}
-                    alt="Organisationslogo"
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                  />
-                ) : (
-                  <MockIcon ctx="default" n="photo" size={22} />
-                )}
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  hidden
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) void uploadLogo(file)
-                  }}
-                />
-                <MockBtn
-                  sm
-                  kind="ghost"
-                  disabled={pending || logoUploading}
-                  onClick={() => logoInputRef.current?.click()}
-                >
-                  {logoUploading ? 'Lädt…' : 'Hochladen'}
-                </MockBtn>
-                {orgLogoUrl ? (
-                  <MockBtn
-                    sm
-                    kind="ghost"
-                    disabled={pending || logoUploading}
-                    onClick={() => setOrgLogoUrl('')}
-                  >
-                    Löschen
-                  </MockBtn>
-                ) : null}
-              </div>
-            </div>
           </MockField>
 
           <MockField label="Impressum-URL (Mieter)" required full>

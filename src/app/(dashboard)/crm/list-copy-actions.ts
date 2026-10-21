@@ -14,7 +14,7 @@ export async function duplicateAnfrage(
   const { data: src, error: loadErr } = await supabase
     .from('leads')
     .select(
-      'kunde_id, kanal, situation, bereiche, bereiche_sonstiges, budget_ca, preis_min, preis_max, plz, zeitraum, zeitraum_von, zeitraum_bis, kundentyp, kontakt_name, kontakt_email, kontakt_telefon, kontakt_nachricht, funnel_daten, ist_bauprojekt, kunde_objekt_id, auftraggeber_kunde_id, anlass, kostentraeger, kostentraeger_vorgeschlagen, versicherungs_nr'
+      'kunde_id, kanal, situation, bereiche, bereiche_sonstiges, budget_ca, preis_min, preis_max, plz, zeitraum, zeitraum_von, zeitraum_bis, kundentyp, kontakt_name, kontakt_email, kontakt_telefon, kontakt_nachricht, funnel_daten, ist_bauprojekt, kunde_objekt_id, auftraggeber_kunde_id, anlass'
     )
     .eq('id', leadId)
     .maybeSingle()

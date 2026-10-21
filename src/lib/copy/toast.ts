@@ -185,8 +185,6 @@ export const TOAST = {
   korrektur_verworfen_kein_entwurf_gespeichert: "Korrektur verworfen",
   korrektur_entwurf_angelegt_bitte_pruefen_und_ers: "Korrektur angelegt. Bitte prüfen und dann senden.",
   korrektur_entwurf_angelegt_bitte_pruefen_und_ver: "Korrektur angelegt. Bitte prüfen und senden.",
-  kostentraeger_se_vorgeschlagen: "Kostenträger SE vorgeschlagen",
-  kostentraeger_versicherung_vorgeschlagen: "Kostenträger Versicherung vorgeschlagen",
   kunde_angelegt: "Kunde angelegt",
   kunde_geloescht: "Kunde gelöscht",
   kunde_kopiert: "Kunde kopiert",

@@ -23,8 +23,6 @@ type OrgKundePick = {
   name?: string | null
   org_anzeigename?: string | null
   org_kennung?: string | null
-  org_logo_url?: string | null
-  org_primary_color?: string | null
   telefon?: string | null
   email?: string | null
   impressum_url?: string | null
@@ -67,7 +65,7 @@ export async function renderMeldeAushangPdf(objektId: string): Promise<RenderAus
   const { data: objekt, error } = await supabaseAdmin
     .from('kunden_objekte')
     .select(
-      'id, titel, strasse, hausnummer, plz, ort, melde_slug, kunde_id, kunden(id, name, org_anzeigename, org_kennung, org_logo_url, org_primary_color, telefon, email, typ, impressum_url, datenschutz_url)'
+      'id, titel, strasse, hausnummer, plz, ort, melde_slug, kunde_id, kunden(id, name, org_anzeigename, org_kennung, telefon, email, typ, impressum_url, datenschutz_url)'
     )
     .eq('id', objektId)
     .maybeSingle()
@@ -98,11 +96,11 @@ export async function renderMeldeAushangPdf(objektId: string): Promise<RenderAus
     {
       orgName: kunde?.org_anzeigename?.trim() || kunde?.name?.trim() || 'Hausverwaltung',
       orgSub: 'Verwaltung',
-      primaryColor: kunde?.org_primary_color?.trim() || AUSHANG_PRIMARY_NEUTRAL,
+      primaryColor: AUSHANG_PRIMARY_NEUTRAL,
       objektTitel: objekt.titel?.trim() || 'Objekt',
       objektAdresse: adresse,
       meldeUrl,
-      logoUrl: kunde?.org_logo_url ?? null,
+      logoUrl: null,
       hvTelefon: kunde?.telefon ?? null,
       hvEmail: kunde?.email ?? null,
     },
@@ -118,7 +116,7 @@ export async function renderHvMeldeAushangPdf(kundeId: string): Promise<RenderAu
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
     .select(
-      'id, name, org_anzeigename, org_kennung, org_logo_url, org_primary_color, telefon, email, portal_modus, impressum_url, datenschutz_url'
+      'id, name, org_anzeigename, org_kennung, telefon, email, portal_modus, impressum_url, datenschutz_url'
     )
     .eq('id', kundeId)
     .maybeSingle()
@@ -147,11 +145,11 @@ export async function renderHvMeldeAushangPdf(kundeId: string): Promise<RenderAu
     {
       orgName,
       orgSub: 'Verwaltung',
-      primaryColor: (kunde as OrgKundePick).org_primary_color?.trim() || AUSHANG_PRIMARY_NEUTRAL,
+      primaryColor: AUSHANG_PRIMARY_NEUTRAL,
       objektTitel: 'alle Objekte',
       objektAdresse: null,
       meldeUrl,
-      logoUrl: (kunde as OrgKundePick).org_logo_url ?? null,
+      logoUrl: null,
       hvTelefon: (kunde as OrgKundePick).telefon ?? null,
       hvEmail: (kunde as OrgKundePick).email ?? null,
     },

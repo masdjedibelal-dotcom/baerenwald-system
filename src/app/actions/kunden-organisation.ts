@@ -11,7 +11,6 @@ export type SaveKundeOrganisationInput = {
   portal_modus: PortalModus
   org_kennung?: string | null
   org_anzeigename?: string | null
-  org_logo_url?: string | null
   impressum_url?: string | null
   datenschutz_url?: string | null
   freigabe_modus: FreigabeModus
@@ -109,7 +108,6 @@ export async function saveKundeOrganisation(
     portal_modus: 'organisation',
     org_kennung: slug,
     org_anzeigename: input.org_anzeigename?.trim() || null,
-    org_logo_url: input.org_logo_url?.trim() || null,
     freigabe_modus: freigabeModus,
     freigabe_schwelle_eur: parseSchwelle(input.freigabe_schwelle_eur),
     notfall_direkt: freigabeModus === 'freigabe' ? Boolean(input.notfall_direkt) : false,
