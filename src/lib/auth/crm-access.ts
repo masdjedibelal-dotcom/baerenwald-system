@@ -11,8 +11,8 @@ export function isBaerenwaldPrimaryStaffEmail(email: string | null | undefined):
 
 /**
  * Vertrauenswürdige Admin-Erkennung (client-sicher, kein next/headers):
- * 1. app_metadata.crm_role / app_metadata.is_crm_admin (kanonisch)
- * 2. Fallback user_metadata.role === 'admin' (Legacy, nur lesen)
+ * app_metadata.crm_role / app_metadata.is_crm_admin — nur der Server kann app_metadata setzen.
+ * NICHT user_metadata: das kann jeder angemeldete Nutzer selbst ändern (auth.updateUser).
  */
 export function isCrmAdmin(user: User | null | undefined): boolean {
   if (!user) return false
@@ -23,9 +23,7 @@ export function isCrmAdmin(user: User | null | undefined): boolean {
     is_crm_admin?: boolean
   }
   if (app.is_crm_admin === true) return true
-  if (app.crm_role === 'admin') return true
-  const meta = (user.user_metadata ?? {}) as { role?: string }
-  return meta.role === 'admin'
+  return app.crm_role === 'admin'
 }
 
 export function crmRoleFromUser(user: User | null | undefined): 'admin' | 'manager' | null {
@@ -33,8 +31,6 @@ export function crmRoleFromUser(user: User | null | undefined): 'admin' | 'manag
   if (isCrmAdmin(user)) return 'admin'
   const app = (user.app_metadata ?? {}) as { crm_role?: string }
   if (app.crm_role === 'manager') return 'manager'
-  const role = (user.user_metadata as { role?: string } | undefined)?.role
-  if (role === 'admin' || role === 'manager') return role
   return null
 }
 
