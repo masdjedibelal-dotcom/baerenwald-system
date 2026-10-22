@@ -5,6 +5,8 @@ const JOBS = [
   /** 00:00 UTC ≈ 02:00 Europe/Berlin (Sommer); 01:00 im Winter (MEZ) */
   { id: 'rechnungen', path: '/api/cron/rechnungen', hour: 0, minute: 0, dom: null, dow: null, mailRisk: true },
   { id: 'angebot-nachfass', path: '/api/cron/angebot-nachfass', hour: 9, minute: 0, dom: null, dow: null, mailRisk: true },
+  /** Servus TEO: fällige Pläne an TEO (Route prüft Marke; BW überspringt) */
+  { id: 'teo-plaene', path: '/api/cron/teo-plaene', hour: 5, minute: 0, dom: null, dow: null, mailRisk: true },
 ]
 
 function isStagingCronHost() {
