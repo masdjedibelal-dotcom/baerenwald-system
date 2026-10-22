@@ -8057,6 +8057,39 @@ export type Database = {
         }
         Relationships: []
       }
+      teo_einheiten: {
+        Row: {
+          aktiv: boolean
+          bezeichnung: string
+          created_at: string
+          id: string
+          kunde_id: string
+          kunde_objekt_id: string
+          lage: string | null
+          notiz: string | null
+        }
+        Insert: {
+          aktiv?: boolean
+          bezeichnung: string
+          created_at?: string
+          id?: string
+          kunde_id: string
+          kunde_objekt_id: string
+          lage?: string | null
+          notiz?: string | null
+        }
+        Update: {
+          aktiv?: boolean
+          bezeichnung?: string
+          created_at?: string
+          id?: string
+          kunde_id?: string
+          kunde_objekt_id?: string
+          lage?: string | null
+          notiz?: string | null
+        }
+        Relationships: []
+      }
       teo_mitteilungen: {
         Row: {
           aktiv: boolean
