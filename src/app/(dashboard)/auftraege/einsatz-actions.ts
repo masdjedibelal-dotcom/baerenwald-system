@@ -384,6 +384,8 @@ export async function createEinsatz(input: {
     mitarbeiterId = String(m.id)
   }
 
+  // Geheimer Link für Annehmen/Ablehnen aus der Mail (ohne Portal-Login) — hier merken, SELECT liefert ihn nicht zurück
+  const antwortToken = neuerAntwortToken()
   const { data, error } = await gate.db
     .from('einsaetze')
     .insert({
@@ -402,8 +404,7 @@ export async function createEinsatz(input: {
       // Nie automatisch angenommen — auch nicht bei „Nur eintragen“
       status: 'gesendet',
       erstellt_von: gate.user.id,
-      // Geheimer Link für Annehmen/Ablehnen aus der Mail (ohne Portal-Login)
-      antwort_token: neuerAntwortToken(),
+      antwort_token: antwortToken,
     })
     .select(SELECT)
     .single()
@@ -452,8 +453,8 @@ export async function createEinsatz(input: {
         ekBetrag: einsatz.ek_betrag,
         ekArt: einsatz.ek_art,
         portalLink: buildPartnerDashboardLink(),
-        annehmenLink: einsatzAntwortLink(String((data as { antwort_token?: string }).antwort_token ?? ''), 'annehmen'),
-        ablehnenLink: einsatzAntwortLink(String((data as { antwort_token?: string }).antwort_token ?? ''), 'ablehnen'),
+        annehmenLink: einsatzAntwortLink(antwortToken, 'annehmen'),
+        ablehnenLink: einsatzAntwortLink(antwortToken, 'ablehnen'),
       },
       branding
     )
