@@ -53,6 +53,7 @@ function LoginPageContent() {
   const searchParams = useSearchParams()
   const devError = searchParams.get('dev_error')
   const urlError = searchParams.get('error')
+  const passwortNeu = searchParams.get('passwort') === 'neu'
 
   useEffect(() => {
     let cancelled = false
@@ -236,6 +237,10 @@ function LoginPageContent() {
               <p className="crm-login__welcome-sub">
                 {staging ? 'Staging — Admin ist vorausgefüllt.' : 'Melden Sie sich mit Ihrem Konto an.'}
               </p>
+
+              {passwortNeu ? (
+                <div className="crm-login__alert crm-login__alert--ok">Passwort gespeichert. Bitte melden Sie sich jetzt an.</div>
+              ) : null}
 
               {staging ? (
                 <div className="crm-login__alert crm-login__alert--ok">

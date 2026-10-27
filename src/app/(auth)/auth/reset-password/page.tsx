@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Card } from '@/components/ui/Card'
 import { BrandLogo } from '@/components/brand/BrandLogo'
-import { verifyCrmStaffSession } from '@/app/(auth)/auth-actions'
+import { passwortMitLinkSetzen, verifyCrmStaffSession } from '@/app/(auth)/auth-actions'
 
 function ResetPasswordContent() {
   const supabase = createClient()
@@ -19,9 +19,16 @@ function ResetPasswordContent() {
   const [checking, setChecking] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  // Neuer Mail-Link: token_hash in der URL → Formular sofort, eingelöst wird erst beim Speichern
+  const tokenHash = searchParams.get('token_hash')
 
   useEffect(() => {
     let cancelled = false
+    if (tokenHash) {
+      setReady(true)
+      setChecking(false)
+      return
+    }
     void (async () => {
       const code = searchParams.get('code')
       if (code) {
@@ -60,7 +67,7 @@ function ResetPasswordContent() {
     return () => {
       cancelled = true
     }
-  }, [router, searchParams, supabase])
+  }, [router, searchParams, supabase, tokenHash])
 
   async function handleSave() {
     if (password.length < 8) {
@@ -73,6 +80,16 @@ function ResetPasswordContent() {
     }
     setLoading(true)
     setError(null)
+    if (tokenHash) {
+      const r = await passwortMitLinkSetzen(tokenHash, password)
+      setLoading(false)
+      if (!r.ok) {
+        setError(r.message)
+        return
+      }
+      router.replace('/login?passwort=neu')
+      return
+    }
     const { error: updErr } = await supabase.auth.updateUser({ password })
     setLoading(false)
     if (updErr) {

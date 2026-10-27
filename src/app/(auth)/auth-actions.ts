@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { CRM_LOGIN_PORTAL_ONLY_MESSAGE } from '@/lib/auth/crm-access'
 import { isStagingAdminEmail, STAGING_ADMIN_EMAIL, STAGING_ADMIN_NAME } from '@/lib/auth/staging-admin'
-import { crmPasswordResetRedirectUrl } from '@/lib/auth/crm-auth-url'
+import { CRM_PUBLIC_ORIGIN, crmPasswordResetRedirectUrl } from '@/lib/auth/crm-auth-url'
 import { MARKE } from '@/lib/marke'
 import { sendMail } from '@/lib/mail-service'
 import { C } from '@/lib/tokens/colors'
@@ -85,13 +85,13 @@ export async function requestCrmPasswordReset(
     options: { redirectTo },
   })
 
-  // Eigener Link mit token_hash: der Callback prüft ihn serverseitig (verifyOtp).
-  // Der action_link von Supabase liefert die Sitzung im #-Fragment, das der Server nie sieht.
+  // Link direkt aufs Formular mit token_hash. Eingelöst wird erst beim Speichern, serverseitig
+  // (passwortMitLinkSetzen) — keine Browser-Sitzung nötig, Link-Scanner verbrauchen nichts.
   const tokenHash = linkData?.properties?.hashed_token?.trim()
   if (linkErr || !tokenHash) {
     return { ok: false, message: linkErr?.message ?? 'Reset-Link konnte nicht erzeugt werden.' }
   }
-  const resetUrl = new URL(redirectTo)
+  const resetUrl = new URL(`${CRM_PUBLIC_ORIGIN}/auth/reset-password`)
   resetUrl.searchParams.set('token_hash', tokenHash)
   resetUrl.searchParams.set('type', 'recovery')
   const actionLink = resetUrl.toString()
@@ -122,5 +122,34 @@ export async function requestCrmPasswordReset(
     return { ok: false, message: sent.error ?? 'E-Mail konnte nicht gesendet werden.' }
   }
 
+  return { ok: true }
+}
+
+/**
+ * Passwort über den Link aus der Reset-Mail setzen: Code einlösen und Passwort im selben Server-Schritt.
+ * Danach normal anmelden — hängt nicht davon ab, dass der Browser eine Sitzung übernimmt.
+ */
+export async function passwortMitLinkSetzen(
+  tokenHash: string,
+  passwort: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const hash = tokenHash.trim()
+  if (!hash) return { ok: false, message: 'Link unvollständig. Bitte „Passwort vergessen“ erneut nutzen.' }
+  if (passwort.length < 8) return { ok: false, message: 'Mindestens 8 Zeichen.' }
+
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.verifyOtp({ type: 'recovery', token_hash: hash })
+  const uid = data?.user?.id
+  if (error || !uid) {
+    return { ok: false, message: 'Link abgelaufen oder schon benutzt. Bitte „Passwort vergessen“ erneut anfordern.' }
+  }
+  const staff = await verifyCrmStaffSession(uid)
+  if (!staff.ok) return { ok: false, message: staff.message }
+
+  const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(uid, { password: passwort })
+  if (updErr) {
+    logDbError('app/auth-actions:passwort-setzen', updErr)
+    return { ok: false, message: 'Passwort konnte nicht gespeichert werden.' }
+  }
   return { ok: true }
 }
