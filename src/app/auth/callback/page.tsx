@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BrandLogo } from '@/components/brand/BrandLogo'
 import { completeAuthCallback } from '@/app/auth/callback/complete-auth-callback'
@@ -13,9 +13,12 @@ function AuthCallbackInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [err, setErr] = useState<string | null>(null)
+  // Einmal-Link (token_hash/code) nur einmal einlösen — ein zweiter Lauf (z. B. StrictMode) würde ihn als „abgelaufen“ melden
+  const gestartet = useRef(false)
 
   useEffect(() => {
-    let cancelled = false
+    if (gestartet.current) return
+    gestartet.current = true
     void (async () => {
       const res = await completeAuthCallback({
         code: searchParams.get('code'),
@@ -23,13 +26,9 @@ function AuthCallbackInner() {
         type: searchParams.get('type'),
         next: searchParams.get('next'),
       })
-      if (cancelled) return
       if (!res.ok) setErr(res.message)
       router.replace(res.redirect)
     })()
-    return () => {
-      cancelled = true
-    }
   }, [router, searchParams])
 
   return (
