@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 import { cache } from 'react'
-import { KUNDE_MAIL_BCC } from '@/lib/mail-constants'
+import { KUNDE_MAIL_BCC, MARKE_MAIL_BCC_IMMER } from '@/lib/mail-constants'
 import { rewriteMailLogoUrlsToHosted } from '@/lib/mail/mail-logo-inline'
 import { type MailInlineLogoAttachment } from '@/lib/mail/mail-logo-inline.server'
 import { createClient } from '@/lib/supabase-server'
@@ -89,12 +89,23 @@ function normalizeRecipients(list?: string | string[]): string[] | undefined {
   return normalized.length ? normalized : undefined
 }
 
-function resolveBcc(opts: SendMailOptions): string[] | undefined {
+/** Mails mit Anmelde-/Reset-Links: nie in Kopie an andere Postfächer. */
+const OHNE_BCC_IMMER_TYPEN = new Set(['crm_password_reset'])
+
+function resolveBccBasis(opts: SendMailOptions): string[] | undefined {
   if (opts.bcc !== undefined) {
     return normalizeRecipients(opts.bcc)
   }
   if (!KUNDE_MAIL_BCC_TYPEN.has(opts.typ)) return undefined
   return [KUNDE_MAIL_BCC]
+}
+
+function resolveBcc(opts: SendMailOptions): string[] | undefined {
+  const basis = resolveBccBasis(opts) ?? []
+  const immer = OHNE_BCC_IMMER_TYPEN.has(opts.typ) ? [] : MARKE_MAIL_BCC_IMMER
+  const empfaenger = new Set((Array.isArray(opts.an) ? opts.an : [opts.an]).map((x) => x.trim().toLowerCase()))
+  const alle = [...basis, ...immer].filter((x, i, arr) => !empfaenger.has(x.toLowerCase()) && arr.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i)
+  return alle.length ? alle : undefined
 }
 
 async function resolveGesendetVon(): Promise<string | null> {

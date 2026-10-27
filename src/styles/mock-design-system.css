@@ -22475,6 +22475,15 @@ button.abschlagsplan-zeile__del:hover { background: var(--red-bg); color: var(--
   gap: 4px;
   margin-top: 6px;
   width: 100%;
+  flex-basis: 100%;
+}
+/* Handy: Name volle Breite, Gewerke-Pills in eigener Zeile darunter */
+.vg-row--kontakt > .vg-vorgang {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.vg-row--kontakt > .vg-vorgang .t {
+  flex: 1 1 0;
 }
 
 /* Dokumente (05.10.2026): flache Gruppen + Listenzeilen statt Karten in Karten — auch mobil */
