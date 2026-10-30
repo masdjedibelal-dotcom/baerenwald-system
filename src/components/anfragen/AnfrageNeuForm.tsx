@@ -16,13 +16,13 @@ import {
   FACHDETAILS_CONFIG,
   GROESSEN_CONFIG,
   KUNDENTYP_OPTIONS,
-  bereicheFuerSituation,
   fachdetailKeysForBereich,
   groessePropLabel,
   hatGroesseFeld,
   normalizeSituation,
   type SituationValue,
 } from '@/lib/vorab-formular-config'
+import { bereicheForStaffSituation } from '@/lib/anfragen/staff-funnel-steps'
 import { BEREICH_LABELS,KANAL_LABELS,cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase'
 import { parseLeadFunnelDaten } from '@/lib/lead-funnel-daten'
@@ -576,7 +576,7 @@ export function AnfrageNeuForm({
     if (!isBearbeiten) router.push(`/anfragen/${outId}`)
   }
 
-  const verfuegbareBereiche = situation ? bereicheFuerSituation(situation) : []
+  const verfuegbareBereiche = situation ? bereicheForStaffSituation(situation) : []
   const showDetails = bereiche.length > 0
   const isModal = variant === 'modal'
   const isSheet = variant === 'sheet'

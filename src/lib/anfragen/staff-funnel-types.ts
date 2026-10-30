@@ -1,5 +1,6 @@
 import type { SituationValue } from '@/lib/vorab-formular-config'
 import type { LeadKanal } from '@/lib/types'
+import { istTeo } from '@/lib/marke'
 
 /** Formular = Card-Funnel wie Website; Frei = Vorhaben/Beschreibung als Text. */
 export type StaffErfassungsModus = 'formular' | 'frei'
@@ -72,7 +73,7 @@ export type StaffFunnelState = {
  */
 export type StaffAnliegenId = 'erneuern' | 'betreuung' | 'kaputt' | 'gewerbe'
 
-export const STAFF_ANLIEGEN: {
+const STAFF_ANLIEGEN_BW: {
   id: StaffAnliegenId
   label: string
   hint: string
@@ -111,11 +112,38 @@ export const STAFF_ANLIEGEN: {
   },
 ]
 
+/** Servus TEO: dieselben Fälle wie die Website-Anfrage (Schaden, Maßnahme, Laufender Betrieb) — gleiche Situationen dahinter. */
+const STAFF_ANLIEGEN_TEO: typeof STAFF_ANLIEGEN_BW = [
+  {
+    id: 'kaputt',
+    label: 'Schaden im Objekt',
+    hint: 'Rohrbruch, Heizung aus, Klingel defekt',
+    icon: '02-reparatur',
+    situation: 'kaputt',
+  },
+  {
+    id: 'erneuern',
+    label: 'Angebot für eine Maßnahme',
+    hint: 'Dach, Fassade, Treppenhaus, auch für den Beschluss',
+    icon: '01-haus-erneuern',
+    situation: 'erneuern',
+  },
+  {
+    id: 'betreuung',
+    label: 'Laufender Betrieb',
+    hint: 'Hausmeister, Reinigung, Winterdienst, Wartungen',
+    icon: '03-betreuung',
+    situation: 'betreuung',
+  },
+]
+
+export const STAFF_ANLIEGEN = istTeo ? STAFF_ANLIEGEN_TEO : STAFF_ANLIEGEN_BW
+
 /** Labels inkl. Legacy-Anliegen (ältere CRM-Erfassungen). */
 export const STAFF_ANLIEGEN_LABELS: Record<string, string> = {
-  erneuern: 'Umbau & Modernisierung',
-  betreuung: 'Betreuung',
-  kaputt: 'Reparatur & Notfall',
+  erneuern: istTeo ? 'Angebot für eine Maßnahme' : 'Umbau & Modernisierung',
+  betreuung: istTeo ? 'Laufender Betrieb' : 'Betreuung',
+  kaputt: istTeo ? 'Schaden im Objekt' : 'Reparatur & Notfall',
   gewerbe: 'Gewerbe',
   individuell: 'Individuell',
   termin: 'Termin / Beratung',

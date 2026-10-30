@@ -2,8 +2,10 @@ import {
   bereicheFuerSituation,
   fachdetailKeysForBereich,
   hatGroesseFeld,
+  type BereichOption,
   type SituationValue,
 } from '@/lib/vorab-formular-config'
+import { istTeo } from '@/lib/marke'
 import type { StaffFunnelState } from '@/lib/anfragen/staff-funnel-types'
 import {
   anliegenToSituation
@@ -131,9 +133,22 @@ export function staffFunnelGroesseBereiche(state: StaffFunnelState): string[] {
   return state.bereiche.filter((b) => hatGroesseFeld(b))
 }
 
-export function bereicheForStaffSituation(situation: SituationValue | ''): ReturnType<
-  typeof bereicheFuerSituation
-> {
+/**
+ * Servus TEO: Schadenbereiche wie Website, Mieter-Meldung und Arbeitsplatz (Portal `melde-bereiche.ts`),
+ * hier mit den Rechner-Werten der Website-Anfrage (Fachfragen/Gewerke im CRM).
+ */
+const TEO_SCHADEN_BEREICHE: BereichOption[] = [
+  { value: 'sanitaer', label: 'Wasser, Rohr, WC', situation: ['kaputt', 'notfall'] },
+  { value: 'heizung', label: 'Heizung, Warmwasser', situation: ['kaputt', 'notfall'] },
+  { value: 'elektrik', label: 'Strom, Licht, Klingel', situation: ['kaputt', 'notfall'] },
+  { value: 'fenster', label: 'Tür, Fenster, Schloss', situation: ['kaputt', 'notfall'] },
+  { value: 'dach', label: 'Dach, Regenrinne', situation: ['kaputt', 'notfall'] },
+  { value: 'schimmel', label: 'Feuchtigkeit, Schimmel', situation: ['kaputt', 'notfall'] },
+  { value: 'sonstiges', label: 'Etwas anderes', situation: ['kaputt', 'notfall'] },
+]
+
+export function bereicheForStaffSituation(situation: SituationValue | ''): BereichOption[] {
   if (!situation) return []
+  if (istTeo && (situation === 'kaputt' || situation === 'notfall')) return TEO_SCHADEN_BEREICHE
   return bereicheFuerSituation(situation)
 }
