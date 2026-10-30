@@ -41,6 +41,21 @@ const HANDWERKSKARTE_TYP: ComplianceDokumentTyp = {
   mehrfach_erlaubt: false,
 }
 
+/** Freistellungsbescheinigung § 48b EStG — Upload mit „gültig bis“ */
+const FREISTELLUNG_TYP: ComplianceDokumentTyp = {
+  id: 'freistellungsbescheinigung',
+  slug: 'freistellungsbescheinigung',
+  bezeichnung: 'Freistellungsbescheinigung § 48b EStG',
+  beschreibung: null,
+  pflicht_fuer_fachbetriebe: false,
+  erneuerung_monate: 36,
+  sort_order: 2,
+  mehrfach_erlaubt: false,
+}
+
+/** Feste Arten mit eigenem Titel und „gültig bis“ in der Liste */
+const FESTE_TYPEN = new Set(['handwerkskarte', 'freistellungsbescheinigung'])
+
 const ALLGEMEIN_KEY = 'allgemein'
 const ALLGEMEIN_TITLE = 'Allgemein'
 
@@ -67,11 +82,13 @@ export function HandwerkerAkteDokumente({
   dokumente,
   auftraege = [],
   handwerkskarteTyp: handwerkskarteTypProp = null,
+  freistellungTyp: freistellungTypProp = null,
 }: {
   handwerkerId: string
   dokumente: PartnerDokument[]
   /** Handwerkskarte liegt mit in der Akte (kein eigener Tab mehr) */
   handwerkskarteTyp?: ComplianceDokumentTyp | null
+  freistellungTyp?: ComplianceDokumentTyp | null
   auftraege?: {
     id: string
     titel: string | null
@@ -81,6 +98,7 @@ export function HandwerkerAkteDokumente({
 }) {
   const isMobile = useIsMobile()
   const handwerkskarteTyp = handwerkskarteTypProp ?? HANDWERKSKARTE_TYP
+  const freistellungTyp = freistellungTypProp ?? FREISTELLUNG_TYP
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editDoc, setEditDoc] = useState<PartnerDokument | null>(null)
 
@@ -105,7 +123,7 @@ export function HandwerkerAkteDokumente({
   const rows = useMemo((): AkteDocRow[] => {
     return dokumente
       .filter(
-        (d) => d.datei_url?.trim() && (istEigeneUnterlageTyp(d.typ) || d.typ === 'handwerkskarte')
+        (d) => d.datei_url?.trim() && (istEigeneUnterlageTyp(d.typ) || FESTE_TYPEN.has(d.typ))
       )
       .map((d) => {
         const aid = d.auftrag_id?.trim()
@@ -141,20 +159,28 @@ export function HandwerkerAkteDokumente({
     editDoc != null
       ? editDoc.typ === 'handwerkskarte'
         ? handwerkskarteTyp
-        : {
+        : editDoc.typ === 'freistellungsbescheinigung'
+          ? freistellungTyp
+          : {
             ...AKTE_UPLOAD_TYP,
             slug: editDoc.typ,
             bezeichnung: editDoc.bezeichnung || 'Dokument',
           }
       : handwerkskarteTyp
-  const uploadTypen = [handwerkskarteTyp, AKTE_UPLOAD_TYP]
+  const uploadTypen = [handwerkskarteTyp, freistellungTyp, AKTE_UPLOAD_TYP]
 
   function rowMeta(doc: PartnerDokument) {
-    const istKarte = doc.typ === 'handwerkskarte'
-    const title = istKarte ? 'Handwerkskarte' : doc.bezeichnung?.trim() || 'Dokument'
+    const fest = FESTE_TYPEN.has(doc.typ)
+    const title =
+      doc.typ === 'handwerkskarte'
+        ? 'Handwerkskarte'
+        : doc.typ === 'freistellungsbescheinigung'
+          ? 'Freistellungsbescheinigung'
+          : doc.bezeichnung?.trim() || 'Dokument'
+    const abgelaufen = fest && doc.gueltig_bis && String(doc.gueltig_bis).slice(0, 10) < new Date().toISOString().slice(0, 10)
     const teile = [
       doc.hochgeladen_am ? `Hochgeladen ${formatDate(doc.hochgeladen_am)}` : null,
-      istKarte && doc.gueltig_bis ? `gültig bis ${formatDate(doc.gueltig_bis)}` : null,
+      fest && doc.gueltig_bis ? `${abgelaufen ? 'abgelaufen am' : 'gültig bis'} ${formatDate(doc.gueltig_bis)}` : null,
     ].filter(Boolean)
     return { title, meta: teile.length ? teile.join(' · ') : null }
   }
@@ -228,7 +254,7 @@ export function HandwerkerAkteDokumente({
             }}
           >
             <MockIcon ctx="btn" n="cloud-upload" size={18} />
-            Handwerkskarte oder Dokument hochladen
+            Handwerkskarte, Freistellung oder Dokument hochladen
           </div>
         ) : null}
         {rows.length === 0 ? (

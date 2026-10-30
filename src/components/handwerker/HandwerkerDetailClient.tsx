@@ -174,12 +174,9 @@ export function HandwerkerDetailClient({
     }
   }, [notizen, hw.id, hw.notizen, router])
 
-  // Pflichtnachweise entfallen (04.10.2026): nur noch die Handwerkskarte, Rahmenvertrag separat
+  // Pflichtnachweise entfallen (04.10.2026): nur Handwerkskarte + Freistellungsbescheinigung, Rahmenvertrag separat
   const complianceTypenStandard = useMemo(
-    () =>
-      filterStandardComplianceTypen(complianceTypen, hwGewerkSlugs, gewerke).filter(
-        (t) => t.slug === 'handwerkskarte'
-      ),
+    () => filterStandardComplianceTypen(complianceTypen, hwGewerkSlugs, gewerke),
     [complianceTypen, hwGewerkSlugs, gewerke]
   )
 
@@ -325,7 +322,8 @@ export function HandwerkerDetailClient({
       handwerkerId={hw.id}
       dokumente={payload.dokumente}
       auftraege={payload.auftraege}
-      handwerkskarteTyp={complianceTypenStandard[0] ?? null}
+      handwerkskarteTyp={complianceTypenStandard.find((t) => t.slug === 'handwerkskarte') ?? null}
+      freistellungTyp={complianceTypenStandard.find((t) => t.slug === 'freistellungsbescheinigung') ?? null}
     />
   )
 
