@@ -98,6 +98,10 @@
     {
       "crm": "src/lib/status/write-einsatz-status.ts",
       "portal": "src/lib/status/write-einsatz-status.ts"
+    },
+    {
+      "crm": "src/teo/hv/plan-logik.ts",
+      "portal": "src/teo/arbeitsplatz/plaene/plan-logik.ts"
     }
   ],
   "planned": [

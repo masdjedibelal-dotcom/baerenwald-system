@@ -15,6 +15,7 @@ import { Suspense,useEffect,useMemo,useState } from 'react'
 import { DetailActionsBar } from '@/components/layout/DetailActionsBar'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
 import { FreigabeSettingsCard } from '@/teo/hv/FreigabeSettingsCard'
+import { ObjektPlaeneTab } from '@/teo/hv/ObjektPlaeneTab'
 import { ObjektAkteReadOnlySection } from '@/components/objektakte/ObjektAkteReadOnlySection'
 import { ObjektKontakteSection } from '@/components/objektakte/ObjektKontakteSection'
 import { KundenObjektModal } from '@/components/kunden/KundenObjektModal'
@@ -26,7 +27,7 @@ import type { ObjektAkteDetailPayload,ObjektHistorieRow } from '@/lib/objektakte
 import type { Gewerk,Kunde,KundenObjekt } from '@/lib/types'
 import type { VorgangListeRow } from '@/lib/vorgang/types'
 
-type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'anlagen' | 'historie' | 'vorgaenge' | 'akte'
+type ObjektAkteTab = 'uebersicht' | 'einheiten' | 'anlagen' | 'historie' | 'vorgaenge' | 'plaene' | 'akte'
 
 function objektErbtFreigabe(o: KundenObjekt): boolean {
   return o.freigabe_schwelle_eur == null && o.notfall_direkt == null && o.akut_fall_ids == null
@@ -228,6 +229,17 @@ export function ObjektAkteDetailClient({
         </Suspense>
       ),
     },
+    // Servus TEO: Pläne (Checklisten, Wartungen) zentral pflegen — gleiche Pläne wie im Arbeitsplatz der Verwaltung
+    ...(funktionAn('hvWorkflow')
+      ? [
+          {
+            id: 'plaene',
+            label: 'Pläne',
+            icon: 'clipboard-check',
+            render: () => <ObjektPlaeneTab kundeId={kunde.id} objektId={objektState.id} />,
+          } satisfies DetailShellGroup,
+        ]
+      : []),
     {
       id: 'akte',
       label: 'Akte',
