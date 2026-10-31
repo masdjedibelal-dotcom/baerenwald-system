@@ -19,7 +19,7 @@ import {
 } from '@/lib/vertraege/rahmen-anlagen'
 import type { FirmenEinstellungen } from '@/lib/einstellungen-keys'
 import { handwerkerAnzeigename } from '@/lib/vertraege/build-vertrag-texte'
-import { MARKE } from '@/lib/marke'
+import { istTeo, MARKE } from '@/lib/marke'
 
 const GRUEN = C.greenDark
 const TEXT_PRIMARY = C.gray900
@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: GRUEN,
   },
-  logo: { height: 80, maxWidth: 320, objectFit: 'contain' },
+  logo: { height: istTeo ? 46 : 80, maxWidth: 320, objectFit: 'contain' },
   docTitleCenter: {
     fontSize: 13,
     fontWeight: 'bold',

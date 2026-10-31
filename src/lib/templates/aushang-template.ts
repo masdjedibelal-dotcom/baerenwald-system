@@ -3,8 +3,9 @@
  * Kompakt für A4 mit Standard-PDF-Rändern (eine Druckseite).
  */
 
+import { PDF_FONT_IMPORT } from '@/lib/pdf/chrome'
 import { C } from '@/lib/tokens/colors'
-import { MARKE } from '@/lib/marke'
+import { istTeo, MARKE } from '@/lib/marke'
 const GOLD = C.accentGold3
 
 export type AushangHtmlInput = {
@@ -19,6 +20,8 @@ export type AushangHtmlInput = {
   logoUrl?: string | null
   hvTelefon?: string | null
   hvEmail?: string | null
+  /** TEO-Wortmarke (data:/https) für „Ein Service von teo.“ — Standard: Website-Datei */
+  teoLogoUrl?: string | null
 }
 
 function esc(s: string): string {
@@ -35,6 +38,7 @@ function hexOr(primary: string | null | undefined, fallback: string): string {
 }
 
 export function buildAushangHtml(p: AushangHtmlInput): string {
+  if (istTeo) return buildAushangHtmlTeo(p)
   const primary = hexOr(p.primaryColor, C.grayNeutral7)
   const org = (p.orgName || 'Hausverwaltung').trim()
   const sub = (p.orgSub || 'Mieter-Service').trim()
@@ -105,6 +109,85 @@ export function buildAushangHtml(p: AushangHtmlInput): string {
     <footer style="padding:12px 4px 0;border-top:1px solid ${C.gray200};font-size:7.5pt;color:${C.grayNeutral4};line-height:1.4;display:flex;justify-content:space-between;gap:12px;">
       <div><strong>Kein Smartphone?</strong><br/>Melden Sie sich bei Ihrer Hausverwaltung: ${esc(kontakt)}</div>
       <div style="text-align:right;max-width:220px;">Datenschutz: Angaben nur zur Schadenbearbeitung.<br/><span style="font-size:6.5pt;color:${C.grayNeutral3};">Ein Service von ${MARKE.name}</span></div>
+    </footer>
+  </div>
+</body></html>`
+}
+
+/**
+ * Servus TEO: Plakat fürs Treppenhaus im Website-Look (Navy/Gold, Manrope).
+ * Farben sind fest — die Verwaltung erscheint nur mit Namen und (optional) Logo.
+ */
+function buildAushangHtmlTeo(p: AushangHtmlInput): string {
+  const NAVY = '#0b1f3a'
+  const GOLD_TEO = '#e8a317'
+  const TEXT_2 = '#4a5d75'
+  const LINIE = '#dce4ee'
+  const org = (p.orgName || 'Hausverwaltung').trim()
+  const objekt = (p.objektTitel || '').trim()
+  const adresse = (p.objektAdresse || '').trim()
+  const kontakt = [p.hvTelefon?.trim(), p.hvEmail?.trim()].filter(Boolean).map((z) => esc(String(z)))
+
+  const logo = p.logoUrl?.trim()
+  const logoOk = logo && (logo.startsWith('data:') || /^https?:\/\//i.test(logo))
+  const absender = logoOk
+    ? `<img src="${logo!.replace(/"/g, '&quot;')}" alt="" style="height:16mm;width:auto;max-width:70mm;object-fit:contain;display:block;" />`
+    : `<div style="font-size:15pt;font-weight:800;color:${NAVY};letter-spacing:-0.01em;">${esc(org)}</div>`
+  const teoLogo = p.teoLogoUrl?.trim() || `https://${MARKE.websiteHost}/brand/teo/logo-wordmark.png`
+
+  const qr = p.qrDataUrl?.trim()
+  const qrHtml = qr
+    ? `<img src="${qr.replace(/"/g, '&quot;')}" alt="QR-Code zur Meldeseite" style="width:82mm;height:82mm;display:block;" />`
+    : `<div style="width:82mm;height:82mm;display:flex;align-items:center;justify-content:center;color:${TEXT_2};font-size:11pt;">QR-Code</div>`
+
+  const schritte = [
+    ['1', 'Scannen', 'Handy-Kamera auf den QR-Code halten.'],
+    ['2', 'Melden', 'Bereich wählen, Foto machen, kurz beschreiben.'],
+    ['3', 'Verfolgen', 'Sie bekommen eine Bestätigung und sehen den Stand.'],
+  ]
+
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"/><title>Aushang Schadenmeldung</title>
+<style>
+  ${PDF_FONT_IMPORT}
+  @page { size: A4; margin: 8mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'Manrope', Arial, Helvetica, sans-serif; color: ${NAVY}; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .blatt { height: 280mm; padding: 8mm 8mm 4mm; display: flex; flex-direction: column; overflow: hidden; }
+</style>
+</head><body>
+  <div class="blatt">
+    <header style="display:flex;justify-content:space-between;align-items:flex-end;gap:10mm;padding-bottom:6mm;border-bottom:1.5pt solid ${NAVY};">
+      <div>${absender}${logoOk ? `<div style="margin-top:2mm;font-size:10pt;font-weight:700;">${esc(org)}</div>` : ''}</div>
+      <div style="text-align:right;font-size:10pt;line-height:1.45;color:${TEXT_2};">
+        ${objekt ? `<div style="font-weight:700;color:${NAVY};">${esc(objekt)}</div>` : ''}
+        ${adresse ? `<div>${esc(adresse)}</div>` : ''}
+      </div>
+    </header>
+
+    <h1 style="margin:13mm 0 0;font-size:40pt;line-height:1.05;font-weight:800;letter-spacing:-0.025em;">Schaden im Haus?<br/>Hier melden<span style="color:${GOLD_TEO};">.</span></h1>
+    <p style="margin:5mm 0 0;font-size:14pt;line-height:1.45;color:${TEXT_2};max-width:150mm;">QR-Code scannen, Foto machen, fertig. Ohne App und ohne Warteschleife – die Meldung geht direkt an Ihre Verwaltung.</p>
+
+    <div style="margin:11mm auto 0;padding:7mm;border:1.5pt solid ${LINIE};border-radius:6mm;text-align:center;">
+      ${qrHtml}
+    </div>
+    <div style="margin-top:4mm;text-align:center;font-size:9pt;color:${TEXT_2};word-break:break-all;">${esc(p.meldeUrl)}</div>
+
+    <div style="margin-top:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:7mm;">
+      ${schritte
+        .map(
+          ([nr, titel, text]) => `<div style="border-top:2pt solid ${GOLD_TEO};padding-top:4mm;">
+        <div style="font-size:9pt;font-weight:800;color:${GOLD_TEO};letter-spacing:0.08em;">SCHRITT ${nr}</div>
+        <div style="margin-top:1.5mm;font-size:14pt;font-weight:800;">${esc(titel)}</div>
+        <div style="margin-top:1.5mm;font-size:10pt;line-height:1.4;color:${TEXT_2};">${esc(text)}</div>
+      </div>`
+        )
+        .join('')}
+    </div>
+
+    <footer style="margin-top:9mm;padding-top:5mm;border-top:0.75pt solid ${LINIE};display:flex;justify-content:space-between;align-items:center;gap:8mm;font-size:9.5pt;line-height:1.45;color:${TEXT_2};">
+      <div><strong style="color:${NAVY};">Kein Smartphone?</strong> Melden Sie sich bei ${esc(org)}${kontakt.length ? `:<br/>${kontakt.join(' · ')}` : '.'}</div>
+      <div style="display:flex;align-items:center;gap:2.5mm;white-space:nowrap;font-size:8pt;">Ein Service von <img src="${teoLogo.replace(/"/g, '&quot;')}" alt="teo." style="height:6mm;width:auto;display:block;" /></div>
     </footer>
   </div>
 </body></html>`

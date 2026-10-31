@@ -488,6 +488,10 @@ export async function renderHtmlToPdfBuffer(
     const page = await browser.newPage()
     await page.setViewport({ width: 794, height: 1123 })
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+    // Web-Schrift (TEO: Manrope) — erst Stylesheet laden lassen, sonst meldet fonts.ready sofort „fertig“
+    if (html.includes('fonts.googleapis.com')) {
+      await page.waitForNetworkIdle({ idleTime: 300, timeout: 8_000 }).catch(() => undefined)
+    }
     await page.evaluate(() => document.fonts?.ready).catch((err) => {
       console.error('[angebote/render-angebot-html-pdf] fonts.ready', err)
       return undefined

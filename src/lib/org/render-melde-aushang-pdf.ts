@@ -12,6 +12,7 @@ import {
 import { buildMeldeLink } from '@/lib/org/org-portal-helpers'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
+import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { buildAushangHtml, type AushangHtmlInput } from '@/lib/templates/aushang-template'
 import { C } from '@/lib/tokens/colors'
 
@@ -21,6 +22,7 @@ export type RenderAushangResult =
 
 type OrgKundePick = {
   name?: string | null
+  org_logo_url?: string | null
   org_anzeigename?: string | null
   org_kennung?: string | null
   telefon?: string | null
@@ -43,12 +45,12 @@ async function requireAuthUser() {
 async function buildAushangPdf(input: AushangHtmlInput, filename: string): Promise<RenderAushangResult> {
   const qrPng = await QRCode.toBuffer(input.meldeUrl, {
     type: 'png',
-    width: 480,
+    width: 800,
     margin: 2,
     errorCorrectionLevel: 'M',
   })
   const qrDataUrl = `data:image/png;base64,${Buffer.from(qrPng).toString('base64')}`
-  const html = buildAushangHtml({ ...input, qrDataUrl })
+  const html = buildAushangHtml({ ...input, qrDataUrl, teoLogoUrl: resolveAngebotPdfLogoSrc() })
   const buffer = await renderHtmlToPdfBuffer(html, {
     preferCSSPageSize: true,
     displayHeaderFooter: false,
@@ -65,7 +67,7 @@ export async function renderMeldeAushangPdf(objektId: string): Promise<RenderAus
   const { data: objekt, error } = await supabaseAdmin
     .from('kunden_objekte')
     .select(
-      'id, titel, strasse, hausnummer, plz, ort, melde_slug, kunde_id, kunden(id, name, org_anzeigename, org_kennung, telefon, email, typ, impressum_url, datenschutz_url)'
+      'id, titel, strasse, hausnummer, plz, ort, melde_slug, kunde_id, kunden(id, name, org_anzeigename, org_kennung, org_logo_url, telefon, email, typ, impressum_url, datenschutz_url)'
     )
     .eq('id', objektId)
     .maybeSingle()
@@ -100,7 +102,7 @@ export async function renderMeldeAushangPdf(objektId: string): Promise<RenderAus
       objektTitel: objekt.titel?.trim() || 'Objekt',
       objektAdresse: adresse,
       meldeUrl,
-      logoUrl: null,
+      logoUrl: kunde?.org_logo_url?.trim() || null,
       hvTelefon: kunde?.telefon ?? null,
       hvEmail: kunde?.email ?? null,
     },

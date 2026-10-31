@@ -6,6 +6,7 @@ import {
   resolveBrandLogoUrl,
   resolvePublicAppUrl,
 } from '@/lib/brand'
+import { istTeo } from '@/lib/marke'
 
 function crmProjectRoots(): string[] {
   const roots: string[] = []
@@ -26,11 +27,14 @@ function crmProjectRoots(): string[] {
  * (transparentes PNG → sonst oft schwarzer Hintergrund im Print-PDF).
  */
 function localLogoDataUrl(): string | null {
-  const candidates = [
-    'logo-mark-green-on-white.png',
-    // Fallback falls Asset fehlt (sollte nicht)
-    'logo-mark-green.png',
-  ]
+  // TEO: breite Wortmarke aus /brand/teo (vorher lag hier fest das Bärenwald-Logo)
+  const candidates = istTeo
+    ? ['teo/logo-wordmark.png', 'teo/logo-mark-green-on-white.png']
+    : [
+        'logo-mark-green-on-white.png',
+        // Fallback falls Asset fehlt (sollte nicht)
+        'logo-mark-green.png',
+      ]
   for (const root of crmProjectRoots()) {
     for (const name of candidates) {
       const file = join(root, 'public', 'brand', name)
@@ -55,6 +59,8 @@ export function resolveAngebotPdfLogoSrc(logoUrlOverride?: string | null): strin
     const fromApp = resolvePublicAppUrl(custom)
     if (/^https?:\/\//i.test(fromApp)) return fromApp
   }
+
+  if (istTeo) return resolveBrandLogoUrl('green', '/brand/teo/logo-wordmark.png')
 
   /** Öffentliche Website-URL — zuverlässiger in Headless-PDF als localhost. */
   const websiteLogo = resolveBrandLogoUrl('green', null)

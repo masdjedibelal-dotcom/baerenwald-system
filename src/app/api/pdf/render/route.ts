@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { renderHtmlToPdfBuffer } from '@/lib/angebote/render-angebot-html-pdf'
 import { generatePartnerDokumentPdf } from '@/lib/pdf/service/generate-partner-dokument-pdf'
+import { resolveAngebotPdfLogoSrc } from '@/lib/angebote/angebot-pdf-logo'
 import { buildAushangHtml } from '@/lib/templates/aushang-template'
 
 export const runtime = 'nodejs'
@@ -70,6 +71,7 @@ async function renderAushang(data: Record<string, unknown>): Promise<Uint8Array>
     logoUrl,
     hvTelefon: data.hvTelefon != null ? String(data.hvTelefon) : null,
     hvEmail: data.hvEmail != null ? String(data.hvEmail) : null,
+    teoLogoUrl: resolveAngebotPdfLogoSrc(),
   })
 
   const buffer = await renderHtmlToPdfBuffer(html, {

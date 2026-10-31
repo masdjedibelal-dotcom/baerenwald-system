@@ -5,7 +5,16 @@
  */
 
 import { C } from '@/lib/tokens/colors'
-import { MARKE } from '@/lib/marke'
+import { istTeo, MARKE } from '@/lib/marke'
+
+/** Servus TEO: gleiche Schrift wie die Website (Manrope), Gold als Akzent wie im Logo-Punkt. */
+export const PDF_FONT_FAMILY = istTeo
+  ? "'Manrope', Arial, Helvetica, sans-serif"
+  : 'Arial, Helvetica, sans-serif'
+export const PDF_FONT_IMPORT = istTeo
+  ? `@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=block');`
+  : ''
+export const PDF_AKZENT_GOLD = '#e8a317'
 
 /** PDF-Typografie (Vorschlag 3.1 / App-Stufen). */
 export const PDF_FS = {
@@ -96,11 +105,12 @@ export function pdfShellCss(opts?: {
   const bottom = opts?.bottomMarginMm ?? PDF_BOTTOM_MARGIN_MM
   const pad = opts?.bodyPaddingBottom ?? '0'
   return `
+  ${PDF_FONT_IMPORT}
   * { box-sizing: border-box; }
   @page { size: A4; margin: 12mm 12mm ${bottom}mm 12mm; }
   body {
     margin: 0;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: ${PDF_FONT_FAMILY};
     color: ${C.text};
     font-size: ${PDF_FS.text};
     font-weight: 400;
@@ -271,7 +281,7 @@ export function pdfFussPuppeteerTemplate(input: PdfFussInput): string {
     ? ` · ${esc(input.seitenZusatz.trim())}`
     : ''
 
-  return `<div style="width:100%;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-size:7.5pt;color:${C.text3};padding:4px 12mm 2px;border-top:0.5pt solid ${C.border};background:${C.white};">
+  return `<div style="width:100%;box-sizing:border-box;font-family:${PDF_FONT_FAMILY.replace(/'/g, '')};font-size:7.5pt;color:${C.text3};padding:4px 12mm 2px;border-top:0.5pt solid ${C.border};background:${C.white};">
   <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;width:100%;">
     <div style="flex:1;text-align:left;line-height:1.45;">${left}</div>
     <div style="flex:0 0 auto;text-align:center;line-height:1.45;white-space:nowrap;padding:0 8px;">Seite ${pageN} von ${pageM}${zusatz}</div>

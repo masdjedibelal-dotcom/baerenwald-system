@@ -34,7 +34,7 @@ import {
 } from '@/lib/rich-text'
 import { kiVisualisierungPdfHtml } from '@/lib/visualize/pdf-html'
 import type { KiVizPdfPage } from '@/lib/visualize/pdf-data'
-import { MARKE } from '@/lib/marke'
+import { istTeo, MARKE } from '@/lib/marke'
 
 const PROJEKT_ACCENT = C.greenDark
 const PROJEKT_TINT = C.greenTint
@@ -583,8 +583,10 @@ export function angebotLogoKopfHtml(props: AngebotHtmlInput): string {
   if (!src || /^file:/i.test(src)) return ''
   if (!src.startsWith('data:') && !/^https?:\/\//i.test(src)) return ''
   const safeSrc = src.replace(/"/g, '&quot;')
+  // TEO: Wortmarke (breit) statt quadratischem Bildzeichen — flacher, damit sie wie auf der Website wirkt
+  const hoehe = istTeo ? 46 : 80
   return `<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid ${PROJEKT_ACCENT};">
-    <img src="${safeSrc}" alt="" role="presentation" style="height:80px;width:auto;max-width:320px;object-fit:contain;display:block;background:#fff;" />
+    <img src="${safeSrc}" alt="" role="presentation" style="height:${hoehe}px;width:auto;max-width:320px;object-fit:contain;display:block;background:#fff;" />
   </div>`
 }
 

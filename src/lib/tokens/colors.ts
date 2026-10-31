@@ -13,7 +13,7 @@ export const C = {
   greenSoft: '#eaf3de',
   greenSoftBorder: '#c5ddb0',
   greenSoftBorder2: '#a8c5a0',
-  greenTint: '#f3f7f4',
+  greenTint: istTeo ? '#f5f7fa' : '#f3f7f4',
   greenTint2: '#e8f5ee',
   greenTint3: '#e8f0e4',
   greenTint4: '#eef3ec',
