@@ -11,6 +11,7 @@ import {
   type MarketingDateRange,
   type RechnerFunnelStep,
 } from '@/lib/ki-hub/sources/posthog'
+import { istTeo } from '@/lib/marke'
 export type DashboardMarketingTopQuery = {
   query: string
   clicks: number
@@ -94,33 +95,11 @@ const FUNNEL_MILESTONES: Array<{
   },
 ]
 
-function buildFunnelStages(
-  start: number,
-  steps: RechnerFunnelStep[],
-  lead: number
+/** Anteil vom Start und Absprung gegenüber dem vorherigen Meilenstein. */
+function mitAbsprung(
+  raw: Array<{ key: string; label: string; count: number }>,
+  pct: (n: number) => number | null
 ): DashboardMarketingFunnelStage[] {
-  const pct = (n: number): number | null =>
-    start > 0 ? Math.round((n / start) * 1000) / 10 : null
-
-  const bucketMax = new Map<string, number>()
-  for (const step of steps) {
-    const label = step.label.trim()
-    const milestone = FUNNEL_MILESTONES.find((m) => m.match(label))
-    if (!milestone) continue
-    const prev = bucketMax.get(milestone.key) ?? 0
-    if (step.count > prev) bucketMax.set(milestone.key, step.count)
-  }
-
-  const raw: Array<{ key: string; label: string; count: number }> = [
-    { key: 'start', label: 'Rechner gestartet', count: start },
-    ...FUNNEL_MILESTONES.filter((m) => bucketMax.has(m.key)).map((m) => ({
-      key: m.key,
-      label: m.label,
-      count: bucketMax.get(m.key) ?? 0,
-    })),
-    { key: 'lead', label: 'Anfrage abgeschickt', count: lead },
-  ]
-
   return raw.map((s, i) => {
     const prev = i > 0 ? raw[i - 1]! : null
     let dropoffPct: number | null = null
@@ -142,6 +121,45 @@ function buildFunnelStages(
       dropoffLost,
     }
   })
+}
+
+function buildFunnelStages(
+  start: number,
+  steps: RechnerFunnelStep[],
+  lead: number
+): DashboardMarketingFunnelStage[] {
+  const pct = (n: number): number | null =>
+    start > 0 ? Math.round((n / start) * 1000) / 10 : null
+
+  // TEO: die 4 Schritte der Anfrage direkt (Anliegen, Details, Objekt, Kontakt) — keine Rechner-Meilensteine
+  if (istTeo) {
+    return mitAbsprung([
+      { key: 'start', label: 'Anfrage geöffnet', count: start },
+      ...steps.map((s) => ({ key: s.key, label: s.label, count: s.count })),
+      { key: 'lead', label: 'Anfrage abgeschickt', count: lead },
+    ], pct)
+  }
+
+  const bucketMax = new Map<string, number>()
+  for (const step of steps) {
+    const label = step.label.trim()
+    const milestone = FUNNEL_MILESTONES.find((m) => m.match(label))
+    if (!milestone) continue
+    const prev = bucketMax.get(milestone.key) ?? 0
+    if (step.count > prev) bucketMax.set(milestone.key, step.count)
+  }
+
+  const raw: Array<{ key: string; label: string; count: number }> = [
+    { key: 'start', label: 'Rechner gestartet', count: start },
+    ...FUNNEL_MILESTONES.filter((m) => bucketMax.has(m.key)).map((m) => ({
+      key: m.key,
+      label: m.label,
+      count: bucketMax.get(m.key) ?? 0,
+    })),
+    { key: 'lead', label: 'Anfrage abgeschickt', count: lead },
+  ]
+
+  return mitAbsprung(raw, pct)
 }
 
 /** Fallback wenn PostHog/GSC hängen oder das Dashboard-Zeitbudget überschreiten. */

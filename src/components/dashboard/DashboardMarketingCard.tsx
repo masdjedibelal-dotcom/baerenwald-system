@@ -7,6 +7,7 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { useMemo, useState } from 'react'
 import type { DashboardMarketingSnapshot } from '@/lib/dashboard/dashboard-marketing'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { istTeo } from '@/lib/marke'
 import { formatNumber } from '@/lib/format/geld-datum'
 
 const SUCHBEGRIFFE_PRO_SEITE = 10
@@ -126,7 +127,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
     ) : (
       <div className="mkt-funnel-empty">
         {data.funnelOk
-          ? 'Noch keine Rechner-Events im Zeitraum.'
+          ? istTeo ? 'Noch keine Anfragen im Zeitraum.' : 'Noch keine Rechner-Events im Zeitraum.'
           : 'Funnel nicht verfügbar.'}
         {!data.funnelOk && data.funnelError ? (
           <>
@@ -171,7 +172,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                 }
               />
               <CompactKpi
-                label="Rechner gestartet"
+                label={istTeo ? 'Anfrage geöffnet' : 'Rechner gestartet'}
                 value={data.funnelOk ? formatNum(data.rechnerStart) : '—'}
                 detail={!data.funnelOk ? 'Fehler' : null}
                 muted={!data.funnelOk || data.rechnerStart == null}
@@ -197,7 +198,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
             <div className={`mkt-funnel-block${isMobile ? ' mkt-funnel-block--acc' : ''}`}>
               {isMobile ? (
                 <MockBtn className="mkt-funnel-acc-trigger" type="button" aria-expanded={funnelOpen} onClick={() => setFunnelOpen((o) => !o)}>
-                  <span className="mkt-funnel-h">Rechner-Funnel</span>
+                  <span className="mkt-funnel-h">{istTeo ? 'Anfrage-Weg' : 'Rechner-Funnel'}</span>
                   <MockIcon
                     ctx="empty"
                     n="chevron-down"
@@ -206,7 +207,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
                   />
                 </MockBtn>
               ) : (
-                <p className="mkt-funnel-h">Rechner-Funnel</p>
+                <p className="mkt-funnel-h">{istTeo ? 'Anfrage-Weg' : 'Rechner-Funnel'}</p>
               )}
               {(!isMobile || funnelOpen) ? (
                 <>

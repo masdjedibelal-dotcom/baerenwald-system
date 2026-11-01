@@ -1,6 +1,7 @@
 import 'server-only'
 
 import type { KiHubQuelleResult } from '@/lib/ki-hub/types'
+import { MARKE } from '@/lib/marke'
 
 export type MarketingDateRange = {
   /** YYYY-MM-DD */
@@ -85,6 +86,9 @@ function defaultRange(range?: MarketingDateRange): { from: string; to: string } 
   return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) }
 }
 
+/** Bärenwald und TEO teilen sich ein PostHog-Projekt — Seitenaufrufe nur von der eigenen Website zählen. */
+const WEBSITE_HOSTS = [MARKE.websiteHost, `www.${MARKE.websiteHost}`]
+
 function hogqlDateLiteral(ymd: string): string {
   // YYYY-MM-DD → safe literal for HogQL
   const safe = ymd.replace(/[^0-9-]/g, '').slice(0, 10)
@@ -103,6 +107,7 @@ export async function fetchPostHogSummary(
     query: {
       kind: 'TrendsQuery',
       series: [{ event: '$pageview', kind: 'EventsNode' }],
+      properties: [{ key: '$host', value: WEBSITE_HOSTS, operator: 'exact', type: 'event' }],
       dateRange: {
         date_from: dateFrom,
         date_to: dateTo,
@@ -139,7 +144,12 @@ function parseHogqlRows(json: unknown): unknown[][] {
   return []
 }
 
-/** Rechner-Funnel: Start → Schritte → Lead abgeschickt (unique persons). */
+/** Event-Namen eines Anfrage-Wegs: Bärenwald-Rechner oder TEO-Anfrage (servus-teo.de). */
+const FUNNEL_EVENTS = MARKE.id === 'teo'
+  ? { start: 'teo_anfrage_start', schritt: 'teo_anfrage_schritt', lead: 'teo_anfrage_abgeschickt' }
+  : { start: 'rechner_start', schritt: 'rechner_schritt', lead: 'lead_abgeschickt' }
+
+/** Rechner-Funnel bzw. TEO-Anfrage-Weg: Start → Schritte → Anfrage abgeschickt (unique persons). */
 export async function fetchPostHogRechnerFunnel(
   range?: MarketingDateRange
 ): Promise<
@@ -162,14 +172,14 @@ export async function fetchPostHogRechnerFunnel(
     posthogQuery(cfg, {
       query: {
         kind: 'HogQLQuery',
-        query: `SELECT count(DISTINCT distinct_id) FROM events WHERE event = 'rechner_start' AND ${timeFilter}`,
+        query: `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '${FUNNEL_EVENTS.start}' AND ${timeFilter}`,
       },
       name: 'crm-rechner-start',
     }),
     posthogQuery(cfg, {
       query: {
         kind: 'HogQLQuery',
-        query: `SELECT count(DISTINCT distinct_id) FROM events WHERE event = 'lead_abgeschickt' AND ${timeFilter}`,
+        query: `SELECT count(DISTINCT distinct_id) FROM events WHERE event = '${FUNNEL_EVENTS.lead}' AND ${timeFilter}`,
       },
       name: 'crm-rechner-lead',
     }),
@@ -182,7 +192,7 @@ SELECT
   any(toString(properties.schritt_name)) AS name,
   count(DISTINCT distinct_id) AS persons
 FROM events
-WHERE event = 'rechner_schritt'
+WHERE event = '${FUNNEL_EVENTS.schritt}'
   AND ${timeFilter}
   AND properties.schritt_nummer IS NOT NULL
 GROUP BY schritt
