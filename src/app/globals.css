@@ -8,6 +8,18 @@
     --green: #1e5fa8;
     --green-dark: #0b1f3a;
     --green-50: #dce4ee;
+    /* Neutrale wie die Website: kühles Grau-Blau statt grünlich/warm */
+    --bg-soft: #f5f7fa;
+    --bg-mobile: #f5f7fa;
+    --border: #e3e9f0;
+    --border-2: #e3e9f0;
+    --border-strong: #d3dce7;
+    --input-border: #cfd8e3;
+    --text: #0b1f3a;
+    --text-2: #4a5d75;
+    --text-3: #6a7c92;
+    --text-4: #9aa8b8;
+    --gray-bg: #edf0f4;
   }
   :root[data-marke='teo'] body {
     font-family: var(--font-teo), -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;

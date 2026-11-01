@@ -22874,3 +22874,11 @@ button.dok-gruppe__kopf {
 .vw-nachricht__kopf strong { color: var(--text); }
 .vw-nachricht__text { margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .vw-nachrichten__fuss { display: flex; justify-content: flex-end; margin-top: 8px; }
+
+/* Servus TEO: Knöpfe wie auf der Website — rund, Hauptknopf Navy */
+:root[data-marke='teo'] .btn,
+:root[data-marke='teo'] .btn.sm { border-radius: 999px; }
+:root[data-marke='teo'] .btn.primary { background: var(--green-dark); border-color: var(--green-dark); }
+:root[data-marke='teo'] .btn.primary:hover { background: #13325c; border-color: #13325c; }
+:root[data-marke='teo'] .crm-login__submit { border-radius: 999px; background: var(--green-dark); }
+:root[data-marke='teo'] .crm-login__submit:hover:not(:disabled) { background: #13325c; }
