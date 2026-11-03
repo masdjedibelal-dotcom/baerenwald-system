@@ -78,7 +78,7 @@ Erlaubte JSON-Formen:
 - Mängel-Liste: {"type":"maengel","text":"Zeile1\\nZeile2"}
 - Kunden-Mail: {"type":"mail","betreff":"…","text":"Nachrichtentext ohne HTML"}
 
-Nur ein bw-apply-Block. Ton: ${MARKE.name} Handwerk, klar, freundlich, ohne Marketing-Floskeln.
+Nur ein bw-apply-Block, immer mit dem Zaun \`\`\`bw-apply … \`\`\`. Positionen nicht zusätzlich als Text aufzählen — das CRM zeigt sie als Karte. Ton: ${MARKE.name} Handwerk, klar, freundlich, ohne Marketing-Floskeln.
 `.trim()
 
 export const KI_ASSIST_SCOPES: Record<KiAssistScopeId, KiAssistScope> = {
@@ -315,17 +315,97 @@ export function getKiAssistScope(id: KiAssistScopeId): KiAssistScope {
   return KI_ASSIST_SCOPES[id]
 }
 
-/** Extrahiert den letzten ```bw-apply JSON-Block aus einer Assistenten-Antwort. */
-export function parseBwApplyDraft(content: string): KiAssistDraft | null {
-  const re = /```bw-apply\s*([\s\S]*?)```/gi
-  let last: string | null = null
-  let m: RegExpExecArray | null
-  while ((m = re.exec(content)) != null) {
-    last = m[1]?.trim() ?? null
+const APPLY_TYPEN = /\{\s*"type"\s*:\s*"(?:positionen|position|text|maengel|mail)"/g
+
+/** Ende des JSON-Objekts ab `start` (Klammern zählen, Strings beachten) — sonst null. */
+function jsonObjektEnde(s: string, start: number): number | null {
+  let tiefe = 0
+  let inString = false
+  for (let i = start; i < s.length; i++) {
+    const c = s[i]
+    if (inString) {
+      if (c === '\\') i++
+      else if (c === '"') inString = false
+      continue
+    }
+    if (c === '"') inString = true
+    else if (c === '{' || c === '[') tiefe++
+    else if (c === '}' || c === ']') {
+      tiefe--
+      if (tiefe === 0) return i + 1
+    }
   }
-  if (!last) return null
+  return null
+}
+
+/**
+ * Findet den Entwurf in einer Antwort. Die KI hält sich nicht immer an den ```bw-apply-Zaun
+ * (mal ```json, mal ohne Zaun) — dann den JSON-Teil trotzdem erkennen.
+ */
+function findeApplyBereich(content: string): { json: string; von: number; bis: number } | null {
+  const zaun = /```(?:bw-apply|json)?\s*([\s\S]*?)```/gi
+  let treffer: { json: string; von: number; bis: number } | null = null
+  let m: RegExpExecArray | null
+  while ((m = zaun.exec(content)) != null) {
+    const inhalt = m[1]?.trim() ?? ''
+    if (/^\{\s*"type"\s*:/.test(inhalt)) treffer = { json: inhalt, von: m.index, bis: m.index + m[0].length }
+  }
+  if (treffer) return treffer
+  let start = -1
+  while ((m = APPLY_TYPEN.exec(content)) != null) start = m.index
+  if (start < 0) return null
+  const ende = jsonObjektEnde(content, start)
+  if (ende == null) return null
+  // Zaun-Reste davor/danach (```bw-apply ohne Schluss o. ä.) mit entfernen
+  const davor = content.slice(0, start).match(/```[\w-]*\s*$/)
+  const danach = content.slice(ende).match(/^\s*```/)
+  return {
+    json: content.slice(start, ende),
+    von: davor ? start - davor[0].length : start,
+    bis: danach ? ende + danach[0].length : ende,
+  }
+}
+
+/** Extrahiert den letzten bw-apply-Entwurf aus einer Assistenten-Antwort. */
+export function parseBwApplyDraft(content: string): KiAssistDraft | null {
+  const bereich = findeApplyBereich(content)
+  return bereich ? draftAusJson(bereich.json) : null
+}
+
+/**
+ * Antwort mitten im Entwurf abgeschnitten (Längen-Limit der KI)? Dann die vollständigen
+ * Positionen retten und den Text davor für die Anzeige zurückgeben.
+ */
+export function abgeschnittenerEntwurf(
+  content: string
+): { textDavor: string; gerettet: KiAssistDraft | null } | null {
+  if (findeApplyBereich(content)) return null
+  let start = -1
+  let m: RegExpExecArray | null
+  while ((m = APPLY_TYPEN.exec(content)) != null) start = m.index
+  if (start < 0) return null
+  const textDavor = content.slice(0, start).replace(/```[\w-]*\s*$/, '').trim()
+  const liste = content.slice(start).match(/"(?:items|positionen)"\s*:\s*\[/)
+  let gerettet: KiAssistDraft | null = null
+  if (liste?.index != null) {
+    let i = start + liste.index + liste[0].length
+    let letztesEnde = -1
+    while (i < content.length) {
+      while (i < content.length && /[\s,]/.test(content[i])) i++
+      if (content[i] !== '{') break
+      const ende = jsonObjektEnde(content, i)
+      if (ende == null) break
+      letztesEnde = ende
+      i = ende
+    }
+    if (letztesEnde > 0) gerettet = draftAusJson(`${content.slice(start, letztesEnde)}]}`)
+  }
+  return { textDavor, gerettet }
+}
+
+function draftAusJson(json: string): KiAssistDraft | null {
   try {
-    const raw = JSON.parse(last) as Record<string, unknown>
+    const raw = JSON.parse(json) as Record<string, unknown>
     const type = String(raw.type ?? '')
     if (type === 'position') {
       const name = String(raw.name ?? raw.leistung ?? '').trim()
@@ -395,5 +475,7 @@ export function parseBwApplyDraft(content: string): KiAssistDraft | null {
 
 /** Text ohne bw-apply-Block für die Chat-Anzeige (optional bereinigen). */
 export function stripBwApplyBlock(content: string): string {
-  return content.replace(/```bw-apply\s*[\s\S]*?```/gi, '').trim()
+  const bereich = findeApplyBereich(content)
+  if (!bereich) return content.trim()
+  return (content.slice(0, bereich.von) + content.slice(bereich.bis)).trim()
 }

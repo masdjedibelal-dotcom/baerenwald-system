@@ -12,6 +12,7 @@ import { useOverlayChromeLock } from '@/hooks/useOverlayChromeLock'
 import { useVisualViewportFrame } from '@/hooks/useVisualViewportFrame'
 import { buildAssistentContextHint } from '@/lib/copilot/assistent-context'
 import {
+abgeschnittenerEntwurf,
 getKiAssistScope,
 parseBwApplyDraft,
 stripBwApplyBlock,
@@ -428,7 +429,7 @@ export function AssistentPanel() {
   }
 
   function applyDraftFromMessage(content: string) {
-    const draft = parseBwApplyDraft(content)
+    const draft = parseBwApplyDraft(content) ?? abgeschnittenerEntwurf(content)?.gerettet ?? null
     if (!draft) {
       toast.error(TOAST.kein_uebernehmbarer_entwurf_in_der_antwort)
       return
@@ -566,9 +567,14 @@ export function AssistentPanel() {
           ) : (
             <>
               {messages.map((m, i) => {
-                const draft = m.role === 'assistant' ? parseBwApplyDraft(m.content) : null
-                const displayRaw =
-                  m.role === 'assistant' && draft
+                const vollstaendig = m.role === 'assistant' ? parseBwApplyDraft(m.content) : null
+                // Antwort im Entwurf abgeschnitten: vollständige Positionen retten, Rest als Hinweis
+                const abgeschnitten =
+                  m.role === 'assistant' && !vollstaendig ? abgeschnittenerEntwurf(m.content) : null
+                const draft = vollstaendig ?? abgeschnitten?.gerettet ?? null
+                const displayRaw = abgeschnitten
+                  ? `${abgeschnitten.textDavor}\n\n${abgeschnittenHinweis(abgeschnitten.gerettet)}`
+                  : m.role === 'assistant' && draft
                     ? stripBwApplyBlock(m.content)
                     : m.content
                 const display =
@@ -689,4 +695,11 @@ export function AssistentPanel() {
       </aside>
     </>
   )
+}
+
+function abgeschnittenHinweis(gerettet: KiAssistDraft | null): string {
+  const n = gerettet?.type === 'positionen' ? gerettet.items.length : 0
+  return n
+    ? `**Antwort zu lang — abgeschnitten.** ${n === 1 ? '1 Position ist vollständig und kann' : `${n} Positionen sind vollständig und können`} übernommen werden, der Rest fehlt. Bitte die übrigen Arbeiten in einer zweiten Nachricht anfragen.`
+    : '**Antwort zu lang — abgeschnitten.** Bitte die Arbeiten in kleineren Teilen anfragen (z. B. je Gewerk).'
 }
