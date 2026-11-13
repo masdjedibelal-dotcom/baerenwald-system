@@ -232,3 +232,13 @@ export async function ladePersonEin(kundeId: string, id: string): Promise<{ ok: 
   revalidateKundeDetail(kundeId)
   return { ok: true }
 }
+
+/** Für die Übersicht: QR-Meldung an? (null = unbekannt/Spalte fehlt → wie bisher anzeigen) */
+export async function meldeQrAktivFuerKunde(kundeId: string): Promise<boolean | null> {
+  const g = await gate()
+  if (!g.ok) return null
+  const { data, error } = await g.db.from('kunden').select('melde_qr_aktiv').eq('id', kundeId).maybeSingle()
+  if (error) return null
+  const v = (data as { melde_qr_aktiv?: boolean | null } | null)?.melde_qr_aktiv
+  return typeof v === 'boolean' ? v : null
+}

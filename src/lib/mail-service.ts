@@ -13,7 +13,8 @@ import {
   newMailCatcherId,
 } from '@/lib/mail/mail-catcher'
 import { htmlToPlainText } from '@/lib/mail/html-to-plain-text'
-import { MARKE } from '@/lib/marke'
+import { funktionAn, MARKE } from '@/lib/marke'
+import { MAIL_PORTAL_PS_ENDE, MAIL_PORTAL_PS_START } from '@/lib/mail-templates'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -169,11 +170,40 @@ function mergeAttachments(
   return list.length ? list : undefined
 }
 
+/** Portal-P.S. entfernen, wenn Empfänger eine Verwaltung ohne Arbeitsplatz ist (nur TEO; ohne Spalte → unverändert). */
+async function ohnePortalHinweisFuerHvOhneArbeitsplatz(html: string, opts: SendMailOptions): Promise<string> {
+  if (!funktionAn('hvWorkflow') || !html.includes(MAIL_PORTAL_PS_START)) return html
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase-admin')
+    let orgId: string | null = null
+    if (opts.leadId) {
+      const { data } = await supabaseAdmin.from('leads').select('auftraggeber_kunde_id').eq('id', opts.leadId).maybeSingle()
+      orgId = (data as { auftraggeber_kunde_id?: string | null } | null)?.auftraggeber_kunde_id ?? null
+    }
+    const ids = [orgId, opts.kundeId].filter((x): x is string => Boolean(x))
+    if (!ids.length) return html
+    const { data, error } = await supabaseAdmin
+      .from('kunden')
+      .select('id, arbeitsplatz_aktiv, portal_modus')
+      .in('id', ids)
+    if (error || !data) return html
+    const ohne = (data as { arbeitsplatz_aktiv?: boolean | null; portal_modus?: string | null }[]).some(
+      (k) => k.portal_modus === 'organisation' && k.arbeitsplatz_aktiv === false
+    )
+    if (!ohne) return html
+    const re = new RegExp(`${MAIL_PORTAL_PS_START}[\\s\\S]*?${MAIL_PORTAL_PS_ENDE}`, 'g')
+    return html.replace(re, '')
+  } catch {
+    return html
+  }
+}
+
 export async function sendMail(
   opts: SendMailOptions
 ): Promise<{ success: boolean; error?: string; resendId?: string | null; emailLogId?: string | null }> {
   // Logos als HTTPS (baerenwaldmuenchen.de) — kein CID-Anhang (Apple-Mail-Büroklammer).
-  const html = rewriteMailLogoUrlsToHosted(opts.html)
+  // TEO: Verwaltung ohne Arbeitsplatz bekommt keinen Portal-Hinweis (P.S.) — sie arbeitet per E-Mail.
+  const html = await ohnePortalHinweisFuerHvOhneArbeitsplatz(rewriteMailLogoUrlsToHosted(opts.html), opts)
   const text = (opts.text?.trim() || htmlToPlainText(html)).trim() || undefined
   const inlineLogos: MailInlineLogoAttachment[] = []
 

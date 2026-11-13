@@ -90,6 +90,9 @@ export type MailHtmlBaseOptions = {
   statusLink?: string | null
 }
 
+export const MAIL_PORTAL_PS_START = '<!--portal-ps-->'
+export const MAIL_PORTAL_PS_ENDE = '<!--/portal-ps-->'
+
 /** P.S. mit genau einem Portal-Button — nie zusätzlich im Mail-Body duplizieren. */
 export function mailMeinBaerenwaldPsFooter(opts: {
   anrede: 'du' | 'sie'
@@ -101,11 +104,12 @@ export function mailMeinBaerenwaldPsFooter(opts: {
   const anrede = opts.anrede
   const text = portalMailPsIntro(audience, anrede)
   const buttonLabel = portalMailButtonLabel(audience)
-  return `<div style="margin:28px 0 0;padding:16px 0 0;border-top:1px solid ${C.gray200};">
+  // Marker: sendMail entfernt den Block für Verwaltungen ohne Arbeitsplatz (TEO)
+  return `${MAIL_PORTAL_PS_START}<div style="margin:28px 0 0;padding:16px 0 0;border-top:1px solid ${C.gray200};">
     <p style="font-size:15px;font-weight:700;color:${C.gray500};margin:0 0 8px;letter-spacing:0.02em;">P.S.</p>
     <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 12px;">${text}</p>
     ${mailSecondaryButtonHtml(buttonLabel, portal, { margin: '0' })}
-  </div>`
+  </div>${MAIL_PORTAL_PS_ENDE}`
 }
 
 /** Standard-Hülle: durchgehend weiß wie Anfrage-Bestätigung (kein grauer Rand, keine Card). */
