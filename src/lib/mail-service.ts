@@ -81,6 +81,8 @@ export interface SendMailOptions {
   internetMessageId?: string | null
   /** Feste ID für email_log (z. B. Tracking-Marker in HTML). */
   emailLogId?: string
+  /** Antworten an diese Adresse (z. B. Auftragsadresse der Verwaltung → landet im CRM). */
+  replyTo?: string
 }
 
 function normalizeRecipients(list?: string | string[]): string[] | undefined {
@@ -276,6 +278,7 @@ export async function sendMail(
       subject: opts.betreff,
       html,
       ...(text ? { text } : {}),
+      ...(opts.replyTo?.trim() ? { replyTo: opts.replyTo.trim() } : {}),
       attachments,
     })
 

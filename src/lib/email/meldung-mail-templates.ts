@@ -1,4 +1,5 @@
 import { mailHtmlBase } from '@/lib/mail-templates'
+import { mailPrimaryButtonHtml, mailSecondaryButtonHtml } from '@/lib/mail/email-buttons'
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailTeamGruss } from '@/lib/mail/anrede'
 import { buildSubject } from '@/lib/mail/build-subject'
@@ -169,9 +170,12 @@ export function mailOrgFreigabeAngefordert(
     orgName: string
     objektTitel: string
     betragEur: number
-    portalLink: string
+    /** Nur wenn die Verwaltung den Arbeitsplatz nutzt — sonst kein Portal-Hinweis. */
+    portalLink?: string
     /** Optional: erneut nach Ablehnung — was angepasst wurde. */
     anpassungNotiz?: string
+    /** Freigeben/Ablehnen direkt aus der Mail (ohne Anmeldung). */
+    freigabeLinks?: { freigeben: string; ablehnen: string }
   },
   b: MailBranding
 ): { betreff: string; html: string } {
@@ -183,20 +187,29 @@ export function mailOrgFreigabeAngefordert(
   const anpassungBlock = anpassung
     ? `<p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;"><strong>Was angepasst wurde:</strong> ${esc(anpassung)}</p>`
     : ''
+  const links = data.freigabeLinks
+  const knoepfe = links
+    ? `<p style="margin:0 0 8px;">${mailPrimaryButtonHtml('Freigeben', links.freigeben, { margin: '0 8px 8px 0' })}${mailSecondaryButtonHtml('Ablehnen', links.ablehnen, { margin: '0 0 8px 0' })}</p>
+    <p style="font-size:13px;color:${C.gray500};margin:0 0 16px;line-height:1.5;">Ohne Anmeldung: Der Knopf öffnet eine Seite, auf der Sie Ihre Entscheidung noch einmal bestätigen.</p>`
+    : ''
+  const hinweis = links
+    ? 'Das Angebot liegt als PDF in der separaten Angebots-Mail. Bitte geben Sie es frei oder lehnen Sie es ab.'
+    : `Bitte im ${esc(MARKE.portalName)}-Arbeitsplatz freigeben oder ablehnen.`
   const body = `
     <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">Guten Tag,</p>
     <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">für <strong>${esc(data.objektTitel)}</strong> liegt ein Angebot über <strong>${esc(
       formatEuro(data.betragEur, { style: 'currency' })
-    )}</strong> vor und benötigt Ihre Freigabe.</p>
+    )}</strong> (netto) vor. Der Betrag liegt über Ihrer Freigabegrenze.</p>
     ${anpassungBlock}
-    <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">Dies betrifft eine <strong>Mieter-Schadenmeldung</strong>. Bitte im Auftraggeber-Portal freigeben oder ablehnen, bevor Bärenwald den Partner informiert.</p>
+    <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${hinweis} Erst danach beauftragen wir den Handwerker.</p>
+    ${knoepfe}
   `
   return {
     betreff,
     html: mailHtmlBase(body, 'Freigabe erforderlich', b, undefined, {
       anrede: 'sie',
       portalAudience: 'organisation',
-      portalLink: data.portalLink,
+      ...(data.portalLink ? { portalLink: data.portalLink } : { skipMeinBaerenwaldPs: true }),
     }),
   }
 }

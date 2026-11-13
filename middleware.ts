@@ -110,6 +110,8 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/whatsapp/webhook') ||
     path.startsWith('/einsatz/') ||
     path.startsWith('/api/einsatz-antwort') ||
+    path.startsWith('/freigabe/') ||
+    path.startsWith('/api/freigabe-antwort') ||
     // Portal → CRM mit eigenem Bearer-Check in der Route
     path.startsWith('/api/portal/einsaetze/') ||
     path.startsWith('/api/dev/auto-login')

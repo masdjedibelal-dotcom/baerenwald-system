@@ -26,7 +26,7 @@ import type { Kunde,Lead,LeadAnlass,LeadErfassungVon,OrgFreigabeStatus } from '@
 /** Await + ehrliches Ergebnis — kein void/Fire-and-forget (F-179). */
 async function awaitOrgFreigabeMail(opts: {
   typ: 'org_freigabe_angefordert' | 'org_angebot_info'
-  an: string
+  an: string | string[]
   anName: string
   betreff: string
   html: string
@@ -47,10 +47,52 @@ async function awaitOrgFreigabeMail(opts: {
   return { mailOk: true }
 }
 
+/**
+ * Freigabe-Mail an die Verwaltung: Haupt-Mail + Personen mit „darf freigeben“,
+ * mit Freigeben/Ablehnen-Links (ohne Login). Portal-Hinweis nur mit Arbeitsplatz.
+ */
+async function sendeFreigabeAnforderung(opts: {
+  org: OrgKundePick | null
+  orgKundeId: string
+  leadId: string
+  objektTitel: string
+  betrag: number
+  anpassungNotiz?: string
+}): Promise<{ mailOk: true } | { mailOk: false; mailError: string }> {
+  const { freigabeEmpfaenger, freigabeLink, freigabeTokenFuerLead } = await import('@/teo/hv/freigabe-per-mail')
+  const an = await freigabeEmpfaenger(opts.orgKundeId, opts.org?.email)
+  if (!an.length) return { mailOk: false, mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung' }
+  const orgName = opts.org?.org_anzeigename?.trim() || opts.org?.name?.trim() || 'Auftraggeber'
+  const token = await freigabeTokenFuerLead(opts.leadId)
+  const branding = await getMailBranding(supabaseAdmin)
+  const tpl = mailOrgFreigabeAngefordert(
+    {
+      orgName,
+      objektTitel: opts.objektTitel,
+      betragEur: opts.betrag,
+      portalLink: opts.org?.arbeitsplatz_aktiv ? buildPortalLoginLink() : undefined,
+      anpassungNotiz: opts.anpassungNotiz,
+      freigabeLinks: token
+        ? { freigeben: freigabeLink(token, 'freigegeben'), ablehnen: freigabeLink(token, 'abgelehnt') }
+        : undefined,
+    },
+    branding
+  )
+  return awaitOrgFreigabeMail({
+    typ: 'org_freigabe_angefordert',
+    an: an.length === 1 ? an[0]! : an,
+    anName: orgName,
+    betreff: tpl.betreff,
+    html: tpl.html,
+    leadId: opts.leadId,
+    kundeId: opts.orgKundeId,
+  })
+}
+
 type OrgKundePick = Pick<
   Kunde,
   'id' | 'name' | 'email' | 'org_anzeigename' | 'portal_modus' | 'freigabe_modus' | 'freigabe_schwelle_eur' | 'notfall_direkt'
->
+> & { arbeitsplatz_aktiv?: boolean | null }
 
 type LeadPick = Pick<
   Lead,
@@ -166,7 +208,7 @@ async function loadOrgKunde(
   const { data, error } = await supabase
     .from('kunden')
     .select(
-      'id, name, email, org_anzeigename, portal_modus, freigabe_modus, freigabe_schwelle_eur, notfall_direkt'
+      'id, name, email, org_anzeigename, portal_modus, freigabe_modus, freigabe_schwelle_eur, notfall_direkt, arbeitsplatz_aktiv'
     )
     .eq('id', orgKundeId)
     .maybeSingle()
@@ -344,43 +386,13 @@ export async function syncOrgFreigabeNachAngebot(input: {
         if (__dbErr1) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr1)
 
         const objektTitel = await loadObjektTitel(supabaseAdmin, lead.kunde_objekt_id)
-        const orgEmail = org?.email?.trim()
-        const orgName = org?.org_anzeigename?.trim() || org?.name?.trim() || 'Auftraggeber'
-        if (orgEmail) {
-          const branding = await getMailBranding(supabaseAdmin)
-          const tpl = mailOrgFreigabeAngefordert(
-            {
-              orgName,
-              objektTitel,
-              betragEur: betrag,
-              portalLink: buildPortalLoginLink(),
-            },
-            branding
-          )
-          const sent = await awaitOrgFreigabeMail({
-            typ: 'org_freigabe_angefordert',
-            an: orgEmail,
-            anName: orgName,
-            betreff: tpl.betreff,
-            html: tpl.html,
-            leadId,
-            kundeId: orgKundeId,
-          })
-          return {
-            ok: true,
-            status: 'ausstehend',
-            erforderlich: true,
-            mailOk: sent.mailOk,
-            ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
-          }
-        }
-
+        const sent = await sendeFreigabeAnforderung({ org, orgKundeId, leadId, objektTitel, betrag })
         return {
           ok: true,
           status: 'ausstehend',
           erforderlich: true,
-          mailOk: false,
-          mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+          mailOk: sent.mailOk,
+          ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
         }
       }
     }
@@ -388,8 +400,6 @@ export async function syncOrgFreigabeNachAngebot(input: {
   }
 
   const objektTitel = await loadObjektTitel(supabaseAdmin, lead.kunde_objekt_id)
-  const orgEmail = org?.email?.trim()
-  const orgName = org?.org_anzeigename?.trim() || org?.name?.trim() || 'Auftraggeber'
 
   if (!erforderlich) {
     const now = new Date().toISOString()
@@ -473,41 +483,13 @@ export async function syncOrgFreigabeNachAngebot(input: {
   })
   if (__dbErr4) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr4)
 
-  if (orgEmail) {
-    const branding = await getMailBranding(supabaseAdmin)
-    const tpl = mailOrgFreigabeAngefordert(
-      {
-        orgName,
-        objektTitel,
-        betragEur: betrag,
-        portalLink: buildPortalLoginLink(),
-      },
-      branding
-    )
-    const sent = await awaitOrgFreigabeMail({
-      typ: 'org_freigabe_angefordert',
-      an: orgEmail,
-      anName: orgName,
-      betreff: tpl.betreff,
-      html: tpl.html,
-      leadId,
-      kundeId: orgKundeId,
-    })
-    return {
-      ok: true,
-      status: 'ausstehend',
-      erforderlich: true,
-      mailOk: sent.mailOk,
-      ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
-    }
-  }
-
+  const sent = await sendeFreigabeAnforderung({ org, orgKundeId, leadId, objektTitel, betrag })
   return {
     ok: true,
     status: 'ausstehend',
     erforderlich: true,
-    mailOk: false,
-    mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+    mailOk: sent.mailOk,
+    ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
   }
 }
 
@@ -603,41 +585,11 @@ export async function erneutOrgFreigabeAnfordernNachAblehnung(input: {
   if (__dbErr6) logDbError('lib/org/org-freigabe-logic:org_freigabe_log', __dbErr6)
 
   const objektTitel = await loadObjektTitel(supabaseAdmin, lead.kunde_objekt_id)
-  const orgEmail = org?.email?.trim()
-  const orgName = org?.org_anzeigename?.trim() || org?.name?.trim() || 'Auftraggeber'
-  if (orgEmail) {
-    const branding = await getMailBranding(supabaseAdmin)
-    const tpl = mailOrgFreigabeAngefordert(
-      {
-        orgName,
-        objektTitel,
-        betragEur: betrag,
-        portalLink: buildPortalLoginLink(),
-        anpassungNotiz: anpassung,
-      },
-      branding
-    )
-    const sent = await awaitOrgFreigabeMail({
-      typ: 'org_freigabe_angefordert',
-      an: orgEmail,
-      anName: orgName,
-      betreff: tpl.betreff,
-      html: tpl.html,
-      leadId,
-      kundeId: orgKundeId,
-    })
-    return {
-      ok: true,
-      status: 'ausstehend',
-      mailOk: sent.mailOk,
-      ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
-    }
-  }
-
+  const sent = await sendeFreigabeAnforderung({ org, orgKundeId, leadId, objektTitel, betrag, anpassungNotiz: anpassung })
   return {
     ok: true,
     status: 'ausstehend',
-    mailOk: false,
-    mailError: 'Keine Org-E-Mail für Freigabe-Benachrichtigung',
+    mailOk: sent.mailOk,
+    ...(!sent.mailOk ? { mailError: sent.mailError } : {}),
   }
 }

@@ -1,6 +1,9 @@
 import { revalidateLeadDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { NextResponse } from 'next/server'
+import { Resend } from 'resend'
+
+import { auftragAusMail, auftragsKennungAusEmpfaengern, ladeEingehendeMail } from '@/teo/hv/auftrag-per-mail'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertEmailLogRow } from '@/lib/kommunikation/insert-email-log'
 import { parseEmailLogIdFromHtml } from '@/lib/kommunikation/types'
@@ -9,6 +12,8 @@ import { logLeadEmailTimelineEvent } from '@/lib/kommunikation/log-lead-email-ti
 type ResendInboundPayload = {
   type?: string
   data?: {
+    email_id?: string
+    received_for?: string[]
     from?: string
     to?: string | string[]
     subject?: string
@@ -48,18 +53,43 @@ async function findParentLogId(data: NonNullable<ResendInboundPayload['data']>):
   return parseEmailLogIdFromHtml(text)
 }
 
-export async function POST(req: Request) {
-  const secret = process.env.RESEND_WEBHOOK_SECRET?.trim()
-  if (secret) {
-    const auth = req.headers.get('authorization') ?? ''
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+/** Echt von Resend? Bearer (alt) oder Svix-Signatur (Resend-Webhook-Secret „whsec_…“). */
+function pruefeHerkunft(req: Request, roh: string): { ok: boolean; verifiziert: boolean } {
+  const bearer = process.env.RESEND_WEBHOOK_SECRET?.trim()
+  const signing = process.env.RESEND_WEBHOOK_SIGNING_SECRET?.trim()
+  const auth = req.headers.get('authorization') ?? ''
+  if (bearer && auth === `Bearer ${bearer}`) return { ok: true, verifiziert: true }
+  if (signing && req.headers.get('svix-signature')) {
+    try {
+      new Resend('re_unused').webhooks.verify({
+        payload: roh,
+        headers: {
+          id: req.headers.get('svix-id') ?? '',
+          timestamp: req.headers.get('svix-timestamp') ?? '',
+          signature: req.headers.get('svix-signature') ?? '',
+        },
+        webhookSecret: signing,
+      })
+      return { ok: true, verifiziert: true }
+    } catch {
+      return { ok: false, verifiziert: false }
     }
+  }
+  // Ohne konfigurierte Secrets: Antwort-Zuordnung wie bisher erlaubt, aber nichts Neues anlegen
+  if (!bearer && !signing) return { ok: true, verifiziert: false }
+  return { ok: false, verifiziert: false }
+}
+
+export async function POST(req: Request) {
+  const roh = await req.text()
+  const herkunft = pruefeHerkunft(req, roh)
+  if (!herkunft.ok) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   let body: ResendInboundPayload
   try {
-    body = (await req.json()) as ResendInboundPayload
+    body = JSON.parse(roh) as ResendInboundPayload
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
@@ -68,9 +98,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, skipped: true })
   }
 
-  const data = body.data
+  // Webhook liefert nur Eckdaten — Text/HTML/Header bei Resend nachladen
+  const voll = body.data.email_id ? await ladeEingehendeMail(body.data.email_id) : null
+  const data: NonNullable<ResendInboundPayload['data']> = voll
+    ? {
+        ...body.data,
+        from: voll.from,
+        to: voll.to,
+        subject: voll.subject,
+        html: voll.html ?? undefined,
+        text: voll.text ?? undefined,
+        message_id: voll.messageId ?? body.data.message_id,
+        in_reply_to: body.data.in_reply_to ?? voll.inReplyTo ?? null,
+      }
+    : body.data
   const parentId = await findParentLogId(data)
   if (!parentId) {
+    const empfaenger = [...(Array.isArray(data.to) ? data.to : [data.to ?? '']), ...(body.data.received_for ?? [])].filter(Boolean)
+    const kennung = auftragsKennungAusEmpfaengern(empfaenger)
+    if (kennung !== null && herkunft.verifiziert && voll) {
+      const r = await auftragAusMail(voll, kennung)
+      if (!r.ok) return NextResponse.json({ error: r.message }, { status: 500 })
+      return NextResponse.json(r)
+    }
     return NextResponse.json({ ok: true, unmatched: true })
   }
 

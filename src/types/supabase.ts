@@ -5007,6 +5007,7 @@ export type Database = {
           adresse: string | null
           akut_fall_ids: Json
           ansprechpartner: string | null
+          arbeitsplatz_aktiv: boolean
           auth_user_id: string | null
           av_akzeptiert_am: string | null
           av_akzeptiert_von: string | null
@@ -5030,6 +5031,7 @@ export type Database = {
           kleinreparaturen_ohne_angebot: boolean
           kundennummer: string | null
           letzte_aktivitaet: string | null
+          melde_qr_aktiv: boolean
           mieter_kontakt_email: string | null
           mieter_kontakt_hinweis: string | null
           mieter_kontakt_telefon: string | null
@@ -5051,6 +5053,7 @@ export type Database = {
           org_strasse: string | null
           org_sub: string | null
           org_telefon: string | null
+          org_typ: string | null
           ort: string | null
           plz: string | null
           portal_gesperrt_am: string | null
@@ -5065,12 +5068,12 @@ export type Database = {
           vorname: string | null
           webseite: string | null
           wl_ansprache_am: string | null
-          org_typ: string | null
         }
         Insert: {
           adresse?: string | null
           akut_fall_ids?: Json
           ansprechpartner?: string | null
+          arbeitsplatz_aktiv?: boolean
           auth_user_id?: string | null
           av_akzeptiert_am?: string | null
           av_akzeptiert_von?: string | null
@@ -5094,6 +5097,7 @@ export type Database = {
           kleinreparaturen_ohne_angebot?: boolean
           kundennummer?: string | null
           letzte_aktivitaet?: string | null
+          melde_qr_aktiv?: boolean
           mieter_kontakt_email?: string | null
           mieter_kontakt_hinweis?: string | null
           mieter_kontakt_telefon?: string | null
@@ -5115,6 +5119,7 @@ export type Database = {
           org_strasse?: string | null
           org_sub?: string | null
           org_telefon?: string | null
+          org_typ?: string | null
           ort?: string | null
           plz?: string | null
           portal_gesperrt_am?: string | null
@@ -5129,12 +5134,12 @@ export type Database = {
           vorname?: string | null
           webseite?: string | null
           wl_ansprache_am?: string | null
-          org_typ?: string | null
         }
         Update: {
           adresse?: string | null
           akut_fall_ids?: Json
           ansprechpartner?: string | null
+          arbeitsplatz_aktiv?: boolean
           auth_user_id?: string | null
           av_akzeptiert_am?: string | null
           av_akzeptiert_von?: string | null
@@ -5158,6 +5163,7 @@ export type Database = {
           kleinreparaturen_ohne_angebot?: boolean
           kundennummer?: string | null
           letzte_aktivitaet?: string | null
+          melde_qr_aktiv?: boolean
           mieter_kontakt_email?: string | null
           mieter_kontakt_hinweis?: string | null
           mieter_kontakt_telefon?: string | null
@@ -5179,6 +5185,7 @@ export type Database = {
           org_strasse?: string | null
           org_sub?: string | null
           org_telefon?: string | null
+          org_typ?: string | null
           ort?: string | null
           plz?: string | null
           portal_gesperrt_am?: string | null
@@ -5193,7 +5200,6 @@ export type Database = {
           vorname?: string | null
           webseite?: string | null
           wl_ansprache_am?: string | null
-          org_typ?: string | null
         }
         Relationships: []
       }
@@ -5729,6 +5735,7 @@ export type Database = {
           erfassung_von: string | null
           erstellt_von: string | null
           freigabe_bypass_grund: string | null
+          freigabe_token: string | null
           funnel_daten: Json | null
           geloescht_am: string | null
           hausnummer: string | null
@@ -5805,6 +5812,7 @@ export type Database = {
           erfassung_von?: string | null
           erstellt_von?: string | null
           freigabe_bypass_grund?: string | null
+          freigabe_token?: string | null
           funnel_daten?: Json | null
           geloescht_am?: string | null
           hausnummer?: string | null
@@ -5881,6 +5889,7 @@ export type Database = {
           erfassung_von?: string | null
           erstellt_von?: string | null
           freigabe_bypass_grund?: string | null
+          freigabe_token?: string | null
           funnel_daten?: Json | null
           geloescht_am?: string | null
           hausnummer?: string | null
