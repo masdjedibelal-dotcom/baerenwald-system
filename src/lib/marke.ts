@@ -13,6 +13,8 @@ export type MarkeFunktion =
   | 'hvRollen'
   /** HV-Ablauf: Freigabe/Schwelle, Akut/Sofortmaßnahme, eigener HV-Meldungsstatus (Mieter-Meldung wartet auf HV) */
   | 'hvWorkflow'
+  /** Portal-Konto nur auf Einladung (CRM-Link oder Einladung der Verwaltung), keine Selbstregistrierung */
+  | 'nurEinladung'
 
 type Marke = {
   id: MarkeId
@@ -85,7 +87,7 @@ const MARKEN: Record<MarkeId, Marke> = {
     themeColor: '#1a3d2b',
     marketingSeite: true,
     recht: { impressum: '/impressum', datenschutz: '/datenschutz', agb: '/agb' },
-    funktionen: { hvRollen: false, hvWorkflow: false },
+    funktionen: { hvRollen: false, hvWorkflow: false, nurEinladung: false },
   },
   teo: {
     id: 'teo',
@@ -113,7 +115,7 @@ const MARKEN: Record<MarkeId, Marke> = {
     themeColor: '#0b1f3a',
     marketingSeite: false,
     recht: { impressum: '/impressum', datenschutz: '/datenschutz', agb: '/agb' },
-    funktionen: { hvRollen: false, hvWorkflow: true },
+    funktionen: { hvRollen: false, hvWorkflow: true, nurEinladung: true },
   },
 }
 

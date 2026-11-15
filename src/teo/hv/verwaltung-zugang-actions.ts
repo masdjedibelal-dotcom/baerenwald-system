@@ -210,6 +210,7 @@ export async function ladePersonEin(kundeId: string, id: string): Promise<{ ok: 
   const body = `
     <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">Guten Tag ${esc(name)},</p>
     <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">für <strong>${esc(orgName)}</strong> haben wir Ihnen einen Zugang zum ${esc(MARKE.name)}-Arbeitsplatz eingerichtet (Rolle: ${ROLLEN_LABEL[rolle]}). Dort sehen Sie alle Vorgänge, Angebote und Fotos an einer Stelle.</p>
+    ${rolle === 'eigentuemer' ? `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${esc(MARKE.name)} ist der Handwerks-Service von ${esc(orgName)}: Wir kümmern uns um Schäden, Reparaturen und Arbeiten an Ihrem Haus.</p>` : ''}
     <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">Legen Sie Ihr Passwort fest, danach sind Sie direkt drin.</p>
     <p style="margin:0 0 16px;">${mailPrimaryButtonHtml('Zugang einrichten', link)}</p>
     <p style="font-size:13px;color:${C.gray500};margin:0;line-height:1.5;">Sie müssen den Arbeitsplatz nicht nutzen: Angebote, Termine und Rechnungen bekommen Sie weiterhin per E-Mail.</p>`

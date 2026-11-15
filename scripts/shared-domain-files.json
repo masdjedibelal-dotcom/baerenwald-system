@@ -6,6 +6,10 @@
       "portal": "src/lib/marke.ts"
     },
     {
+      "crm": "src/lib/portal-einladung-token.ts",
+      "portal": "src/lib/portal/portal-einladung-token.ts"
+    },
+    {
       "crm": "src/lib/status/status-map.ts",
       "portal": "src/lib/shared-domain/status-map.ts"
     },

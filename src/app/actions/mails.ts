@@ -29,8 +29,6 @@ import {
 import { resolveAngebotKundeTyp } from '@/lib/angebote/angebot-wizard-types'
 import { buildBesichtigungTerminMail } from '@/lib/mail/besichtigung-termin-mail'
 import {
-  buildPortalLoginLink,
-  buildPartnerDashboardLink,
   buildPartnerPortalButton,
   defaultPortalInviteBetreff,
   defaultPortalInviteText,
@@ -42,6 +40,7 @@ import {
 import { C } from '@/lib/tokens/colors'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
 import { MARKE } from '@/lib/marke'
+import { kundenPortalEinladungLink, partnerPortalEinladungLink } from '@/lib/portal-einladung-link'
 
 /** Website-Lead: Bestätigungsmail; mit `force` auch für manuell erfasste Anfragen (Checkbox). */
 export async function sendAnfrageBestaetigung(
@@ -597,7 +596,7 @@ export async function getKundenPortalMailDraft(
 > {
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, email, typ, portal_modus, org_anzeigename')
+    .select('id, name, email, typ, portal_modus, org_anzeigename, auth_user_id')
     .eq('id', kundeId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:kunden', error)
@@ -608,7 +607,7 @@ export async function getKundenPortalMailDraft(
   const istOrganisation = (kunde as { portal_modus?: string }).portal_modus === 'organisation'
   const orgName = (kunde as { org_anzeigename?: string | null }).org_anzeigename
 
-  const portalLink = buildPortalLoginLink()
+  const portalLink = kundenPortalEinladungLink(kunde as { email?: string | null; name?: string | null; auth_user_id?: string | null })
   const name = String((kunde as { name?: string | null }).name ?? 'Kundin/Kunde').trim()
   const branding = await getMailBranding(supabaseAdmin)
   const anrede = mailAnredeFromKundeTyp((kunde as { typ?: string | null }).typ)
@@ -646,13 +645,13 @@ export async function sendKundenPortalLinkMail(input: {
   if (!input.to.trim()) return { ok: false, message: 'Bitte Empfänger-Adresse angeben.' }
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, typ, portal_modus')
+    .select('id, name, email, typ, portal_modus, auth_user_id')
     .eq('id', input.kundeId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:kunden', error)
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
 
-  const portalLink = buildPortalLoginLink()
+  const portalLink = kundenPortalEinladungLink(kunde as { email?: string | null; name?: string | null; auth_user_id?: string | null })
   const branding = await getMailBranding(supabaseAdmin)
   const anrede =
     input.anrede === 'du' || input.anrede === 'sie'
@@ -691,13 +690,13 @@ export async function previewKundenPortalMail(input: {
 }): Promise<{ ok: true; html: string } | { ok: false; message: string }> {
   const { data: kunde, error } = await supabaseAdmin
     .from('kunden')
-    .select('id, name, typ, portal_modus')
+    .select('id, name, email, typ, portal_modus, auth_user_id')
     .eq('id', input.kundeId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:kunden', error)
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
 
-  const portalLink = buildPortalLoginLink()
+  const portalLink = kundenPortalEinladungLink(kunde as { email?: string | null; name?: string | null; auth_user_id?: string | null })
   const branding = await getMailBranding(supabaseAdmin)
   const anrede =
     input.anrede === 'du' || input.anrede === 'sie'
@@ -764,7 +763,7 @@ export async function getPartnerPortalMailDraft(
 > {
   const { data: hw, error } = await supabaseAdmin
     .from('handwerker')
-    .select('id, name, email')
+    .select('id, name, email, auth_user_id')
     .eq('id', handwerkerId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:handwerker', error)
@@ -772,7 +771,7 @@ export async function getPartnerPortalMailDraft(
   const to = String((hw as { email?: string | null }).email ?? '').trim()
   if (!to) return { ok: false, message: 'Partner hat keine E-Mail-Adresse.' }
 
-  const portalLink = buildPartnerDashboardLink()
+  const portalLink = partnerPortalEinladungLink(hw as { auth_user_id?: string | null })
   const name = String((hw as { name?: string | null }).name ?? 'Partner').trim()
   const branding = await getMailBranding(supabaseAdmin)
   const betreff = defaultPartnerPortalInviteBetreff()
@@ -799,13 +798,13 @@ export async function sendPartnerPortalLinkMail(input: {
   if (!input.to.trim()) return { ok: false, message: 'Bitte Empfänger-Adresse angeben.' }
   const { data: hw, error } = await supabaseAdmin
     .from('handwerker')
-    .select('id, name')
+    .select('id, name, auth_user_id')
     .eq('id', input.handwerkerId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:handwerker', error)
   if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
 
-  const portalLink = buildPartnerDashboardLink()
+  const portalLink = partnerPortalEinladungLink(hw as { auth_user_id?: string | null })
   const branding = await getMailBranding(supabaseAdmin)
   const html = partnerPortalMailHtml({
     name: String((hw as { name?: string | null }).name ?? 'Partner').trim(),
@@ -833,13 +832,13 @@ export async function previewPartnerPortalMail(input: {
 }): Promise<{ ok: true; html: string } | { ok: false; message: string }> {
   const { data: hw, error } = await supabaseAdmin
     .from('handwerker')
-    .select('id, name')
+    .select('id, name, auth_user_id')
     .eq('id', input.handwerkerId)
     .maybeSingle()
   if (error) logDbError('app/actions/mails:handwerker', error)
   if (error || !hw) return { ok: false, message: error?.message ?? 'Partner nicht gefunden' }
 
-  const portalLink = buildPartnerDashboardLink()
+  const portalLink = partnerPortalEinladungLink(hw as { auth_user_id?: string | null })
   const branding = await getMailBranding(supabaseAdmin)
   const html = partnerPortalMailHtml({
     name: String((hw as { name?: string | null }).name ?? 'Partner').trim(),
