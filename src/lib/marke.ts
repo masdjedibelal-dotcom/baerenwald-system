@@ -48,6 +48,8 @@ type Marke = {
     hausnummer: string
     plz: string
     ort: string
+    /** Festnetz für Kunden (Anzeige) */
+    telefon: string
     email: string
     website: string
   }
@@ -81,6 +83,7 @@ const MARKEN: Record<MarkeId, Marke> = {
       hausnummer: '20',
       plz: '81737',
       ort: 'München',
+      telefon: '089 8095 5726',
       email: 'info@baerenwald-muenchen.de',
       website: 'www.baerenwaldmuenchen.de',
     },
@@ -109,6 +112,7 @@ const MARKEN: Record<MarkeId, Marke> = {
       hausnummer: '15',
       plz: '80538',
       ort: 'München',
+      telefon: '089 80929405',
       email: 'info@servus-teo.de',
       website: 'www.servus-teo.de',
     },

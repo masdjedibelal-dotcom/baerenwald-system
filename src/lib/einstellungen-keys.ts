@@ -42,7 +42,7 @@ export function defaultFirmenEinstellungen(): FirmenEinstellungen {
     hausnummer: '20',
     plz: '81737',
     ort: 'München',
-    telefon: '089 8095 5726',
+    telefon: MARKE.firma.telefon,
     email: MARKE.firma.email,
     website: MARKE.firma.website,
     ust_id: 'DE362198001',
