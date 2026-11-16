@@ -877,14 +877,15 @@ function parseFusszeileKontakt(props: AngebotHtmlInput): {
     if (/^www\./i.test(line) && !web) web = line.replace(/^https?:\/\//i, '')
   }
   if (!web) web = MARKE.firma.website
-  if (!tel) tel = '+49 163 7316161'
+  if (!tel) tel = MARKE.id === 'baerenwald' ? '+49 163 7316161' : MARKE.firma.telefon
   if (!email) email = MARKE.infoEmail
   return { tel, email, web }
 }
 
 function parseFusszeileSteuer(props: AngebotHtmlInput): { ustId: string; steuernr: string } {
-  let ustId = 'DE362198001'
-  let steuernr = '14417721070'
+  const bw = MARKE.id === 'baerenwald'
+  let ustId = bw ? 'DE362198001' : ''
+  let steuernr = bw ? '14417721070' : ''
   const lines = (props.firmen_steuer_footer ?? '')
     .split('\n')
     .map((z) => z.trim())

@@ -35,18 +35,20 @@ export type EinstellungKey = (typeof EINSTELLUNG_KEYS)[keyof typeof EINSTELLUNG_
 export type FirmenEinstellungen = Record<EinstellungKey, string>
 
 export function defaultFirmenEinstellungen(): FirmenEinstellungen {
+  /** Steuer- und Registerangaben nur für Bärenwald vorbelegen — andere Marken: leer = nicht anzeigen */
+  const bw = MARKE.id === 'baerenwald'
   return {
     firmenname: MARKE.firma.firmenname,
     rechtsform: '',
     strasse: MARKE.firma.strasse,
-    hausnummer: '20',
-    plz: '81737',
-    ort: 'München',
+    hausnummer: MARKE.firma.hausnummer,
+    plz: MARKE.firma.plz,
+    ort: MARKE.firma.ort,
     telefon: MARKE.firma.telefon,
     email: MARKE.firma.email,
     website: MARKE.firma.website,
-    ust_id: 'DE362198001',
-    steuernummer: '14417721070',
+    ust_id: bw ? 'DE362198001' : '',
+    steuernummer: bw ? '14417721070' : '',
     iban: '',
     bic: '',
     bank_name: '',
@@ -55,7 +57,7 @@ export function defaultFirmenEinstellungen(): FirmenEinstellungen {
     angebot_gueltig_tage: '30',
     mwst_satz: '19',
     kleinunternehmer: '',
-    pdf_fusszeile: 'Amtsgericht München · HRB …',
+    pdf_fusszeile: bw ? 'Amtsgericht München · HRB …' : '',
     geschaeftsfuehrer: '',
     anfahrt_pauschale_netto: '49',
     anfahrt_leistung_text: 'Anfahrtskosten (Pauschale)',

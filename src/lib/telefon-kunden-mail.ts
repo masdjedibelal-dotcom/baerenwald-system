@@ -1,5 +1,7 @@
+import { MARKE } from '@/lib/marke'
+
 /** Festnetz für Kunden-E-Mails (Footer, tel:-Links) — nicht die Mobilnummer. */
-export const FESTNETZ_TELEFON_DEFAULT = '089 8095 5726'
+export const FESTNETZ_TELEFON_DEFAULT = MARKE.firma.telefon
 
 /** Erkennt deutsche Mobilnummern (+49 15x/16x/17x oder 016x …). */
 export function isMobilnummer(telefon: string): boolean {
