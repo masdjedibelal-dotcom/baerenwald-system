@@ -77,7 +77,8 @@ export function buildDefaultAbnahmeMetaFromAuftrag(
     projektadresse,
     leistungsumfang_kurz: leistungsumfang,
     ansprechpartner_kunde: kunde?.name?.trim() || '',
-    vertreter_an: firm.geschaeftsfuehrer?.trim() || '',
+    // Vertreter vor Ort trägt man selbst ein — nicht mit Geschäftsführung vorbelegen
+    vertreter_an: '',
   })
 }
 
