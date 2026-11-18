@@ -39,7 +39,7 @@ import {
 } from '@/lib/portal-utils'
 import { C } from '@/lib/tokens/colors'
 import { mailPrimaryButtonHtml } from '@/lib/mail/email-buttons'
-import { MARKE } from '@/lib/marke'
+import { istTeo, MARKE } from '@/lib/marke'
 import { kundenPortalEinladungLink, partnerPortalEinladungLink } from '@/lib/portal-einladung-link'
 
 /** Website-Lead: Bestätigungsmail; mit `force` auch für manuell erfasste Anfragen (Checkbox). */
@@ -650,6 +650,17 @@ export async function sendKundenPortalLinkMail(input: {
     .maybeSingle()
   if (error) logDbError('app/actions/mails:kunden', error)
   if (error || !kunde) return { ok: false, message: error?.message ?? 'Kunde nicht gefunden' }
+
+  // TEO: Wer eine Verwaltung zum Portal einlädt, will ihr den Zugang geben — Arbeitsplatz einschalten,
+  // sonst landet sie nach der Registrierung auf „Kein Online-Zugang freigeschaltet“.
+  if (istTeo && (kunde as { portal_modus?: string }).portal_modus === 'organisation') {
+    const { error: apErr } = await supabaseAdmin
+      .from('kunden')
+      .update({ arbeitsplatz_aktiv: true, updated_at: new Date().toISOString() })
+      .eq('id', input.kundeId)
+      .eq('arbeitsplatz_aktiv', false)
+    if (apErr) logDbError('app/actions/mails:arbeitsplatz-aktiv', apErr)
+  }
 
   const portalLink = kundenPortalEinladungLink(kunde as { email?: string | null; name?: string | null; auth_user_id?: string | null })
   const branding = await getMailBranding(supabaseAdmin)
