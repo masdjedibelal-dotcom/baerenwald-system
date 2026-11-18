@@ -6,13 +6,10 @@ import { useEffect,useMemo,useState,type ReactNode } from 'react'
 import Link from 'next/link'
 import { KundeModal } from '@/components/kunden/KundeModal'
 import { StammdatenPortalZeile } from '@/components/crm/StammdatenPortalZeile'
-import { SheetEditableField } from '@/components/surfaces/SheetEditableField'
 import { updateLeadKontakt } from '@/app/(dashboard)/anfragen/actions'
-import { saveKunde } from '@/app/actions/kunden'
 import { kundentypLabel } from '@/lib/lead-display-helpers'
 import { splitStrasseHausnummer } from '@/lib/kunde-stammdaten'
 import type { Kunde } from '@/lib/types'
-import { toast } from '@/components/ui/app-toast'
 
 function telHref(tel: string) {
   return `tel:${tel.replace(/\s/g, '')}`
@@ -143,73 +140,11 @@ export function EntityKundenStammdatenCard({
     setSheetOpen(true)
   }
 
-  async function saveInlineField(
-    patch: Partial<Pick<EntityKundenStammDraft, 'name' | 'telefon' | 'email'>>
-  ) {
-    const next = { ...draft, ...patch }
-    setDraft(next)
-    const kid = kundeId?.trim()
-    const lid = leadId?.trim()
-    if (kid) {
-      const { strasse, hausnummer } = splitStrasseHausnummer(next.strasse)
-      const r = await saveKunde(
-        {
-          name: next.name,
-          vorname: next.vorname,
-          nachname: next.nachname,
-          telefon: next.telefon || null,
-          email: next.email || null,
-          plz: next.plz || null,
-          ort: next.ort || null,
-          strasse: strasse || null,
-          hausnummer: hausnummer || null,
-          typ: (typ ?? 'privat') as string,
-          stammPflicht: false,
-        },
-        kid,
-        lid ? { revalidateAnfrageIds: [lid] } : undefined
-      )
-      if (!r.ok) {
-        toast.systemError(r)
-        setDraft(draft)
-        return
-      }
-    }
-    if (lid) {
-      const r = await updateLeadKontakt(lid, {
-        kontakt_name: next.name,
-        kontakt_telefon: next.telefon || null,
-        kontakt_email: next.email || null,
-        plz: next.plz || null,
-        kundentyp: typ ?? undefined,
-      })
-      if (!r.ok) {
-        toast.systemError(r)
-        return
-      }
-    }
-    toast.autoSaved({ label: 'Kontakt' })
-    onSaved?.(next as Partial<Kunde>)
-  }
-
   const viewBody = (
     <>
       {banner}
       <div className="vgid">
-        {canEdit ? (
-          <SheetEditableField
-            kind="text"
-            label="Name"
-            value={draft.name}
-            placeholder="Name"
-            editMode="inline"
-            sheetContext="detail"
-            onSave={(v) => void saveInlineField({ name: v })}
-            className="vgid-name-field"
-          />
-        ) : (
-          <div className="vgid-name">{draft.name.trim() || '—'}</div>
-        )}
+        <div className="vgid-name">{draft.name.trim() || '—'}</div>
         {typLbl && typLbl !== '—' ? <div className="vgid-meta">{typLbl}</div> : null}
       </div>
 
@@ -223,33 +158,7 @@ export function EntityKundenStammdatenCard({
             />
           ) : null}
           <PropRow label="Adresse" value={adresse || '—'} />
-          {canEdit ? (
-            <>
-              <div className="prop prop--inline-edit">
-                <SheetEditableField
-                  kind="tel"
-                  label="Telefon"
-                  value={draft.telefon}
-                  placeholder="Telefon"
-                  editMode="inline"
-                  sheetContext="detail"
-                  onSave={(v) => void saveInlineField({ telefon: v })}
-                />
-              </div>
-              <div className="prop prop--inline-edit">
-                <SheetEditableField
-                  kind="email"
-                  label="E-Mail"
-                  value={draft.email}
-                  placeholder="E-Mail"
-                  editMode="inline"
-                  sheetContext="detail"
-                  onSave={(v) => void saveInlineField({ email: v })}
-                />
-              </div>
-            </>
-          ) : (
-            <>
+          {/* Bearbeiten nur über den Stift (Blatt mit Speichern) — kein Speichern direkt im Feld */}
               <PropRow
                 label="Telefon"
                 value={
@@ -274,8 +183,6 @@ export function EntityKundenStammdatenCard({
                   )
                 }
               />
-            </>
-          )}
           {draft.ansprechpartner?.trim() ? (
             <PropRow label="Ansprechpartner" value={draft.ansprechpartner.trim()} />
           ) : null}
