@@ -1,9 +1,13 @@
 import { logDbError } from '@/lib/errors/log-db-error'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { istTeo } from '@/lib/marke'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
-/** Erste Rechnungsnummer im Jahr 2026 (danach fortlaufend). */
+/** Erste Rechnungsnummer im Jahr 2026 (danach fortlaufend) — nur Bärenwald. */
 export const RE_NUMMER_START_2026 = 2069
+
+/** Eigener Nummernkreis je Marke: Bärenwald RE{Jahr}-…, Servus TEO TEO{Jahr}-… (ab 1). */
+const NUMMER_KERN = istTeo ? 'TEO' : 'RE'
 
 export type RechnungBelegNummerTyp = 'rechnung' | 'gutschrift'
 
@@ -12,7 +16,7 @@ export function rechnungsnummerPrefix(
   jahr = new Date().getFullYear()
 ): string {
   const y = String(jahr)
-  return typ === 'gutschrift' ? `GS-RE${y}-` : `RE${y}-`
+  return typ === 'gutschrift' ? `GS-${NUMMER_KERN}${y}-` : `${NUMMER_KERN}${y}-`
 }
 
 export function isRe2026FormatNummer(
@@ -27,10 +31,11 @@ export function isRe2026FormatNummer(
 }
 
 function startNummerFuerJahr(jahr: string): number {
+  if (istTeo) return 1
   return jahr === '2026' ? RE_NUMMER_START_2026 : 1
 }
 
-/** Nächste Nummer per Abfrage (RE2026-2069, RE2026-2070, …).
+/** Nächste Nummer per Abfrage (RE2026-2069, RE2026-2070, … bzw. TEO2026-1, TEO2026-2, …).
  * Auch Entwürfe mit Nummer zählen — sonst Kollision beim Versand. */
 export async function nextRechnungsnummerAusDb(
   supabase: SupabaseClient,
@@ -72,6 +77,14 @@ export async function allocateRechnungsnummer(
   typ: RechnungBelegNummerTyp = 'rechnung',
   supabase: SupabaseClient = supabaseAdmin
 ): Promise<{ ok: true; nummer: string } | { ok: false; message: string }> {
+  // TEO: DB-Funktion generate_beleg_nummer kennt nur das RE-Format (Bärenwald) — Nummer direkt aus den TEO-Rechnungen
+  if (istTeo) {
+    try {
+      return { ok: true, nummer: await nextRechnungsnummerAusDb(supabase, typ) }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : 'Rechnungsnummer konnte nicht erzeugt werden.' }
+    }
+  }
   const { data: rpcRaw, error: rpcErr } = await supabase.rpc('generate_beleg_nummer', {
     p_typ: typ,
   })

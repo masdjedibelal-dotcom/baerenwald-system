@@ -5,9 +5,9 @@ import { formatEuro } from '@/lib/format/geld-datum'
 const UUID_RE =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi
 
-/** BW-2026-0001, RE2026-2069, AN-…, AG-… */
+/** BW-2026-0001, RE2026-2069, TEO2026-1, AN-…, AG-… */
 const DOC_NR_RE =
-  /\b(?:BW|RE|AN|AG|AUF)[-–]?\d{2,4}[-–]?\d{2,6}\b/gi
+  /\b(?:BW|RE|TEO|AN|AG|AUF)[-–]?\d{2,4}[-–]?\d{2,6}\b/gi
 
 const CRM_PATH_RE =
   /\/(?:rechnungen|angebote|auftraege|anfragen|kunden|handwerker|partner|vorgaenge|kalender|katalog)(?:\/[^\s)|\]"'<>]*)?/gi

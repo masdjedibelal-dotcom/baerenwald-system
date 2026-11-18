@@ -1,5 +1,7 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
+
 import { MockBtn } from '@/components/mock-ui'
 import { MockInput } from '@/components/mock-ui/MockForm'
 import { MockCard } from '@/components/mock-ui/MockCard'
@@ -1574,7 +1576,7 @@ export function RechnungWizard({
           <SheetEditableField
             label="Rechnungsnummer"
             value={rechnungsnummer}
-            placeholder="RE2026-2069"
+            placeholder={istTeo ? `TEO${new Date().getFullYear()}-1` : "RE2026-2069"}
             sheetContext="canvas"
             onSave={(v) => {
               setRechnungsnummer(v.trim())
