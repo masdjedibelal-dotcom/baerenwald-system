@@ -186,7 +186,7 @@ export async function entfernePerson(kundeId: string, id: string): Promise<{ ok:
   return { ok: true }
 }
 
-/** Einladung zum Arbeitsplatz (nur wenn der Arbeitsplatz für diese Verwaltung an ist). Passwort legt die Person selbst fest. */
+/** Einladung zum Arbeitsplatz; schaltet den Arbeitsplatz der Verwaltung mit ein. Passwort legt die Person selbst fest. */
 export async function ladePersonEin(kundeId: string, id: string): Promise<{ ok: true } | Fail> {
   const g = await gate()
   if (!g.ok) return g
@@ -198,7 +198,12 @@ export async function ladePersonEin(kundeId: string, id: string): Promise<{ ok: 
   if (pRes.error) logDbError('teo/hv/verwaltung-zugang:einladen-person', pRes.error)
   const k = kRes.data as { name?: string | null; org_anzeigename?: string | null; arbeitsplatz_aktiv?: boolean | null } | null
   const p = pRes.data as { name?: string | null; email?: string | null; rolle?: string; auth_user_id?: string | null } | null
-  if (!k?.arbeitsplatz_aktiv) return { ok: false, message: 'Der Arbeitsplatz ist für diese Verwaltung aus.' }
+  if (!k) return { ok: false, message: 'Verwaltung nicht gefunden.' }
+  // Zugang gilt mit der Einladung — Arbeitsplatz der Verwaltung einschalten (steuert u. a. den Portal-Hinweis in Mails)
+  if (!k.arbeitsplatz_aktiv) {
+    const { error: apErr } = await g.db.from('kunden').update({ arbeitsplatz_aktiv: true, updated_at: new Date().toISOString() }).eq('id', kundeId)
+    if (apErr) logDbError('teo/hv/verwaltung-zugang:arbeitsplatz-aktiv', apErr)
+  }
   if (!p?.email) return { ok: false, message: 'Person ohne E-Mail.' }
   if (p.auth_user_id) return { ok: false, message: 'Diese Person ist bereits angemeldet.' }
 
