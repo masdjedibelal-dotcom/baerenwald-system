@@ -32,7 +32,6 @@ import { toast } from '@/components/ui/app-toast'
 import { KundenObjekteCard } from '@/components/kunden/KundenObjekteCard'
 import { KundenAnsprechpartnerCard } from '@/components/kunden/KundenAnsprechpartnerCard'
 import { MeldeLinksCard } from '@/components/kunden/MeldeLinksCard'
-import { meldeQrAktivFuerKunde } from '@/teo/hv/verwaltung-zugang-actions'
 import { FreigabeSettingsCard } from '@/teo/hv/FreigabeSettingsCard'
 import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
 import { normalizeAkutFallIds } from '@/teo/hv/sofortmassnahme-faelle'
@@ -220,23 +219,6 @@ export function KundeDetailClient({
   }, [kunde, rechnungen])
 
   const zeigtOrganisationTab = istKundeHausverwaltungTyp(kunde.typ)
-  // TEO: Melde-Links nur zeigen, wenn die QR-Mieter-Meldung für diese Verwaltung an ist (null = unbekannt → anzeigen)
-  const [meldeQrAktiv, setMeldeQrAktiv] = useState<boolean | null>(null)
-  useEffect(() => {
-    if (!funktionAn('hvWorkflow') || !zeigtOrganisationTab) return
-    let aus = false
-    meldeQrAktivFuerKunde(kunde.id)
-      .then((v) => {
-        if (!aus) setMeldeQrAktiv(v)
-      })
-      .catch(() => {
-        if (!aus) setMeldeQrAktiv(null)
-      })
-    return () => {
-      aus = true
-    }
-  }, [kunde.id, zeigtOrganisationTab, kunde.updated_at])
-
   const freigabeSettingsValue = useMemo(
     () => ({
       notfall_direkt: kunde.notfall_direkt ?? true,
@@ -396,7 +378,7 @@ export function KundeDetailClient({
           onChanged={() => refresh()}
         />
       ) : null}
-      {kunde.org_kennung?.trim() && meldeQrAktiv !== false ? (
+      {kunde.org_kennung?.trim() ? (
         <MeldeLinksCard
           kundeId={kunde.id}
           orgSlug={kunde.org_kennung.trim().toLowerCase()}
