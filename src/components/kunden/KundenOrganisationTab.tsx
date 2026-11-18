@@ -11,7 +11,6 @@ import { C } from '@/lib/tokens/colors'
 import { useEffect, useState } from 'react'
 import { saveKundeOrganisation } from '@/app/actions/kunden-organisation'
 import { FreigabeRegelnEditor } from '@/teo/hv/FreigabeRegelnEditor'
-import { VerwaltungZugangCard } from '@/teo/hv/VerwaltungZugangCard'
 import {
   normalizeOrgHttpUrl,
   orgMeldeLegalUrlsReady,
@@ -265,7 +264,6 @@ export function KundenOrganisationTab({ kunde, onSaved }: Props) {
         ) : null}
       </MockCard>
 
-      {funktionAn('hvWorkflow') ? <VerwaltungZugangCard kundeId={kunde.id} /> : null}
 
       <ConfirmPopup
         open={aushangWarnOpen}

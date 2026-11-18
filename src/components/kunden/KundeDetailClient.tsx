@@ -37,6 +37,7 @@ import { FreigabeSettingsCard } from '@/teo/hv/FreigabeSettingsCard'
 import { saveKundeFreigabeRegeln } from '@/app/actions/kunden-organisation'
 import { normalizeAkutFallIds } from '@/teo/hv/sofortmassnahme-faelle'
 import { KundenOrganisationTab } from '@/components/kunden/KundenOrganisationTab'
+import { VerwaltungZugangCard } from '@/teo/hv/VerwaltungZugangCard'
 import { KundenDokumenteTab } from '@/components/kunden/KundenDokumenteTab'
 import { KundenNotizenTab } from '@/components/kunden/KundenNotizenTab'
 import { KundePickerSheet } from '@/components/kunden/KundePickerSheet'
@@ -437,6 +438,8 @@ export function KundeDetailClient({
           onSaved={() => refresh()}
         />
       ) : null}
+      {/* TEO: Arbeitsplatz-/QR-Schalter, Auftragsadresse und Personen direkt in der Übersicht (der Organisation-Tab hat keinen Einstieg) */}
+      {zeigtOrganisationTab && funktionAn('hvWorkflow') ? <VerwaltungZugangCard kundeId={kunde.id} /> : null}
       {zusatzfelderCard}
     </div>
   )
