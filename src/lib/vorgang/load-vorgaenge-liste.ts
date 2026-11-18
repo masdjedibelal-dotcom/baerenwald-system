@@ -815,8 +815,8 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       return null
     }
 
-    // Abgeschlossener Auftrag ohne Voll-/Schlussrechnung → Rechnung/Offen
-    // („Offen“). Reine Abschläge gewinnen die Phase nicht (isPhaseWinningRechnung).
+    // Abgeschlossener Auftrag ohne Voll-/Schlussrechnung → bleibt in Phase Auftrag (wie die Detailseite),
+    // Status „Rechnung fehlt“, zählt als Offen. Reine Abschläge gewinnen die Phase nicht (isPhaseWinningRechnung).
     const leadAngRaw = angeboteByLead.get(lead.id) ?? []
     const hatAbschlagsplan = leadAngRaw.some((a) =>
       hatAktivenAbschlagsplan(parseZahlungsplan(a.zahlungsplan))
@@ -829,7 +829,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       resolved.unterstatus === 'abgeschlossen' &&
       !leadRechnungenStamm.some(hatGestellteEndabrechnung)
 
-    const listPhase: VorgangPhase = rechnungAusstehend ? 'rechnung' : resolved.phase
+    const listPhase: VorgangPhase = resolved.phase
     const listUnterstatus = rechnungAusstehend ? 'ausstehend' : resolved.unterstatus
     const listUnterstatusLabel =
       resolved.badges.wartet_freigabe
@@ -848,7 +848,7 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       if (listPhase === 'angebot') {
         return (angeboteByLead.get(lead.id) ?? []).find((a) => a.id === resolved.entityId)?.gueltig_bis ?? null
       }
-      if (listPhase === 'auftrag') {
+      if (listPhase === 'auftrag' && !rechnungAusstehend) {
         // Nächster Einsatz (frühester offener Start ab heute), sonst geplantes Ende
         const naechster = (einsatzTermineByAuftrag.get(resolved.entityId) ?? [])
           .filter((t) => t >= heute)

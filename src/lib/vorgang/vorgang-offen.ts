@@ -10,8 +10,8 @@ export function vorgangStatusKind(row: VorgangListeRow): string {
   const u = row.unterstatus.toLowerCase()
   // Storno-Gutschrift: eigener Badge-Look unter Erledigt
   if (row.belegTyp === 'gutschrift') return 'storniert'
-  // Abgeschlossener Auftrag ohne RE — in Rechnung/Offen, nicht als „fertig“
-  if (row.phase === 'rechnung' && u === 'ausstehend') return 'neu'
+  // Abgeschlossener Auftrag ohne RE („Rechnung fehlt“) — offen, nicht als „fertig“
+  if (u === 'ausstehend' && (row.phase === 'auftrag' || row.phase === 'rechnung')) return 'neu'
   if (row.phase === 'rechnung') {
     const d = rechnungStatusDisplay(row.unterstatus, {
       ueberfaellig: row.ueberfaellig,
