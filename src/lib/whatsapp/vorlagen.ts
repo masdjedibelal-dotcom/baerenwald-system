@@ -9,7 +9,7 @@ import { MARKE } from '@/lib/marke'
  * Der Testmodus zeigt im Chat denselben Text, den der Empfänger später sieht.
  */
 
-export type VorlagenName = 'bw_einsatz_neu' | 'bw_bautagebuch' | 'bw_nachricht'
+export type VorlagenName = 'bw_einsatz_neu' | 'bw_bautagebuch_update' | 'bw_nachricht'
 
 export type VorlagenDefinition = {
   name: VorlagenName
@@ -28,8 +28,8 @@ export const VORLAGEN: Record<VorlagenName, VorlagenDefinition> = {
     knoepfe: ['Annehmen', 'Ablehnen'],
     beschreibung: 'Neuer Einsatz an einen Partner, mit Annehmen/Ablehnen.',
   },
-  bw_bautagebuch: {
-    name: 'bw_bautagebuch',
+  bw_bautagebuch_update: {
+    name: 'bw_bautagebuch_update',
     text:
       `Guten Tag {{1}}, es gibt ein neues Update zu Ihrem Projekt „{{2}}“:\n\n{{3}}\n\nFotos und alle Details: {{4}}\n\nIhr ${MARKE.name}-Team`,
     beschreibung: 'Bautagebuch-Eintrag an den Kunden, mit Link zur Projektseite.',

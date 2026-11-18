@@ -545,7 +545,7 @@ export async function bautagebuchPerWhatsApp(
     const r = await nachrichtSenden(db, {
       kontakt: { typ: 'kunde', id: String(auf.kunde_id), name: e.name, nummer: e.nummer },
       vorlage: {
-        name: 'bw_bautagebuch',
+        name: 'bw_bautagebuch_update',
         werte: [e.name, String(auf.titel ?? 'Ihr Projekt'), inhalt || 'Neue Fotos und Infos', projektUrlFromToken(token)],
       },
       auftragId: input.auftragId,
