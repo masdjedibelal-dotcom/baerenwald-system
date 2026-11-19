@@ -1,0 +1,151 @@
+/*
+ * Servus TEO: CRM im Look der Website/Portale (freigegebener Entwurf 19.11.2026).
+ * Struktur bleibt: dunkles Menü mit Icons, dichte Tabellen, Wizards und PDFs unverändert.
+ * Neu: Manrope, große runde Karten, Pillen-Knöpfe und -Filter, Status ohne Punkt,
+ * heller Grund mit Blau/Gold-Verlauf, große Begrüßung auf dem Dashboard, Login als Karte.
+ * Wirkt nur bei <html data-marke="teo">.
+ */
+
+:root[data-marke='teo'] {
+  --teo-navy: #0b1f3a;
+  --teo-blau: #1e5fa8;
+  --teo-blau-bg: #eaf0f8;
+  --teo-gold: #e8a317;
+  --teo-linie: #dce4ee;
+  --teo-linie-fein: #eef2f7;
+  --teo-grund: #f7f9fc;
+  --teo-schatten: 0 20px 50px -40px rgba(11, 31, 58, 0.35);
+  --teo-verlauf:
+    radial-gradient(36vmax 24vmax at 0% 0%, rgba(156, 192, 234, 0.3), transparent 70%),
+    radial-gradient(28vmax 20vmax at 100% 0%, rgba(246, 207, 115, 0.2), transparent 70%);
+  --r: 16px;
+  --r-card: 24px;
+  --r-lg: 24px;
+  --r-sheet: 24px;
+  --r-field: 14px;
+  --r-button: 999px;
+  --shadow: var(--teo-schatten);
+  --shadow-mobile: var(--teo-schatten);
+  --bg-mobile: var(--teo-grund);
+  --card-mobile: #ffffff;
+}
+
+/* ── Seite: heller Grund mit Verlauf ─────────────────────── */
+:root[data-marke='teo'] .page {
+  background: var(--teo-verlauf), var(--teo-grund);
+  background-repeat: no-repeat;
+  background-attachment: local;
+}
+@media (min-width: 768px) {
+  :root[data-marke='teo'] .page-inner { padding: 28px 40px 120px; max-width: 1240px; }
+}
+
+/* ── Menü links: dunkel bleibt, weichere Formen ──────────── */
+:root[data-marke='teo'] .sidebar { padding: 16px 12px 14px; }
+:root[data-marke='teo'] .sidebar-icon { border-radius: 12px; font-weight: 600; }
+:root[data-marke='teo'] .sidebar-icon.active { font-weight: 800; box-shadow: none; }
+:root[data-marke='teo'] .sidebar-section { letter-spacing: 0.08em; font-weight: 800; }
+
+/* ── Kopfzeile: Suche als Pille ──────────────────────────── */
+:root[data-marke='teo'] .topbar { border-bottom: 1px solid var(--teo-linie); }
+:root[data-marke='teo'] .topbar-search-field { border-radius: 999px; background: var(--teo-grund); border-color: var(--teo-linie); }
+:root[data-marke='teo'] .topbar-icon-btn { border-radius: 999px; }
+
+/* ── Karten ──────────────────────────────────────────────── */
+:root[data-marke='teo'] .card,
+:root[data-marke='teo'] .listcard,
+:root[data-marke='teo'] .kpi-tile {
+  border: 1px solid var(--teo-linie);
+  border-radius: var(--r-card);
+  box-shadow: var(--teo-schatten);
+  background: #ffffff;
+}
+:root[data-marke='teo'] .card .card,
+:root[data-marke='teo'] .card .listcard,
+:root[data-marke='teo'] .dshell-cards .card .card { border: 0; box-shadow: none; border-radius: 0; background: transparent; }
+:root[data-marke='teo'] .card-h { border-bottom-color: var(--teo-linie-fein); padding: 18px 24px 14px; }
+:root[data-marke='teo'] .card-h .title,
+:root[data-marke='teo'] .card-title { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--teo-navy); }
+:root[data-marke='teo'] .card-b { padding-left: 24px; padding-right: 24px; }
+:root[data-marke='teo'] .listcard { overflow: hidden; }
+
+/* ── Dashboard: große Begrüßung, Kacheln ohne Icon ───────── */
+:root[data-marke='teo'] .dashboard-page .dash-hero { margin-bottom: 28px; }
+:root[data-marke='teo'] .dashboard-page .dash-hero > div:first-child > div:first-child { font-weight: 700; color: var(--text-2); }
+:root[data-marke='teo'] .dashboard-page .dash-hero > div:first-child > div:last-child {
+  font-size: clamp(28px, 3.6vw, 44px);
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  color: var(--teo-navy);
+}
+:root[data-marke='teo'] .kpi-tile { padding: 18px 22px; min-height: 0; }
+:root[data-marke='teo'] .kpi-ico { display: none; }
+:root[data-marke='teo'] .kpi-val { font-size: 32px; font-weight: 800; line-height: 1; }
+:root[data-marke='teo'] .kpi-label { font-size: 14px; font-weight: 600; color: var(--text-2); margin-top: 6px; }
+:root[data-marke='teo'] .kpi-tile:hover { border-color: #c7d5e6; }
+:root[data-marke='teo'] .mkt-kpi { border-radius: 18px; }
+
+/* ── Filter, Umschalter, Status ──────────────────────────── */
+:root[data-marke='teo'] .chip {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--teo-linie);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+/* Icon trägt Inline-display, daher !important */
+:root[data-marke='teo'] .chip .mock-icon { display: none !important; }
+:root[data-marke='teo'] .chip.active { background: var(--teo-navy); border-color: var(--teo-navy); color: #ffffff; }
+:root[data-marke='teo'] .chip.active .chip-count { color: rgba(255, 255, 255, 0.7); }
+:root[data-marke='teo'] .segment-toggle,
+:root[data-marke='teo'] .seg { border-radius: 999px; }
+:root[data-marke='teo'] .segment-toggle-btn,
+:root[data-marke='teo'] .seg button { border-radius: 999px; font-weight: 700; }
+:root[data-marke='teo'] .badge { border-radius: 999px; padding: 3px 10px; font-weight: 700; }
+:root[data-marke='teo'] .badge::before { display: none; }
+
+/* ── Detailseiten ────────────────────────────────────────── */
+:root[data-marke='teo'] .phase-steps__step { border-radius: 999px; font-weight: 700; }
+:root[data-marke='teo'] .phase-steps__step--hier { background: var(--teo-navy); }
+:root[data-marke='teo'] .dh-title { font-size: clamp(24px, 2.6vw, 34px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.1; }
+:root[data-marke='teo'] .dshell-navitem { border-radius: 14px; }
+:root[data-marke='teo'] .dshell-navitem.active { background: #ffffff; color: var(--teo-navy); font-weight: 800; box-shadow: 0 10px 30px -24px rgba(11, 31, 58, 0.5); }
+:root[data-marke='teo'] .dshell-tab-mobile { border-radius: 999px; }
+:root[data-marke='teo'] .prop { border-color: var(--teo-linie-fein); }
+
+/* ── Felder, Seitenblätter ───────────────────────────────── */
+:root[data-marke='teo'] .input,
+:root[data-marke='teo'] select.input,
+:root[data-marke='teo'] textarea.input { border-radius: var(--r-field); }
+:root[data-marke='teo'] .sheet { border-color: var(--teo-linie); }
+
+/* ── Login: heller Verlauf, Formular als Karte ───────────── */
+:root[data-marke='teo'] .crm-login {
+  grid-template-columns: 1fr;
+  background:
+    radial-gradient(48vmax 32vmax at 0% 0%, rgba(156, 192, 234, 0.38), transparent 70%),
+    radial-gradient(40vmax 28vmax at 100% 100%, rgba(246, 207, 115, 0.28), transparent 70%),
+    var(--teo-grund);
+}
+:root[data-marke='teo'] .crm-login__brand { display: none; }
+:root[data-marke='teo'] .crm-login__panel { background: transparent; padding: 40px 16px; }
+:root[data-marke='teo'] .crm-login__form-wrap {
+  width: min(440px, 100%);
+  box-sizing: border-box;
+  padding: 36px 36px 32px;
+  background: #ffffff;
+  border: 1px solid var(--teo-linie);
+  border-radius: 28px;
+  box-shadow: 0 30px 70px -45px rgba(11, 31, 58, 0.45);
+}
+:root[data-marke='teo'] .crm-login__mobile-brand { display: flex; }
+:root[data-marke='teo'] .crm-login__welcome { font-size: 32px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.08; }
+:root[data-marke='teo'] .crm-login__label { font-size: 14px; font-weight: 700; color: var(--teo-navy); }
+:root[data-marke='teo'] .crm-login__input { height: 50px; border-radius: 14px; border-color: var(--teo-linie); }
+:root[data-marke='teo'] .crm-login__input:focus { border-color: var(--teo-blau); box-shadow: 0 0 0 4px var(--teo-blau-bg); }
+:root[data-marke='teo'] .crm-login__submit { height: 52px; font-size: 16px; font-weight: 700; }
+@media (max-width: 480px) {
+  :root[data-marke='teo'] .crm-login__form-wrap { padding: 28px 22px 24px; }
+}

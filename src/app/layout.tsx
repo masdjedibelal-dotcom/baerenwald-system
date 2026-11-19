@@ -4,6 +4,8 @@ import './globals.css'
 /* Mock-Listen/Shell-Klassen (.vg-row, .listbar, …) — Tokens liegen in globals.css */
 import '../styles/mock-design-system.css'
 import '../styles/staff-funnel.css'
+/* Servus TEO: Website-Look (wirkt nur bei data-marke="teo") */
+import '../styles/teo-website-look.css'
 import { istTeo, MARKE, MARKE_ID } from '@/lib/marke'
 
 /* Servus TEO: Manrope (nur geladen, wenn die Marke TEO aktiv ist — CSS nutzt die Variable nur bei data-marke="teo") */
