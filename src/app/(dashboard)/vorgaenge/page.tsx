@@ -5,6 +5,8 @@ import { loadVorgaengeListe } from '@/lib/vorgang/load-vorgaenge-liste'
 import { loadHwEingangsrechnungen } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
 import { VorgaengeListeClient } from '@/components/vorgaenge/VorgaengeListeClient'
 import { CrmInlineLoading } from '@/components/layout/CrmPageLoading'
+import { istTeo } from '@/lib/marke'
+import { loadCrmTeamMitglieder } from '@/lib/crm-team'
 
 export const metadata: Metadata = {
   title: 'Vorgänge',
@@ -22,9 +24,11 @@ export default async function VorgaengePage({ searchParams }: PageProps) {
     // nicht nur für eine 50er-Seite (Umbau P05). Bei heute < 100 Vorgängen unkritisch.
     await searchParams
     const supabase = createClient()
-    const [{ rows, error }, hw] = await Promise.all([
+    const [{ rows, error }, hw, team] = await Promise.all([
       loadVorgaengeListe({ pageSize: 100, fetchAllPages: true }),
       loadHwEingangsrechnungen(supabase),
+      // Servus TEO: Spalte „Zuständig“
+      istTeo ? loadCrmTeamMitglieder() : Promise.resolve([]),
     ])
 
     if (error) {
@@ -49,6 +53,7 @@ export default async function VorgaengePage({ searchParams }: PageProps) {
           rows={rows}
           hwEingangsrechnungen={hw.rows}
           serverPagination={null}
+          team={team.map((m) => ({ id: m.id, name: m.name }))}
         />
       </Suspense>
     )

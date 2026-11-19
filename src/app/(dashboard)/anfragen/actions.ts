@@ -1291,7 +1291,17 @@ export async function saveLeadTerminVereinbart(input: {
   }
 
   const zeitLabel = `${input.datum} ${input.uhrzeit}`
-  const statusRes = await updateLeadStatus(input.leadId, 'termin', zeitLabel)
+  // Status nur in der Anfrage-Phase setzen — ein Termin bei Angebot/Auftrag (Termin-Karte) lässt den Status stehen
+  const { data: statusRow, error: statusErr } = await supabase
+    .from('leads')
+    .select('status')
+    .eq('id', input.leadId)
+    .maybeSingle()
+  if (statusErr) logDbError('app/anfragen/actions:leads.status', statusErr)
+  const aktStatus = String((statusRow as { status?: string } | null)?.status ?? 'neu')
+  const statusRes = ['neu', 'kontaktiert', 'termin'].includes(aktStatus)
+    ? await updateLeadStatus(input.leadId, 'termin', zeitLabel)
+    : ({ ok: true } as const)
   if (!statusRes.ok) {
     if (/enum lead_status/i.test(statusRes.message) && /termin/i.test(statusRes.message)) {
       return {

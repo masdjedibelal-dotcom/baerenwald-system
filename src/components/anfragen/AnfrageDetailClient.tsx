@@ -58,7 +58,8 @@ import { HvMeldungKontextCards } from '@/components/anfragen/HvMeldungKontextCar
 import { MeldungsdetailsCard } from '@/components/anfragen/MeldungsdetailsCard'
 import { HvWarteFreigabeSheet } from '@/teo/hv/HvWarteFreigabeSheet'
 import { VerwaltungNachrichtenCard } from '@/teo/hv/VerwaltungNachrichtenCard'
-import { funktionAn } from '@/lib/marke'
+import { funktionAn, istTeo } from '@/lib/marke'
+import { VorOrtTerminCard, type VorOrtTerminVorbelegung } from '@/components/anfragen/VorOrtTerminCard'
 import { DirektBeauftragenWizard } from '@/components/auftraege/DirektBeauftragenWizard'
 import { AnfrageHandwerkerAnfragenSheet } from '@/components/anfragen/AnfrageHandwerkerAnfragenSheet'
 import { AnfragePartnerEinholungCards } from '@/components/anfragen/AnfragePartnerEinholungCards'
@@ -258,6 +259,7 @@ export function AnfrageDetailClient({
   const [lead, setLead] = useState(initial)
   const [pending, ] = useTransition()
   const [statusModalKind, setStatusModalKind] = useState<StatusModalKind | null>(null)
+  const [terminVorbelegung, setTerminVorbelegung] = useState<VorOrtTerminVorbelegung | null>(null)
   const [wvOpen, setWvOpen] = useState(false)
   const [zusammenfuehrenOpen, setZusammenfuehrenOpen] = useState(false)
   const [angebotWizardOpen, setAngebotWizardOpen] = useState(false)
@@ -812,6 +814,15 @@ export function AnfrageDetailClient({
   const stammdatenInhalt = (
     <>
       <AnfrageStammdatenCard lead={lead} onSaved={() => refresh()} />
+      {istTeo && !wartetAufHvFreigabe ? (
+        <VorOrtTerminCard
+          lead={lead}
+          onPlanen={(vb) => {
+            setTerminVorbelegung(vb)
+            setStatusModalKind('termin')
+          }}
+        />
+      ) : null}
       <MeldungsdetailsCard lead={lead} />
       <HvMeldungKontextCards lead={lead} onSaved={() => refresh()} />
       {funktionAn('hvWorkflow') && lead.auftraggeber_kunde_id ? <VerwaltungNachrichtenCard leadId={lead.id} /> : null}
@@ -1104,9 +1115,14 @@ export function AnfrageDetailClient({
         kind={statusModalKind}
         open={statusModalKind != null}
         lead={lead}
-        onClose={() => setStatusModalKind(null)}
+        terminVorbelegung={statusModalKind === 'termin' ? terminVorbelegung : null}
+        onClose={() => {
+          setStatusModalKind(null)
+          setTerminVorbelegung(null)
+        }}
         onSaved={() => {
           setStatusModalKind(null)
+          setTerminVorbelegung(null)
           refresh()
         }}
         onSuggestVerloren={() => {

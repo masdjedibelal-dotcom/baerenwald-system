@@ -138,6 +138,8 @@ export type VorgangListeRow = ResolvedVorgang & {
   fotoUrl?: string | null
   /** Straße des Vorgangs (unter dem Titel). */
   ortLabel?: string | null
+  /** Servus TEO: zuständiges Teammitglied (auth user id), leer = niemand. */
+  zustaendigId?: string | null
 }
 
 export type PortalRole = 'crm' | 'kunde' | 'hv' | 'handwerker' | 'mieter'

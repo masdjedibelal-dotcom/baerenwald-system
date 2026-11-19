@@ -60,11 +60,12 @@ import {
 } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { TOAST } from '@/lib/copy'
+import { setVorgangZustaendig } from '@/app/actions/vorgang-zustaendig'
 
 /** Spec §3/§14: Alle · Anfrage · Angebot · Auftrag · Rechnung · Wartung & Pflege */
 const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung', 'bestand'] as const
 
-const DATA_COL_IDS = ['kunde', 'titel', 'phase', 'wert', 'datum', 'status'] as const
+const DATA_COL_IDS = ['kunde', 'titel', 'phase', 'wert', 'datum', 'zust', 'status'] as const
 type DataColId = (typeof DATA_COL_IDS)[number]
 
 /** Daten-Spalten — fr-Gewichte (Hook), Kunde/Titel breiter; feste Spalten in px. */
@@ -74,6 +75,7 @@ const VORGAENGE_DATA_COLS: ResizableColDef[] = [
   { id: 'phase', defaultWidth: 9, minWidth: 6, maxWidth: 14 },
   { id: 'wert', defaultWidth: 8, minWidth: 5, maxWidth: 12 },
   { id: 'datum', defaultWidth: 12, minWidth: 8, maxWidth: 16 },
+  { id: 'zust', defaultWidth: 10, minWidth: 7, maxWidth: 16 },
   { id: 'status', defaultWidth: 11, minWidth: 8, maxWidth: 16 },
 ]
 
@@ -143,7 +145,7 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: 'updated_at', label: 'Aktualisiert' },
 ]
 
-type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'status'
+type SortCol = 'kunde' | 'titel' | 'phase' | 'wert' | 'datum' | 'zust' | 'status'
 
 const statusKind = vorgangStatusKind
 
@@ -219,6 +221,7 @@ export function VorgaengeListeClient({
   restrictKundeId,
   restrictLeadIds,
   serverPagination = null,
+  team = [],
 }: {
   rows: VorgangListeRow[]
   /** Partner-Eingangsrechnungen (angebot_handwerker mit PDF) */
@@ -233,6 +236,8 @@ export function VorgaengeListeClient({
   restrictLeadIds?: string[]
   /** P3-3: echte DB-Seiten über crm_vorgaenge_lead_page (?seite=) */
   serverPagination?: VorgaengeListePagination | null
+  /** Servus TEO: Teammitglieder für die Spalte „Zuständig“ (leer = Spalte aus). */
+  team?: { id: string; name: string }[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -242,6 +247,24 @@ export function VorgaengeListeClient({
   useEffect(() => {
     setLocalRows(rows)
   }, [rows])
+
+  // Servus TEO: Vorgang einem Teammitglied zuordnen (Spalte „Zuständig“)
+  const teamName = useCallback(
+    (id: string | null | undefined) => (id ? team.find((m) => m.id === id)?.name ?? null : null),
+    [team]
+  )
+  const setZustaendig = useCallback(
+    async (leadId: string, userId: string | null) => {
+      const vorher = localRows
+      setLocalRows((rs) => rs.map((r) => (r.leadId === leadId ? { ...r, zustaendigId: userId } : r)))
+      const res = await setVorgangZustaendig(leadId, userId)
+      if (!res.ok) {
+        setLocalRows(vorher)
+        toast.systemError(res)
+      }
+    },
+    [localRows]
+  )
 
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<(typeof VORGANG_FILTERS)[number]>('alle')
@@ -270,9 +293,10 @@ export function VorgaengeListeClient({
       phase: zeigePhaseSpalte,
       wert: true,
       datum: true,
+      zust: team.length > 0,
       status: true,
     }),
-    [zeigePhaseSpalte]
+    [zeigePhaseSpalte, team.length]
   )
   const [flashKeys, ] = useState<Record<string, boolean>>({})
   // Standard: wie geladen (zuletzt bearbeitet zuerst); „Fällig“ sortiert auf Klick
@@ -641,6 +665,7 @@ export function VorgaengeListeClient({
       wert: (v) => wertEuro(v) ?? -1,
       // Ohne Datum immer ans Ende, egal welche Richtung
       datum: (v) => v.faelligAm?.slice(0, 10) ?? (sortDir === 1 ? '9999' : '0000'),
+      zust: (v) => teamName(v.zustaendigId) ?? (sortDir === 1 ? '\uffff' : ''),
       status: (v) => v.unterstatusLabel.toLowerCase(),
     }
 
@@ -661,7 +686,7 @@ export function VorgaengeListeClient({
       if (av > bv) return 1 * dir
       return 0
     })
-  }, [filteredBase, sortCol, sortDir])
+  }, [filteredBase, sortCol, sortDir, teamName])
 
   const selectedCount = Object.values(selected).filter(Boolean).length
   const toggleSel = (key: string) => setSelected((s) => ({ ...s, [key]: !s[key] }))
@@ -1196,7 +1221,7 @@ export function VorgaengeListeClient({
 
       <PullToRefresh onRefresh={() => afterServerActionRefresh()}>
       <div
-        className="listcard listcard--cols vg-selectmode"
+        className={cn('listcard listcard--cols vg-selectmode', visibleCols.zust && 'vg-mit-zust')}
         style={{ ['--list-cols' as string]: gridTemplateColumns }}
       >
         <div className="vg-row head">
@@ -1271,6 +1296,18 @@ export function VorgaengeListeClient({
             onResizePointerDown={(e) => startColResize('datum', e)}
           >
             Fällig
+          </MockSortHead>
+          ) : null}
+          {visibleCols.zust ? (
+          <MockSortHead
+            col="zust"
+            sortCol={sortCol}
+            sortDir={sortDir}
+            onSort={(c) => toggleSort(c as SortCol)}
+            resizable
+            onResizePointerDown={(e) => startColResize('zust', e)}
+          >
+            Zuständig
           </MockSortHead>
           ) : null}
           {visibleCols.status ? (
@@ -1412,6 +1449,30 @@ export function VorgaengeListeClient({
                         <MockIcon ctx="default" n="clock" size={12} />
                         {formatDatum(v.faelligAm)}
                       </span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {visibleCols.zust ? (
+                  <div
+                    className="vg-zust"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    {v.leadId ? (
+                      <select
+                        className={cn('vg-zust__select', !v.zustaendigId && 'is-leer')}
+                        value={v.zustaendigId ?? ''}
+                        aria-label="Zuständig"
+                        title={teamName(v.zustaendigId) ?? 'Noch niemand zugeordnet'}
+                        onChange={(e) => void setZustaendig(v.leadId, e.target.value || null)}
+                      >
+                        <option value="">Offen</option>
+                        {team.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
                     ) : null}
                   </div>
                 ) : null}

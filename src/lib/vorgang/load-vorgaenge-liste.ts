@@ -30,6 +30,7 @@ import {
   parseZahlungsplan,
 } from '@/lib/rechnungen/zahlungsplan'
 import { formatEuro } from '@/lib/format/geld-datum'
+import { istTeo } from '@/lib/marke'
 
 export type { VorgangListeRow } from '@/lib/vorgang/types'
 
@@ -1085,6 +1086,21 @@ async function loadVorgaengeListeInner(opts?: LoadVorgaengeListeOpts): Promise<{
       rechnungRichtung: 'eingehend',
       angebotHandwerkerId: r.angebot_handwerker_id,
     })
+  }
+
+  // Servus TEO: zuständiges Teammitglied je Vorgang (eigene Abfrage — fehlt die Spalte noch, bleibt die Liste heil)
+  if (istTeo) {
+    const ids = [...new Set(rows.map((r) => r.leadId).filter(Boolean))]
+    if (ids.length) {
+      const zRes = await supabase.from('leads').select('id, zustaendig_id').in('id', ids)
+      if (zRes.error) logDbError('lib/vorgang/load-vorgaenge-liste:leads.zustaendig_id', zRes.error)
+      else {
+        const map = new Map(
+          ((zRes.data ?? []) as unknown as { id: string; zustaendig_id: string | null }[]).map((z) => [z.id, z.zustaendig_id])
+        )
+        for (const r of rows) r.zustaendigId = map.get(r.leadId) ?? null
+      }
+    }
   }
 
   rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))

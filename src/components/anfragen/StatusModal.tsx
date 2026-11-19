@@ -72,6 +72,7 @@ export function StatusModal({
   onClose,
   onSaved,
   onSuggestVerloren,
+  terminVorbelegung,
 }: {
   kind: StatusModalKind | null
   lead: LeadDetail
@@ -80,6 +81,8 @@ export function StatusModal({
   onSaved?: () => void
   /** Nach 3× Nicht erreichbar: Verloren-Sheet öffnen */
   onSuggestVerloren?: () => void
+  /** Servus TEO: bestehenden Vor-Ort-Termin ändern — Felder vorbelegen, kein „Rückgängig“ */
+  terminVorbelegung?: { datum: string; uhrzeit: string; mitarbeiterId: string; notiz: string } | null
 }) {
   const { fieldErrors, applyFieldErrors } = useFieldErrors()
   const [datum, setDatum] = useState(todayISO())
@@ -119,11 +122,12 @@ export function StatusModal({
 
   useEffect(() => {
     if (!open || !kind) return
-    setDatum(todayISO())
-    setUhrzeit('10:00')
-    setNotiz('')
+    const vb = kind === 'termin' ? terminVorbelegung : null
+    setDatum(vb?.datum || todayISO())
+    setUhrzeit(vb?.uhrzeit || '10:00')
+    setNotiz(vb?.notiz ?? '')
     setGrund('zu_teuer')
-    setMitarbeiterId('')
+    setMitarbeiterId(vb?.mitarbeiterId ?? '')
     setMailToggle(!isHvKanal(lead.kanal))
     setMailDraft(null)
     if (kind === 'termin') {
@@ -132,6 +136,7 @@ export function StatusModal({
         .then((list) => setTeam(list))
         .finally(() => setTeamLoading(false))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Vorbelegung nur beim Öffnen übernehmen
   }, [open, kind, lead.id, lead.kanal])
 
   useEffect(() => {
@@ -220,7 +225,7 @@ export function StatusModal({
         mailToggle && mailDraft?.to.length
           ? 'Termin gespeichert und Bestätigung per E-Mail versendet.'
           : 'Termin vereinbart',
-        {
+        terminVorbelegung ? undefined : {
           action: {
             label: 'Rückgängig',
             onClick: () => {
