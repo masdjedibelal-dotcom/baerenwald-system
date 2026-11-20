@@ -207,3 +207,31 @@
   :root[data-marke='teo'] .detail-entity-toprow__actions .qa-btn:hover,
   :root[data-marke='teo'] .detail-entity-toprow__actions .detail-top-more:hover { background: #ffffff; }
 }
+
+/* ── Zuständig: in der Liste nur Anzeige, im Detailkopf änderbar ── */
+:root[data-marke='teo'] .vg-zust__name {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--teo-blau-bg);
+  color: var(--teo-navy);
+  font-size: 13px;
+  font-weight: 700;
+}
+:root[data-marke='teo'] .vg-zust__name.is-leer {
+  background: transparent;
+  border: 1px dashed var(--teo-linie);
+  color: var(--text-3);
+  font-weight: 600;
+}
+:root[data-marke='teo'] .dh-sub-teo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+:root[data-marke='teo'] .dh-zustaendig { display: inline-flex; align-items: center; gap: 8px; }
+:root[data-marke='teo'] .dh-zustaendig__label { font-size: 13px; font-weight: 700; color: var(--text-2); }
+:root[data-marke='teo'] .dh-zustaendig .vg-zust__select { width: auto; }
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .vg-zust__name { padding: 2px 10px; font-size: 12px; }
+}

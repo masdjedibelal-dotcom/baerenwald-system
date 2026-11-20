@@ -2,7 +2,7 @@
 import { EMPTY } from '@/lib/crm-labels'
 import { C } from '@/lib/tokens/colors'
 
-import { ListBulkBar,MockBadge,MockBtn,MockChip,MockEmpty,MockIcon,MockInput,MockPager,MockSelect,MockSortHead } from '@/components/mock-ui'
+import { ListBulkBar,MockBadge,MockBtn,MockChip,MockEmpty,MockIcon,MockInput,MockPager,MockSortHead } from '@/components/mock-ui'
 import { MockEntityRowMenu,MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -60,7 +60,6 @@ import {
 } from '@/lib/rechnungen/load-hw-eingangsrechnungen'
 import { formatEuro } from '@/lib/format/geld-datum'
 import { TOAST } from '@/lib/copy'
-import { setVorgangZustaendig } from '@/app/actions/vorgang-zustaendig'
 
 /** Spec §3/§14: Alle · Anfrage · Angebot · Auftrag · Rechnung · Wartung & Pflege */
 const VORGANG_FILTERS = ['alle', 'anfrage', 'angebot', 'auftrag', 'rechnung', 'bestand'] as const
@@ -248,23 +247,10 @@ export function VorgaengeListeClient({
     setLocalRows(rows)
   }, [rows])
 
-  // Servus TEO: Vorgang einem Teammitglied zuordnen (Spalte „Zuständig“)
+  // Servus TEO: Spalte „Zuständig“ nur zur Anzeige — geändert wird im Detailkopf
   const teamName = useCallback(
     (id: string | null | undefined) => (id ? team.find((m) => m.id === id)?.name ?? null : null),
     [team]
-  )
-  const setZustaendig = useCallback(
-    (leadId: string, userId: string | null) => {
-      const vorher = localRows
-      setLocalRows((rs) => rs.map((r) => (r.leadId === leadId ? { ...r, zustaendigId: userId } : r)))
-      return setVorgangZustaendig(leadId, userId).then((res) => {
-        if (!res.ok) {
-          setLocalRows(vorher)
-          toast.systemError(res)
-        }
-      })
-    },
-    [localRows]
   )
 
   const [query, setQuery] = useState('')
@@ -1454,26 +1440,11 @@ export function VorgaengeListeClient({
                   </div>
                 ) : null}
                 {visibleCols.zust ? (
-                  <div
-                    className="vg-zust"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
+                  <div className="vg-zust">
                     {v.leadId ? (
-                      <MockSelect
-                        className={cn('vg-zust__select', !v.zustaendigId && 'is-leer')}
-                        value={v.zustaendigId ?? ''}
-                        aria-label="Zuständig"
-                        title={teamName(v.zustaendigId) ?? 'Noch niemand zugeordnet'}
-                        onChange={(e) => setZustaendig(v.leadId, e.target.value || null)}
-                      >
-                        <option value="">Offen</option>
-                        {team.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </MockSelect>
+                      <span className={cn('vg-zust__name', !v.zustaendigId && 'is-leer')}>
+                        {teamName(v.zustaendigId) ?? 'Offen'}
+                      </span>
                     ) : null}
                   </div>
                 ) : null}

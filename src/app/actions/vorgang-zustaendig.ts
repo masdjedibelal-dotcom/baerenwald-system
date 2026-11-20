@@ -35,3 +35,23 @@ export async function setVorgangZustaendig(
   }
   return { ok: true }
 }
+
+/** Servus TEO: aktuelle Zuordnung + Teamliste für die Auswahl im Detailkopf. */
+export async function getVorgangZustaendig(
+  leadId: string
+): Promise<
+  | { ok: true; zustaendigId: string | null; team: { id: string; name: string }[] }
+  | { ok: false; message: string }
+> {
+  if (!istTeo) return { ok: false, message: 'Nicht verfügbar.' }
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const { data, error } = await gate.db.from('leads').select('zustaendig_id').eq('id', leadId).maybeSingle()
+  if (error) {
+    logDbError('app/actions/vorgang-zustaendig:get', error)
+    return { ok: false, message: error.message }
+  }
+  const { loadCrmTeamMitglieder } = await import('@/lib/crm-team')
+  const team = (await loadCrmTeamMitglieder()).map((m) => ({ id: m.id, name: m.name }))
+  return { ok: true, zustaendigId: (data as { zustaendig_id?: string | null } | null)?.zustaendig_id ?? null, team }
+}

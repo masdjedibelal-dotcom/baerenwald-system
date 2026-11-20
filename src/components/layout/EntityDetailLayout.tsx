@@ -1,6 +1,8 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
+import { istTeo } from '@/lib/marke'
+import { ZustaendigAuswahl } from '@/components/vorgaenge/ZustaendigAuswahl'
 
 import { MockDetailBackLink } from '@/components/mock-ui/MockDetailBackLink'
 import { MockTabs } from '@/components/mock-ui/MockTabs'
@@ -379,7 +381,16 @@ export function EntityDetailLayout({
             titleBadges={head.titleBadges}
             titleTrailing={isMobile ? undefined : head.titleTrailing}
             meta={undefined}
-            sub={vorOrt}
+            sub={
+              istTeo && projektKontext?.lead?.id ? (
+                <div className="dh-sub-teo">
+                  {vorOrt}
+                  <ZustaendigAuswahl leadId={projektKontext.lead.id} />
+                </div>
+              ) : (
+                vorOrt
+              )
+            }
             actions={head.actions}
             amount={head.amount}
             variant={head.variant}
