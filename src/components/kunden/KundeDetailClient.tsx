@@ -560,7 +560,7 @@ export function KundeDetailClient({
   return (
     <EntityDetailLayout
       crumbBackHref="/kunden"
-      crumbBackLabel="Zurück zur Liste"
+      crumbBackLabel={istTeo ? "Zurück" : "Zurück zur Liste"}
       quickBar={quickBar}
       head={{
         title: kundeDisplayName(kunde),

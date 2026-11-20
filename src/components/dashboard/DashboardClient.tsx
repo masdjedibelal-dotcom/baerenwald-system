@@ -2,6 +2,8 @@
 
 import { MockBtn,MockChip } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockSelect } from '@/components/mock-ui/MockForm'
+import { istTeo } from '@/lib/marke'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect,useMemo,useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -39,6 +41,7 @@ const ZEITRAUM_PRESETS = DASHBOARD_ZEITRAUM_OPTIONS.filter((o) => o.value !== 'b
 
 function DashboardZeitraumChips({ filter }: { filter: DashboardZeitraumFilter }) {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [customMode, setCustomMode] = useState(filter.preset === 'benutzerdefiniert')
   const [draftVon, setDraftVon] = useState(filter.von)
   const [draftBis, setDraftBis] = useState(filter.bis)
@@ -65,6 +68,23 @@ function DashboardZeitraumChips({ filter }: { filter: DashboardZeitraumFilter })
 
   return (
     <div className="dash-zeitraum-chips">
+      {/* TEO am Handy: ein Auswahlfeld statt sechs Chips in drei Zeilen */}
+      {istTeo && isMobile ? (
+        <label className="dash-zeitraum-wahl">
+          <span className="dash-zeitraum-wahl__label">Zeitraum</span>
+          <MockSelect
+            value={customMode ? 'benutzerdefiniert' : filter.preset}
+            onChange={(e) => (e.target.value === 'benutzerdefiniert' ? setCustomMode(true) : selectPreset(e.target.value as DashboardZeitraumPreset))}
+          >
+            {ZEITRAUM_PRESETS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+            <option value="benutzerdefiniert">Individuell</option>
+          </MockSelect>
+        </label>
+      ) : (
       <div className="chiprow" role="group" aria-label="Zeitraum">
         {ZEITRAUM_PRESETS.map((o) => (
           <MockChip
@@ -79,6 +99,7 @@ function DashboardZeitraumChips({ filter }: { filter: DashboardZeitraumFilter })
           Individuell
         </MockChip>
       </div>
+      )}
       {customMode ? (
         <div className="dash-zeitraum-chips__custom">
           <DateInput
@@ -158,7 +179,8 @@ function VertriebsFunnel({
       icon="filter"
       actions={
         <div className="text-[length:var(--fs-text)] text-[var(--text-2)]">
-          Gesamt-Conversion{' '}
+          {/* TEO: kurz, damit der Kartenkopf am Handy nicht umbricht */}
+          {istTeo ? 'Quote' : 'Gesamt-Conversion'}{' '}
           <b className="tabular-nums text-[var(--text)]">{conversionGesamt}%</b>
         </div>
       }
@@ -234,11 +256,13 @@ function GewerkUmsatzCard({
 
 const TOP_RANKING_LIMIT = 8
 
-const TYP_FARBE: Record<string, string> = {
-  gewerbe: 'var(--green)',
-  privat: 'var(--blue-tx)',
-  hausverwaltung: 'var(--yel-tx)',
-}
+const TYP_FARBE: Record<string, string> = istTeo
+  ? { gewerbe: '#e8a317', privat: '#1e5fa8', hausverwaltung: '#0b1f3a' } // TEO-Palette: Gold, Blau, Navy
+  : {
+      gewerbe: 'var(--green)',
+      privat: 'var(--blue-tx)',
+      hausverwaltung: 'var(--yel-tx)',
+    }
 
 function TopRankingCard({
   handwerker,

@@ -15,7 +15,11 @@ export function ZustaendigAuswahl({ leadId }: { leadId: string }) {
   useEffect(() => {
     let aktiv = true
     getVorgangZustaendig(leadId).then((res) => {
-      if (!aktiv || !res.ok) return
+      if (!aktiv) return
+      if (!res.ok) {
+        setTeam([])
+        return
+      }
       setTeam(res.team)
       setWert(res.zustaendigId ?? '')
     })
@@ -24,7 +28,18 @@ export function ZustaendigAuswahl({ leadId }: { leadId: string }) {
     }
   }, [leadId])
 
-  if (!team?.length) return null
+  // Während des Ladens Platz freihalten, damit die Seite nicht springt
+  if (team === null) {
+    return (
+      <label className="dh-zustaendig" aria-busy="true">
+        <span className="dh-zustaendig__label">Zuständig</span>
+        <MockSelect className="vg-zust__select is-leer" disabled value="">
+          <option value="">…</option>
+        </MockSelect>
+      </label>
+    )
+  }
+  if (!team.length) return null
 
   return (
     <label className="dh-zustaendig">
@@ -49,7 +64,7 @@ export function ZustaendigAuswahl({ leadId }: { leadId: string }) {
           })
         }}
       >
-        <option value="">Offen</option>
+        <option value="">Nicht zugeordnet</option>
         {team.map((m) => (
           <option key={m.id} value={m.id}>
             {m.name}

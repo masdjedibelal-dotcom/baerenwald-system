@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import {
 DetailShell,
 EntityDetailLayout,
@@ -380,7 +381,7 @@ export function HandwerkerDetailClient({
   return (
     <EntityDetailLayout
       crumbBackHref="/handwerker"
-      crumbBackLabel="Zurück zur Liste"
+      crumbBackLabel={istTeo ? "Zurück" : "Zurück zur Liste"}
       quickBar={quickBar}
       head={{
         title: handwerkerDisplayName(hw),

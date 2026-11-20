@@ -1503,7 +1503,7 @@ export function VorgaengeListeClient({
                   <div className="vg-zust">
                     {v.leadId ? (
                       <span className={cn('vg-zust__name', !v.zustaendigId && 'is-leer')}>
-                        {teamName(v.zustaendigId) ?? 'Offen'}
+                        {teamName(v.zustaendigId) ?? 'Nicht zugeordnet'}
                       </span>
                     ) : null}
                   </div>
