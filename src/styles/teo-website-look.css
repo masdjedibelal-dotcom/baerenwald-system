@@ -15,9 +15,8 @@
   --teo-linie-fein: #eef2f7;
   --teo-grund: #f7f9fc;
   --teo-schatten: 0 20px 50px -40px rgba(11, 31, 58, 0.35);
-  --teo-verlauf:
-    radial-gradient(36vmax 24vmax at 0% 0%, rgba(156, 192, 234, 0.3), transparent 70%),
-    radial-gradient(28vmax 20vmax at 100% 0%, rgba(246, 207, 115, 0.2), transparent 70%);
+  /* Kein Farbverlauf in der App (wirkte oben wie ein verschwommenes Bild) — nur auf der Anmeldung */
+  --teo-verlauf: linear-gradient(transparent, transparent);
   --r: 16px;
   --r-card: 24px;
   --r-lg: 24px;
