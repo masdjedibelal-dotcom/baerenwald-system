@@ -33,7 +33,46 @@ export async function setVorgangZustaendig(
     }
     return { ok: false, message: error.message }
   }
+  // Zuständigen kurz per Mail informieren (nicht, wenn man sich selbst zuordnet)
+  if (id && id !== gate.user.id) {
+    await zustaendigPerMailInformieren(leadId, id).catch((e) => console.warn('[vorgang-zustaendig] Mail', e))
+  }
   return { ok: true }
+}
+
+async function zustaendigPerMailInformieren(leadId: string, userId: string): Promise<void> {
+  const { supabaseAdmin } = await import('@/lib/supabase-admin')
+  const { data: u } = await supabaseAdmin.auth.admin.getUserById(userId)
+  const email = u?.user?.email?.trim()
+  if (!email) return
+  const { data: l } = await supabaseAdmin
+    .from('leads')
+    .select('kontakt_name, situation, strasse, hausnummer')
+    .eq('id', leadId)
+    .maybeSingle()
+  const lead = l as { kontakt_name?: string | null; situation?: string | null; strasse?: string | null; hausnummer?: string | null } | null
+  const was = [lead?.kontakt_name, [lead?.strasse, lead?.hausnummer].filter(Boolean).join(' ')].filter(Boolean).join(' · ') || 'Vorgang'
+  const { crmBasisUrl } = await import('@/lib/crm-basis-url')
+  const { getMailBranding } = await import('@/lib/get-mail-branding')
+  const { mailHtmlBase } = await import('@/lib/mail-templates')
+  const { mailPrimaryButtonHtml } = await import('@/lib/mail/email-buttons')
+  const { sendMail } = await import('@/lib/mail-service')
+  const link = `${crmBasisUrl()}/anfragen/${leadId}`
+  const b = await getMailBranding()
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  await sendMail({
+    typ: 'intern_zustaendig',
+    an: email,
+    betreff: `Ihnen zugeordnet: ${was}`,
+    html: mailHtmlBase(
+      `<p style="font-size:15px;line-height:1.6;margin:0 0 14px;">Ihnen wurde ein Vorgang zugeordnet:</p>
+       <p style="font-size:16px;font-weight:700;margin:0 0 18px;">${esc(was)}</p>
+       ${mailPrimaryButtonHtml('Vorgang öffnen', link)}`,
+      `Ihnen zugeordnet: ${was}`,
+      b
+    ),
+    leadId,
+  })
 }
 
 /** Servus TEO: aktuelle Zuordnung + Teamliste für die Auswahl im Detailkopf. */

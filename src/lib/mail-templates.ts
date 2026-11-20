@@ -28,7 +28,7 @@ import { filterAdressRueckfragen,type VorOrtRueckfrage } from '@/lib/anfrage-adr
 import { anfrageBetreffNachAnlass } from '@/lib/email/meldung-mail-templates'
 import { formatEuro,formatEuroSpanne } from '@/lib/format/geld-datum'
 import { C } from '@/lib/tokens/colors'
-import { MARKE } from '@/lib/marke'
+import { istTeo, MARKE } from '@/lib/marke'
 
 function esc(s: string): string {
   return s
@@ -338,6 +338,57 @@ export function mailBesichtigungTermin(
   }
 }
 
+/** Ausführungstermin (Einsatz eines Handwerkers) — Bestätigung an den Kunden, gleiches Layout wie Vor-Ort-Termin. */
+export function mailAusfuehrungstermin(
+  data: {
+    name: string
+    titel: string
+    datumFmt: string
+    adresse: string
+    betrieb?: string | null
+    hinweis?: string | null
+    statusLink: string
+    anrede?: MailAnrede
+    kundeTyp?: string | null
+    geaendert?: boolean
+  },
+  b: MailBranding
+): { betreff: string; html: string } {
+  const anrede = resolveMailAnrede(data.anrede, data.kundeTyp)
+  const begruessung = esc(mailBegruessungZeile(anrede, data.name))
+  const ort = data.adresse.trim() || '—'
+  const satz = data.geaendert
+    ? mailText(anrede, 'der Termin für die Arbeiten hat sich geändert:', 'der Termin für die Arbeiten hat sich geändert:')
+    : mailText(anrede, 'hiermit bestätigen wir den Termin für die Arbeiten:', 'hiermit bestätigen wir den Termin für die Arbeiten:')
+  const betriebBlock = data.betrieb?.trim()
+    ? `<p style="margin:12px 0 0;font-size:15px;color:${C.gray700};line-height:1.55;">Ausführender Betrieb: <strong>${esc(data.betrieb.trim())}</strong></p>`
+    : ''
+  const hinweisBlock = data.hinweis?.trim()
+    ? `<p style="margin:12px 0 0;font-size:15px;color:${C.gray700};line-height:1.55;"><strong>Hinweis:</strong> ${esc(data.hinweis.trim()).replace(/\n/g, '<br/>')}</p>`
+    : ''
+  return {
+    betreff: buildSubject({ objekt: data.adresse.trim() || data.titel, ereignis: data.geaendert ? 'Termin geändert' : 'Terminbestätigung' }),
+    html: mailHtmlBase(
+      `
+      <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 6px;">${begruessung}</p>
+      <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 14px;">${satz}</p>
+      <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 4px;"><strong>${esc(data.titel)}</strong></p>
+      <p style="margin:0 0 18px;font-size:15px;color:${C.gray700};line-height:1.7;">
+        <strong>Datum:</strong> ${esc(data.datumFmt)}<br/>
+        <strong>Ort:</strong> ${esc(ort)}
+      </p>
+      ${betriebBlock}
+      ${hinweisBlock}
+      <p style="font-size:15px;color:${C.gray700};margin:20px 0 0;">${mailTeamGruss(anrede, b.firmenname)}</p>
+    `,
+      `Termin am ${data.datumFmt}, ${ort}`,
+      b,
+      undefined,
+      { anrede, statusLink: data.statusLink }
+    ),
+  }
+}
+
 function formatWebsiteKurz(website: string): string {
   return website
     .trim()
@@ -518,6 +569,7 @@ export function mailAngebot(
       ${summaryHtml}
       ${hint35a}
       ${data.visualisierung_vorschau_url ? mailKiVisualisierungBlock(anredeKey, data.visualisierung_vorschau_url) : ''}
+      ${istTeo && data.statusLink ? `<div style="margin:4px 0 20px;">${mailPrimaryButtonHtml(mailText(anrede, 'Angebot ansehen und annehmen', 'Angebot ansehen und annehmen'), data.statusLink)}</div>` : ''}
       <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
       <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
       mailText(anrede, `Dein Angebot: ${betragText}`, `Ihr Angebot: ${betragText}`),

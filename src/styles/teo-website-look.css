@@ -388,3 +388,11 @@
   color: var(--teo-navy);
   font-weight: 700;
 }
+
+/* Einsatz-Blatt: Ausführungstermin */
+:root[data-marke='teo'] .einsatz-termin { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; border-top: 1px solid var(--teo-linie-fein); }
+:root[data-marke='teo'] .einsatz-termin__felder { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+:root[data-marke='teo'] .einsatz-termin__mail { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--teo-navy); }
+@media (max-width: 480px) {
+  :root[data-marke='teo'] .einsatz-termin__felder { grid-template-columns: 1fr; }
+}

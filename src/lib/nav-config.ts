@@ -4,6 +4,7 @@ createAnfrageHref,
 createAngebotHref,
 createRechnungHref,
 } from '@/lib/crm/create-entry'
+import { istTeo } from '@/lib/marke'
 import { COPY_ROLE } from '@/lib/copy'
 
 export type NavItemDef = {
@@ -90,6 +91,8 @@ export const MEHR_TILE_NAV: Array<{
 }> = [
   { href: '/handwerker', iconName: 'tool', label: COPY_ROLE.partner, desc: 'Ausführungspartner' },
   { href: '/einstellungen', iconName: 'settings', label: 'Einstellungen', desc: 'Firma & Team' },
+  // Servus TEO: von Mietern/Eigentümern auf der Website genannte Verwaltungen (Akquise)
+  ...(istTeo ? [{ href: '/kunden/genannte-verwaltungen', iconName: 'building', label: 'Genannte Verwaltungen', desc: 'Aus Website-Meldungen' }] : []),
 ]
 
 export type RouteCta = { label: string; href: string }

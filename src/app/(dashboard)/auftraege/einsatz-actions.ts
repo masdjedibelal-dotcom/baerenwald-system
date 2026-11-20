@@ -819,3 +819,45 @@ export async function einsatzRechnungBezahlt(
   revalidatePath(`/auftraege/${e.auftrag_id}`)
   return { ok: true }
 }
+
+/**
+ * Servus TEO: Ausführungstermin des Einsatzes setzen oder ändern — optional Bestätigungsmail an den Kunden.
+ * Termin ist ein Datum (von–bis), ohne Uhrzeit.
+ */
+export async function einsatzTerminSetzen(input: {
+  einsatzId: string
+  terminVon: string
+  terminBis?: string | null
+  kundeInformieren: boolean
+}): Promise<{ ok: true; mailAn: string | null; mailFehler: string | null } | { ok: false; message: string }> {
+  const gate = await requireStaffAndServiceRole()
+  if (!gate.ok) return { ok: false, message: gate.message }
+  const von = input.terminVon.trim().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(von)) return { ok: false, message: 'Bitte ein Datum wählen.' }
+  const bisRoh = input.terminBis?.trim().slice(0, 10) || ''
+  const bis = /^\d{4}-\d{2}-\d{2}$/.test(bisRoh) && bisRoh >= von ? bisRoh : null
+  const e = await ladeEinsatzKurz(gate.db, input.einsatzId)
+  if (!e) return { ok: false, message: 'Einsatz nicht gefunden.' }
+  const { data: vorher } = await gate.db.from('einsaetze').select('termin_von').eq('id', input.einsatzId).maybeSingle()
+  const hatteTermin = Boolean((vorher as { termin_von?: string | null } | null)?.termin_von)
+
+  const { error } = await gate.db
+    .from('einsaetze')
+    .update({ termin_von: von, termin_bis: bis })
+    .eq('id', input.einsatzId)
+  if (error) {
+    logDbError('app/auftraege/einsatz-actions:termin', error)
+    return { ok: false, message: 'Termin konnte nicht gespeichert werden.' }
+  }
+
+  let mailAn: string | null = null
+  let mailFehler: string | null = null
+  if (input.kundeInformieren) {
+    const { sendeAusfuehrungsterminMail } = await import('@/lib/mail/ausfuehrungstermin-mail')
+    const r = await sendeAusfuehrungsterminMail({ einsatzId: input.einsatzId, geaendert: hatteTermin, quelle: 'crm' })
+    if (r.ok) mailAn = r.an
+    else mailFehler = r.message
+  }
+  revalidatePath(`/auftraege/${e.auftrag_id}`)
+  return { ok: true, mailAn, mailFehler }
+}

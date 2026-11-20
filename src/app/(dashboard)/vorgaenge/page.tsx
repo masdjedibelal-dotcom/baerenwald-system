@@ -24,6 +24,9 @@ export default async function VorgaengePage({ searchParams }: PageProps) {
     // nicht nur für eine 50er-Seite (Umbau P05). Bei heute < 100 Vorgängen unkritisch.
     await searchParams
     const supabase = createClient()
+    const {
+      data: { user: ich },
+    } = await supabase.auth.getUser()
     const [{ rows, error }, hw, team] = await Promise.all([
       loadVorgaengeListe({ pageSize: 100, fetchAllPages: true }),
       loadHwEingangsrechnungen(supabase),
@@ -54,6 +57,7 @@ export default async function VorgaengePage({ searchParams }: PageProps) {
           hwEingangsrechnungen={hw.rows}
           serverPagination={null}
           team={team.map((m) => ({ id: m.id, name: m.name }))}
+          ichId={istTeo ? ich?.id ?? null : null}
         />
       </Suspense>
     )

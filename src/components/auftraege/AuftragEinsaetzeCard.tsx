@@ -9,6 +9,7 @@ einsatzFertigErfassen,
 einsatzRechnungErfassen,
 einsatzRegieErfassen,
 einsatzMitarbeiterSetzen,
+einsatzTerminSetzen,
 einsatzRueckmeldungErfassen,
 einsatzUpdateErfassen,
 einsatzUpdatesGesehen,
@@ -22,7 +23,7 @@ type EinsatzPartnerOption,
 type EinsatzStatus,
 type EinsatzZeile,
 } from '@/app/(dashboard)/auftraege/einsatz-actions'
-import { MockBadge,MockBtn,MockCard,MockSegment } from '@/components/mock-ui'
+import { MockBadge,MockBtn,MockCard,MockCheckbox,MockSegment } from '@/components/mock-ui'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
 import { MockField,MockInput,MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -42,7 +43,7 @@ import { toast } from '@/components/ui/app-toast'
 import { useRouter } from 'next/navigation'
 import { nachrichtenHref } from '@/lib/whatsapp/schluessel'
 import { useWhatsAppStatus } from '@/components/whatsapp/useWhatsAppStatus'
-import { MARKE } from '@/lib/marke'
+import { istTeo, MARKE } from '@/lib/marke'
 
 // Farben: gesendet blau · in Auftrag gelb · fertig grün · abgelehnt/entzogen rot
 const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
@@ -417,6 +418,25 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
   /** Einsatz-Ansicht: Mitarbeiter des Partners und aktuelle Wahl */
   const [detailMitarbeiter, setDetailMitarbeiter] = useState<PartnerMitarbeiter[]>([])
   const [detailWahl, setDetailWahl] = useState('')
+  // Servus TEO: Ausführungstermin im Einsatz-Blatt setzen/ändern (+ Mail an den Kunden)
+  const [terminForm, setTerminForm] = useState<{ von: string; bis: string; mail: boolean } | null>(null)
+  const [terminSpeichert, setTerminSpeichert] = useState(false)
+  async function terminSpeichern(id: string) {
+    if (!terminForm) return
+    setTerminSpeichert(true)
+    const res = await safeAction(
+      einsatzTerminSetzen({ einsatzId: id, terminVon: terminForm.von, terminBis: terminForm.bis || null, kundeInformieren: terminForm.mail })
+    )
+    setTerminSpeichert(false)
+    if (!res.ok) {
+      toast.systemError(res)
+      return
+    }
+    if (res.mailFehler) toast.error(`Termin gespeichert, Mail nicht gesendet: ${res.mailFehler}`)
+    else toast.success(res.mailAn ? `Termin gespeichert, Bestätigung an ${res.mailAn}` : 'Termin gespeichert')
+    setTerminForm(null)
+    void laden()
+  }
   const detailPartner = detail?.handwerker_id ?? ''
   const detailMaId = detail?.mitarbeiter_id ?? ''
   useEffect(() => {
@@ -543,6 +563,51 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 </div>
               ) : detail.mitarbeiter_name ? (
                 <p className="einsatz-mitarbeiter">Vor Ort: {detail.mitarbeiter_name}</p>
+              ) : null}
+              {istTeo && (detail.status === 'gesendet' || detail.status === 'angenommen') ? (
+                <div className="einsatz-termin">
+                  {terminForm ? (
+                    <>
+                      <div className="einsatz-termin__felder">
+                        <MockField label="Ausführung am">
+                          <DateInput value={terminForm.von} onChange={(ev) => setTerminForm({ ...terminForm, von: ev.target.value })} />
+                        </MockField>
+                        <MockField label="bis (optional)">
+                          <DateInput value={terminForm.bis} onChange={(ev) => setTerminForm({ ...terminForm, bis: ev.target.value })} />
+                        </MockField>
+                      </div>
+                      <label className="einsatz-termin__mail">
+                        <MockCheckbox checked={terminForm.mail} onChange={(ev) => setTerminForm({ ...terminForm, mail: ev.target.checked })} />
+                        Kunde per Mail informieren
+                      </label>
+                      <div className="einsatz-aktionen">
+                        <MockBtn sm kind="primary" disabled={!terminForm.von || terminSpeichert} onClick={() => { terminSpeichern(detail.id) }}>
+                          {terminSpeichert ? 'Wird gespeichert…' : 'Termin speichern'}
+                        </MockBtn>
+                        <MockBtn sm kind="secondary" onClick={() => setTerminForm(null)}>
+                          Abbrechen
+                        </MockBtn>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="einsatz-aktionen">
+                      <MockBtn
+                        sm
+                        kind="secondary"
+                        icon="calendar-event"
+                        onClick={() =>
+                          setTerminForm({
+                            von: detail.termin_von?.slice(0, 10) ?? '',
+                            bis: detail.termin_bis && detail.termin_bis !== detail.termin_von ? detail.termin_bis.slice(0, 10) : '',
+                            mail: true,
+                          })
+                        }
+                      >
+                        {detail.termin_von ? 'Termin ändern' : 'Termin eintragen'}
+                      </MockBtn>
+                    </div>
+                  )}
+                </div>
               ) : null}
               {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
               {detail.anweisung_fotos.length ? (

@@ -222,6 +222,7 @@ export function VorgaengeListeClient({
   restrictLeadIds,
   serverPagination = null,
   team = [],
+  ichId = null,
 }: {
   rows: VorgangListeRow[]
   /** Partner-Eingangsrechnungen (angebot_handwerker mit PDF) */
@@ -238,6 +239,8 @@ export function VorgaengeListeClient({
   serverPagination?: VorgaengeListePagination | null
   /** Servus TEO: Teammitglieder für die Spalte „Zuständig“ (leer = Spalte aus). */
   team?: { id: string; name: string }[]
+  /** Servus TEO: eigene User-ID für den Filter „Meine“ */
+  ichId?: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -258,6 +261,8 @@ export function VorgaengeListeClient({
   const [filter, setFilter] = useState<(typeof VORGANG_FILTERS)[number]>('alle')
   const [filterOpen, setFilterOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string[]>([])
+  /** Servus TEO: Zuständig — alle / meine / ohne Zuständigen */
+  const [zustFilter, setZustFilter] = useState<'alle' | 'meine' | 'ohne'>('alle')
   const [fKunde, setFKunde] = useState('')
   const [fTitel, setFTitel] = useState('')
   const [fWertVon, setFWertVon] = useState('')
@@ -436,6 +441,7 @@ export function VorgaengeListeClient({
   const resetFilters = () => {
     setPhaseFilter('alle')
     setStatusFilter([])
+    setZustFilter('alle')
     setQuery('')
     setFKunde('')
     setFTitel('')
@@ -632,6 +638,8 @@ export function VorgaengeListeClient({
         return false
       }
       if (statusFilter.length && !rowMatchesStatusFilter(v, statusFilter)) return false
+      if (zustFilter === 'meine' && (!ichId || v.zustaendigId !== ichId)) return false
+      if (zustFilter === 'ohne' && v.zustaendigId) return false
       if (
         query &&
         !(v.titel + ' ' + (v.kundeName ?? '') + ' ' + v.entityId)
@@ -659,6 +667,8 @@ export function VorgaengeListeClient({
     lifecycleRows,
     filter,
     statusFilter,
+    zustFilter,
+    ichId,
     query,
     fKunde,
     fTitel,
@@ -1080,6 +1090,17 @@ export function VorgaengeListeClient({
               </MockChip>
             ) : null}
             {/* Rechnungseingang (Eingehend) entfällt — Partner-Rechnungen liegen in den Vorgangs-Dokumenten */}
+            {team.length > 0 ? (
+              <>
+                <span className="listbar-chips-sep" aria-hidden />
+                <MockChip active={zustFilter === 'meine'} onClick={() => setZustFilter(zustFilter === 'meine' ? 'alle' : 'meine')}>
+                  Meine
+                </MockChip>
+                <MockChip active={zustFilter === 'ohne'} onClick={() => setZustFilter(zustFilter === 'ohne' ? 'alle' : 'ohne')}>
+                  Ohne Zuständigen
+                </MockChip>
+              </>
+            ) : null}
           </div>
           )}
           <MockListbarChrome
