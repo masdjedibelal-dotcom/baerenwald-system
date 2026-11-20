@@ -485,7 +485,23 @@
       backdrop-filter: blur(18px) saturate(1.6);
       padding-bottom: 0;
     }
-    :root[data-marke='teo'] .bottomnav-item.active { background: rgba(255, 255, 255, 0.18); border-radius: 999px; margin: 6px 4px; }
+    /* Aktiver Punkt: nur eine Glas-Pille, Icon auf gleicher Höhe wie die anderen, kein Punkt darunter */
+    :root[data-marke='teo'] .bottomnav-item.active { background: transparent; margin: 0 4px; }
+    :root[data-marke='teo'] .bottomnav-item.active::after { display: none; }
+    :root[data-marke='teo'] .bottomnav-item.active::before {
+      display: block;
+      content: '';
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 0;
+      right: 0;
+      width: auto;
+      height: auto;
+      transform: none;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.18);
+    }
   }
   /* Kopfzeile: helles Glas, Inhalt scheint beim Scrollen durch */
   :root[data-marke='teo'] .topbar {
