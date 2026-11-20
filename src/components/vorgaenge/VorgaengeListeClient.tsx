@@ -2,7 +2,7 @@
 import { EMPTY } from '@/lib/crm-labels'
 import { C } from '@/lib/tokens/colors'
 
-import { ListBulkBar,MockBadge,MockBtn,MockChip,MockEmpty,MockIcon,MockInput,MockPager,MockSortHead } from '@/components/mock-ui'
+import { ListBulkBar,MockBadge,MockBtn,MockChip,MockEmpty,MockIcon,MockInput,MockPager,MockSelect,MockSortHead } from '@/components/mock-ui'
 import { MockEntityRowMenu,MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
 import { afterServerActionRefresh } from '@/lib/crm-client-refresh'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
@@ -254,14 +254,15 @@ export function VorgaengeListeClient({
     [team]
   )
   const setZustaendig = useCallback(
-    async (leadId: string, userId: string | null) => {
+    (leadId: string, userId: string | null) => {
       const vorher = localRows
       setLocalRows((rs) => rs.map((r) => (r.leadId === leadId ? { ...r, zustaendigId: userId } : r)))
-      const res = await setVorgangZustaendig(leadId, userId)
-      if (!res.ok) {
-        setLocalRows(vorher)
-        toast.systemError(res)
-      }
+      return setVorgangZustaendig(leadId, userId).then((res) => {
+        if (!res.ok) {
+          setLocalRows(vorher)
+          toast.systemError(res)
+        }
+      })
     },
     [localRows]
   )
@@ -1459,12 +1460,12 @@ export function VorgaengeListeClient({
                     onKeyDown={(e) => e.stopPropagation()}
                   >
                     {v.leadId ? (
-                      <select
+                      <MockSelect
                         className={cn('vg-zust__select', !v.zustaendigId && 'is-leer')}
                         value={v.zustaendigId ?? ''}
                         aria-label="Zuständig"
                         title={teamName(v.zustaendigId) ?? 'Noch niemand zugeordnet'}
-                        onChange={(e) => void setZustaendig(v.leadId, e.target.value || null)}
+                        onChange={(e) => setZustaendig(v.leadId, e.target.value || null)}
                       >
                         <option value="">Offen</option>
                         {team.map((m) => (
@@ -1472,7 +1473,7 @@ export function VorgaengeListeClient({
                             {m.name}
                           </option>
                         ))}
-                      </select>
+                      </MockSelect>
                     ) : null}
                   </div>
                 ) : null}

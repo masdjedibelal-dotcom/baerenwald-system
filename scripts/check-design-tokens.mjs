@@ -16,7 +16,8 @@ function walk(dir) {
   for (const n of readdirSync(dir)) {
     const p = join(dir, n)
     if (statSync(p).isDirectory()) walk(p)
-    else if (p.endsWith('.css')) files.push(p)
+    // Servus TEO: eigene Marken-Schicht im Website-Look (wirkt nur bei data-marke="teo") — bewusst andere Werte
+    else if (p.endsWith('.css') && !p.endsWith('teo-website-look.css')) files.push(p)
   }
 }
 walk(join(ROOT, 'src'))
