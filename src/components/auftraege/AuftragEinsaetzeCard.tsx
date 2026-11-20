@@ -25,6 +25,8 @@ type EinsatzZeile,
 } from '@/app/(dashboard)/auftraege/einsatz-actions'
 import { MockBadge,MockBtn,MockCard,MockCheckbox,MockSegment } from '@/components/mock-ui'
 import { MockChip } from '@/components/mock-ui/MockPrimitives'
+import { MockEntityRowMenu } from '@/components/mock-ui/MockEntityRowMenu'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockField,MockInput,MockTextarea } from '@/components/mock-ui/MockForm'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ClearableNumberInput } from '@/components/ui/ClearableNumberInput'
@@ -508,8 +510,11 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         onClose={() => setDetail(null)}
         title={detail?.partner_name ?? 'Einsatz'}
         crumb={detail?.titel}
+        headerEnd={istTeo && detail ? <EinsatzMehrMenu detail={detail} zurueckziehen={zurueckziehen} /> : undefined}
         secondary={
-          detail && (detail.status === 'gesendet' || detail.status === 'abgelehnt')
+          istTeo
+            ? null
+            : detail && (detail.status === 'gesendet' || detail.status === 'abgelehnt')
             ? { label: 'Zurückziehen', kind: 'ghost', onClick: () => { zurueckziehen(detail.id) } }
             : detail && detail.status === 'angenommen'
               ? {
@@ -529,7 +534,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         }
         primary={
           detail && detail.status === 'angenommen'
-            ? { label: 'Fertig gemeldet', icon: 'check', onClick: () => erfassenOeffnen('fertig') }
+            ? { label: istTeo ? 'Als fertig markieren' : 'Fertig gemeldet', icon: 'check', onClick: () => erfassenOeffnen('fertig') }
             : null
         }
       >
@@ -542,7 +547,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 </MockBadge>
                 <span className="einsatz-kopf__meta">
                   {[
-                    termin(detail.termin_von, detail.termin_bis),
+                    istTeo ? '' : termin(detail.termin_von, detail.termin_bis),
                     detail.ort ?? '',
                     detail.ek_betrag != null ? `EK ${formatEuro(detail.ek_betrag)} ${detail.ek_art}` : '',
                   ]
@@ -590,22 +595,18 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                       </div>
                     </>
                   ) : (
-                    <div className="einsatz-aktionen">
-                      <MockBtn
-                        sm
-                        kind="secondary"
-                        icon="calendar-event"
-                        onClick={() =>
-                          setTerminForm({
-                            von: detail.termin_von?.slice(0, 10) ?? '',
-                            bis: detail.termin_bis && detail.termin_bis !== detail.termin_von ? detail.termin_bis.slice(0, 10) : '',
-                            mail: true,
-                          })
-                        }
-                      >
-                        {detail.termin_von ? 'Termin ändern' : 'Termin eintragen'}
-                      </MockBtn>
-                    </div>
+                    <EinsatzZeileTeo
+                      icon="calendar-event"
+                      label="Ausführung"
+                      wert={detail.termin_von ? termin(detail.termin_von, detail.termin_bis) : 'Noch offen'}
+                      onClick={() =>
+                        setTerminForm({
+                          von: detail.termin_von?.slice(0, 10) ?? '',
+                          bis: detail.termin_bis && detail.termin_bis !== detail.termin_von ? detail.termin_bis.slice(0, 10) : '',
+                          mail: true,
+                        })
+                      }
+                    />
                   )}
                 </div>
               ) : null}
@@ -641,6 +642,22 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                   <MockBtn sm kind="secondary" onClick={() => erfassenOeffnen('abgelehnt')}>
                     Hat abgelehnt
                   </MockBtn>
+                </div>
+              ) : istTeo && (detail.status === 'angenommen' || detail.status === 'fertig') ? (
+                // Meldungen als Liste; „Als fertig markieren“ steht als Hauptknopf unten im Blatt
+                <div className="einsatz-gruppe einsatz-gruppe--melden">
+                  <div className="einsatz-gruppe__kopf">
+                    <span className="einsatz-gruppe__titel">Melden</span>
+                  </div>
+                  <div className="einsatz-zeilen-teo">
+                    <EinsatzZeileTeo icon="clock" label="Stunden melden" onClick={() => erfassenOeffnen('regie')} />
+                    {detail.status === 'angenommen' ? (
+                      <EinsatzZeileTeo icon="message" label="Update erfassen" onClick={() => erfassenOeffnen('update')} />
+                    ) : null}
+                    {!detail.rechnung_eingereicht_at ? (
+                      <EinsatzZeileTeo icon="file-invoice" label="Rechnung hochladen" onClick={() => erfassenOeffnen('rechnung')} />
+                    ) : null}
+                  </div>
                 </div>
               ) : detail.status === 'angenommen' || detail.status === 'fertig' ? (
                 // „Fertig gemeldet“ steht als Hauptknopf unten im Blatt
@@ -975,4 +992,42 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
 
     </>
   )
+}
+
+/** TEO: eine antippbare Zeile im Einsatz-Blatt (Icon · Bezeichnung · Wert · Pfeil), wie in iOS-Einstellungen. */
+function EinsatzZeileTeo({ icon, label, wert, onClick }: { icon: string; label: string; wert?: string; onClick: () => void }) {
+  return (
+    <MockBtn className="einsatz-zeile-teo" onClick={onClick}>
+      <span className="einsatz-zeile-teo__icon"><MockIcon ctx="row" n={icon} size={18} /></span>
+      <span className="einsatz-zeile-teo__label">{label}</span>
+      {wert ? <span className="einsatz-zeile-teo__wert">{wert}</span> : null}
+      <span className="einsatz-zeile-teo__pfeil"><MockIcon ctx="row" n="chevron-right" size={16} /></span>
+    </MockBtn>
+  )
+}
+
+/** TEO: Seltenes und Riskantes im „…“-Menü oben im Blatt (Zurückziehen / Partner entziehen mit Rückfrage). */
+function EinsatzMehrMenu({ detail, zurueckziehen }: { detail: EinsatzZeile; zurueckziehen: (id: string) => Promise<void> }) {
+  const items =
+    detail.status === 'gesendet' || detail.status === 'abgelehnt'
+      ? [{ icon: 'arrow-back-up', label: 'Zurückziehen', onClick: () => zurueckziehen(detail.id) }]
+      : detail.status === 'angenommen'
+        ? [
+            {
+              icon: 'user-x',
+              label: 'Partner entziehen',
+              danger: true,
+              onClick: () =>
+                openConfirmPopup({
+                  title: 'Einsatz entziehen?',
+                  sub: detail.partner_name,
+                  body: 'Der Partner sieht den Einsatz danach nicht mehr in seinem Portal. Seine Updates bleiben hier im Verlauf.',
+                  confirmLabel: 'Entziehen',
+                  danger: true,
+                  onConfirm: () => zurueckziehen(detail.id),
+                }),
+            },
+          ]
+        : []
+  return <MockEntityRowMenu items={items} title="Einsatz" />
 }

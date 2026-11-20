@@ -178,11 +178,16 @@
 :root[data-marke='teo'] .vg-zust__select:focus-visible { outline: none; border-color: var(--teo-blau); box-shadow: 0 0 0 3px var(--teo-blau-bg); }
 @media (max-width: 767px) {
   /* Zeile hat mobil ein eigenes 3-Spalten-Raster (title status actions / wert datum datum) */
+  /* Titel bekommt die ganze erste Zeile (mit Foto und langer Status-Plakette wurde er sonst zusammengedrückt) */
   :root[data-marke='teo'] .vg-mit-zust .vg-row--vorgang {
+    grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "title  status  actions"
-      "wert   zust    datum";
+      "title   title  actions"
+      "status  datum  datum"
+      "wert    zust   zust";
   }
+  :root[data-marke='teo'] .vg-mit-zust .vg-row--vorgang > .vg-status { justify-self: start; }
+  :root[data-marke='teo'] .vg-mit-zust .vg-row--vorgang > .vg-datum { justify-self: end; }
   :root[data-marke='teo'] .vg-row > .vg-zust { grid-area: zust; justify-self: end; }
   :root[data-marke='teo'] .vg-zust__select { height: 26px; font-size: 12px; padding: 0 22px 0 10px; background-position: right 8px center; }
 }
@@ -535,3 +540,65 @@
 :root[data-marke='teo'] .crm-login__mobile-brand .crm-login__brand-mark { width: 44px; height: 44px; border-radius: 12px; }
 :root[data-marke='teo'] .crm-login__mobile-brand img { height: 36px !important; width: auto !important; }
 :root[data-marke='teo'] input[type='checkbox'] { accent-color: var(--teo-navy); }
+
+/* ── Einsatz-Blatt (TEO): Infos und Meldungen als antippbare Zeilen statt Pillen ── */
+:root[data-marke='teo'] .einsatz-zeilen-teo {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid var(--teo-linie);
+  border-radius: 16px;
+  overflow: hidden;
+}
+:root[data-marke='teo'] .einsatz-zeile-teo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  font: inherit;
+  color: var(--teo-navy);
+  cursor: pointer;
+}
+:root[data-marke='teo'] .einsatz-zeilen-teo .einsatz-zeile-teo + .einsatz-zeile-teo { border-top: 1px solid var(--teo-linie); }
+:root[data-marke='teo'] .einsatz-termin > .einsatz-zeile-teo { border: 1px solid var(--teo-linie); border-radius: 16px; }
+:root[data-marke='teo'] .einsatz-zeile-teo:hover { background: var(--teo-blau-bg); }
+:root[data-marke='teo'] .einsatz-zeile-teo:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--teo-blau); }
+:root[data-marke='teo'] .einsatz-zeile-teo__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 999px;
+  background: var(--teo-blau-bg);
+  color: var(--teo-blau);
+}
+:root[data-marke='teo'] .einsatz-zeile-teo__label { flex: 1 1 auto; min-width: 0; font-weight: 700; font-size: 15px; }
+:root[data-marke='teo'] .einsatz-zeile-teo__wert { flex: 0 0 auto; font-size: 15px; color: var(--text-2, #5b6b80); font-variant-numeric: tabular-nums; }
+:root[data-marke='teo'] .einsatz-zeile-teo__pfeil { display: inline-flex; color: var(--text-2, #5b6b80); opacity: 0.7; }
+:root[data-marke='teo'] .einsatz-gruppe--melden { margin-top: 4px; }
+
+/* ── Detailseiten mobil: nur die Aktionsleiste unten (als schwebende Glas-Kapsel), Menüleiste ausgeblendet ── */
+@media (max-width: 767px) {
+  :root[data-marke='teo']:has(.detail-mobile-action-bar) { --mobile-bottom-nav-height: 0px; }
+  :root[data-marke='teo'] body:has(.detail-mobile-action-bar) .bottomnav { display: none; }
+  :root[data-marke='teo'] .detail-mobile-action-bar {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 14px;
+    right: 14px;
+    padding: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    backdrop-filter: blur(18px) saturate(1.6);
+    border: 1px solid rgba(220, 228, 238, 0.9);
+    box-shadow: 0 18px 40px -18px rgba(11, 31, 58, 0.45);
+  }
+}
