@@ -165,13 +165,17 @@ function buildAushangHtmlTeo(p: AushangHtmlInput): string {
       </div>
     </header>
 
-    <h1 style="margin:13mm 0 0;font-size:40pt;line-height:1.05;font-weight:800;letter-spacing:-0.025em;">Schaden im Haus?<br/>Hier melden<span style="color:${GOLD_TEO};">.</span></h1>
+    <h1 style="margin:13mm 0 0;font-size:40pt;line-height:1.05;font-weight:800;letter-spacing:-0.025em;">Schaden im Haus?<br/><span style="color:#1e5fa8;">Hier melden</span><span style="color:${GOLD_TEO};">.</span></h1>
     <p style="margin:5mm 0 0;font-size:14pt;line-height:1.45;color:${TEXT_2};max-width:150mm;">QR-Code scannen, Foto machen, fertig. Ohne App und ohne Warteschleife – die Meldung geht direkt an Ihre Verwaltung.</p>
 
-    <div style="margin:11mm auto 0;padding:7mm;border:1.5pt solid ${LINIE};border-radius:6mm;text-align:center;">
+    <div style="margin:9mm auto 0;padding:7mm;border:1.5pt solid ${LINIE};border-radius:6mm;text-align:center;">
       ${qrHtml}
     </div>
     <div style="margin-top:4mm;text-align:center;font-size:9pt;color:${TEXT_2};word-break:break-all;">${esc(p.meldeUrl)}</div>
+
+    <div style="margin:7mm 0 8mm;padding:4mm 5mm;border-radius:4mm;background:#fbe7e7;color:#8a1c14;font-size:10.5pt;line-height:1.45;">
+      <strong>Notfall?</strong> Läuft Wasser aus, ist der Strom weg oder riecht es nach Gas: nicht nur melden, sondern sofort anrufen${p.hvTelefon?.trim() ? ` – ${esc(p.hvTelefon.trim())}` : ' – Ihre Verwaltung'}. Bei Gasgeruch oder Gefahr: <strong>112</strong>.
+    </div>
 
     <div style="margin-top:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:7mm;">
       ${schritte
