@@ -12,6 +12,7 @@ import { leadSituationDisplay, normalizeFunnelDaten } from '@/lib/lead-funnel-da
 import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { BEREICH_LABELS } from '@/lib/utils'
 import type { LeadDetail } from '@/lib/types'
+import { istTeo } from '@/lib/marke'
 
 function PropRow({ label, value }: { label: string; value: string | null | undefined }) {
   const text = value?.trim()
@@ -100,7 +101,12 @@ export function MeldungsdetailsCard({ lead }: { lead: LeadDetail }) {
   if (!hatInhalt) return null
 
   return (
-    <MockCard title="Meldungsdetails">
+    <MockCard
+      title="Meldungsdetails"
+      // Servus TEO: Übersicht schlank — aufklappbar, offen nur solange die Anfrage neu ist
+      collapsible={istTeo}
+      defaultOpen={!istTeo || String(lead.status ?? '') === 'neu'}
+    >
       <div className="props">
         <PropRow label="Situation" value={situation} />
         <PropRow label="Bereich(e)" value={bereiche} />

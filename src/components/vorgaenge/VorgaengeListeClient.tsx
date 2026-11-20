@@ -9,7 +9,8 @@ import { EditorSheet } from '@/components/surfaces/EditorSheet'
 import { ConfirmPopup } from '@/components/ui/ConfirmPopup'
 
 import { useRouter,useSearchParams } from 'next/navigation'
-import { useCallback,useEffect,useMemo,useState,type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback,useEffect,useMemo,useRef,useState,type PointerEvent as ReactPointerEvent } from 'react'
+import { istTeo } from '@/lib/marke'
 import { buildListReturnUrl } from '@/lib/list-return-url'
 import { ListInfiniteSentinel } from '@/components/layout/mock'
 import { useExport,type ExportField } from '@/hooks/useExport'
@@ -395,6 +396,40 @@ export function VorgaengeListeClient({
     const qParam = searchParams.get('q')
     if (qParam !== null) setQuery(qParam)
   }, [embedded, searchParams])
+
+  // Servus TEO: Liste merkt sich Phase, Offen/Erledigt und Sortierung (pro Browser)
+  const ANSICHT_KEY = 'crm.vorgaenge.ansicht.v1'
+  const ansichtGeladen = useRef(false)
+  useEffect(() => {
+    if (!istTeo || embedded || ansichtGeladen.current) return
+    ansichtGeladen.current = true
+    let gespeichert: { tab?: string; lifecycle?: string; sortCol?: SortCol | null; sortDir?: 1 | -1 } | null = null
+    try {
+      gespeichert = JSON.parse(window.localStorage.getItem(ANSICHT_KEY) ?? 'null')
+    } catch {
+      gespeichert = null
+    }
+    if (!gespeichert) return
+    if (gespeichert.sortCol !== undefined) setSortCol(gespeichert.sortCol ?? null)
+    if (gespeichert.sortDir === 1 || gespeichert.sortDir === -1) setSortDir(gespeichert.sortDir)
+    const hatUrlFilter = ['tab', 'phase', 'lifecycle', 'q'].some((k) => searchParams.get(k) !== null)
+    const tab = isVorgangFilter(gespeichert.tab ?? null) ? gespeichert.tab : 'alle'
+    const lc = gespeichert.lifecycle === 'erledigt' ? 'erledigt' : 'offen'
+    if (!hatUrlFilter && (tab !== 'alle' || lc !== 'offen')) {
+      const params = new URLSearchParams()
+      if (tab !== 'alle') params.set('tab', String(tab))
+      if (lc !== 'offen') params.set('lifecycle', lc)
+      router.replace(`/vorgaenge?${params.toString()}`, { scroll: false })
+    }
+  }, [embedded, router, searchParams])
+  useEffect(() => {
+    if (!istTeo || embedded || !ansichtGeladen.current) return
+    try {
+      window.localStorage.setItem(ANSICHT_KEY, JSON.stringify({ tab: filter, lifecycle, sortCol, sortDir }))
+    } catch {
+      /* privater Modus o. Ä. — Liste funktioniert auch ohne */
+    }
+  }, [embedded, filter, lifecycle, sortCol, sortDir])
 
   const rowKey = (row: VorgangListeRow) => `${row.phase}:${row.entityId}`
 

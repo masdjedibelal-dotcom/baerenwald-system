@@ -27,13 +27,15 @@ export async function GET(req: Request) {
     supabase
       .from('leads')
       .select('id, kontakt_name, situation, plz')
-      .or(`kontakt_name.ilike.${pattern},situation.ilike.${pattern},plz.ilike.${pattern}`)
+      .or(
+        `kontakt_name.ilike.${pattern},situation.ilike.${pattern},plz.ilike.${pattern},strasse.ilike.${pattern},kontakt_email.ilike.${pattern},kontakt_telefon.ilike.${pattern}`
+      )
       .limit(5),
     supabase
       .from('kunden')
       .select('id, name, vorname, nachname, ort, org_anzeigename')
       .or(
-        `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},ort.ilike.${pattern},org_anzeigename.ilike.${pattern}`
+        `name.ilike.${pattern},vorname.ilike.${pattern},nachname.ilike.${pattern},ort.ilike.${pattern},org_anzeigename.ilike.${pattern},strasse.ilike.${pattern},email.ilike.${pattern},telefon.ilike.${pattern}`
       )
       .limit(5),
     supabase
@@ -66,7 +68,7 @@ export async function GET(req: Request) {
     supabase
       .from('kunden_objekte')
       .select('id, titel, kostenstelle_nr, kunde_id')
-      .or(`titel.ilike.${pattern},kostenstelle_nr.ilike.${pattern}`)
+      .or(`titel.ilike.${pattern},kostenstelle_nr.ilike.${pattern},strasse.ilike.${pattern},plz.ilike.${pattern},ort.ilike.${pattern}`)
       .limit(5),
     supabase
       .from('auftrag_abnahmeprotokolle')
