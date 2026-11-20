@@ -396,3 +396,109 @@
 @media (max-width: 480px) {
   :root[data-marke='teo'] .einsatz-termin__felder { grid-template-columns: 1fr; }
 }
+
+/* ════ Abschnitt 4 (20.11.): Dashboard, Einstellungen, Mehr, Kunden, Phasenleiste, leere Zustände ════ */
+
+/* Dashboard: Zeitraum-Chips umbrechen statt seitlich verschwinden — die Auswahl ist immer sichtbar */
+:root[data-marke='teo'] .dash-zeitraum-chips .chiprow { flex-wrap: wrap; overflow: visible; gap: 8px; }
+:root[data-marke='teo'] .dash-zeitraum-chips .chip { height: 34px; padding: 0 14px; }
+/* Karten-Kopf mit Umschalter (z. B. Marketing | Sichtbarkeit): am Handy umbrechen, Umschalter volle Breite */
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .card-h:has(> .seg) { flex-wrap: wrap; gap: 10px; }
+  :root[data-marke='teo'] .card-h > .seg { width: 100%; display: flex; }
+  :root[data-marke='teo'] .card-h > .seg > button { flex: 1 1 0; }
+}
+
+/* Konto-Knopf oben: teo-Plakette in Navy statt einfarbigem Kreis */
+:root[data-marke='teo'] .brand-avatar { background: var(--teo-navy); overflow: hidden; }
+:root[data-marke='teo'] .brand-avatar__img { object-fit: cover; }
+
+/* Einstellungen & Detail-Reiter am Handy: Pillen wie die Vorgangs-Reiter */
+:root[data-marke='teo'] .dshell-tabs-mobile { gap: 8px; border-bottom: 0; padding-bottom: 4px; }
+:root[data-marke='teo'] .dshell-tab-mobile {
+  border: 1px solid var(--teo-linie);
+  background: #ffffff;
+  color: var(--text-2);
+  font-weight: 700;
+  box-shadow: none;
+}
+:root[data-marke='teo'] .dshell-tab-mobile.active { background: var(--teo-navy); border-color: var(--teo-navy); color: #ffffff; }
+:root[data-marke='teo'] .dshell-tab-mobile .mock-icon { display: none !important; }
+
+/* Mehr: runde Icon-Kreise wie im „Neu erstellen“-Menü */
+:root[data-marke='teo'] .mehr-tile { border: 1px solid var(--teo-linie); border-radius: 20px; box-shadow: var(--teo-schatten); background: #ffffff; }
+:root[data-marke='teo'] .mehr-tile-icon { border-radius: 999px; background: var(--teo-blau-bg); color: var(--teo-blau); }
+:root[data-marke='teo'] .mehr-tile-icon .mock-icon { color: var(--teo-blau); }
+:root[data-marke='teo'] .mehr-tile-label { font-weight: 800; color: var(--teo-navy); }
+
+/* Kunden-Liste: keine farbigen Punkte mehr (Typ steht als Pille daneben); Auswahl-Häkchen am Handy aus */
+:root[data-marke='teo'] .vg-row--kontakt .dot { display: none; }
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .vg-selectmode .vg-row--kontakt { grid-template-columns: 0 minmax(0, 1fr) auto auto; }
+  :root[data-marke='teo'] .vg-row--kontakt > .vg-check { display: none; }
+  :root[data-marke='teo'] .listcard--cols .vg-row--kontakt {
+    background: #ffffff;
+    border: 1px solid var(--teo-linie);
+    border-radius: 20px;
+    box-shadow: var(--teo-schatten);
+    margin-bottom: 10px;
+  }
+}
+
+/* Phasenleiste am Handy: volle Wörter statt „Anfra…“ — Schritte so breit wie ihr Text */
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .phase-steps { overflow-x: auto; }
+  :root[data-marke='teo'] .phase-steps__step { flex: 0 0 auto; padding: 0 12px 0 16px; }
+  :root[data-marke='teo'] .phase-steps__step:first-child { padding-left: 12px; }
+  :root[data-marke='teo'] .phase-steps__step > span { overflow: visible; text-overflow: clip; }
+  :root[data-marke='teo'] .phase-steps__step .mock-icon { display: none !important; }
+}
+
+/* Leere Zustände: Icon im hellblauen Kreis, Titel fett — wie auf der Website */
+:root[data-marke='teo'] .empty > div:first-child {
+  opacity: 1 !important;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px !important;
+  border-radius: 999px;
+  background: var(--teo-blau-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+:root[data-marke='teo'] .empty > div:first-child .mock-icon { color: var(--teo-blau); }
+:root[data-marke='teo'] .empty > div:nth-child(2) { font-size: 17px; font-weight: 800 !important; color: var(--teo-navy) !important; }
+
+/* ════ Liquid Glass (Apple-Stil) für die Rahmen-Teile: Leiste unten und Kopfzeile ════ */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (max-width: 767px) {
+    /* Leiste unten: schwebende Glas-Kapsel mit Abstand zum Rand */
+    :root[data-marke='teo'] .bottomnav {
+      left: 14px;
+      right: 14px;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      border-radius: 999px;
+      background: rgba(11, 31, 58, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 0 18px 40px -18px rgba(11, 31, 58, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      -webkit-backdrop-filter: blur(18px) saturate(1.6);
+      backdrop-filter: blur(18px) saturate(1.6);
+      padding-bottom: 0;
+    }
+    :root[data-marke='teo'] .bottomnav-item.active { background: rgba(255, 255, 255, 0.18); border-radius: 999px; margin: 6px 4px; }
+  }
+  /* Kopfzeile: helles Glas, Inhalt scheint beim Scrollen durch */
+  :root[data-marke='teo'] .topbar {
+    background: rgba(247, 249, 252, 0.72);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    backdrop-filter: blur(16px) saturate(1.5);
+    border-bottom-color: rgba(220, 228, 238, 0.7);
+  }
+}
+/* Schwebende Leiste: Platz darunter (10 px) in die Höhe einrechnen, damit Aktionsleisten und Seitenende passen */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (max-width: 767px) {
+    :root[data-marke='teo'] { --mobile-bottom-nav-height: calc(58px + env(safe-area-inset-bottom, 0px)); }
+    :root[data-marke='teo'] body.is-pwa-standalone { --mobile-bottom-nav-height: calc(70px + env(safe-area-inset-bottom, 0px)); }
+  }
+}
