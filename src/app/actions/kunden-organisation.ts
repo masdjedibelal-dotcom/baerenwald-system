@@ -230,3 +230,44 @@ export async function kundeHatOrgKennung(kundeId: string): Promise<boolean> {
   if (!row || row.portal_modus !== 'organisation') return true
   return Boolean(row.org_kennung?.trim())
 }
+
+/**
+ * Servus TEO: Kennung der Verwaltung automatisch anlegen (aus dem Namen, eindeutig).
+ * Ohne Kennung gibt es keinen Melde-Link und keinen Aushang — der Organisation-Reiter ist nicht mehr erreichbar.
+ */
+export async function orgKennungEinrichten(
+  kundeId: string
+): Promise<{ ok: true; kennung: string } | { ok: false; message: string }> {
+  const db = createClient()
+  const { data: row, error } = await db
+    .from('kunden')
+    .select('id, typ, name, org_anzeigename, org_kennung')
+    .eq('id', kundeId)
+    .maybeSingle()
+  if (error) return { ok: false, message: error.message }
+  if (!row) return { ok: false, message: 'Kunde nicht gefunden.' }
+  const k = row as { typ?: string | null; name?: string | null; org_anzeigename?: string | null; org_kennung?: string | null }
+  if (!istKundeHausverwaltungTyp(k.typ)) return { ok: false, message: 'Nur für Verwaltungen.' }
+  if (k.org_kennung?.trim()) return { ok: true, kennung: k.org_kennung.trim().toLowerCase() }
+
+  const basis = normalizeOrgSlug(k.org_anzeigename || k.name || '') || 'verwaltung'
+  let kennung = ''
+  for (let i = 0; i < 20; i++) {
+    const versuch = (i === 0 ? basis : `${basis.slice(0, 44)}-${i + 1}`).replace(/-+$/g, '')
+    if (!isValidMeldeSlug(versuch)) continue
+    const frei = await checkOrgKennungUnique(versuch, kundeId)
+    if (frei.ok) {
+      kennung = versuch
+      break
+    }
+  }
+  if (!kennung) return { ok: false, message: 'Keine freie Kennung gefunden.' }
+
+  const { error: upErr } = await db
+    .from('kunden')
+    .update({ org_kennung: kennung })
+    .eq('id', kundeId)
+  if (upErr) return { ok: false, message: upErr.message }
+  revalidateKundeDetail(kundeId)
+  return { ok: true, kennung }
+}

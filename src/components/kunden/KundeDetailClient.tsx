@@ -1,6 +1,8 @@
 'use client'
 
-import { funktionAn } from '@/lib/marke'
+import { funktionAn, istTeo } from '@/lib/marke'
+import { MockCard } from '@/components/mock-ui/MockCard'
+import { orgKennungEinrichten } from '@/app/actions/kunden-organisation'
 import { MockBtn } from '@/components/mock-ui'
 import {
 DetailShell,
@@ -377,6 +379,32 @@ export function KundeDetailClient({
           initial={kunde.kunden_ansprechpartner ?? []}
           onChanged={() => refresh()}
         />
+      ) : null}
+      {istTeo && istKundeHausverwaltungTyp(kunde.typ) && !kunde.org_kennung?.trim() ? (
+        <MockCard title="Melde-Link und Aushang">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 text-[length:var(--fs-text)] text-muted">
+              Noch nicht eingerichtet. Danach gibt es den Link für Mieter und den Aushang mit QR-Code.
+            </p>
+            <MockBtn
+              kind="primary"
+              sm
+              type="button"
+              onClick={() => {
+                orgKennungEinrichten(kunde.id).then((res) => {
+                  if (!res.ok) {
+                    toast.systemError(res)
+                    return
+                  }
+                  setKunde((prev) => ({ ...prev, org_kennung: res.kennung }))
+                  refresh()
+                })
+              }}
+            >
+              Melde-Link einrichten
+            </MockBtn>
+          </div>
+        </MockCard>
       ) : null}
       {kunde.org_kennung?.trim() ? (
         <MeldeLinksCard
