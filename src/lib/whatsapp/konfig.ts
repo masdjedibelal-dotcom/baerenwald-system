@@ -2,6 +2,7 @@ import 'server-only'
 
 import { isStagingSupabase } from '@/lib/auth/staging-admin'
 import { crmBasisUrl } from '@/lib/crm-basis-url'
+import { istTeo } from '@/lib/marke'
 
 /**
  * WhatsApp-Einstellungen aus der Umgebung (Netlify → Environment variables):
@@ -38,7 +39,8 @@ export function whatsappKonfig(): WhatsAppKonfig {
     apiKey: echt ? apiKey : null,
     nummer: env('WHATSAPP_NUMMER'),
     webhookToken: env('WHATSAPP_WEBHOOK_TOKEN'),
-    sichtbar: echt || isStagingSupabase(),
+    // Servus TEO: WhatsApp ist noch nicht angebunden — Postfach „Nachrichten“ bleibt aus, auch wenn Einstellungen gesetzt sind
+    sichtbar: !istTeo && (echt || isStagingSupabase()),
   }
 }
 

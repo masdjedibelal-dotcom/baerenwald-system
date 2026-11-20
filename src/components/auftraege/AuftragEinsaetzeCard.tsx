@@ -646,7 +646,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                 // „Fertig gemeldet“ steht als Hauptknopf unten im Blatt
                 <div className="einsatz-aktionen">
                   <MockBtn sm kind="secondary" icon="clock" onClick={() => erfassenOeffnen('regie')}>
-                    Regie melden
+                    {istTeo ? 'Stunden melden' : 'Regie melden'}
                   </MockBtn>
                   {detail.status === 'angenommen' ? (
                     <MockBtn sm kind="secondary" icon="plus" onClick={() => erfassenOeffnen('update')}>
@@ -707,7 +707,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
           erfassen === 'abgelehnt'
             ? 'Hat abgelehnt'
             : erfassen === 'regie'
-              ? 'Regie melden'
+              ? istTeo ? 'Stunden melden' : 'Regie melden'
               : erfassen === 'update'
               ? 'Update erfassen'
               : erfassen === 'fertig'
