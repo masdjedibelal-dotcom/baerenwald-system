@@ -297,3 +297,94 @@
   /* Name in der Stammdaten-Karte nicht übergroß */
   :root[data-marke='teo'] .vgid-name { font-size: 22px; }
 }
+
+/* ════ Komponenten einheitlich (20.11.): X-Knöpfe, Seitenblätter, Felder, Menüs, Seitenzahlen ════ */
+
+/* Icon-Knöpfe zum Schließen: überall gleich — weißer Kreis mit Rand, Navy-Icon (wie „×“ auf der Website) */
+:root[data-marke='teo'] :is(.editor-sheet__icon-btn, .mobile-filter-sheet__close, .assistent-panel__close, .bt-foto-lightbox__close) {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--teo-linie);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--teo-navy);
+  box-shadow: none;
+}
+:root[data-marke='teo'] :is(.editor-sheet__icon-btn, .mobile-filter-sheet__close, .assistent-panel__close, .bt-foto-lightbox__close):hover {
+  background: var(--teo-blau-bg);
+  border-color: #c7d5e6;
+}
+:root[data-marke='teo'] :is(.editor-sheet__icon-btn, .mobile-filter-sheet__close, .assistent-panel__close, .bt-foto-lightbox__close) .mock-icon {
+  color: var(--teo-navy);
+  font-size: 18px;
+}
+
+/* Seitenblätter: Titel groß und fett, links neben dem X */
+:root[data-marke='teo'] :is(.editor-sheet__title, .mobile-filter-sheet__title) {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--teo-navy);
+  text-align: left;
+}
+:root[data-marke='teo'] .mobile-filter-sheet__header { justify-content: flex-start; gap: 12px; }
+
+/* Abschnittstitel in Formularen und Filtern: fett, ohne Trennlinie */
+:root[data-marke='teo'] .form-section-h {
+  border-bottom: 0;
+  padding-bottom: 0;
+  font-weight: 800;
+  color: var(--teo-navy);
+}
+
+/* Felder: weiß mit Rand (wie das Website-Formular), Fokus in Blau */
+:root[data-marke='teo'] :is(.input, input.input, select.input, textarea.input) {
+  background-color: #ffffff;
+  border: 1px solid var(--teo-linie);
+  color: var(--teo-navy);
+}
+:root[data-marke='teo'] :is(.input, input.input, select.input, textarea.input):focus {
+  border-color: var(--teo-blau);
+  box-shadow: 0 0 0 4px var(--teo-blau-bg);
+  outline: none;
+}
+
+/* Umschalter (Privat / Hausverwaltung / Gewerbe): Pille, aktive Wahl weiß mit Schatten */
+:root[data-marke='teo'] .seg { background: var(--teo-linie-fein); }
+
+/* „Neu erstellen“: runde Icon-Kacheln, großer Titel, Abbrechen als weiße Pille */
+:root[data-marke='teo'] .neu-pop-head { font-size: 20px; font-weight: 800; color: var(--teo-navy); }
+:root[data-marke='teo'] .neu-pop-ico {
+  border-radius: 999px;
+  background: var(--teo-blau-bg);
+  color: var(--teo-blau);
+}
+:root[data-marke='teo'] .neu-pop-ico .mock-icon { color: var(--teo-blau); }
+:root[data-marke='teo'] .neu-pop-txt { font-weight: 700; color: var(--teo-navy); }
+:root[data-marke='teo'] .neu-pop-cancel {
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--teo-linie);
+  color: var(--teo-navy);
+  font-weight: 700;
+}
+
+/* Seitenzahlen: Pillen, aktive Seite Navy */
+:root[data-marke='teo'] .pager-btn { border-radius: 999px; border-color: var(--teo-linie); }
+:root[data-marke='teo'] .pager-btn.active { background: var(--teo-navy); border-color: var(--teo-navy); color: #ffffff; }
+/* Feld-Hintergrund kommt aus --input-bg (Formular-Regeln in Seitenblättern sind spezifischer) */
+:root[data-marke='teo'] { --input-bg: #ffffff; }
+:root[data-marke='teo'] .editor-sheet :is(input, select, textarea).input { border-color: var(--teo-linie); }
+/* Zweiter Knopf unten in Blättern („Abbrechen“, „Zurücksetzen“): weiße Pille mit Rand statt nacktem Text */
+:root[data-marke='teo'] :is(.sheet-footer-actions, .mobile-filter-sheet__footer) .btn.ghost {
+  background: #ffffff;
+  border: 1px solid var(--teo-linie);
+  border-radius: 999px;
+  color: var(--teo-navy);
+  font-weight: 700;
+}
