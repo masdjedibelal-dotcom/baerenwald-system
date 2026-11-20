@@ -502,3 +502,20 @@
     :root[data-marke='teo'] body.is-pwa-standalone { --mobile-bottom-nav-height: calc(70px + env(safe-area-inset-bottom, 0px)); }
   }
 }
+
+/* ── Wizards: Kundenauswahl, Kartenwahl, Hinzufügen-Knöpfe ── */
+:root[data-marke='teo'] .cbx-search { border-radius: 999px; border: 1px solid var(--teo-linie); background: #ffffff; }
+:root[data-marke='teo'] .cbx-search input { outline: none; border: 0; box-shadow: none; background: transparent; }
+:root[data-marke='teo'] .cbx-search:focus-within { border-color: var(--teo-blau); box-shadow: 0 0 0 3px var(--teo-blau-bg); }
+/* Kartenwahl (z. B. „Art der Leistung“): runde Karten, gewählte Karte blau umrandet, Radio-Kreis aus */
+:root[data-marke='teo'] .doctype-radio-opt { border: 1px solid var(--teo-linie); border-radius: 18px; padding: 16px 18px; }
+:root[data-marke='teo'] .doctype-radio-opt:hover { border-color: var(--teo-blau); background: var(--teo-blau-bg); }
+:root[data-marke='teo'] .doctype-radio-opt > .dot { display: none; }
+:root[data-marke='teo'] .doctype-radio-opt .lbl { font-weight: 800; color: var(--teo-navy); }
+/* Hinzufügen-Knöpfe unten im Dokument: leichter, ohne schwere gestrichelte Kästen */
+:root[data-marke='teo'] .posboard-add-fab { border-style: solid; border-color: var(--teo-linie); border-radius: 999px; background: #ffffff; font-weight: 700; }
+
+/* ── Anmeldung: Logo größer, Häkchen in Navy statt Browser-Blau ── */
+:root[data-marke='teo'] .crm-login__mobile-brand .crm-login__brand-mark { width: 44px; height: 44px; border-radius: 12px; }
+:root[data-marke='teo'] .crm-login__mobile-brand img { height: 36px !important; width: auto !important; }
+:root[data-marke='teo'] input[type='checkbox'] { accent-color: var(--teo-navy); }

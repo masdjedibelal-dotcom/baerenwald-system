@@ -152,7 +152,7 @@ export async function acceptAngebotAndCreateAuftrag(
   if (direktOhneHv) {
     const leadIdCheck = (ang.lead_id as string | null)?.trim() ?? ''
     if (!leadIdCheck) {
-      return { ok: false, message: 'Direkt Auftrag ohne Lead nicht möglich.' }
+      return { ok: false, message: 'Ohne Anfrage ist kein direkter Auftrag möglich.' }
     }
     const { data: leadRow, error } = await supabaseAdmin
       .from('leads')

@@ -24,7 +24,7 @@ export function DetailQuickBar({
   return (
     <div className={cn('detail-quickbar', className)} role="toolbar" aria-label="Schnellaktionen">
       {actions.map((a) => (
-        <MockBtn className="detail-quickbar__btn" key={a.id} type="button" disabled={a.disabled} onClick={a.onClick}>
+        <MockBtn className="detail-quickbar__btn" key={a.id} type="button" disabled={a.disabled} onClick={a.onClick} aria-label={a.label}>
           <ActionIcon n={a.icon} size={18} />
           <span>{a.label}</span>
         </MockBtn>

@@ -1192,7 +1192,7 @@ export function RechnungWizard({
               }}
               placeholder={
                 (hasPlan && selRate?.titel?.trim()) ||
-                (istDirektrechnung ? 'Titel der Rechnung, z. B. Badsanierung' : auftragLabel) ||
+                (istDirektrechnung ? 'Titel, z. B. Badsanierung' : auftragLabel) ||
                 'Titel der Rechnung'
               }
               aria-label="Titel der Rechnung"
@@ -1902,8 +1902,8 @@ export function RechnungWizard({
             lineHeight: 1.45,
           }}
         >
-          Einmalig = Projekt/Auftrag mit Abschluss. Wiederkehrend = Bestand wie Wartung,
-          Winterdienst oder Hausmeisterservice.
+          Einmalig: ein Auftrag, der einmal abgerechnet wird. Wiederkehrend: laufende Leistungen wie
+          Wartung, Winterdienst oder Hausmeister.
         </p>
         <div className="doctype-row doctype-row--stack">
           <MockBtn className="doctype-radio-opt doctype-radio-opt--block" type="button" onClick={() => {

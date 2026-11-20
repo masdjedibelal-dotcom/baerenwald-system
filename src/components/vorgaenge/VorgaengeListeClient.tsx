@@ -1447,6 +1447,10 @@ export function VorgaengeListeClient({
                         src={v.fotoUrl}
                         alt=""
                         loading="lazy"
+                        // Fehler vor der Hydration verpasst onError — dann gleich beim Einhängen ausblenden
+                        ref={(el) => {
+                          if (el && el.complete && el.naturalWidth === 0) el.style.display = 'none'
+                        }}
                         onError={(e) => {
                           e.currentTarget.style.display = 'none'
                         }}

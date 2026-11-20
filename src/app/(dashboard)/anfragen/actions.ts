@@ -50,7 +50,7 @@ export async function updateLeadStatus(
     return { ok: false, message: fetchErr.message }
   }
   if (!lead) {
-    return { ok: false, message: 'Lead nicht gefunden oder keine Berechtigung.' }
+    return { ok: false, message: 'Anfrage nicht gefunden oder keine Berechtigung.' }
   }
 
   const alterStatus = lead.status as LeadStatus

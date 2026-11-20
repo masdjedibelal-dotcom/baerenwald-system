@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 export function ZustaendigAuswahl({ leadId }: { leadId: string }) {
   const [team, setTeam] = useState<{ id: string; name: string }[] | null>(null)
   const [wert, setWert] = useState<string>('')
+  const [speichert, setSpeichert] = useState(false)
 
   useEffect(() => {
     let aktiv = true
@@ -31,11 +32,14 @@ export function ZustaendigAuswahl({ leadId }: { leadId: string }) {
       <MockSelect
         className={cn('vg-zust__select', !wert && 'is-leer')}
         value={wert}
+        disabled={speichert}
         onChange={(e) => {
           const neu = e.target.value
           const vorher = wert
           setWert(neu)
+          setSpeichert(true)
           setVorgangZustaendig(leadId, neu || null).then((res) => {
+            setSpeichert(false)
             if (!res.ok) {
               setWert(vorher)
               toast.systemError(res)
@@ -52,6 +56,7 @@ export function ZustaendigAuswahl({ leadId }: { leadId: string }) {
           </option>
         ))}
       </MockSelect>
+      {speichert ? <span className="dh-zustaendig__label" aria-live="polite">Wird gespeichert…</span> : null}
     </label>
   )
 }

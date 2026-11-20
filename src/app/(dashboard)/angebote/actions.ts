@@ -2426,7 +2426,7 @@ export async function schliesseLeadNachAngebotVerlust(
     .eq('id', angebotId)
     .maybeSingle()
   if (error) logDbError('app/angebote/actions:angebote', error)
-  if (!a?.lead_id) return { ok: false, message: 'Kein Lead mit diesem Angebot verknüpft.' }
+  if (!a?.lead_id) return { ok: false, message: 'Zu diesem Angebot gibt es keine Anfrage.' }
   if (a.status !== 'abgelehnt') {
     return { ok: false, message: 'Angebot ist nicht als abgelehnt markiert.' }
   }

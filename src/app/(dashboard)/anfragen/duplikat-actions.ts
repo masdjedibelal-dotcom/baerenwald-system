@@ -18,7 +18,7 @@ export async function zusammenfuehrenLeadDuplikat(input: {
 
   const doppel = input.doppelterLeadId.trim()
   const ziel = input.zielLeadId.trim()
-  if (!doppel || !ziel) return { ok: false, message: 'Beide Leads erforderlich.' }
+  if (!doppel || !ziel) return { ok: false, message: 'Bitte beide Anfragen wählen.' }
   if (doppel === ziel) return { ok: false, message: 'Ziel und Duplikat müssen verschieden sein.' }
 
   const { data: zielRow, error: zErr } = await supabaseAdmin
@@ -53,7 +53,7 @@ export async function listDuplikatKandidaten(leadId: string): Promise<
 > {
   const supabase = createClient()
   const id = leadId.trim()
-  if (!id) return { ok: false, message: 'Lead fehlt' }
+  if (!id) return { ok: false, message: 'Anfrage fehlt' }
 
   const { data: lead, error } = await supabase
     .from('leads')

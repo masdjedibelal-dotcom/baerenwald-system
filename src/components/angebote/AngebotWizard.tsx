@@ -1850,8 +1850,8 @@ export function AngebotWizard({
                 lineHeight: 1.45,
               }}
             >
-              Einmalig = Projekt/Auftrag mit Abschluss. Wiederkehrend = Bestand wie Wartung,
-              Winterdienst oder Hausmeisterservice.
+              Einmalig: ein Auftrag, der einmal abgerechnet wird. Wiederkehrend: laufende Leistungen wie
+              Wartung, Winterdienst oder Hausmeister.
             </p>
             <div className="doctype-row doctype-row--stack">
               <MockBtn className="doctype-radio-opt doctype-radio-opt--block" type="button" onClick={() => {
