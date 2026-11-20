@@ -186,3 +186,24 @@
   :root[data-marke='teo'] .vg-row > .vg-zust { grid-area: zust; justify-self: end; }
   :root[data-marke='teo'] .vg-zust__select { height: 26px; font-size: 12px; padding: 0 22px 0 10px; background-position: right 8px center; }
 }
+
+/* ── Detailseiten mobil: kein Bild im Kopf, Schnellknöpfe als weiße Pillen (wie im Portal) ── */
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .detail-entity-hero {
+    background: transparent;
+    background-image: none;
+  }
+  :root[data-marke='teo'] .detail-entity-hero .detail-head .dh-title { font-weight: 800; color: var(--teo-navy); }
+  :root[data-marke='teo'] .detail-entity-hero .detail-quickbar__btn {
+    background: #ffffff;
+    border: 1px solid var(--teo-linie);
+    border-radius: 999px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 10px 24px -16px rgba(11, 31, 58, 0.45);
+    color: var(--teo-navy);
+  }
+  :root[data-marke='teo'] .detail-entity-hero .detail-quickbar__btn:active:not(:disabled) { background: var(--teo-blau-bg); }
+  :root[data-marke='teo'] .detail-entity-toprow__actions .qa-btn:hover,
+  :root[data-marke='teo'] .detail-entity-toprow__actions .detail-top-more:hover { background: #ffffff; }
+}
