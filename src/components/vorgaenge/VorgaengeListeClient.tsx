@@ -273,6 +273,7 @@ export function VorgaengeListeClient({
   const [rechnungRichtung, setRechnungRichtung] = useState<'ausgehend' | 'eingehend'>('ausgehend')
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
+  const [oeffnetKey, setOeffnetKey] = useState<string | null>(null)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   /** Aufgeklappte Korrektur-Ketten entfallen — eine Card pro Vorgang. */
   // Beim Kunden eingebettet ist die Kunden-Spalte doppelt.
@@ -1054,6 +1055,7 @@ export function VorgaengeListeClient({
 
   return (
     <div>
+      {oeffnetKey && istTeo ? <div className="teo-laedt-balken" aria-hidden /> : null}
       <div className="listbar">
         <div className="listbar-main">
           {embedded ? (
@@ -1416,8 +1418,12 @@ export function VorgaengeListeClient({
             ]
             const row = (
               <div
-                className={cn('vg-row vg-row--vorgang', selected[key] && 'sel', flashKeys[key] && 'vg-row--flash')}
-                onClick={() => openDetail(v)}
+                className={cn('vg-row vg-row--vorgang', selected[key] && 'sel', flashKeys[key] && 'vg-row--flash', oeffnetKey === key && 'vg-row--oeffnet')}
+                onClick={() => {
+                  // Sofort sichtbar reagieren (Zeile gedrückt + Ladebalken oben), bis die Detailseite da ist
+                  setOeffnetKey(key)
+                  openDetail(v)
+                }}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
@@ -1513,7 +1519,10 @@ export function VorgaengeListeClient({
                     className="vg-status"
                     style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}
                   >
-                    {v.badges?.notfall ? (
+                    {/* TEO: Notfall als lesbare Pille statt unerklärtem Punkt */}
+                    {v.badges?.notfall && istTeo ? (
+                      <MockBadge kind="storniert">Akut</MockBadge>
+                    ) : v.badges?.notfall ? (
                       <span
                         className="inline-flex items-center gap-1"
                         title="Notfall"

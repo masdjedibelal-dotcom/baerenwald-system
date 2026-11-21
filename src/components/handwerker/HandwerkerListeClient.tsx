@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { ListBulkBar,MockBtn,MockChip,MockEmpty,MockIcon,MockPager,MockSortHead } from '@/components/mock-ui'
 import { MockEntityRowMenu,MockListbarChrome } from '@/components/mock-ui/MockEntityRowMenu'
 import { MockField,MockInput } from '@/components/mock-ui/MockForm'
@@ -628,10 +629,20 @@ export function HandwerkerListeClient({
                     </div>
                   ) : null}
                 </div>
-                <div className="vg-kontakt">
-                  <span title={tel || undefined}>{tel || '—'}</span>
-                  <span title={mail || undefined}>{mail || '—'}</span>
-                </div>
+                {/* TEO: leere Angaben weglassen statt „—“-Zeilen */}
+                {istTeo ? (
+                  tel || mail ? (
+                    <div className="vg-kontakt">
+                      {tel ? <span title={tel}>{tel}</span> : null}
+                      {mail ? <span title={mail}>{mail}</span> : null}
+                    </div>
+                  ) : null
+                ) : (
+                  <div className="vg-kontakt">
+                    <span title={tel || undefined}>{tel || '—'}</span>
+                    <span title={mail || undefined}>{mail || '—'}</span>
+                  </div>
+                )}
                 {menuCell}
               </div>
             ) : (

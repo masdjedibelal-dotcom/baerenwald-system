@@ -96,7 +96,7 @@ function InlineActionButton({
   const iconSize = compact ? 15 : size === 'md' ? 16 : 14
 
   // TEO am Handy: „Bearbeiten“ als runder Stift (Text wurde zu „Bearbeit…“ abgeschnitten)
-  const nurStift = istTeo && compact && slot === 'secondary' && /bearbeiten/i.test(action.label)
+  const nurStift = istTeo && compact && slot === 'secondary' && /bearbeiten|korrigieren|ändern/i.test(action.label)
   const inner = nurStift ? (
     <ActionIcon n="pencil" size={18} />
   ) : (

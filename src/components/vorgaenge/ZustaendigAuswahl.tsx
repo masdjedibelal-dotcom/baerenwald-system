@@ -34,7 +34,7 @@ export function ZustaendigAuswahl({ leadId }: { leadId: string }) {
       <label className="dh-zustaendig" aria-busy="true">
         <span className="dh-zustaendig__label">Zuständig</span>
         <MockSelect className="vg-zust__select is-leer" disabled value="">
-          <option value="">…</option>
+          <option value="">Nicht zugeordnet</option>
         </MockSelect>
       </label>
     )

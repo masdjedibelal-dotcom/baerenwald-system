@@ -1054,3 +1054,154 @@
 :root[data-marke='teo'] .mkt-funnel-bar-fill { height: 100%; border-radius: 6px; background: var(--teo-blau); }
 /* Marketing-Zahlen: weiße Kacheln mit Rand statt grauer Flächen */
 :root[data-marke='teo'] .mkt-kpi-grid > * { background: var(--teo-blau-bg, #eef4fb) !important; border: 0 !important; border-radius: 14px !important; }
+
+/* ════════════ Feinschliff-System 21.11. (gilt für CRM; gleiche Werte in den Portalen) ════════════
+   Tiefe in drei Stufen · Popover hell mit feinem Rand · Blatt mit Griff · ✕ rund · Icons einheitlich · Druck-Effekt
+   Regeln: Karte = Inhalt auf der Seite · Popover = kurze Aktionsliste am Knopf (≤ 6, keine Eingabe)
+           Blatt = Details oder kurze Eingabe zu einem Eintrag · Vollbild = Formular > 3 Felder / Assistent
+           Dialog = Rückfrage vor Löschen/Absagen · Toast = kurze Rückmeldung */
+:root[data-marke='teo'] {
+  --teo-tiefe-1: 0 1px 2px rgba(11, 31, 58, 0.04), 0 8px 24px -18px rgba(11, 31, 58, 0.18);
+  --teo-tiefe-2: 0 2px 6px rgba(11, 31, 58, 0.06), 0 16px 40px -12px rgba(11, 31, 58, 0.22);
+  --teo-tiefe-3: 0 -8px 40px -8px rgba(11, 31, 58, 0.22);
+  --teo-rand-fein: rgba(11, 31, 58, 0.08);
+  --teo-icon-grau: #6a7c92;
+}
+
+/* Menüleiste unten: helles Glas (Entscheidung 21.11.) */
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .bottomnav {
+    background: rgba(255, 255, 255, 0.78) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(1.8) !important;
+    backdrop-filter: blur(20px) saturate(1.8) !important;
+    border: 1px solid var(--teo-rand-fein) !important;
+    box-shadow: 0 12px 32px -12px rgba(11, 31, 58, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  }
+  :root[data-marke='teo'] .bottomnav-item { color: var(--teo-icon-grau) !important; }
+  :root[data-marke='teo'] .bottomnav-item .bottomnav-item__lbl { color: var(--teo-icon-grau) !important; }
+  :root[data-marke='teo'] .bottomnav-item.active,
+  :root[data-marke='teo'] .bottomnav-item.active .bottomnav-item__lbl { color: var(--teo-navy) !important; }
+  :root[data-marke='teo'] .bottomnav-item.active::before { background: rgba(11, 31, 58, 0.07) !important; }
+}
+
+/* Popover / Menüs: weiß, feiner Rand, weicher Schatten, Zeilen 44 px, graue Icons, sanftes Öffnen */
+:root[data-marke='teo'] .popover,
+:root[data-marke='teo'] .menu,
+:root[data-marke='teo'] .menu--portal {
+  background: #ffffff !important;
+  border: 1px solid var(--teo-rand-fein) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--teo-tiefe-2) !important;
+  padding: 6px !important;
+  animation: teo-pop-auf 0.14s ease-out;
+  transform-origin: top right;
+}
+@keyframes teo-pop-auf { from { opacity: 0; transform: scale(0.96) translateY(-4px); } to { opacity: 1; transform: none; } }
+:root[data-marke='teo'] .popover .pop-item,
+:root[data-marke='teo'] .menu .menu-item {
+  min-height: 44px;
+  gap: 12px;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--teo-navy);
+}
+:root[data-marke='teo'] .popover .pop-item .mock-icon,
+:root[data-marke='teo'] .menu .menu-item .mock-icon,
+:root[data-marke='teo'] .menu .menu-item-ico { color: var(--teo-icon-grau); }
+:root[data-marke='teo'] .popover .pop-item:hover,
+:root[data-marke='teo'] .menu .menu-item:hover { background: #f1f5fa !important; }
+:root[data-marke='teo'] .popover .pop-item.danger,
+:root[data-marke='teo'] .popover .btn.danger.pop-item,
+:root[data-marke='teo'] .menu .menu-item.danger,
+:root[data-marke='teo'] .menu .menu-item.danger .mock-icon { color: #b42318 !important; }
+:root[data-marke='teo'] .popover .pop-sep,
+:root[data-marke='teo'] .menu .menu-sep { height: 1px; margin: 6px 8px; background: #eef2f7; border: 0; }
+
+/* Blätter: oben rund, Griff, Kopf ruhig, ✕ als runder grauer Knopf (wie iOS) */
+:root[data-marke='teo'] .editor-sheet { box-shadow: var(--teo-tiefe-3); }
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .editor-sheet--bottom { border-radius: 24px 24px 0 0 !important; }
+}
+:root[data-marke='teo'] .editor-sheet__drag-handle-bar { width: 36px; height: 5px; border-radius: 999px; background: #d5dde8; }
+:root[data-marke='teo'] .editor-sheet__title { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; color: var(--teo-navy); }
+:root[data-marke='teo'] .editor-sheet__icon-btn {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #eef2f7 !important;
+  color: #44546a !important;
+  box-shadow: none !important;
+}
+:root[data-marke='teo'] .editor-sheet__icon-btn .mock-icon { width: 18px !important; height: 18px !important; }
+:root[data-marke='teo'] .editor-sheet-overlay { background: rgba(11, 31, 58, 0.4) !important; }
+
+/* Icons überall gleich: eine Linienstärke */
+:root[data-marke='teo'] .mock-icon svg [stroke-width],
+:root[data-marke='teo'] .mock-icon svg path,
+:root[data-marke='teo'] svg.lucide { stroke-width: 1.75; }
+
+/* Antippen fühlt sich an: leichtes Eindrücken bei Knöpfen, Karten und Zeilen */
+:root[data-marke='teo'] .btn,
+:root[data-marke='teo'] .vg-row,
+:root[data-marke='teo'] .list-row,
+:root[data-marke='teo'] .einsatz-zeile-teo,
+:root[data-marke='teo'] .lt-card,
+:root[data-marke='teo'] .ueber-kpi,
+:root[data-marke='teo'] .mehr-tile { transition: transform 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease; }
+:root[data-marke='teo'] .btn:active:not(:disabled),
+:root[data-marke='teo'] .vg-row:active,
+:root[data-marke='teo'] .list-row:not(.head):active,
+:root[data-marke='teo'] .einsatz-zeile-teo:active,
+:root[data-marke='teo'] .lt-card:active,
+:root[data-marke='teo'] .ueber-kpi:active,
+:root[data-marke='teo'] .mehr-tile:active { transform: scale(0.98); }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-marke='teo'] .popover, :root[data-marke='teo'] .menu, :root[data-marke='teo'] .menu--portal { animation: none; }
+}
+
+/* Karten: eine Tiefe (feiner Rand + weicher Schatten) */
+:root[data-marke='teo'] .card { border-color: #e6ecf3; box-shadow: var(--teo-tiefe-1); }
+
+/* Vorgänge-Tabelle am Rechner: feste Breiten, nichts abgeschnitten; Titel nimmt den Rest */
+@media (min-width: 768px) {
+  :root[data-marke='teo'] .vg-mit-zust .vg-row--vorgang,
+  :root[data-marke='teo'] .vg-mit-zust .vg-row.head {
+    grid-template-columns: 36px minmax(0, 1fr) 96px 96px 112px 136px 124px 40px !important;
+  }
+  :root[data-marke='teo'] .vg-mit-zust .vg-row > * { min-width: 0; }
+  :root[data-marke='teo'] .vg-mit-zust .vg-row .vg-datum,
+  :root[data-marke='teo'] .vg-mit-zust .vg-row .vg-phase { white-space: nowrap; }
+  :root[data-marke='teo'] .vg-mit-zust .vg-row .vg-zust .vg-zust__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  /* Fotos nur in der Handy-Karte/im Detail — in der Tabelle verschieben sie die Titelspalte */
+  :root[data-marke='teo'] .vg-mit-zust .vg-row .vg-foto { display: none; }
+}
+
+/* Antippen einer Zeile: sofort Rückmeldung (Zeile gedrückt, schmaler Ladebalken oben), bis das Detail da ist */
+.teo-laedt-balken {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #1e5fa8, transparent);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: teo-laedt 1s ease-in-out infinite;
+}
+@keyframes teo-laedt { from { background-position: -50% 0; } to { background-position: 150% 0; } }
+:root[data-marke='teo'] .vg-row--oeffnet { background: #f1f5fa !important; transform: scale(0.99); }
+
+/* Dashboard am Rechner: Karten in einer Reihe gleich hoch (keine Lücke unter kurzen Karten) */
+@media (min-width: 768px) {
+  :root[data-marke='teo'] .dash-zahlen { align-items: stretch !important; }
+  :root[data-marke='teo'] .dash-zahlen > * { height: 100%; }
+  :root[data-marke='teo'] .dash-zahlen > * > .card,
+  :root[data-marke='teo'] .dash-zahlen > .card { height: 100%; }
+}

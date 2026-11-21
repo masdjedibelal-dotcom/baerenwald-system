@@ -570,7 +570,7 @@ export function KundenListeClient({
             resizable
             onResizePointerDown={(e) => startResize(resizeOffset + 3, e)}
           >
-            Email
+            E-Mail
           </MockSortHead>
           <div
             className="lc-desk"

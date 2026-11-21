@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { useEffect, useState } from 'react'
@@ -108,7 +109,9 @@ export function StammdatenPortalZeile({
       ? 'Aktiv'
       : registered === false
         ? 'Nicht registriert'
-        : '…'
+        : istTeo
+          ? 'Wird geprüft'
+          : '…'
 
   const dotClass = gesperrt
     ? 'd is-off'

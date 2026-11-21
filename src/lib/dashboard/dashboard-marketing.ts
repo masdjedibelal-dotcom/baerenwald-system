@@ -135,7 +135,12 @@ function buildFunnelStages(
   if (istTeo) {
     return mitAbsprung([
       { key: 'start', label: 'Anfrage geöffnet', count: start },
-      ...steps.map((s) => ({ key: s.key, label: s.label, count: s.count })),
+      // Feste Namen je Position (das Tracking nennt den ersten Schritt teils auch „Kontakt“ → doppelt)
+      ...steps.map((s, i) => ({
+        key: s.key,
+        label: steps.length === 4 ? (['Anliegen', 'Details', 'Objekt', 'Kontakt'][i] ?? s.label) : s.label,
+        count: s.count,
+      })),
       { key: 'lead', label: 'Anfrage abgeschickt', count: lead },
     ], pct)
   }
