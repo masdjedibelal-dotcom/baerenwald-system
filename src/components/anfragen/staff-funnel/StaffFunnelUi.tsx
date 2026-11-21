@@ -1,6 +1,8 @@
 'use client'
 
 import { MockBtn } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { istTeo } from '@/lib/marke'
 import { cn } from '@/lib/utils'
 import { formatEuro } from '@/lib/format/geld-datum'
 
@@ -13,7 +15,16 @@ export type StaffChoiceOption = {
   tag?: string
 }
 
-function FunnelIcon({ name }: { name: string }) {
+/** TEO: Linien-Icons in Markenfarbe statt der grünen Bärenwald-Bilder */
+const TEO_FUNNEL_ICONS: Record<string, string> = {
+  '01-haus-erneuern': 'building',
+  '02-reparatur': 'tool',
+  '03-betreuung': 'calendar-event',
+  '04-gewerbe': 'briefcase',
+}
+
+export function FunnelIcon({ name }: { name: string }) {
+  if (istTeo) return <MockIcon ctx="default" n={TEO_FUNNEL_ICONS[name] ?? 'tool'} size={20} />
   return (
     // eslint-disable-next-line @next/next/no-img-element -- lokale SVG-Icons aus /public/icons
     <img src={`/icons/${name}.svg`} alt="" width={22} height={22} decoding="async" />

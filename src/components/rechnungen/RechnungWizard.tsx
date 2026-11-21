@@ -1361,7 +1361,7 @@ export function RechnungWizard({
               }
         }
         primaryAction={{
-          label: 'Weiter: Prüfen',
+          label: istTeo ? 'Weiter' : 'Weiter: Prüfen',
           onClick: () => {
             if (saving) return
             openPruefenSheet()

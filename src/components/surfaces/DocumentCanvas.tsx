@@ -20,6 +20,7 @@ import {
   type DocCanvasPrimaryAction,
   type DocCanvasSection,
 } from '@/lib/surfaces/document-canvas-chrome'
+import { istTeo } from '@/lib/marke'
 import { cn } from '@/lib/utils'
 
 export type DocumentCanvasProps = {
@@ -133,6 +134,8 @@ export function DocumentCanvas({
   const saveFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const useFooterChrome = Boolean(primaryAction || draftAction)
+  /** TEO: „Speichern“ oben rechts im Kopf, unten nur der Hauptknopf (Weiter) */
+  const draftOben = istTeo && Boolean(draftAction) && Boolean(primaryAction)
   const lastSavedLabel = formatLastSavedAt(lastSavedAt, nowTick)
   const headerStatus = lastSavedLabel ?? statusHint ?? null
 
@@ -483,7 +486,12 @@ export function DocumentCanvas({
   const ui = (
     <div
       ref={rootRef}
-      className={cn('document-canvas', useFooterChrome && 'document-canvas--footer-chrome', className)}
+      className={cn(
+        'document-canvas',
+        useFooterChrome && 'document-canvas--footer-chrome',
+        draftOben && 'document-canvas--speichern-oben',
+        className
+      )}
       role="dialog"
       aria-modal="true"
       aria-busy={interactionLocked || undefined}
@@ -505,6 +513,16 @@ export function DocumentCanvas({
             </p>
           ) : null}
         </div>
+        {draftOben && draftAction ? (
+          <MockBtn
+            type="button"
+            className={cn('document-canvas__speichern-oben', saveFlash && 'bw-motion-save-ok')}
+            disabled={interactionLocked || draftAction.disabled}
+            onClick={handleDraftAction}
+          >
+            {draftAction.busy ? '…' : 'Speichern'}
+          </MockBtn>
+        ) : null}
         {headerEnd != null ? (
           <div
             className={cn(
@@ -607,7 +625,7 @@ export function DocumentCanvas({
             interactionLocked && 'pointer-events-none opacity-60'
           )}
         >
-          {draftAction ? (
+          {draftAction && !draftOben ? (
             <MockBtn
               type="button"
               kind="secondary"

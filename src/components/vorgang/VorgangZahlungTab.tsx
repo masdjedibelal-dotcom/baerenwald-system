@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { AbschlagsplanSheet } from '@/components/vorgang/AbschlagsplanSheet'
 import { MockCard } from '@/components/mock-ui/MockCard'
@@ -679,7 +680,7 @@ export function VorgangZahlungTab({
       {/* Ein Knopf: Abschläge anlegen und den Plan später ändern */}
       {abschlagMoeglich || plan.zeilen.some((z) => z.typ !== 'rest') ? (
         <MockBtn sm kind="secondary" icon={hatAbschlaege ? 'pencil' : 'plus'} onClick={() => setAbschlagOpen(true)}>
-          {hatAbschlaege ? 'Abschlagsplan' : 'Abschlag stellen'}
+          {hatAbschlaege ? 'Abschlagsplan' : istTeo ? 'Abschlag erstellen' : 'Abschlag stellen'}
         </MockBtn>
       ) : null}
       {!hatSchlusszeile ? (
@@ -694,11 +695,13 @@ export function VorgangZahlungTab({
           }}
         >
           {/* Ohne Abschläge ist es einfach „die Rechnung“ */}
-          {plan.zeilen.some((z) => z.typ !== 'rest') ? 'Schlussrechnung' : 'Rechnung stellen'}
+          {plan.zeilen.some((z) => z.typ !== 'rest') ? 'Schlussrechnung' : istTeo ? 'Rechnung erstellen' : 'Rechnung stellen'}
         </MockBtn>
       ) : null}
     </span>
   ) : null
+  /** TEO: Knöpfe unter der Liste (volle Breite) statt eng im Kartenkopf */
+  const planAktionenUnten = istTeo && planAktionen ? <div className="zahlplan-aktionen-teo">{planAktionen}</div> : null
   const abschlagSheet = canEditPlan ? (
     <AbschlagsplanSheet
       open={abschlagOpen}
@@ -790,9 +793,7 @@ export function VorgangZahlungTab({
           title="Zahlung"
           icon="calculator"
           className="zahlplan-shell dshell-framed"
-          actions={
-            planAktionen
-          }
+          actions={istTeo ? null : planAktionen}
         >
           <div className="zahlplan-empty">
             <MockIcon ctx="empty" n="calculator" size={26} />
@@ -800,6 +801,7 @@ export function VorgangZahlungTab({
               {variant === 'angebot' ? 'Kein Zahlungsvorschlag' : 'Noch keine Rechnung'}
             </div>
           </div>
+          {planAktionenUnten}
           {afterTable}
         </MockCard>
         {abschlagSheet}
@@ -814,7 +816,7 @@ export function VorgangZahlungTab({
         icon="calculator"
         className="zahlplan-shell dshell-framed"
         actions={
-          canEditPlan ? (
+          canEditPlan && istTeo ? null : canEditPlan ? (
             <span style={{ display: 'inline-flex', gap: 8 }}>
               {planAktionen}
             </span>
@@ -919,6 +921,8 @@ export function VorgangZahlungTab({
             </span>
           </div>
         </div>
+
+        {planAktionenUnten}
 
         {afterTable}
 

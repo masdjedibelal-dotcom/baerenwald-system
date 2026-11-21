@@ -1,17 +1,20 @@
 import { cn } from '@/lib/utils'
-import { SkeletonDetailPage, SkeletonListPage } from '@/components/ui/Skeleton'
+import { istTeo } from '@/lib/marke'
+import { SkeletonDetailPage, SkeletonList, SkeletonListPage } from '@/components/ui/Skeleton'
 
 /** Volle Seitenfläche — für Next.js `loading.tsx` und schwere Detail-Routen. */
 export function CrmPageLoading({
   label = 'Wird geladen …',
   className,
-  variant = 'spinner',
+  variant: variantIn = 'spinner',
 }: {
   label?: string
   className?: string
   /** list = Chip+Rows · detail = Kopf+Tabs · spinner = klassisch */
   variant?: 'spinner' | 'list' | 'detail'
 }) {
+  // TEO: überall Platzhalter in Form der Seite statt Kreisel mit Text
+  const variant = istTeo && variantIn === 'spinner' ? 'detail' : variantIn
   if (variant === 'list') {
     return (
       <div className={cn(className)} role="status" aria-busy="true" aria-label={label}>
@@ -52,6 +55,14 @@ export function CrmInlineLoading({
   className?: string
   minHeight?: number
 }) {
+  if (istTeo) {
+    return (
+      <div className={cn('teo-laden-inline', className)} role="status" aria-busy="true" aria-label={label} style={{ minHeight }}>
+        <SkeletonList rows={Math.max(2, Math.min(5, Math.round(minHeight / 56)))} />
+        <span className="sr-only">{label}</span>
+      </div>
+    )
+  }
   return (
     <div
       className={cn('page-loading page-loading--inline', className)}

@@ -1,5 +1,6 @@
 'use client'
 
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField,MockTextarea } from '@/components/mock-ui/MockForm'
@@ -81,25 +82,20 @@ export function AngebotOrgFreigabeBanner({
   }
 
   return (
-    <MockCard title="Org-Freigabe" icon="shield-check">
+    <MockCard title="Freigabe durch HV" icon="shield-check">
       <div className="flex flex-wrap items-center gap-2">
         <MockBadge kind={hubSpotStatusToMockBadgeKind(badgeStatus)}>
           {ORG_FREIGABE_LABELS[status]}
         </MockBadge>
+        {/* Erklärung hinter ⓘ statt als Text (R10) */}
         {status === 'ausstehend' ? (
-          <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            Angebot liegt vor — Kunde/HV kann annehmen oder ablehnen.
-          </span>
+          <MockInfoTip tip="Angebot liegt vor — die HV kann annehmen oder ablehnen." />
         ) : null}
         {status === 'beschluss_ausstehend' ? (
-          <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            Wartet auf Eigentümerbeschluss — Entscheidung im HV-Portal.
-          </span>
+          <MockInfoTip tip="Wartet auf Eigentümerbeschluss — Entscheidung im HV-Portal." />
         ) : null}
         {status === 'abgelehnt' ? (
-          <span className="text-[length:var(--fs-meta)] text-bw-text-muted">
-            Freigabe abgelehnt — nach Anpassung erneut anfordern.
-          </span>
+          <MockInfoTip tip="Freigabe abgelehnt — nach Anpassung erneut anfordern." />
         ) : null}
       </div>
 

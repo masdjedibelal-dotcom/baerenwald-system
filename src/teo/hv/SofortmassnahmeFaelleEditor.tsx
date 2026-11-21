@@ -1,6 +1,7 @@
 'use client'
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { EditorSheet } from '@/components/surfaces/EditorSheet'
 
 import { useMemo, useState } from 'react'
@@ -48,10 +49,13 @@ export function SofortmassnahmeFaelleEditor({
 
   return (
     <div className={cn('sofortmassnahme-faelle', className)}>
-      <p className="sofortmassnahme-faelle__intro">{SOFORTMASSNAHME_FAELLE_INTRO}</p>
+      <div className="sofortmassnahme-faelle__kopf">
+        <span>Fälle ohne Freigabe</span>
+        <MockInfoTip tip={`${SOFORTMASSNAHME_FAELLE_INTRO} ${SOFORTMASSNAHME_FAELLE_FOOTNOTE}`} />
+      </div>
 
       {selected.length === 0 ? (
-        <p className="sofortmassnahme-faelle__empty">Noch keine Fälle — nichts geht direkt.</p>
+        <p className="sofortmassnahme-faelle__empty">Noch keine Fälle.</p>
       ) : (
         <ul className="sofortmassnahme-faelle__list">
           {selected.map((id) => (
@@ -79,8 +83,6 @@ export function SofortmassnahmeFaelleEditor({
         </MockBtn>
       ) : null}
 
-      <p className="sofortmassnahme-faelle__footnote">{SOFORTMASSNAHME_FAELLE_FOOTNOTE}</p>
-
       <EditorSheet
         open={katalogOpen}
         onClose={() => setKatalogOpen(false)}
@@ -98,8 +100,8 @@ export function SofortmassnahmeFaelleEditor({
                   {openFaelle.map((f) => (
                     <li key={f.id}>
                       <MockBtn className="sofortmassnahme-faelle__katalog-btn" type="button" onClick={() => add(f.id)}>
-                        <MockIcon ctx="btn" n="plus" size={14} />
-                        <span>{f.label}</span>
+                        <span className="sofortmassnahme-faelle__katalog-label">{f.label}</span>
+                        <MockIcon ctx="btn" n="plus" size={16} />
                       </MockBtn>
                     </li>
                   ))}

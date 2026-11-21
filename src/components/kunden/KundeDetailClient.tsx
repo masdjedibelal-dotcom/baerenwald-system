@@ -384,7 +384,7 @@ export function KundeDetailClient({
         <MockCard title="Melde-Link und Aushang">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="m-0 text-[length:var(--fs-text)] text-muted">
-              Noch nicht eingerichtet. Danach gibt es den Link für Mieter und den Aushang mit QR-Code.
+              Link, QR-Code und Aushang für Mieter.
             </p>
             <MockBtn
               kind="primary"
@@ -398,6 +398,12 @@ export function KundeDetailClient({
                   }
                   setKunde((prev) => ({ ...prev, org_kennung: res.kennung }))
                   refresh()
+                  // An der neuen Karte bleiben (nicht nach oben springen), erstes Feld bereit
+                  window.setTimeout(() => {
+                    const el = document.getElementById('melde-links-karte')
+                    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+                    el?.querySelector('input')?.focus({ preventScroll: true })
+                  }, 80)
                 })
               }}
             >
@@ -407,6 +413,7 @@ export function KundeDetailClient({
         </MockCard>
       ) : null}
       {kunde.org_kennung?.trim() ? (
+        <div id="melde-links-karte">
         <MeldeLinksCard
           kundeId={kunde.id}
           orgSlug={kunde.org_kennung.trim().toLowerCase()}
@@ -421,6 +428,7 @@ export function KundeDetailClient({
             }))
           }}
         />
+        </div>
       ) : null}
       {zeigtOrganisationTab && funktionAn('hvWorkflow') ? (
         <FreigabeSettingsCard

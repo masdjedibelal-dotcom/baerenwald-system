@@ -20,8 +20,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: MARKE.name,
-    /* Mit viewport-fit=cover: Statusleiste über Content → Safe-Area-Insets greifen */
-    statusBarStyle: 'black-translucent',
+    /* Mit viewport-fit=cover: Statusleiste über Content → Safe-Area-Insets greifen.
+       TEO: heller Kopf → Statusleiste deckend hell, nichts scrollt darunter durch */
+    statusBarStyle: istTeo ? 'default' : 'black-translucent',
   },
   icons: {
     icon: [

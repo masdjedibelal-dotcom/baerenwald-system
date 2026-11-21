@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import { ActionSheet } from '@/components/ui/ActionSheet'
 import type { ActionsMenuItem } from '@/components/ui/actions-menu'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { istTeo } from '@/lib/marke'
 import type { EntityMenuItem } from '@/lib/entity-menu'
 import { cn } from '@/lib/utils'
 
@@ -51,7 +52,8 @@ export function MockEntityRowMenu({
   items: EntityMenuItem[]
   title?: string
 }) {
-  const isMobile = useIsMobile()
+  // TEO: „…“ öffnet überall ein Popover am Knopf (kein Blatt von unten)
+  const isMobile = useIsMobile() && !istTeo
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLSpanElement>(null)
 
@@ -214,7 +216,8 @@ export function MockDetailOverflowMenu({
   align?: 'left' | 'right'
   sheetTitle?: string
 }) {
-  const isMobile = useIsMobile()
+  // TEO: „…“ öffnet überall ein Popover am Knopf (kein Blatt von unten)
+  const isMobile = useIsMobile() && !istTeo
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)

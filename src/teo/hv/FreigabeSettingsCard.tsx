@@ -2,6 +2,7 @@
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
+import { MockInfoTip } from '@/components/mock-ui/MockInfoTip'
 import { useEffect, useRef, useState } from 'react'
 import { useTransition } from '@/components/ui/action-busy'
 import { SofortmassnahmeFaelleEditor } from '@/teo/hv/SofortmassnahmeFaelleEditor'
@@ -166,8 +167,9 @@ export function FreigabeSettingsCard({
       title={title}
       icon="shield-check"
       className={cn('freigabe-settings', className)}
+      // Speichern erst zeigen, wenn etwas geändert ist (überall gleich)
       actions={
-        !erben ? (
+        !erben && (dirty || pending) ? (
           <MockBtn
             sm
             kind="primary"
@@ -182,9 +184,8 @@ export function FreigabeSettingsCard({
       {onErbenChange ? (
         <div className="freigabe-settings__row">
           <div className="freigabe-settings__row-text">
-            <div className="freigabe-settings__label">HV-Standard übernehmen</div>
-            <div className="freigabe-settings__hint">
-              Aus = eigene Regeln nur für dieses Objekt
+            <div className="freigabe-settings__label">
+              HV-Standard übernehmen <MockInfoTip tip="Aus = eigene Regeln nur für dieses Objekt." />
             </div>
           </div>
           <button
@@ -212,8 +213,9 @@ export function FreigabeSettingsCard({
       <div className={cn('freigabe-settings__body', erben && 'is-muted')}>
         <div className="freigabe-settings__row">
           <div className="freigabe-settings__row-text">
-            <div className="freigabe-settings__label">Direktbeauftragung bei Sofortmaßnahmen</div>
-            <div className="freigabe-settings__hint">{akutHint}</div>
+            <div className="freigabe-settings__label">
+              Sofortmaßnahmen direkt <MockInfoTip tip={akutHint} />
+            </div>
           </div>
           <button
             type="button"
@@ -227,7 +229,6 @@ export function FreigabeSettingsCard({
 
         {showAkutFaelle && !erben ? (
           <div className="freigabe-settings__faelle">
-            <div className="freigabe-settings__label">Sofortmaßnahme-Fälle</div>
             <SofortmassnahmeFaelleEditor
               selected={akutFaelle}
               onChange={setAkutFaelle}
@@ -238,9 +239,8 @@ export function FreigabeSettingsCard({
 
         <div className="freigabe-settings__row">
           <div className="freigabe-settings__row-text">
-            <div className="freigabe-settings__label">Schwellenwert</div>
-            <div className="freigabe-settings__hint">
-              Unter der Schwelle: „Direkt Auftrag“ ohne HV-Freigabe
+            <div className="freigabe-settings__label">
+              Schwellenwert <MockInfoTip tip="Unter der Schwelle: „Direkt Auftrag“ ohne HV-Freigabe." />
             </div>
           </div>
           <button

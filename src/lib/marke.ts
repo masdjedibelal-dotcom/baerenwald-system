@@ -116,7 +116,7 @@ const MARKEN: Record<MarkeId, Marke> = {
       email: 'info@servus-teo.de',
       website: 'www.servus-teo.de',
     },
-    themeColor: '#0b1f3a',
+    themeColor: '#f7f9fc',
     marketingSeite: false,
     recht: { impressum: '/impressum', datenschutz: '/datenschutz', agb: '/agb' },
     funktionen: { hvRollen: false, hvWorkflow: true, nurEinladung: true },

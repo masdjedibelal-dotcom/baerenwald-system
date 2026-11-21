@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockInput } from '@/components/mock-ui/MockForm'
 import { MockField,MockSelect,MockTextarea } from '@/components/mock-ui/MockForm'
@@ -1363,7 +1364,7 @@ export function AngebotWizard({
           busy: saving,
         }}
         primaryAction={{
-          label: 'Weiter: Prüfen',
+          label: istTeo ? 'Weiter' : 'Weiter: Prüfen',
           onClick: () => {
             if (saving) return
             openPruefenSheet()

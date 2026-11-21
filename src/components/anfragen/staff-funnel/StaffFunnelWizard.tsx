@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockField,MockFormSection,MockInput,MockSelect } from '@/components/mock-ui/MockForm'
 import { useCallback,useEffect,useMemo,useState } from 'react'
@@ -49,6 +50,7 @@ import {
 import { estimateStaffFunnelPrice } from '@/lib/anfragen/staff-funnel-price'
 import { staffFunnelToPayload } from '@/lib/anfragen/staff-funnel-payload'
 import {
+  FunnelIcon,
   StaffChoiceGrid,
   StaffPreisIndikation,
 } from '@/components/anfragen/staff-funnel/StaffFunnelUi'
@@ -71,12 +73,6 @@ const STAFF_KANAL: LeadKanal[] = [
   'sonstiges',
 ]
 
-function FunnelIcon({ name }: { name: string }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- lokale SVG-Icons
-    <img src={`/icons/${name}.svg`} alt="" width={22} height={22} decoding="async" />
-  )
-}
 
 /** Kundenadresse — immer sichtbar im Kunde-Block. */
 function KundenAdresseFields({
@@ -693,6 +689,8 @@ export function StaffFunnelWizard({
         busy: loading,
       }}
       footerCta={
+        // TEO: Preiskasten nur, wenn es eine Zahl gibt (sonst nimmt er unten nur Platz weg)
+        istTeo && !(isFormular && (state.preisMin != null || state.preisMax != null)) ? null : (
         <StaffPreisIndikation
           min={isFormular ? state.preisMin : null}
           max={isFormular ? state.preisMax : null}
@@ -701,6 +699,7 @@ export function StaffFunnelWizard({
             (state.preisModus === 'komplex' || state.anliegen === 'gewerbe')
           }
         />
+        )
       }
       className="staff-funnel staff-funnel--mock"
     >
@@ -730,6 +729,7 @@ export function StaffFunnelWizard({
 
         {isFormular ? (
           <>
+            {istTeo && state.kundentyp === 'mieter' ? null : (
             <section className="sf-sec" data-doc-section="anliegen">
               <h3 className="sf-sec-l">Anliegen</h3>
               <div className="sf-anliegen">
@@ -748,8 +748,20 @@ export function StaffFunnelWizard({
                 })}
               </div>
             </section>
+            )}
 
-            {showBereiche ? (
+            {showBereiche && istTeo ? (
+              <section className="sf-sec">
+                <h3 className="sf-sec-l">Was ist betroffen?</h3>
+                {/* TEO: Kacheln wie bei der Mieter-Meldung statt Auswahlliste */}
+                <StaffChoiceGrid
+                  columns={2}
+                  options={bereichOptions.map((b) => ({ value: b.value, label: b.label }))}
+                  value={state.bereiche[0] ?? ''}
+                  onChange={(v) => setBereich(v)}
+                />
+              </section>
+            ) : showBereiche ? (
               <section className="sf-sec">
                 <h3 className="sf-sec-l">Bereich</h3>
                 <MockSelect value={state.bereiche[0] ?? ''} onChange={(e) => setBereich(e.target.value)} aria-label="Bereich">
@@ -994,6 +1006,8 @@ export function StaffFunnelWizard({
                     value={state.kundentyp}
                     onChange={(v) => {
                       const nextHv = v === 'verwaltung'
+                      // TEO: Mieter melden immer einen Schaden → direkt „Was ist betroffen?“ (wie die QR-Meldung)
+                      if (istTeo && v === 'mieter' && state.anliegen !== 'kaputt') selectAnliegen('kaputt')
                       patch({
                         kundentyp: v,
                         ...(nextHv ? {} : MIETER_OBJEKT_CLEAR),
