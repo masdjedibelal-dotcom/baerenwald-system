@@ -589,15 +589,34 @@ export function KundeDetailClient({
                 router.push(createAngebotHref(kunde.id))
               },
             }}
-            secondary={{
-              label: 'Rechnung erstellen',
-              icon: 'receipt',
-              onClick: () => {
-                showRouteBusy('Rechnung wird geöffnet…')
-                router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kunde.id)}`)
-              },
-            }}
-            menuItems={detailMenuItems}
+            // TEO: ein Hauptknopf, „Rechnung erstellen“ im …-Menü (wie überall: Hauptaktion offen, Rest im Menü)
+            secondary={
+              istTeo
+                ? undefined
+                : {
+                    label: 'Rechnung erstellen',
+                    icon: 'receipt',
+                    onClick: () => {
+                      showRouteBusy('Rechnung wird geöffnet…')
+                      router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kunde.id)}`)
+                    },
+                  }
+            }
+            menuItems={
+              istTeo
+                ? [
+                    {
+                      label: 'Rechnung erstellen',
+                      icon: <MockIcon ctx="row" n="receipt" size={15} />,
+                      onClick: () => {
+                        showRouteBusy('Rechnung wird geöffnet…')
+                        router.push(`/rechnungen/neu?kunde_id=${encodeURIComponent(kunde.id)}`)
+                      },
+                    },
+                    ...detailMenuItems,
+                  ]
+                : detailMenuItems
+            }
           />
         ),
       }}

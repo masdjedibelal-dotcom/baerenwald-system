@@ -1,6 +1,6 @@
 'use client'
 
-import { funktionAn } from '@/lib/marke'
+import { funktionAn, istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { MockField,MockInput } from '@/components/mock-ui/MockForm'
@@ -156,10 +156,13 @@ export function MeldeLinksCard({
       title="Links"
       icon="link"
       className="objekte-links"
+      // TEO: Speichern erst zeigen, wenn etwas geändert ist (wie in den HV-Einstellungen)
       actions={
-        <MockBtn sm kind="primary" disabled={saving || !dirty} onClick={() => void speichern()}>
-          {saving ? `${LIST.speichern}…` : LIST.speichern}
-        </MockBtn>
+        istTeo && !dirty && !saving ? null : (
+          <MockBtn sm kind="primary" disabled={saving || !dirty} onClick={() => void speichern()}>
+            {saving ? `${LIST.speichern}…` : LIST.speichern}
+          </MockBtn>
+        )
       }
     >
       <div className="space-y-3" style={{ marginBottom: 12 }}>
