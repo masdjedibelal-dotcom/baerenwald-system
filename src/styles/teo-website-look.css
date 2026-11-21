@@ -972,3 +972,11 @@
 :root[data-marke='teo'] .einsatz-eintrag__text { margin-top: 2px; font-size: 14px; color: var(--text-2, #5b6b80); }
 /* Karte im Blatt ohne Rahmen — Gruppen tragen selbst */
 :root[data-marke='teo'] .einsatz-blatt .einsatz-karte { border: 0; padding: 0; background: transparent; box-shadow: none; }
+/* Vertrieb: drei gleich breite Kacheln, Quote in der Kachel */
+:root[data-marke='teo'] .dash-teo-stufen { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+:root[data-marke='teo'] .dash-teo-stufe__label { overflow-wrap: normal; hyphens: auto; }
+:root[data-marke='teo'] .dash-teo-stufe__quote { align-self: flex-start; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: #ffffff; font-size: 12px; font-weight: 800; color: var(--teo-blau); }
+/* Zeitleiste: etwas eingerückt, Punkte über der Linie (nicht angeschnitten) */
+:root[data-marke='teo'] .einsatz-verlauf { margin-left: 4px !important; padding-left: 26px !important; padding-right: 2px !important; }
+:root[data-marke='teo'] .einsatz-verlauf::before { left: 7px; z-index: 0; }
+:root[data-marke='teo'] .einsatz-eintrag::before { left: -24px; z-index: 1; box-shadow: 0 0 0 3px #ffffff; }

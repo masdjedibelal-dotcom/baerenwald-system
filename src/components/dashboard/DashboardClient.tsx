@@ -225,20 +225,21 @@ function VertriebsFunnelTeo({ stufen, conversionGesamt }: { stufen: FunnelStufe[
       }
     >
       <div className="dash-teo-stufen">
-        {stufen.map((s, i) => (
-          <div key={s.key} className="dash-teo-stufe-wrap">
-            {i > 0 ? (
-              // Quote von Stufe zu Stufe (z. B. aus 4 Angeboten wurden 3 Aufträge = 75 %)
-              <span className="dash-teo-stufe__pfeil tabular-nums">
-                {stufen[i - 1]!.count > 0 ? Math.round((s.count / stufen[i - 1]!.count) * 100) : 0}%
-              </span>
-            ) : null}
-            <div className="dash-teo-stufe">
+        {stufen.map((s, i) => {
+          // Quote von Stufe zu Stufe (z. B. aus 4 Angeboten wurden 3 Aufträge = 75 %)
+          const vorher = i > 0 ? stufen[i - 1]!.count : 0
+          return (
+            <div key={s.key} className="dash-teo-stufe">
               <span className="dash-teo-stufe__zahl tabular-nums">{s.count}</span>
               <span className="dash-teo-stufe__label">{s.label}</span>
+              {i > 0 ? (
+                <span className="dash-teo-stufe__quote tabular-nums">
+                  {vorher > 0 ? Math.round((s.count / vorher) * 100) : 0} %
+                </span>
+              ) : null}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </MockCard>
   )
