@@ -219,7 +219,7 @@ export function MockDetailOverflowMenu({
   // TEO: „…“ öffnet überall ein Popover am Knopf (kein Blatt von unten)
   const isMobile = useIsMobile() && !istTeo
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; oben?: boolean } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
@@ -233,16 +233,21 @@ export function MockDetailOverflowMenu({
     const update = () => {
       const el = wrapRef.current
       if (!el) return
-      const r = el.getBoundingClientRect()
+      // Am eigentlichen Knopf ausrichten (nicht an der evtl. breiteren Hülle)
+      const knopf = (el.querySelector('button, [role="button"]') as HTMLElement | null) ?? el
+      const r = knopf.getBoundingClientRect()
       const w = Math.max(MENU_MIN_WIDTH, menuRef.current?.offsetWidth ?? MENU_MIN_WIDTH)
       let left = align === 'right' ? r.right - w : r.left
       left = Math.max(8, Math.min(left, window.innerWidth - w - 8))
-      let top = r.bottom + 4
+      const abstand = istTeo ? 8 : 4
+      let top = r.bottom + abstand
       const approxH = menuRef.current?.offsetHeight ?? 120
+      let oben = false
       if (top + approxH > window.innerHeight - 8) {
-        top = Math.max(8, r.top - 4 - approxH)
+        top = Math.max(8, r.top - abstand - approxH)
+        oben = true
       }
-      setPos({ top, left })
+      setPos({ top, left, oben })
     }
     update()
     const raf = requestAnimationFrame(update)
@@ -309,7 +314,7 @@ export function MockDetailOverflowMenu({
       ? createPortal(
           <div
             ref={menuRef}
-            className="menu menu--portal"
+            className={cn('menu menu--portal', pos.oben && 'menu--oben', align === 'right' ? 'menu--rechts' : 'menu--links')}
             style={{ top: pos.top, left: pos.left, right: 'auto' }}
             role="menu"
             onClick={(e) => e.stopPropagation()}
