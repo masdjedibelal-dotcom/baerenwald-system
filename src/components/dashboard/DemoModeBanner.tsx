@@ -43,14 +43,14 @@ export function DemoModeBanner() {
       role="status"
       className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-card border border-status-contact-bg bg-status-contact-bg px-4 py-2 text-[length:var(--fs-text)] text-status-contact-text"
     >
-      <span>Demo-/Test-Account — Transaktionsdaten stammen aus Supabase (keine eingebauten Mock-Datensätze).</span>
+      <span>Testkonto — die Vorgänge hier sind Testdaten.</span>
       <MockBtn
         className="shrink-0 min-h-11 min-w-11 rounded-button border border-status-contact-bg bg-white px-3 text-[length:var(--fs-meta)] font-medium text-status-contact-text hover:bg-status-contact-bg disabled:opacity-50"
         type="button"
         disabled={busy}
         onClick={() => wipeTransactionalData()}
       >
-        {busy ? 'Bitte warten…' : 'Transaktionsdaten leeren'}
+        {busy ? 'Bitte warten…' : 'Testdaten löschen'}
       </MockBtn>
     </div>
   )

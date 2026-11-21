@@ -1211,3 +1211,11 @@
 :root[data-marke='teo'] .menu--portal.menu--oben.menu--rechts { transform-origin: bottom right; animation-name: teo-pop-auf-oben; }
 :root[data-marke='teo'] .menu--portal.menu--oben.menu--links { transform-origin: bottom left; animation-name: teo-pop-auf-oben; }
 @keyframes teo-pop-auf-oben { from { opacity: 0; transform: scale(0.96) translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Einheitliche Bausteine: Kartentitel ohne Icons (wie HV-Portal und Website), Leer-Zustand in Karten kompakt */
+:root[data-marke='teo'] .card-title .mock-icon,
+:root[data-marke='teo'] .card-h > .mock-icon,
+:root[data-marke='teo'] .card-title > svg { display: none !important; }
+:root[data-marke='teo'] .card .empty { padding: 20px 12px !important; }
+:root[data-marke='teo'] .card .empty > div:first-child .mock-icon { width: 28px !important; height: 28px !important; }
+:root[data-marke='teo'] .card .empty > div:nth-child(2) { font-size: 15px !important; }

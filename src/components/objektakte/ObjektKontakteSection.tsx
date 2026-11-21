@@ -1,4 +1,5 @@
 'use client'
+import { istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
 import { MockCard } from '@/components/mock-ui/MockCard'
@@ -367,7 +368,7 @@ export function ObjektKontakteSection({
         title={liste.length ? `Personen · ${liste.length}` : 'Personen'}
         icon="user"
         actions={
-          <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+          <MockBtn sm kind={istTeo ? 'secondary' : 'primary'} icon="plus" onClick={openNeu}>
             {LIST.hinzufuegen}
           </MockBtn>
         }

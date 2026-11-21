@@ -1,4 +1,5 @@
 'use client'
+import { istTeo } from '@/lib/marke'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockBtn } from '@/components/mock-ui'
 import { ListBulkBar } from '@/components/mock-ui/ListBulkBar'
@@ -330,7 +331,7 @@ export function KundenObjekteCard({
         icon="building"
         className={className}
         actions={
-          <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+          <MockBtn sm kind={istTeo ? 'secondary' : 'primary'} icon="plus" onClick={openNeu}>
             {LIST.hinzufuegen}
           </MockBtn>
         }

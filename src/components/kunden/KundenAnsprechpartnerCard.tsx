@@ -1,4 +1,5 @@
 'use client'
+import { istTeo } from '@/lib/marke'
 import { MockCheckbox } from '@/components/mock-ui/MockCheckbox'
 
 import { MockBtn } from '@/components/mock-ui'
@@ -375,7 +376,7 @@ export function KundenAnsprechpartnerCard({
       icon="users"
       className={cn(className)}
       actions={
-        <MockBtn sm kind="primary" icon="plus" onClick={openNeu}>
+        <MockBtn sm kind={istTeo ? 'secondary' : 'primary'} icon="plus" onClick={openNeu}>
           {LIST.hinzufuegen}
         </MockBtn>
       }

@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockCard } from '@/components/mock-ui/MockCard'
 import { useEffect,useMemo,useState,type ReactNode } from 'react'
@@ -143,13 +144,26 @@ export function EntityKundenStammdatenCard({
   const viewBody = (
     <>
       {banner}
-      <div className="vgid">
-        <div className="vgid-name">{draft.name.trim() || '—'}</div>
-        {typLbl && typLbl !== '—' ? <div className="vgid-meta">{typLbl}</div> : null}
-      </div>
+      {/* TEO: Name nicht noch einmal groß — auf Vorgangsseiten als Zeile „Kunde“ mit Link zur Akte */}
+      {istTeo ? null : (
+        <div className="vgid">
+          <div className="vgid-name">{draft.name.trim() || '—'}</div>
+          {typLbl && typLbl !== '—' ? <div className="vgid-meta">{typLbl}</div> : null}
+        </div>
+      )}
 
       <div className="detail-soft-block">
         <div className="props">
+          {istTeo && showKundeLink ? (
+            <PropRow
+              label="Kunde"
+              value={
+                <Link className="link" href={`/kunden/${kundeId!.trim()}`}>
+                  {draft.name.trim() || 'Kundenakte'}
+                </Link>
+              }
+            />
+          ) : null}
           <PropRow label="Typ" value={typLbl} />
           {draft.vorname?.trim() || draft.nachname?.trim() ? (
             <PropRow
@@ -159,6 +173,7 @@ export function EntityKundenStammdatenCard({
           ) : null}
           <PropRow label="Adresse" value={adresse || '—'} />
           {/* Bearbeiten nur über den Stift (Blatt mit Speichern) — kein Speichern direkt im Feld */}
+              {istTeo && !draft.telefon.trim() ? null : (
               <PropRow
                 label="Telefon"
                 value={
@@ -171,6 +186,8 @@ export function EntityKundenStammdatenCard({
                   )
                 }
               />
+              )}
+              {istTeo && !draft.email.trim() ? null : (
               <PropRow
                 label="E-Mail"
                 value={
@@ -183,6 +200,7 @@ export function EntityKundenStammdatenCard({
                   )
                 }
               />
+              )}
           {draft.ansprechpartner?.trim() ? (
             <PropRow label="Ansprechpartner" value={draft.ansprechpartner.trim()} />
           ) : null}
@@ -195,7 +213,7 @@ export function EntityKundenStammdatenCard({
           {kundeId?.trim() ? (
             <StammdatenPortalZeile kundeId={kundeId} fallbackEmail={draft.email} />
           ) : null}
-          {showKundeLink ? (
+          {showKundeLink && !istTeo ? (
             <PropRow
               label="Kundenakte"
               value={
@@ -216,7 +234,7 @@ export function EntityKundenStammdatenCard({
   return (
     <>
       <MockCard
-        title="Stammdaten"
+        title={istTeo && showKundeLink ? 'Kunde' : 'Stammdaten'}
         actions={
           showPencil ? (
             <MockBtn sm kind="secondary" icon="pencil" title="Bearbeiten" onClick={beginEdit} />

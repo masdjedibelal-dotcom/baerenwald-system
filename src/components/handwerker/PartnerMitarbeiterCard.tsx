@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { useCallback, useEffect, useState } from 'react'
 
 import {
@@ -140,7 +141,7 @@ export function PartnerMitarbeiterCard({ handwerkerId, className }: { handwerker
       icon="users"
       className={cn(className)}
       actions={
-        <MockBtn sm kind="primary" icon="plus" onClick={() => oeffnen(null)}>
+        <MockBtn sm kind={istTeo ? 'secondary' : 'primary'} icon="plus" onClick={() => oeffnen(null)}>
           {LIST.hinzufuegen}
         </MockBtn>
       }
