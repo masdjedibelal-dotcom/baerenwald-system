@@ -236,7 +236,8 @@ export function MockDetailOverflowMenu({
       // Am eigentlichen Knopf ausrichten (nicht an der evtl. breiteren Hülle)
       const knopf = (el.querySelector('button, [role="button"]') as HTMLElement | null) ?? el
       const r = knopf.getBoundingClientRect()
-      const w = Math.max(MENU_MIN_WIDTH, menuRef.current?.offsetWidth ?? MENU_MIN_WIDTH)
+      // Tatsächliche Breite nehmen (CSS kann schmaler sein als die Vorgabe) — sonst steht das Menü versetzt
+      const w = menuRef.current?.offsetWidth || MENU_MIN_WIDTH
       let left = align === 'right' ? r.right - w : r.left
       left = Math.max(8, Math.min(left, window.innerWidth - w - 8))
       const abstand = istTeo ? 8 : 4
