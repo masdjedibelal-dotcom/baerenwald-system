@@ -195,8 +195,9 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               />
             </div>
 
-            <div className={`mkt-funnel-block${isMobile ? ' mkt-funnel-block--acc' : ''}`}>
-              {isMobile ? (
+            {/* TEO: Anfrage-Weg immer sichtbar (kein Aufklappen) */}
+            <div className={`mkt-funnel-block${isMobile && !istTeo ? ' mkt-funnel-block--acc' : ''}`}>
+              {isMobile && !istTeo ? (
                 <MockBtn className="mkt-funnel-acc-trigger" type="button" aria-expanded={funnelOpen} onClick={() => setFunnelOpen((o) => !o)}>
                   <span className="mkt-funnel-h">{istTeo ? 'Anfrage-Weg' : 'Rechner-Funnel'}</span>
                   <MockIcon
@@ -209,7 +210,7 @@ export function DashboardMarketingCard({ data }: { data: DashboardMarketingSnaps
               ) : (
                 <p className="mkt-funnel-h">{istTeo ? 'Anfrage-Weg' : 'Rechner-Funnel'}</p>
               )}
-              {(!isMobile || funnelOpen) ? (
+              {(!isMobile || istTeo || funnelOpen) ? (
                 <>
                   {funnelBody}
                   {data.funnelOk && data.funnelError ? (

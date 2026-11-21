@@ -295,6 +295,7 @@ function GewerkUmsatzCard({
   zeilen: GewerkUmsatzZeile[]
   gesamt: number
 }) {
+  if (istTeo) return <GewerkUmsatzTeo zeilen={zeilen ?? []} gesamt={gesamt} />
   return (
     <MockCard
       title="Umsatz nach Gewerk"
@@ -337,6 +338,90 @@ function GewerkUmsatzCard({
   )
 }
 
+/** TEO: Farben je Gewerk aus der Marken-Palette (Navy, Blau, Gold, Hellblau, Rot, Grau). */
+const TEO_GEWERK_FARBEN = ['#0b1f3a', '#1e5fa8', '#e8a317', '#8db4e2', '#c2410c', '#9aa7b8']
+
+/** TEO: Gesamtzahl, ein geteilter Balken und eine Liste mit Farbpunkt — wie in Finanz-Apps. */
+function GewerkUmsatzTeo({ zeilen, gesamt }: { zeilen: GewerkUmsatzZeile[]; gesamt: number }) {
+  const top = zeilen.slice(0, 5)
+  return (
+    <MockCard title="Umsatz nach Gewerk">
+      {top.length === 0 ? (
+        <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">Noch keine beauftragten Umsätze mit Gewerken.</p>
+      ) : (
+        <>
+          <div className="dash-teo-wert">
+            <div className="dash-teo-wert__zahl tabular-nums">{formatEurBetrag(gesamt)}</div>
+            <div className="dash-teo-wert__unter">{top.length === 1 ? '1 Gewerk' : `${zeilen.length} Gewerke`}</div>
+          </div>
+          <div className="dash-teo-teilbalken" aria-hidden>
+            {top.map((z, i) => (
+              <span key={z.name} style={{ width: `${Math.max(z.anteil, 2)}%`, background: TEO_GEWERK_FARBEN[i % TEO_GEWERK_FARBEN.length] }} />
+            ))}
+          </div>
+          <ul className="dash-teo-zeilen">
+            {top.map((z, i) => (
+              <li key={z.name} className="dash-teo-zeile">
+                <span className="dash-teo-zeile__punkt" style={{ background: TEO_GEWERK_FARBEN[i % TEO_GEWERK_FARBEN.length] }} aria-hidden />
+                <span className="dash-teo-zeile__name">{z.name}</span>
+                <span className="dash-teo-zeile__wert tabular-nums">{formatEurBetrag(z.netto)}</span>
+                <span className="dash-teo-zeile__anteil tabular-nums">{z.anteil} %</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </MockCard>
+  )
+}
+
+/** TEO: Rangliste wie in Apps — Rang, Initialen, Name + Anzahl, Betrag rechts, dünner Balken darunter. */
+function TopRankingTeo({ handwerker, kunden }: { handwerker: RankingZeile[]; kunden: RankingZeile[] }) {
+  const [mode, setMode] = useState<'handwerker' | 'kunden'>('kunden')
+  const alle = mode === 'handwerker' ? (handwerker ?? []) : (kunden ?? [])
+  const rows = alle.slice(0, 8)
+  const max = rows.length ? Math.max(1, ...rows.map((r) => Number(r.umsatz) || 0)) : 1
+  const istKunden = mode === 'kunden'
+  const kuerzel = (n: string) =>
+    n.replace(/[^\p{L}\s]/gu, ' ').trim().split(/\s+/).slice(0, 2).map((t) => t[0] ?? '').join('').toUpperCase() || '·'
+  return (
+    <MockCard title="Top-Ranking">
+      <div className="seg dash-teo-seg" role="group" aria-label="Ranking">
+        <MockBtn className={istKunden ? 'on' : undefined} type="button" onClick={() => setMode('kunden')}>
+          Kunden
+        </MockBtn>
+        <MockBtn className={!istKunden ? 'on' : undefined} type="button" onClick={() => setMode('handwerker')}>
+          Partner
+        </MockBtn>
+      </div>
+      {rows.length === 0 ? (
+        <p className="py-6 text-center text-[length:var(--fs-text)] text-[var(--text-3)]">Keine Daten im Zeitraum.</p>
+      ) : (
+        <ol className="dash-teo-rang">
+          {rows.map((r, i) => (
+            <li key={r.id} className="dash-teo-rang__zeile">
+              <span className={i < 3 ? `dash-teo-rang__nr is-top is-${i + 1}` : 'dash-teo-rang__nr'}>{i + 1}</span>
+              <span className="dash-teo-rang__kuerzel" aria-hidden>{kuerzel(r.name)}</span>
+              <span className="dash-teo-rang__text">
+                <span className="dash-teo-rang__name">{r.name}</span>
+                <span className="dash-teo-rang__meta tabular-nums">
+                  {istKunden
+                    ? `${r.vorgaenge} ${r.vorgaenge === 1 ? 'Auftrag' : 'Aufträge'}`
+                    : `${r.vorgaenge} ${r.vorgaenge === 1 ? 'Vorgang' : 'Vorgänge'}`}
+                </span>
+                <span className="dash-teo-rang__balken" aria-hidden>
+                  <span style={{ width: `${Math.max(4, Math.round(((Number(r.umsatz) || 0) / max) * 100))}%` }} />
+                </span>
+              </span>
+              <span className="dash-teo-rang__wert tabular-nums">{formatEuro(r.umsatz, { rounded: true, decimals: 0 })}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </MockCard>
+  )
+}
+
 const TOP_RANKING_LIMIT = 8
 
 const TYP_FARBE: Record<string, string> = istTeo
@@ -348,6 +433,17 @@ const TYP_FARBE: Record<string, string> = istTeo
     }
 
 function TopRankingCard({
+  handwerker,
+  kunden,
+}: {
+  handwerker: RankingZeile[]
+  kunden: RankingZeile[]
+}) {
+  if (istTeo) return <TopRankingTeo handwerker={handwerker} kunden={kunden} />
+  return <TopRankingBw handwerker={handwerker} kunden={kunden} />
+}
+
+function TopRankingBw({
   handwerker,
   kunden,
 }: {

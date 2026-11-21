@@ -1,5 +1,6 @@
 'use server'
 
+import { istTeo } from '@/lib/marke'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { requireCrmAdmin } from '@/lib/auth/crm-access-server'
 import {
@@ -38,7 +39,8 @@ async function resolveKundeTarget(kundeId: string): Promise<
     email,
     roleLabel: isOrg ? `HV / ${(data.name as string) || 'Organisation'}` : `Kunde / ${(data.name as string) || email}`,
     targetType: isOrg ? 'organisation' : 'kunde',
-    next: '/portal',
+    // TEO: Verwaltung direkt in den Arbeitsplatz (kein Umweg über /portal → Zwischenseite)
+    next: isOrg && istTeo ? '/arbeitsplatz' : '/portal',
   }
 }
 

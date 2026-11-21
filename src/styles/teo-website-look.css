@@ -980,3 +980,77 @@
 :root[data-marke='teo'] .einsatz-verlauf { margin-left: 4px !important; padding-left: 26px !important; padding-right: 2px !important; }
 :root[data-marke='teo'] .einsatz-verlauf::before { left: 7px; z-index: 0; }
 :root[data-marke='teo'] .einsatz-eintrag::before { left: -24px; z-index: 1; box-shadow: 0 0 0 3px #ffffff; }
+
+/* ⓘ-Hinweis am Handy: als Karte unten in voller Breite (rutscht nie aus dem Bild) */
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .mock-info-tip__panel {
+    position: fixed !important;
+    left: 16px !important;
+    right: 16px !important;
+    top: auto !important;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+    width: auto !important;
+    max-width: none !important;
+    transform: none !important;
+    z-index: 300;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: #0b1f3a;
+    color: #ffffff;
+    font-size: 14px;
+    line-height: 1.45;
+    box-shadow: 0 24px 48px -20px rgba(11, 31, 58, 0.6);
+  }
+}
+/* Grüne Bärenwald-Bilder (public/icons/*.svg) in TEO-Blau einfärben */
+:root[data-marke='teo'] img[src*="/icons/"] {
+  filter: brightness(0) saturate(100%) invert(29%) sepia(83%) saturate(1500%) hue-rotate(196deg) brightness(91%) contrast(90%);
+}
+
+/* Dashboard: Gewerke, Ranking, Anfrage-Weg im App-Stil */
+:root[data-marke='teo'] .dash-teo-teilbalken { display: flex; gap: 3px; height: 12px; margin-bottom: 14px; }
+:root[data-marke='teo'] .dash-teo-teilbalken > span { border-radius: 6px; min-width: 6px; }
+:root[data-marke='teo'] .dash-teo-zeilen { margin: 0; padding: 0; list-style: none; }
+:root[data-marke='teo'] .dash-teo-zeile { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 44px; align-items: center; gap: 10px; min-height: 44px; border-top: 1px solid var(--teo-linie-fein, #eef2f7); }
+:root[data-marke='teo'] .dash-teo-zeile:first-child { border-top: 0; }
+:root[data-marke='teo'] .dash-teo-zeile__punkt { width: 10px; height: 10px; border-radius: 999px; }
+:root[data-marke='teo'] .dash-teo-zeile__name { font-weight: 700; color: var(--teo-navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-marke='teo'] .dash-teo-zeile__wert { font-weight: 800; color: var(--teo-navy); }
+:root[data-marke='teo'] .dash-teo-zeile__anteil { text-align: right; font-size: 13px; color: var(--text-3, #6a7c92); }
+:root[data-marke='teo'] .dash-teo-seg { display: flex !important; width: 100%; margin-bottom: 12px; }
+:root[data-marke='teo'] .dash-teo-seg > * { flex: 1 1 0; }
+:root[data-marke='teo'] .dash-teo-rang { margin: 0; padding: 0; list-style: none; }
+:root[data-marke='teo'] .dash-teo-rang__zeile { display: grid; grid-template-columns: 22px 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--teo-linie-fein, #eef2f7); }
+:root[data-marke='teo'] .dash-teo-rang__zeile:first-child { border-top: 0; }
+:root[data-marke='teo'] .dash-teo-rang__nr { font-size: 13px; font-weight: 800; color: var(--text-3, #6a7c92); text-align: center; }
+:root[data-marke='teo'] .dash-teo-rang__nr.is-1 { color: #b7791f; }
+:root[data-marke='teo'] .dash-teo-rang__nr.is-2 { color: var(--teo-blau); }
+:root[data-marke='teo'] .dash-teo-rang__nr.is-3 { color: var(--teo-navy); }
+:root[data-marke='teo'] .dash-teo-rang__kuerzel { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 999px; background: var(--teo-blau-bg, #eef4fb); color: var(--teo-blau); font-size: 13px; font-weight: 800; }
+:root[data-marke='teo'] .dash-teo-rang__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+:root[data-marke='teo'] .dash-teo-rang__name { font-weight: 700; color: var(--teo-navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-marke='teo'] .dash-teo-rang__meta { font-size: 12px; color: var(--text-3, #6a7c92); }
+:root[data-marke='teo'] .dash-teo-rang__balken { display: block; height: 4px; margin-top: 4px; border-radius: 4px; background: #eef2f7; overflow: hidden; }
+:root[data-marke='teo'] .dash-teo-rang__balken > span { display: block; height: 100%; border-radius: 4px; background: var(--teo-blau); }
+:root[data-marke='teo'] .dash-teo-rang__wert { font-weight: 800; color: var(--teo-navy); }
+/* Anfrage-Weg: Stufen als Zeilen mit dünnem Balken und Quote */
+:root[data-marke='teo'] .mkt-funnel-h { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: var(--text-3, #6a7c92); }
+:root[data-marke='teo'] .mkt-funnel-list { display: flex; flex-direction: column; gap: 0; }
+:root[data-marke='teo'] .mkt-funnel-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "titel zahl" "balken balken";
+  gap: 6px 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--teo-linie-fein, #eef2f7);
+}
+:root[data-marke='teo'] .mkt-funnel-row:first-child { border-top: 0; }
+:root[data-marke='teo'] .mkt-funnel-left { grid-area: titel; min-width: 0; }
+:root[data-marke='teo'] .mkt-funnel-title { font-weight: 700; color: var(--teo-navy); }
+:root[data-marke='teo'] .mkt-funnel-nums { grid-area: zahl; display: inline-flex; align-items: baseline; gap: 8px; }
+:root[data-marke='teo'] .mkt-funnel-count { font-weight: 800; color: var(--teo-navy); }
+:root[data-marke='teo'] .mkt-funnel-pct { padding: 1px 8px; border-radius: 999px; background: var(--teo-blau-bg, #eef4fb); color: var(--teo-blau); font-size: 12px; font-weight: 800; }
+:root[data-marke='teo'] .mkt-funnel-bar { grid-area: balken; height: 6px; border-radius: 6px; background: #eef2f7; overflow: hidden; }
+:root[data-marke='teo'] .mkt-funnel-bar-fill { height: 100%; border-radius: 6px; background: var(--teo-blau); }
+/* Marketing-Zahlen: weiße Kacheln mit Rand statt grauer Flächen */
+:root[data-marke='teo'] .mkt-kpi-grid > * { background: var(--teo-blau-bg, #eef4fb) !important; border: 0 !important; border-radius: 14px !important; }
