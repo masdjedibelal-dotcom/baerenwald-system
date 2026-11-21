@@ -1,6 +1,6 @@
 'use client'
 
-import { funktionAn } from '@/lib/marke'
+import { funktionAn, istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { normalizeAkutFallIds } from '@/teo/hv/sofortmassnahme-faelle'
 import {
@@ -259,12 +259,17 @@ export function ObjektAkteDetailClient({
         actions: (
           <DetailActionsBar
             sheetTitle="Objekt"
-            primary={{
-              label: 'Objektdaten bearbeiten',
-              icon: 'pencil',
-              onClick: () => setObjektModalOpen(true),
-            }}
-            menuItems={[]}
+            // TEO: Bearbeiten ist keine Hauptaktion — im …-Menü (wie beim Objekt im Arbeitsplatz)
+            primary={
+              istTeo
+                ? null
+                : {
+                    label: 'Objektdaten bearbeiten',
+                    icon: 'pencil',
+                    onClick: () => setObjektModalOpen(true),
+                  }
+            }
+            menuItems={istTeo ? [{ label: 'Objektdaten bearbeiten', onClick: () => setObjektModalOpen(true) }] : []}
           />
         ),
       }}

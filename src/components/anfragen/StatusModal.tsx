@@ -1,4 +1,5 @@
 'use client'
+import { istTeo } from '@/lib/marke'
 import type { MockIconName } from '@/lib/mock-icons'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { DateInput } from '@/components/ui/DateInput'
@@ -58,9 +59,10 @@ const META: Record<
     saveLabel: 'Versuch speichern',
   },
   verloren: {
-    title: 'Verloren',
+    // TEO: dieselbe Bezeichnung wie der Knopf („Absagen“)
+    title: istTeo ? 'Anfrage absagen' : 'Verloren',
     icon: 'circle-x',
-    saveLabel: 'Als verloren markieren',
+    saveLabel: istTeo ? 'Absagen' : 'Als verloren markieren',
     danger: true,
   },
 }
@@ -337,7 +339,7 @@ export function StatusModal({
 
           {kind === 'verloren' ? (
             <div className="space-y-3">
-              <Combobox label="Warum verloren? *" id="grund" name="grund" options={Object.entries(VERLOREN_GRUND_LABELS).map(([value, label]) => ({
+              <Combobox label={istTeo ? "Warum abgesagt? *" : "Warum verloren? *"} id="grund" name="grund" options={Object.entries(VERLOREN_GRUND_LABELS).map(([value, label]) => ({
                   value,
                   label,
                 }))} value={grund == null ? '' : String(grund)} placeholder="Auswählen…" onChange={(next) => { setGrund(next); }} />

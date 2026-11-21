@@ -52,7 +52,7 @@ const STATUS: Record<EinsatzStatus, { label: string; kind: string }> = {
   gesendet: { label: 'Gesendet', kind: 'neu' },
   angenommen: { label: 'In Auftrag', kind: 'warten' },
   abgelehnt: { label: 'Abgelehnt', kind: 'storniert' },
-  fertig: { label: 'Fertig', kind: 'aktiv' },
+  fertig: { label: istTeo ? 'Erledigt' : 'Fertig', kind: 'aktiv' },
 }
 
 /** Grund, den „Partner entziehen“ setzt — Anzeige „Entzogen“ statt „Abgelehnt“. */
@@ -534,7 +534,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         }
         primary={
           detail && detail.status === 'angenommen'
-            ? { label: istTeo ? 'Als fertig markieren' : 'Fertig gemeldet', icon: 'check', onClick: () => erfassenOeffnen('fertig') }
+            ? { label: istTeo ? 'Als erledigt markieren' : 'Fertig gemeldet', icon: 'check', onClick: () => erfassenOeffnen('fertig') }
             : null
         }
       >
@@ -652,7 +652,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                   <div className="einsatz-zeilen-teo">
                     <EinsatzZeileTeo icon="clock" label="Stunden melden" onClick={() => erfassenOeffnen('regie')} />
                     {detail.status === 'angenommen' ? (
-                      <EinsatzZeileTeo icon="message" label="Update erfassen" onClick={() => erfassenOeffnen('update')} />
+                      <EinsatzZeileTeo icon="message" label="Update" onClick={() => erfassenOeffnen('update')} />
                     ) : null}
                     {!detail.rechnung_eingereicht_at ? (
                       <EinsatzZeileTeo icon="file-invoice" label="Rechnung hochladen" onClick={() => erfassenOeffnen('rechnung')} />
@@ -726,9 +726,9 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
             : erfassen === 'regie'
               ? istTeo ? 'Stunden melden' : 'Regie melden'
               : erfassen === 'update'
-              ? 'Update erfassen'
+              ? istTeo ? 'Update' : 'Update erfassen'
               : erfassen === 'fertig'
-                ? 'Fertig gemeldet'
+                ? istTeo ? 'Als erledigt markieren' : 'Fertig gemeldet'
                 : 'Rechnung hochladen'
         }
         crumb={detail?.partner_name}

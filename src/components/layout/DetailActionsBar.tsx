@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockDetailOverflowMenu } from '@/components/mock-ui/MockEntityRowMenu'
 import type { ReactNode } from 'react'
@@ -94,7 +95,11 @@ function InlineActionButton({
     : action.label
   const iconSize = compact ? 15 : size === 'md' ? 16 : 14
 
-  const inner = (
+  // TEO am Handy: „Bearbeiten“ als runder Stift (Text wurde zu „Bearbeit…“ abgeschnitten)
+  const nurStift = istTeo && compact && slot === 'secondary' && /bearbeiten/i.test(action.label)
+  const inner = nurStift ? (
+    <ActionIcon n="pencil" size={18} />
+  ) : (
     <>
       {/* P25: In der Handy-Leiste mit mehreren Knöpfen nur Text — sonst wird er abgeschnitten */}
       {action.icon && !compact ? <ActionIcon n={action.icon} size={iconSize} /> : null}
@@ -104,6 +109,7 @@ function InlineActionButton({
 
   const btnClass = cn(
     slotButtonClass(slot, Boolean(className?.includes('detail-mobile-action-bar'))),
+    nurStift && 'detail-mobile-action-bar__stift',
     size === 'md' &&
       slot === 'primary' &&
       className?.includes('detail-mobile-action-bar')

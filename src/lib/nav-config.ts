@@ -145,7 +145,7 @@ export const SECTION_LABELS: Record<string, string> = {
 export const SUB_LABELS: Record<string, Record<string, string>> = {
   einstellungen: {
     profil: 'Firma',
-    firma: 'Firma & Branding',
+    firma: istTeo ? 'Firma' : 'Firma & Branding',
     benutzer: 'Team',
     preise: 'Preislisten',
     integration: 'Integrationen',

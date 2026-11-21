@@ -574,7 +574,8 @@ export function AnfrageDetailClient({
     if (hatAuftrag) return null
     if (istAkut) {
       return {
-        label: 'Direkt beauftragen',
+        // TEO: gleicher Name wie im …-Menü
+        label: istTeo ? 'Ohne Angebot beauftragen' : 'Direkt beauftragen',
         icon: 'alert-triangle',
         onClick: openDirektBeauftragen,
         disabled: pending,
@@ -697,7 +698,8 @@ export function AnfrageDetailClient({
     if (!hasAngenommen && st !== 'abgebrochen') {
       actions.push({
         id: 'verloren',
-        label: 'Als verloren markieren',
+        // TEO: eine Bezeichnung für dieselbe Aktion („Absagen“)
+        label: istTeo ? 'Absagen' : 'Als verloren markieren',
         icon: 'circle-x',
         danger: true,
         onClick: () => setStatusModalKind('verloren'),
@@ -1126,9 +1128,9 @@ export function AnfrageDetailClient({
           refresh()
         }}
         onSuggestVerloren={() => {
-          toast.success(TOAST.drei_kontaktversuche_vorschlag_als_verloren_mark, {
+          toast.success(istTeo ? 'Drei Kontaktversuche ohne Erfolg. Anfrage absagen?' : TOAST.drei_kontaktversuche_vorschlag_als_verloren_mark, {
             action: {
-              label: 'Als verloren',
+              label: istTeo ? 'Absagen' : 'Als verloren',
               onClick: () => setStatusModalKind('verloren'),
             },
           })

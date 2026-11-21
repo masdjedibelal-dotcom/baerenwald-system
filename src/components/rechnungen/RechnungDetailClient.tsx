@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import {
   DetailShell,
   EntityDetailLayout,
@@ -478,8 +479,10 @@ export function RechnungDetailClient({
     if (isEingehend) return null
     if (rechnungDarfImWizardBearbeitetWerden(detail.status)) {
       return {
-        label: 'Rechnung bearbeiten',
-        shortLabel: 'Bearbeiten',
+        // TEO: sagt, was passiert (Gutschrift + neue Rechnung) statt „Bearbeiten“
+        label: istTeo ? 'Korrigieren' : 'Rechnung bearbeiten',
+        shortLabel: istTeo ? 'Korrigieren' : 'Bearbeiten',
+        title: istTeo ? 'Storniert die Rechnung per Gutschrift und öffnet eine neue mit denselben Positionen.' : undefined,
         icon: 'pencil',
         onClick: handleKorrigieren,
         disabled: pending,
@@ -489,8 +492,10 @@ export function RechnungDetailClient({
     // die neue Rechnung mit denselben Positionen (Abbrechen nimmt beides zurück).
     if (belegTyp === 'rechnung' && rechnungKorrekturModus(detail.status) === 'storno_neu') {
       return {
-        label: 'Rechnung bearbeiten',
-        shortLabel: 'Bearbeiten',
+        // TEO: sagt, was passiert (Gutschrift + neue Rechnung) statt „Bearbeiten“
+        label: istTeo ? 'Korrigieren' : 'Rechnung bearbeiten',
+        shortLabel: istTeo ? 'Korrigieren' : 'Bearbeiten',
+        title: istTeo ? 'Storniert die Rechnung per Gutschrift und öffnet eine neue mit denselben Positionen.' : undefined,
         icon: 'pencil',
         onClick: handleKorrigieren,
         disabled: pending,
