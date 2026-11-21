@@ -774,5 +774,6 @@
 :root[data-marke='teo'] .zahlplan-shell { min-width: 0; max-width: 100%; overflow: hidden; }
 /* C11 Aktionsleiste: Hauptknopf überall nur mit Text (kein Icon), gleich aufgebaut */
 @media (max-width: 767px) {
+  :root[data-marke='teo'] .detail-mobile-action-bar__primary .action-icon,
   :root[data-marke='teo'] .detail-mobile-action-bar__primary .mock-icon { display: none; }
 }
