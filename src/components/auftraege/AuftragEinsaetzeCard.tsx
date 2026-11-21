@@ -87,6 +87,22 @@ function termin(von: string | null, bis: string | null): string {
   return datum(von || bis)
 }
 
+/** TEO: Beschreibung kurz (3 Zeilen) mit „Mehr“ zum Aufklappen. */
+function EinsatzBeschreibung({ text }: { text: string }) {
+  const [offen, setOffen] = useState(false)
+  const lang = text.length > 160 || text.split('\n').length > 3
+  return (
+    <div className="einsatz-beschreibung">
+      <p className={offen || !lang ? 'einsatz-beschreibung__text' : 'einsatz-beschreibung__text is-kurz'}>{text}</p>
+      {lang ? (
+        <MockBtn className="einsatz-beschreibung__mehr" type="button" onClick={() => setOffen((v) => !v)}>
+          {offen ? 'Weniger' : 'Mehr'}
+        </MockBtn>
+      ) : null}
+    </div>
+  )
+}
+
 type VerlaufEintrag = {
   key: string
   at: string
@@ -541,7 +557,14 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
         {detail ? (
           <div className="einsatz-blatt">
             <div className="einsatz-karte">
-              <div className="einsatz-kopf">
+              {/* TEO: Aufgabe groß oben, Status daneben — wie ein App-Detail */}
+              {istTeo && detail.titel ? (
+                <div className="einsatz-kopf-teo">
+                  <span className="einsatz-kopf-teo__titel">{detail.titel}</span>
+                  <MockBadge kind={statusAnzeige(detail).kind}>{statusAnzeige(detail).label}</MockBadge>
+                </div>
+              ) : null}
+              <div className={istTeo && detail.titel ? 'einsatz-kopf einsatz-kopf--ohne-status' : 'einsatz-kopf'}>
                 <MockBadge kind={statusAnzeige(detail).kind}>
                   {statusAnzeige(detail).label}
                 </MockBadge>
@@ -610,7 +633,16 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
                   )}
                 </div>
               ) : null}
-              {detail.anweisung ? <p className="einsatz-anweisung">{detail.anweisung}</p> : null}
+              {detail.anweisung && istTeo ? (
+                <div className="einsatz-gruppe">
+                  <div className="einsatz-gruppe__kopf">
+                    <span className="einsatz-gruppe__titel">Beschreibung</span>
+                  </div>
+                  <EinsatzBeschreibung text={detail.anweisung} />
+                </div>
+              ) : detail.anweisung ? (
+                <p className="einsatz-anweisung">{detail.anweisung}</p>
+              ) : null}
               {detail.anweisung_fotos.length ? (
                 <div className="einsatz-fotos">
                   {detail.anweisung_fotos.map((url, i) => (

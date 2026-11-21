@@ -1,5 +1,6 @@
 'use client'
 
+import { istTeo } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
 import { MockPopover } from '@/components/mock-ui/MockPopover'
@@ -221,7 +222,7 @@ export function TopBar({ user }: TopBarProps) {
               <MockBtn kind="danger" className="pop-item" type="button" disabled={logoutLoading} onClick={() => {
                   void handleLogout()
                 }}>
-                <MockIcon n="arrow-left" ctx="default" className="h-4 w-4" aria-hidden />
+                <MockIcon n={istTeo ? 'log-out' : 'arrow-left'} ctx="default" className="h-4 w-4" aria-hidden />
                 <span>{logoutLoading ? 'Abmelden…' : 'Abmelden'}</span>
               </MockBtn>
             </MockPopover>

@@ -167,9 +167,9 @@ export function FreigabeSettingsCard({
       title={title}
       icon="shield-check"
       className={cn('freigabe-settings', className)}
-      // Speichern erst zeigen, wenn etwas geändert ist (überall gleich)
+      // Speichern immer sichtbar, aktiv erst nach einer Änderung (überall gleich)
       actions={
-        !erben && (dirty || pending) ? (
+        !erben ? (
           <MockBtn
             sm
             kind="primary"

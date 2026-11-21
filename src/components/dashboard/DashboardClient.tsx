@@ -137,6 +137,8 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
   const max = Math.max(1, ...totals)
   const total = totals.reduce((s, n) => s + n, 0)
 
+  if (istTeo) return <UmsatzBarChartTeo months={safeMonths} totals={totals} max={max} total={total} />
+
   return (
     <MockCard title="Umsatzverlauf" icon="activity">
       <div className="mb-3">
@@ -163,6 +165,85 @@ function UmsatzBarChart({ months }: { months: UmsatzMonat[] }) {
   )
 }
 
+/** TEO: wie Apps (Health/Aktien) — Monat antippen zeigt seinen Betrag oben, Säulen mit runden Enden auf heller Spur. */
+function UmsatzBarChartTeo({
+  months,
+  totals,
+  max,
+  total,
+}: {
+  months: UmsatzMonat[]
+  totals: number[]
+  max: number
+  total: number
+}) {
+  const [gewaehlt, setGewaehlt] = useState<number | null>(null)
+  const letzter = months.length - 1
+  const aktiv = gewaehlt ?? null
+  const betrag = aktiv != null ? totals[aktiv] ?? 0 : total
+  const unter = aktiv != null ? months[aktiv]?.label ?? '' : months.length ? `Letzte ${months.length} Monate` : ''
+  return (
+    <MockCard title="Umsatz">
+      <div className="dash-teo-wert">
+        <div className="dash-teo-wert__zahl tabular-nums">{formatEurBetrag(betrag)}</div>
+        <div className="dash-teo-wert__unter">{unter}</div>
+      </div>
+      <div className="dash-teo-saeulen" role="img" aria-label="Umsatz je Monat">
+        {months.map((m, i) => {
+          const gesamt = totals[i] ?? 0
+          const pct = gesamt > 0 ? Math.max((gesamt / max) * 100, 4) : 0
+          const an = aktiv === i || (aktiv == null && i === letzter)
+          return (
+            <MockBtn
+              key={m.key}
+              type="button"
+              className={an ? 'dash-teo-saeule is-an' : 'dash-teo-saeule'}
+              aria-label={`${m.label}: ${formatEurBetrag(gesamt)}`}
+              onClick={() => setGewaehlt((g) => (g === i ? null : i))}
+            >
+              <span className="dash-teo-saeule__spur">
+                {pct > 0 ? <span className="dash-teo-saeule__balken" style={{ height: `${pct}%` }} /> : null}
+              </span>
+              <span className="dash-teo-saeule__label">{m.label}</span>
+            </MockBtn>
+          )
+        })}
+      </div>
+    </MockCard>
+  )
+}
+
+/** TEO: Stufen als Kacheln mit Quote dazwischen (statt Balken-Zeilen). */
+function VertriebsFunnelTeo({ stufen, conversionGesamt }: { stufen: FunnelStufe[]; conversionGesamt: number }) {
+  return (
+    <MockCard
+      title="Vertrieb"
+      actions={
+        <span className="dash-teo-quote">
+          Quote <b className="tabular-nums">{conversionGesamt}%</b>
+        </span>
+      }
+    >
+      <div className="dash-teo-stufen">
+        {stufen.map((s, i) => (
+          <div key={s.key} className="dash-teo-stufe-wrap">
+            {i > 0 ? (
+              // Quote von Stufe zu Stufe (z. B. aus 4 Angeboten wurden 3 Aufträge = 75 %)
+              <span className="dash-teo-stufe__pfeil tabular-nums">
+                {stufen[i - 1]!.count > 0 ? Math.round((s.count / stufen[i - 1]!.count) * 100) : 0}%
+              </span>
+            ) : null}
+            <div className="dash-teo-stufe">
+              <span className="dash-teo-stufe__zahl tabular-nums">{s.count}</span>
+              <span className="dash-teo-stufe__label">{s.label}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </MockCard>
+  )
+}
+
 function VertriebsFunnel({
   stufen,
   conversionGesamt,
@@ -171,6 +252,7 @@ function VertriebsFunnel({
   conversionGesamt: number
 }) {
   const safeStufen = Array.isArray(stufen) ? stufen : []
+  if (istTeo) return <VertriebsFunnelTeo stufen={safeStufen} conversionGesamt={conversionGesamt} />
   const maxCount = Math.max(1, ...safeStufen.map((s) => Number(s.count) || 0), 1)
 
   return (

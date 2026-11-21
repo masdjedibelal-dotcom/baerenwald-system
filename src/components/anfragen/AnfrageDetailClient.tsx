@@ -575,7 +575,7 @@ export function AnfrageDetailClient({
     if (istAkut) {
       return {
         // TEO: gleicher Name wie im …-Menü
-        label: istTeo ? 'Ohne Angebot beauftragen' : 'Direkt beauftragen',
+        label: istTeo ? 'Direktauftrag' : 'Direkt beauftragen',
         icon: 'alert-triangle',
         onClick: openDirektBeauftragen,
         disabled: pending,
@@ -728,7 +728,7 @@ export function AnfrageDetailClient({
     const items: ActionsMenuItem[] = []
     if (kannOhneAngebotBeauftragen) {
       items.push({
-        label: 'Ohne Angebot beauftragen',
+        label: istTeo ? 'Direktauftrag' : 'Ohne Angebot beauftragen',
         icon: <MockIcon ctx="btn" n="briefcase" size={16} />,
         onClick: openDirektBeauftragen,
       })

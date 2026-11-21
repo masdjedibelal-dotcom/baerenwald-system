@@ -777,3 +777,198 @@
   :root[data-marke='teo'] .detail-mobile-action-bar__primary .action-icon,
   :root[data-marke='teo'] .detail-mobile-action-bar__primary .mock-icon { display: none; }
 }
+
+/* Fälle (Sofortmaßnahmen): gruppierte Liste wie iOS-Einstellungen — Abschnittstitel, weiße Gruppe, Trennlinien */
+:root[data-marke='teo'] .sofortmassnahme-faelle__katalog { gap: 18px; }
+:root[data-marke='teo'] .sofortmassnahme-faelle__gruppe-title {
+  margin: 0 0 6px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-3, #6a7c92);
+}
+:root[data-marke='teo'] .sofortmassnahme-faelle__katalog-list,
+:root[data-marke='teo'] .sofortmassnahme-faelle__list {
+  gap: 0 !important;
+  background: #ffffff;
+  border: 1px solid var(--teo-linie);
+  border-radius: 16px;
+  overflow: hidden;
+}
+:root[data-marke='teo'] .sofortmassnahme-faelle__katalog-list > li + li,
+:root[data-marke='teo'] .sofortmassnahme-faelle__list > li + li { border-top: 1px solid var(--teo-linie-fein, #eef2f7); }
+:root[data-marke='teo'] .sofortmassnahme-faelle__katalog-btn {
+  min-height: 48px !important;
+  padding: 10px 14px !important;
+  border-radius: 0 !important;
+  font-size: 15px !important;
+  color: var(--teo-navy) !important;
+}
+:root[data-marke='teo'] .sofortmassnahme-faelle__katalog-btn .mock-icon { color: var(--teo-blau); }
+:root[data-marke='teo'] .sofortmassnahme-faelle__item {
+  min-height: 48px;
+  padding: 8px 8px 8px 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+/* R1 Notch: Kopf am Handy fest (fixed) statt sticky — Safari färbt die Statusleiste dann deckend in Kopffarbe
+   statt den Inhalt darunter weichzuzeichnen. Inhalt rückt um die Kopfhöhe nach unten. */
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .topbar-stack {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+  }
+  :root[data-marke='teo'] .main { padding-top: calc(max(8px, env(safe-area-inset-top, 0px)) + 46px); }
+}
+
+/* Dashboard wie Apps: Titel ohne Icons, große Zahl, Säulen zum Antippen, Vertrieb als Stufen */
+:root[data-marke='teo'] .dash-zahlen .card-title .mock-icon,
+:root[data-marke='teo'] .dash-zahlen .card-h .mock-icon,
+:root[data-marke='teo'] .dash-sec .card-title .mock-icon { display: none; }
+:root[data-marke='teo'] .dash-teo-wert { margin-bottom: 14px; }
+:root[data-marke='teo'] .dash-teo-wert__zahl { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; color: var(--teo-navy); line-height: 1.1; }
+:root[data-marke='teo'] .dash-teo-wert__unter { margin-top: 2px; font-size: 13px; font-weight: 600; color: var(--text-3, #6a7c92); }
+:root[data-marke='teo'] .dash-teo-saeulen { display: flex; align-items: stretch; gap: 8px; height: 168px; }
+:root[data-marke='teo'] .dash-teo-saeule {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  height: 100%;
+  cursor: pointer;
+}
+:root[data-marke='teo'] .dash-teo-saeule__spur {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 34px;
+  border-radius: 10px;
+  background: #eef2f7;
+  overflow: hidden;
+}
+:root[data-marke='teo'] .dash-teo-saeule__balken {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 10px;
+  background: #b9cde6;
+  transition: height 0.3s ease, background 0.2s ease;
+}
+:root[data-marke='teo'] .dash-teo-saeule.is-an .dash-teo-saeule__balken { background: var(--teo-blau); }
+:root[data-marke='teo'] .dash-teo-saeule__label { font-size: 12px; font-weight: 600; color: var(--text-3, #6a7c92); }
+:root[data-marke='teo'] .dash-teo-saeule.is-an .dash-teo-saeule__label { color: var(--teo-navy); font-weight: 800; }
+:root[data-marke='teo'] .dash-teo-quote { font-size: 14px; color: var(--text-2, #5b6b80); }
+:root[data-marke='teo'] .dash-teo-quote b { color: var(--teo-navy); }
+:root[data-marke='teo'] .dash-teo-stufen { display: flex; align-items: stretch; gap: 0; }
+:root[data-marke='teo'] .dash-teo-stufe-wrap { flex: 1 1 0; min-width: 0; display: flex; align-items: center; }
+:root[data-marke='teo'] .dash-teo-stufe {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 12px;
+  border-radius: 16px;
+  background: var(--teo-blau-bg, #eef4fb);
+}
+:root[data-marke='teo'] .dash-teo-stufe__zahl { font-size: 26px; font-weight: 800; line-height: 1; color: var(--teo-navy); }
+:root[data-marke='teo'] .dash-teo-stufe__label { font-size: 12px; font-weight: 600; line-height: 1.25; color: var(--text-2, #5b6b80); overflow-wrap: anywhere; }
+:root[data-marke='teo'] .dash-teo-stufe__pfeil {
+  flex: 0 0 auto;
+  margin: 0 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--teo-linie);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--teo-blau);
+}
+
+/* Leistungen am Handy: Liste mit Trennlinien je Gewerk (wie iOS) statt Karten in der Karte.
+   Gewerk steht im Gruppenkopf, „Im Angebot“ wiederholt sich nicht in jeder Zeile. */
+@media (max-width: 767px) {
+  :root[data-marke='teo'] .lt-mobile { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 8px; }
+  :root[data-marke='teo'] .lt-mobile-gewerk__head { padding: 0 4px 6px; font-size: 13px; font-weight: 700; color: var(--text-3, #6a7c92); }
+  :root[data-marke='teo'] .lt-mobile-gewerk__cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0 !important;
+    background: #ffffff;
+    border: 1px solid var(--teo-linie);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  :root[data-marke='teo'] .lt-card {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 12px 14px !important;
+  }
+  :root[data-marke='teo'] .lt-card + .lt-card { border-top: 1px solid var(--teo-linie-fein, #eef2f7) !important; }
+  :root[data-marke='teo'] .lt-card__head { align-items: flex-start; gap: 10px; }
+  :root[data-marke='teo'] .lt-card__title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--teo-navy);
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    display: block;
+  }
+  :root[data-marke='teo'] .lt-card__head .badge.plain,
+  :root[data-marke='teo'] .lt-card__sub { display: none; }
+  :root[data-marke='teo'] .lt-card__meta { margin-top: 4px; padding-top: 0; border-top: 0 !important; }
+  :root[data-marke='teo'] .lt-card__dim { font-size: 13px; color: var(--text-3, #6a7c92); }
+  :root[data-marke='teo'] .lt-card__price { font-size: 15px; font-weight: 800; color: var(--teo-navy); }
+}
+
+/* Einsatz-Blatt: Aufgabe groß mit Status, Beschreibung kurz mit „Mehr“, Verlauf als Zeitleiste */
+:root[data-marke='teo'] .einsatz-kopf-teo { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+:root[data-marke='teo'] .einsatz-kopf-teo__titel { font-size: 18px; font-weight: 800; line-height: 1.25; color: var(--teo-navy); }
+:root[data-marke='teo'] .einsatz-kopf--ohne-status > .badge { display: none; }
+:root[data-marke='teo'] .einsatz-kopf--ohne-status:not(:has(.einsatz-kopf__meta:not(:empty))) { display: none; }
+:root[data-marke='teo'] .einsatz-beschreibung { padding: 12px 14px; border: 1px solid var(--teo-linie); border-radius: 16px; background: #ffffff; }
+:root[data-marke='teo'] .einsatz-beschreibung__text { margin: 0; font-size: 15px; line-height: 1.5; color: var(--teo-navy); white-space: pre-line; }
+:root[data-marke='teo'] .einsatz-beschreibung__text.is-kurz { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+:root[data-marke='teo'] .einsatz-beschreibung__mehr { margin-top: 6px; padding: 0; border: 0; background: none; box-shadow: none; color: var(--teo-blau); font-weight: 700; font-size: 14px; height: auto; min-height: 0; }
+:root[data-marke='teo'] .einsatz-gruppe { margin-top: 18px; }
+:root[data-marke='teo'] .einsatz-gruppe__titel { font-size: 13px; font-weight: 700; color: var(--text-3, #6a7c92); }
+:root[data-marke='teo'] .einsatz-verlauf { position: relative; margin: 8px 0 0; padding: 0 0 0 22px; list-style: none; border: 0 !important; background: transparent !important; }
+:root[data-marke='teo'] .einsatz-verlauf::before { content: ''; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: var(--teo-linie); }
+:root[data-marke='teo'] .einsatz-eintrag {
+  position: relative;
+  padding: 0 0 16px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+:root[data-marke='teo'] .einsatz-eintrag::before {
+  content: '';
+  position: absolute;
+  left: -21px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 2px solid var(--teo-blau);
+}
+:root[data-marke='teo'] .einsatz-eintrag:last-child::before { background: var(--teo-blau); }
+:root[data-marke='teo'] .einsatz-eintrag__kopf { display: flex; justify-content: space-between; gap: 10px; }
+:root[data-marke='teo'] .einsatz-eintrag__art { font-weight: 700; font-size: 15px; color: var(--teo-navy); }
+:root[data-marke='teo'] .einsatz-eintrag__datum { font-size: 13px; color: var(--text-3, #6a7c92); white-space: nowrap; }
+:root[data-marke='teo'] .einsatz-eintrag__text { margin-top: 2px; font-size: 14px; color: var(--text-2, #5b6b80); }
+/* Karte im Blatt ohne Rahmen — Gruppen tragen selbst */
+:root[data-marke='teo'] .einsatz-blatt .einsatz-karte { border: 0; padding: 0; background: transparent; box-shadow: none; }
