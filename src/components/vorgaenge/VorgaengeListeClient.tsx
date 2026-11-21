@@ -1492,7 +1492,8 @@ export function VorgaengeListeClient({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {v.wertLabel ?? '—'}
+                    {/* TEO: ohne Betrag nichts anzeigen (statt „—“), Tabelle zeigt einen leisen Strich */}
+                    {v.wertLabel ?? (istTeo ? <span className="vg-leer">—</span> : '—')}
                   </div>
                 ) : null}
                 {visibleCols.datum ? (

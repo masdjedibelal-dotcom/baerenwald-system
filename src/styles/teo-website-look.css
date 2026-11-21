@@ -1219,3 +1219,6 @@
 :root[data-marke='teo'] .card .empty { padding: 20px 12px !important; }
 :root[data-marke='teo'] .card .empty > div:first-child .mock-icon { width: 28px !important; height: 28px !important; }
 :root[data-marke='teo'] .card .empty > div:nth-child(2) { font-size: 15px !important; }
+/* Karte am Handy: fehlender Betrag erscheint gar nicht; in der Tabelle als leiser Strich */
+:root[data-marke='teo'] .vg-leer { color: #c3cdd9; }
+@media (max-width: 767px) { :root[data-marke='teo'] .vg-row .vg-leer { visibility: hidden; } }
