@@ -19,7 +19,8 @@ import {
 import { hrefWithAkteFrom,type AkteFromRef } from '@/lib/vorgang/akte-from'
 import { resolveLeadPreisAnzeige } from '@/lib/lead-display-helpers'
 import { buildAnfragePhaseSheetProps } from '@/lib/anfragen/funnel-bedarf-rows'
-import { formatDatum,kanalLabel,cn } from '@/lib/utils'
+import { formatDatum,cn } from '@/lib/utils'
+import { eingangsQuelle } from '@/lib/leads/pipeline-kontext'
 import type { LeadDetail } from '@/lib/types'
 
 export type PhaseKind = 'anfrage' | 'angebot' | 'auftrag' | 'rechnung'
@@ -358,7 +359,7 @@ export function buildPhaseRows(
               k: 'Eingegangen',
               v: leadCreated ? formatDatum(leadCreated) : '—',
             },
-            { k: 'Quelle', v: lead ? kanalLabel(lead.kanal) || '—' : '—' },
+            { k: 'Quelle', v: lead ? eingangsQuelle(lead) : '—' },
             { k: 'Anliegen', v: anfrageTitel },
           ],
     },

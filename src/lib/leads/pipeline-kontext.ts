@@ -34,3 +34,24 @@ export const PIPELINE_KONTEXT_LABELS: Record<PipelineKontext, string> = {
   website: 'Website-Anfrage',
   sonstiges: 'Sonstiger Kanal',
 }
+
+/**
+ * Wer hat die Anfrage eingereicht? Eindeutig statt „HV-Meldung“:
+ * Mieter (Melde-Link/QR) · Hausverwaltung (Portal/E-Mail) · CRM (wir) · Website.
+ * `erfassung_von` ist maßgeblich; `kanal` nur Rückfall für Altfälle.
+ */
+export function eingangsQuelle(lead: {
+  kanal?: string | null
+  erfassung_von?: string | null
+}): string {
+  const von = (lead.erfassung_von ?? '').trim()
+  const kanal = (lead.kanal ?? '').trim()
+  if (von === 'melder') return 'Mieter · Melde-Link'
+  if (von === 'organisation') return kanal === 'email' ? 'Hausverwaltung · E-Mail' : 'Hausverwaltung · Portal'
+  if (von === 'crm') return 'CRM (Team)'
+  if (kanal === 'hv_melder_link' || kanal === 'hv_einladung') return 'Mieter · Melde-Link'
+  if (kanal === 'hv_direkt' || kanal.startsWith('org_')) return 'Hausverwaltung · Portal'
+  if (kanal === 'website') return 'Website'
+  const wie: Record<string, string> = { telefon: 'Telefon', email: 'E-Mail', whatsapp: 'WhatsApp', vor_ort: 'Vor Ort' }
+  return wie[kanal] ? `CRM (Team) · ${wie[kanal]}` : 'CRM (Team)'
+}

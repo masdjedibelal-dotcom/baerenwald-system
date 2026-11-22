@@ -31,7 +31,7 @@ import {
 } from '@/lib/rechnungen/rechnung-wizard-types'
 import { StatusModal,type StatusModalKind } from '@/components/anfragen/StatusModal'
 import { DuplikatBand } from '@/components/anfragen/DuplikatBand'
-import { PipelineKontextBadge } from '@/components/anfragen/PipelineKontextBadge'
+import { eingangsQuelle } from '@/lib/leads/pipeline-kontext'
 import { isAngenommenesAngebotStatus } from '@/lib/dashboard-mock-mapping'
 import { toast } from '@/components/ui/app-toast'
 import { deleteAnfrage,restoreAnfrage,updateLeadStatus } from '@/app/(dashboard)/anfragen/actions'
@@ -85,7 +85,7 @@ import type {
   LeadNotizRow,
   Preisliste,
 } from '@/lib/types'
-import { formatDatum,kanalLabel } from '@/lib/utils'
+import { formatDatum } from '@/lib/utils'
 import { anfrageStatusDisplay } from '@/lib/status/status-display'
 import { hatOffenenVergangenenKalenderTermin } from '@/lib/kalender/termin-no-show-hint'
 import { TOAST } from '@/lib/copy'
@@ -793,8 +793,7 @@ export function AnfrageDetailClient({
 
   const headMeta = useMemo(() => {
     const parts = [kundeTitel]
-    const kanal = kanalLabel(lead.kanal)
-    if (kanal) parts.push(kanal)
+    parts.push(eingangsQuelle({ kanal: lead.kanal, erfassung_von: lead.erfassung_von }))
     if (lead.created_at) {
       const d = new Date(lead.created_at)
       const time = Number.isNaN(d.getTime())
@@ -811,7 +810,7 @@ export function AnfrageDetailClient({
       `Freigabe: ${ORG_FREIGABE_LABELS[freigabeStatus] ?? freigabeStatus}`
     )
     return parts.filter(Boolean).join(' · ')
-  }, [kundeTitel, lead.created_at, lead.kanal, lead.org_freigabe_status])
+  }, [kundeTitel, lead.created_at, lead.kanal, lead.erfassung_von, lead.org_freigabe_status])
 
   const stammdatenInhalt = (
     <>
@@ -952,7 +951,6 @@ export function AnfrageDetailClient({
         title: vorhabenTitel,
         titleBadges: isMobile ? (
           <>
-            <PipelineKontextBadge lead={lead} />
             {istAkut ? (
               <span className="rounded-card px-1.5 py-0.5 text-fs-caption font-bold bg-status-contact-bg text-status-contact-text">
                 Direktauftrag
@@ -963,7 +961,6 @@ export function AnfrageDetailClient({
         ) : undefined,
         badges: isMobile ? undefined : (
           <>
-            <PipelineKontextBadge lead={lead} />
             {istAkut ? (
               <span className="rounded-card px-1.5 py-0.5 text-fs-caption font-bold bg-status-contact-bg text-status-contact-text">
                 Direktauftrag

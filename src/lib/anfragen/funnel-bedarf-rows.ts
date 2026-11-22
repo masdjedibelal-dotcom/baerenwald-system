@@ -1,3 +1,4 @@
+import { eingangsQuelle } from '@/lib/leads/pipeline-kontext'
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import type { ProjektUebersichtExtraRow } from '@/components/crm/EntityProjektUebersichtCard'
 import {
@@ -29,7 +30,6 @@ import {
   formatDatumZeit,
   formatDatumZeitraum,
   isCrmStaffFunnel,
-  kanalLabel,
 } from '@/lib/utils'
 import {
   meldeBereichLabel,
@@ -289,6 +289,7 @@ export function buildAnfragePhaseSheetProps(lead: {
   id: string
   status?: string | null
   kanal?: string | null
+  erfassung_von?: string | null
   anlass?: string | null
   situation?: string | null
   bereiche?: string[] | null
@@ -401,7 +402,7 @@ export function buildAnfragePhaseSheetProps(lead: {
       orgFreigabeStatus: lead.org_freigabe_status,
     }).label
   )
-  push('Quelle', kanalLabel(lead.kanal ?? ''))
+  push('Quelle', eingangsQuelle(lead))
 
   const vorhaben = strFromFunnel(fd, 'vorhaben')
   if (!staffSelbst) {

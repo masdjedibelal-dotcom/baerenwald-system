@@ -13,6 +13,7 @@ import { bereicheFuerAnzeige } from '@/lib/lead-gewerbe-storage'
 import { BEREICH_LABELS } from '@/lib/utils'
 import type { LeadDetail } from '@/lib/types'
 import { istTeo } from '@/lib/marke'
+import { eingangsQuelle } from '@/lib/leads/pipeline-kontext'
 
 function PropRow({ label, value }: { label: string; value: string | null | undefined }) {
   const text = value?.trim()
@@ -108,6 +109,7 @@ export function MeldungsdetailsCard({ lead }: { lead: LeadDetail }) {
       defaultOpen={!istTeo || String(lead.status ?? '') === 'neu'}
     >
       <div className="props">
+        <PropRow label="Quelle" value={eingangsQuelle(lead)} />
         <PropRow label="Situation" value={situation} />
         <PropRow label="Bereich(e)" value={bereiche} />
         <PropRow label="Umfang" value={umfang} />
