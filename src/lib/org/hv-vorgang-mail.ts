@@ -56,7 +56,7 @@ export async function informiereHvZumVorgang(input: {
 
     const { data: org, error: orgErr } = await supabaseAdmin
       .from('kunden')
-      .select('id, email, name, org_anzeigename')
+      .select('id, email, name, org_anzeigename, auth_user_id')
       .eq('id', orgId)
       .maybeSingle()
     if (orgErr) logDbError('lib/org/hv-vorgang-mail:kunden', orgErr)
@@ -84,6 +84,20 @@ export async function informiereHvZumVorgang(input: {
         .maybeSingle()
       if (objErr) logDbError('lib/org/hv-vorgang-mail:kunden_objekte', objErr)
       objektTitel = String(obj?.titel ?? '').trim()
+    }
+
+    // Portal-Hinweis nur, wenn die Verwaltung überhaupt ein Login hat (sonst nie registriert)
+    let hatLogin = Boolean(String((org as { auth_user_id?: string | null } | null)?.auth_user_id ?? '').trim())
+    if (!hatLogin) {
+      const { data: mit, error: mitErr } = await supabaseAdmin
+        .from('kunden_mitglieder')
+        .select('auth_user_id')
+        .eq('kunde_id', orgId)
+        .eq('aktiv', true)
+        .not('auth_user_id', 'is', null)
+        .limit(1)
+      if (mitErr) logDbError('lib/org/hv-vorgang-mail:kunden_mitglieder', mitErr)
+      hatLogin = Boolean(mit?.length)
     }
 
     const b = await getMailBranding()
@@ -118,6 +132,7 @@ export async function informiereHvZumVorgang(input: {
       anrede: 'sie',
       portalAudience: 'organisation',
       portalLink: buildPortalLoginLink(),
+      skipMeinBaerenwaldPs: !hatLogin,
     })
 
     const r = await sendMail({
