@@ -102,6 +102,16 @@ export async function verteileAbnahmeAnUnterlagen(input: {
       link: `/portal?section=vorgaenge&id=${encodeURIComponent(String(auf.lead_id ?? ''))}`,
     })
     if (__dbErr2) logDbError('lib/auftraege/abnahme-unterlagen-verteilung:hv_notifications', __dbErr2)
+    if (auf.lead_id && lead?.auftraggeber_kunde_id?.trim()) {
+      const { informiereHvZumVorgang } = await import('@/lib/org/hv-vorgang-mail')
+      await informiereHvZumVorgang({
+        leadId: String(auf.lead_id),
+        auftragId,
+        ereignis: 'Abnahme',
+        text: `Die Arbeiten zum Auftrag „${String(auf.titel ?? 'Auftrag').trim() || 'Auftrag'}“ sind abgenommen. Das Abnahmeprotokoll finden Sie hier.`,
+        knopf: { label: 'Abnahmeprotokoll öffnen', url: pdfUrl },
+      })
+    }
     const { schedulePortalWebPushForOrgKunde } = await import(
       '@/lib/portal/send-portal-web-push'
     )

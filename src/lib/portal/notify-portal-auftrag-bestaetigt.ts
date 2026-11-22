@@ -162,6 +162,13 @@ export async function notifyPortalAuftragBestaetigtFromCrm(input: {
 
   if (orgKundeId) {
     await insertHv(orgKundeId)
+    const { informiereHvZumVorgang } = await import('@/lib/org/hv-vorgang-mail')
+    await informiereHvZumVorgang({
+      leadId,
+      auftragId: auftragId || null,
+      ereignis: 'Auftrag erteilt',
+      text: `Wir haben den Auftrag „${bezug}“ angelegt und kümmern uns um die Ausführung. Über Termine und Fortschritt informieren wir Sie per E-Mail.`,
+    })
   }
 
   if (portalKundeId) {

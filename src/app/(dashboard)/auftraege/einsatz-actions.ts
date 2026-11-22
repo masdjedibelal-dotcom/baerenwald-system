@@ -858,6 +858,8 @@ export async function einsatzTerminSetzen(input: {
     if (r.ok) mailAn = r.an
     else mailFehler = r.message
   }
+  const { informiereHvAusfuehrungstermin } = await import('@/lib/org/hv-vorgang-mail')
+  await informiereHvAusfuehrungstermin({ einsatzId: input.einsatzId, geaendert: hatteTermin })
   revalidatePath(`/auftraege/${e.auftrag_id}`)
   return { ok: true, mailAn, mailFehler }
 }

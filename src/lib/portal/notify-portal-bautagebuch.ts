@@ -173,6 +173,13 @@ export async function notifyPortalBautagebuchFromCrm(input: {
 
   if (orgKundeId) {
     await insertHv(orgKundeId)
+    const { informiereHvZumVorgang } = await import('@/lib/org/hv-vorgang-mail')
+    await informiereHvZumVorgang({
+      leadId,
+      auftragId,
+      ereignis: 'Neues zum Auftrag',
+      text: `Es gibt eine neue Dokumentation zum Auftrag „${auftragTitel}“: ${eintragTitel}.`,
+    })
   }
 
   if (portalKundeId) {

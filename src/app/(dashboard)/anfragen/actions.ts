@@ -1340,6 +1340,20 @@ export async function saveLeadTerminVereinbart(input: {
     if (!mailRes.ok) return mailRes
   }
 
+  // Verwaltung (Auftraggeber) erfährt den Termin immer per E-Mail — außer sie hat die Bestätigung oben schon bekommen.
+  const { informiereHvZumVorgang } = await import('@/lib/org/hv-vorgang-mail')
+  const tag = /^\d{4}-\d{2}-\d{2}$/.test(input.datum) ? input.datum.split('-').reverse().join('.') : input.datum
+  const zeit = [input.uhrzeit, input.uhrzeitBis?.trim()].filter(Boolean).join('–')
+  await informiereHvZumVorgang({
+    leadId: input.leadId,
+    ereignis: 'Termin vor Ort',
+    text: 'Wir haben einen Termin vor Ort vereinbart, um uns den Schaden anzusehen.',
+    zeilen: [
+      ['Termin', `${tag}, ${zeit} Uhr`],
+      ['Adresse', adresse || null],
+    ],
+  })
+
   return { ok: true }
 }
 

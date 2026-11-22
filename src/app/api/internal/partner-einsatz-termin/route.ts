@@ -32,6 +32,8 @@ export async function POST(req: Request) {
   const einsatz = e as { auftrag_id: string; handwerker_id: string | null; termin_von: string | null; termin_bis: string | null }
 
   const mail = await sendeAusfuehrungsterminMail({ einsatzId, geaendert: Boolean(body.geaendert), quelle: 'handwerker' })
+  const { informiereHvAusfuehrungstermin } = await import('@/lib/org/hv-vorgang-mail')
+  await informiereHvAusfuehrungstermin({ einsatzId, geaendert: Boolean(body.geaendert) })
   const datum = [einsatz.termin_von, einsatz.termin_bis && einsatz.termin_bis !== einsatz.termin_von ? einsatz.termin_bis : null]
     .filter(Boolean)
     .map((d) => String(d).slice(0, 10).split('-').reverse().join('.'))
