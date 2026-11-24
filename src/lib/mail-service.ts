@@ -88,6 +88,8 @@ export interface SendMailOptions {
   replyTo?: string
   /** Zusätzliche Header, z. B. In-Reply-To/References für Antworten im selben Verlauf. */
   headers?: Record<string, string>
+  /** Anhänge per URL (Resend lädt sie selbst), z. B. weitergeleitete Kunden-Anhänge. */
+  anhangUrls?: { filename: string; path: string }[]
 }
 
 function normalizeRecipients(list?: string | string[]): string[] | undefined {
@@ -320,7 +322,7 @@ export async function sendMail(
       ...(text ? { text } : {}),
       ...(opts.replyTo?.trim() ? { replyTo: opts.replyTo.trim() } : {}),
       ...(opts.headers && Object.keys(opts.headers).length ? { headers: opts.headers } : {}),
-      attachments,
+      attachments: opts.anhangUrls?.length ? [...(attachments ?? []), ...opts.anhangUrls] : attachments,
     })
 
     if (result.error) {

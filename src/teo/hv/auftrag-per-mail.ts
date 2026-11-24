@@ -211,14 +211,18 @@ export async function ladeEingehendeMail(emailId: string): Promise<EingehendeMai
   }
 }
 
-async function anhaengeSpeichern(leadId: string, mail: EingehendeMail): Promise<{ fotos: string[]; dateien: number }> {
+export async function anhaengeSpeichern(
+  leadId: string,
+  mail: EingehendeMail
+): Promise<{ fotos: string[]; dateien: number; liste: { name: string; url: string }[] }> {
   const key = process.env.RESEND_API_KEY?.trim()
-  if (!key || !mail.attachments.length) return { fotos: [], dateien: 0 }
+  const liste2: { name: string; url: string }[] = []
+  if (!key || !mail.attachments.length) return { fotos: [], dateien: 0, liste: liste2 }
   const resend = new Resend(key)
   const liste = await resend.emails.receiving.attachments.list({ emailId: mail.emailId })
   if (liste.error || !liste.data) {
     console.warn('[auftrag-per-mail] Anhänge laden', liste.error)
-    return { fotos: [], dateien: 0 }
+    return { fotos: [], dateien: 0, liste: liste2 }
   }
   const fotos: string[] = []
   let dateien = 0
@@ -244,12 +248,13 @@ async function anhaengeSpeichern(leadId: string, mail: EingehendeMail): Promise<
         .insert({ lead_id: leadId, name: a.filename || name, datei_url: url, groesse_bytes: a.size, art: 'sonstiges' })
       if (dokErr) logDbError('teo/hv/auftrag-per-mail:dokument', dokErr)
       if (typ.startsWith('image/')) fotos.push(url)
+      liste2.push({ name: a.filename || name, url })
       dateien++
     } catch (e) {
       console.warn('[auftrag-per-mail] Anhang', a.filename, e)
     }
   }
-  return { fotos, dateien }
+  return { fotos, dateien, liste: liste2 }
 }
 
 function bestaetigungsMail(opts: { referenz: string; betreff: string; objekt: string | null }, branding: Awaited<ReturnType<typeof getMailBranding>>) {

@@ -10,8 +10,6 @@ import { parseEmailLogIdFromHtml } from '@/lib/kommunikation/types'
 import { logLeadEmailTimelineEvent } from '@/lib/kommunikation/log-lead-email-timeline'
 import { logIdAusAntwortAdresse } from '@/lib/kommunikation/antwort-adresse'
 import { crmBasisUrl } from '@/lib/crm-basis-url'
-import { mailHtmlBase } from '@/lib/mail-templates'
-import { getMailBranding } from '@/lib/get-mail-branding'
 import { sendMail } from '@/lib/mail-service'
 import { MARKE } from '@/lib/marke'
 
@@ -195,7 +193,7 @@ export async function POST(req: Request) {
     revalidateLeadDetail(leadId)
   }
 
-  // Team sofort informieren — die Antwort geht nicht mehr ins normale Postfach, sondern in den Vorgang
+  // Zusätzlich ins Postfach: die Antwort kommt vollständig (Text, Anhänge) bei uns an — „Antworten“ geht direkt an den Kunden.
   try {
     const intern = process.env.INTERN_EMAIL?.trim() || MARKE.infoEmail
     const pfad = parent.auftrag_id
@@ -207,28 +205,30 @@ export async function POST(req: Request) {
           : leadId
             ? `/anfragen/${leadId}`
             : '/kommunikation'
-    const b = await getMailBranding()
     const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    const textVorschau = esc(String(data.text ?? '').split(/\n(?:>|Am .* schrieb|On .* wrote)/)[0]!.trim().slice(0, 1500))
+    // Anhänge im Vorgang ablegen und mit weiterleiten
+    let anhaenge: { name: string; url: string }[] = []
+    if (leadId && voll?.attachments.length) {
+      const { anhaengeSpeichern } = await import('@/teo/hv/auftrag-per-mail')
+      anhaenge = (await anhaengeSpeichern(leadId, voll)).liste
+    }
+    const kopf = `<div style="font-family:Arial,sans-serif;font-size:13px;color:#374151;background:#f3f5f8;border-radius:8px;padding:10px 12px;margin:0 0 16px;">
+      Antwort von <strong>${esc(from)}</strong> — im CRM dem Vorgang zugeordnet.
+      <a href="${crmBasisUrl()}${pfad}" style="color:#1e5fa8;">Vorgang öffnen</a></div>`
+    const adresse = from.match(/<([^>]+)>/)?.[1] ?? from
     await sendMail({
       typ: 'intern_hinweis',
       an: intern,
       bcc: [],
-      betreff: `Antwort vom Kunden: ${(data.subject ?? '').trim() || '(Kein Betreff)'}`,
-      html: mailHtmlBase(
-        `<p style="font-size:15px;margin:0 0 12px;">${esc(from)} hat geantwortet. Die Antwort liegt im Vorgang.</p>
-         ${textVorschau ? `<div style="font-size:14px;white-space:pre-wrap;border-left:3px solid #d1d5db;padding:4px 0 4px 12px;margin:0 0 16px;color:#374151;">${textVorschau}</div>` : ''}
-         <p style="margin:0;"><a href="${crmBasisUrl()}${pfad}">Im CRM öffnen</a></p>`,
-        'Antwort vom Kunden',
-        b,
-        undefined,
-        { skipMeinBaerenwaldPs: true }
-      ),
+      ...(adresse.includes('@') ? { replyTo: adresse } : {}),
+      betreff: (data.subject ?? '').trim() || '(Kein Betreff)',
+      html: `${kopf}${html}`,
+      anhangUrls: anhaenge.map((a) => ({ filename: a.name, path: a.url })),
       leadId: leadId ?? null,
       kontextTyp: (parent.kontext_typ as string | null) ?? null,
     })
   } catch (e) {
-    console.warn('[resend-webhook] Team-Hinweis:', e)
+    console.warn('[resend-webhook] Weiterleitung ins Postfach:', e)
   }
 
   return NextResponse.json({ ok: true })
