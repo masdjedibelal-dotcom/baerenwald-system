@@ -22897,3 +22897,37 @@ button.dok-gruppe__kopf {
 :root[data-marke='teo'] .btn.primary:hover { background: #13325c; border-color: #13325c; }
 :root[data-marke='teo'] .crm-login__submit { border-radius: var(--r-pill); background: var(--green-dark); }
 :root[data-marke='teo'] .crm-login__submit:hover:not(:disabled) { background: #13325c; }
+
+/* Mail-Maske: Hinweis „Antwort auf …“ */
+.mail-antwort-hinweis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-alt, #f3f5f8);
+  font-size: 13px;
+  color: var(--text-secondary, #4b5563);
+}
+.mail-antwort-hinweis > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Akte: E-Mails zum Vorgang */
+.vg-mails { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.vg-mail {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  padding: 10px 4px; border: 0; background: none; text-align: left; border-radius: var(--r-sm); cursor: pointer;
+}
+.vg-mail:hover { background: var(--surface-alt, #f3f5f8); }
+.vg-mail--skelett { height: 44px; background: var(--surface-alt, #f3f5f8); animation: vg-puls 1.2s ease-in-out infinite; }
+@keyframes vg-puls { 50% { opacity: .5; } }
+.vg-mail__icon {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-pill);
+  background: var(--surface-alt, #f3f5f8); color: var(--text-secondary, #4b5563);
+}
+.vg-mail__icon.is-ein { background: #e8f0fb; color: #1e5fa8; }
+.vg-mail__text { display: flex; flex-direction: column; min-width: 0; }
+.vg-mail__betreff { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vg-mail__meta { font-size: 12px; color: var(--text-tertiary, #6b7280); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vg-mail-inhalt { width: 100%; min-height: 60vh; border: 0; border-radius: var(--r-sm); background: #fff; }
+.btn.vg-mail { height: auto; min-height: 0; justify-content: flex-start; font-weight: 400; box-shadow: none; border: 0; background: none; color: inherit; }

@@ -8,6 +8,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { insertEmailLogRow } from '@/lib/kommunikation/insert-email-log'
 import { parseEmailLogIdFromHtml } from '@/lib/kommunikation/types'
 import { logLeadEmailTimelineEvent } from '@/lib/kommunikation/log-lead-email-timeline'
+import { logIdAusAntwortAdresse } from '@/lib/kommunikation/antwort-adresse'
+import { crmBasisUrl } from '@/lib/crm-basis-url'
+import { mailHtmlBase } from '@/lib/mail-templates'
+import { getMailBranding } from '@/lib/get-mail-branding'
+import { sendMail } from '@/lib/mail-service'
+import { MARKE } from '@/lib/marke'
 
 type ResendInboundPayload = {
   type?: string
@@ -26,6 +32,15 @@ type ResendInboundPayload = {
 }
 
 async function findParentLogId(data: NonNullable<ResendInboundPayload['data']>): Promise<string | null> {
+  // Antwort an antwort+<log-id>@Eingangsdomain → eindeutig
+  const empfaenger = [...(Array.isArray(data.to) ? data.to : [data.to ?? '']), ...(data.received_for ?? [])].filter(Boolean)
+  const perAdresse = logIdAusAntwortAdresse(empfaenger)
+  if (perAdresse) {
+    const { data: row, error } = await supabaseAdmin.from('email_log').select('id').eq('id', perAdresse).maybeSingle()
+    if (error) logDbError('app/api/webhooks/resend/route:email_log-antwort', error)
+    if (row?.id) return row.id as string
+  }
+
   const inReplyTo = data.in_reply_to?.trim()
   if (inReplyTo) {
     const {data: byResend, error: error1} = await supabaseAdmin
@@ -178,6 +193,42 @@ export async function POST(req: Request) {
       beschreibung: (data.subject ?? '').trim() || from || '(Kein Betreff)',
     })
     revalidateLeadDetail(leadId)
+  }
+
+  // Team sofort informieren — die Antwort geht nicht mehr ins normale Postfach, sondern in den Vorgang
+  try {
+    const intern = process.env.INTERN_EMAIL?.trim() || MARKE.infoEmail
+    const pfad = parent.auftrag_id
+      ? `/auftraege/${parent.auftrag_id}`
+      : parent.rechnung_id
+        ? `/rechnungen/${parent.rechnung_id}`
+        : parent.angebot_id
+          ? `/angebote/${parent.angebot_id}`
+          : leadId
+            ? `/anfragen/${leadId}`
+            : '/kommunikation'
+    const b = await getMailBranding()
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const textVorschau = esc(String(data.text ?? '').split(/\n(?:>|Am .* schrieb|On .* wrote)/)[0]!.trim().slice(0, 1500))
+    await sendMail({
+      typ: 'intern_hinweis',
+      an: intern,
+      bcc: [],
+      betreff: `Antwort vom Kunden: ${(data.subject ?? '').trim() || '(Kein Betreff)'}`,
+      html: mailHtmlBase(
+        `<p style="font-size:15px;margin:0 0 12px;">${esc(from)} hat geantwortet. Die Antwort liegt im Vorgang.</p>
+         ${textVorschau ? `<div style="font-size:14px;white-space:pre-wrap;border-left:3px solid #d1d5db;padding:4px 0 4px 12px;margin:0 0 16px;color:#374151;">${textVorschau}</div>` : ''}
+         <p style="margin:0;"><a href="${crmBasisUrl()}${pfad}">Im CRM öffnen</a></p>`,
+        'Antwort vom Kunden',
+        b,
+        undefined,
+        { skipMeinBaerenwaldPs: true }
+      ),
+      leadId: leadId ?? null,
+      kontextTyp: (parent.kontext_typ as string | null) ?? null,
+    })
+  } catch (e) {
+    console.warn('[resend-webhook] Team-Hinweis:', e)
   }
 
   return NextResponse.json({ ok: true })

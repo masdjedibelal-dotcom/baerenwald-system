@@ -1,4 +1,5 @@
 'use client'
+import { useVorgangMail } from '@/components/kommunikation/useVorgangMail'
 import { funktionAn } from '@/lib/marke'
 import { MockBtn } from '@/components/mock-ui'
 import {
@@ -175,6 +176,7 @@ export function AngebotDetailPageClient({
 }) {
   const { fieldErrors, applyFieldErrors, clearFieldErrors } = useFieldErrors()
   const router = useRouter()
+  const vorgangMail = useVorgangMail({ kontextTyp: 'angebot', angebotId: detail.id }, { onSent: () => router.refresh() })
   const searchParams = useSearchParams()
   const { refresh, hardRefresh } = useCrmRefresh()
   const [pending, startTransition] = useLocalTransition()
@@ -790,6 +792,7 @@ export function AngebotDetailPageClient({
       count: akteCount,
       render: () => (
         <VorgangAkteTab
+          mails={vorgangMail.mailsCard}
           dateien={dokumenteInhalt}
           notizen={notizenInhalt}
         />
@@ -832,11 +835,12 @@ export function AngebotDetailPageClient({
             sheetTitle="Angebot"
             primary={primaryAction}
             secondary={secondaryAction}
-            menuItems={angebotMenuItems}
+            menuItems={[vorgangMail.menuItem, ...angebotMenuItems]}
           />
         ),
       }}
     >
+      {vorgangMail.modal}
       {statusEinfach === 'abgelehnt' ? (
         <p className="rounded-card border border-bw-border px-3 py-2 text-[length:var(--fs-text)] text-bw-text-muted">
           Abgelehnt

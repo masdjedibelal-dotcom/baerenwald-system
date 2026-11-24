@@ -1,4 +1,5 @@
 'use client'
+import { useVorgangMail } from '@/components/kommunikation/useVorgangMail'
 
 import { istTeo } from '@/lib/marke'
 import {
@@ -197,6 +198,7 @@ export function RechnungDetailClient({
   korrekturKette?: import('@/lib/rechnungen/rechnung-korrektur').RechnungKorrekturKetteUi | null
 }) {
   const router = useRouter()
+  const vorgangMail = useVorgangMail({ kontextTyp: 'rechnung', rechnungId: initial.id }, { onSent: () => router.refresh() })
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
   const [detail, setDetail] = useState(initial)
@@ -752,7 +754,7 @@ export function RechnungDetailClient({
           label: entityDetailTabLabel('akte'),
           icon: 'files',
           render: () => (
-            <VorgangAkteTab dateien={dokumenteInhalt} notizen={notizenInhalt} />
+            <VorgangAkteTab mails={isEingehend ? undefined : vorgangMail.mailsCard} dateien={dokumenteInhalt} notizen={notizenInhalt} />
           ),
         },
       ]
@@ -822,11 +824,12 @@ export function RechnungDetailClient({
             sheetTitle="Rechnung"
             primary={primaryAction}
             secondary={secondaryAction}
-            menuItems={overflowMenuItems}
+            menuItems={isEingehend ? overflowMenuItems : [vorgangMail.menuItem, ...overflowMenuItems]}
           />
         ),
       }}
     >
+      {vorgangMail.modal}
       <DetailShell
         groups={detailShellGroups}
         value={mainTab}

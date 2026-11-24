@@ -1,3 +1,5 @@
+import { antwortAdresseFuer } from '@/lib/kommunikation/antwort-adresse'
+import { randomUUID } from 'crypto'
 import { Resend } from 'resend'
 import { cache } from 'react'
 import { KUNDE_MAIL_BCC, MARKE_MAIL_BCC_IMMER } from '@/lib/mail-constants'
@@ -84,6 +86,8 @@ export interface SendMailOptions {
   emailLogId?: string
   /** Antworten an diese Adresse (z. B. Auftragsadresse der Verwaltung → landet im CRM). */
   replyTo?: string
+  /** Zusätzliche Header, z. B. In-Reply-To/References für Antworten im selben Verlauf. */
+  headers?: Record<string, string>
 }
 
 function normalizeRecipients(list?: string | string[]): string[] | undefined {
@@ -201,6 +205,12 @@ async function ohnePortalHinweisFuerHvOhneArbeitsplatz(html: string, opts: SendM
 export async function sendMail(
   opts: SendMailOptions
 ): Promise<{ success: boolean; error?: string; resendId?: string | null; emailLogId?: string | null }> {
+  // Kunden-Mails: Antwort an antwort+<log-id>@Eingangsdomain → Antwort landet automatisch im Vorgang
+  if (!opts.replyTo?.trim() && KUNDE_MAIL_BCC_TYPEN.has(opts.typ)) {
+    const logId = opts.emailLogId ?? randomUUID()
+    const antwortAn = antwortAdresseFuer(logId)
+    if (antwortAn) opts = { ...opts, emailLogId: logId, replyTo: antwortAn }
+  }
   // Logos als HTTPS (baerenwaldmuenchen.de) — kein CID-Anhang (Apple-Mail-Büroklammer).
   // TEO: Verwaltung ohne Arbeitsplatz bekommt keinen Portal-Hinweis (P.S.) — sie arbeitet per E-Mail.
   const html = await ohnePortalHinweisFuerHvOhneArbeitsplatz(rewriteMailLogoUrlsToHosted(opts.html), opts)
@@ -309,6 +319,7 @@ export async function sendMail(
       html,
       ...(text ? { text } : {}),
       ...(opts.replyTo?.trim() ? { replyTo: opts.replyTo.trim() } : {}),
+      ...(opts.headers && Object.keys(opts.headers).length ? { headers: opts.headers } : {}),
       attachments,
     })
 

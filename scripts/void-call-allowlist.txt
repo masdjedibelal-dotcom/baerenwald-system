@@ -182,3 +182,5 @@ webhookEintragen
 hochladen
 setLeadDokumentFuerKunde
 setKundeDokumentFuerKunde
+ladeVorgangMails
+ladeMailInhalt

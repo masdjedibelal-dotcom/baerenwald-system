@@ -1,4 +1,5 @@
 'use client'
+import { useVorgangMail } from '@/components/kommunikation/useVorgangMail'
 
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
 import { posBoardLinesFromAngebotPositionen } from '@/lib/posboard/pos-board-line'
@@ -388,6 +389,7 @@ export function AuftragDetailClient({
   projektKontext?: import('@/lib/crm/projekt-kontext-types').ProjektKontext
 }) {
   const router = useRouter()
+  const vorgangMail = useVorgangMail({ kontextTyp: 'auftrag', auftragId: initial.id }, { onSent: () => router.refresh() })
   const searchParams = useSearchParams()
   const { refresh } = useCrmRefresh()
   const [detail, setDetail] = useState(initial)
@@ -1096,6 +1098,7 @@ export function AuftragDetailClient({
 
   const akteInhalt = (
     <VorgangAkteTab
+      mails={vorgangMail.mailsCard}
       dateien={
         <div className="space-y-4">
           <EinsatzRechnungenAkte auftragId={detail.id} />
@@ -1339,18 +1342,20 @@ export function AuftragDetailClient({
             menuItems={
               detail.lead_id
                 ? [
+                    vorgangMail.menuItem,
                     {
                       label: 'Angebot erstellen',
                       icon: <MockIcon ctx="btn" n="file-text" size={16} />,
                       onClick: () => router.push(`/angebote/neu?lead_id=${encodeURIComponent(String(detail.lead_id))}`),
                     },
                   ]
-                : []
+                : [vorgangMail.menuItem]
             }
           />
         ),
       }}
     >
+      {vorgangMail.modal}
       <DetailShell
         groups={detailShellGroups}
         value={mainTab}

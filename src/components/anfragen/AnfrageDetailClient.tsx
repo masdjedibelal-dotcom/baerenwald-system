@@ -1,4 +1,5 @@
 'use client'
+import { useVorgangMail } from '@/components/kommunikation/useVorgangMail'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { MockBtn } from '@/components/mock-ui'
 import {
@@ -256,6 +257,7 @@ export function AnfrageDetailClient({
   const searchParams = useSearchParams()
   const isMobile = useIsMobile()
   const { refresh, generation } = useCrmRefresh()
+  const vorgangMail = useVorgangMail({ kontextTyp: 'anfrage', leadId: initial.id }, { onSent: () => refresh() })
   const [lead, setLead] = useState(initial)
   const [pending, ] = useTransition()
   const [statusModalKind, setStatusModalKind] = useState<StatusModalKind | null>(null)
@@ -913,6 +915,7 @@ export function AnfrageDetailClient({
       count: (dokumenteCount || 0) + (notizenRows.length || 0) || undefined,
       render: () => (
         <VorgangAkteTab
+          mails={vorgangMail.mailsCard}
           dateien={
             <AnfrageDokumenteTab
               leadId={lead.id}
@@ -986,11 +989,12 @@ export function AnfrageDetailClient({
             sheetTitle="Anfrage"
             primary={detailPrimary}
             secondary={detailSecondary}
-            menuItems={statusMenuItems}
+            menuItems={[vorgangMail.menuItem, ...statusMenuItems]}
           />
         ),
       }}
     >
+      {vorgangMail.modal}
       <div className="space-y-4">
       <DuplikatBand
         leadId={lead.id}

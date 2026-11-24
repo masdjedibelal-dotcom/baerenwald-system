@@ -8,7 +8,6 @@ import { getMailBranding } from '@/lib/get-mail-branding'
 import { mailAnredeFromKundeTyp } from '@/lib/mail/anrede'
 import {
 buildFreitextKundenMailHtml,
-defaultFreitextMailBody,
 } from '@/lib/mail/freitext-kunden-mail'
 import { logLeadEmailTimelineEvent } from '@/lib/kommunikation/log-lead-email-timeline'
 import {
@@ -307,10 +306,36 @@ export async function getMailComposeDraft(
       bodyHtml: string
       anrede: MailAnrede
       statusLink: string | null
+      /** Letzte eingegangene Mail des Kunden zu diesem Vorgang — die neue Mail antwortet darauf. */
+      antwortAuf: { logId: string; betreff: string; von: string; am: string } | null
     }
   | { ok: false; message: string }
 > {
-  const to = (ctx.defaultTo ?? '').trim()
+  let to = (ctx.defaultTo ?? '').trim()
+  let antwortAuf: { logId: string; betreff: string; von: string; am: string } | null = null
+  if (ctx.leadId || ctx.antwortAufLogId) {
+    let q = supabaseAdmin
+      .from('email_log')
+      .select('id, betreff, von_email, created_at')
+      .eq('richtung', 'empfangen')
+    q = ctx.antwortAufLogId ? q.eq('id', ctx.antwortAufLogId) : q.eq('lead_id', ctx.leadId!)
+    const { data: letzte, error } = await q
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) logDbError('kommunikation/actions:antwort-auf', error)
+    if (letzte?.id) {
+      const von = String(letzte.von_email ?? '').trim()
+      antwortAuf = {
+        logId: String(letzte.id),
+        betreff: String(letzte.betreff ?? '').trim(),
+        von,
+        am: String(letzte.created_at ?? ''),
+      }
+      const adresse = von.match(/<([^>]+)>/)?.[1] ?? von
+      if (!to && adresse.includes('@')) to = adresse
+    }
+  }
 
   const anrede = mailAnredeFromKundeTyp(ctx.kundeTyp)
   const statusLink =
@@ -321,8 +346,10 @@ export async function getMailComposeDraft(
     ok: true,
     to,
     cc: ctx.defaultCc ?? [],
-    betreff: '',
-    bodyHtml: defaultFreitextMailBody(anrede),
+    betreff: antwortAuf?.betreff ? (/^(re|aw):/i.test(antwortAuf.betreff) ? antwortAuf.betreff : `Re: ${antwortAuf.betreff}`) : '',
+    antwortAuf,
+    // Leere Nachricht — Anrede und Gruß setzt die Vorlage automatisch
+    bodyHtml: '',
     anrede,
     statusLink,
   }
@@ -357,6 +384,8 @@ export async function sendFreitextKundenMail(input: {
   betreff: string
   bodyHtml: string
   anrede?: MailAnrede | null
+  /** Antwort auf diese eingegangene Mail (gleicher Verlauf beim Kunden). */
+  antwortAufLogId?: string | null
 }): Promise<{ ok: true; emailLogId: string } | { ok: false; message: string }> {
   const toList = input.to
     .split(/[;,]/)
@@ -384,6 +413,20 @@ export async function sendFreitextKundenMail(input: {
   })
 
   const typ = freitextMailTyp(input.ctx.kontextTyp)
+  let headers: Record<string, string> | undefined
+  if (input.antwortAufLogId) {
+    const { data: orig, error } = await supabaseAdmin
+      .from('email_log')
+      .select('internet_message_id')
+      .eq('id', input.antwortAufLogId)
+      .maybeSingle()
+    if (error) logDbError('kommunikation/actions:antwort-header', error)
+    const mid = String(orig?.internet_message_id ?? '').trim()
+    if (mid) {
+      const id = mid.startsWith('<') ? mid : `<${mid}>`
+      headers = { 'In-Reply-To': id, References: id }
+    }
+  }
   const r = await sendMail({
     typ,
     an: toPrimary,
@@ -399,6 +442,8 @@ export async function sendFreitextKundenMail(input: {
     rechnungId: input.ctx.rechnungId ?? null,
     kontextTyp: input.ctx.kontextTyp,
     emailLogId,
+    inReplyToLogId: input.antwortAufLogId ?? null,
+    headers,
   })
 
   if (!r.success) return { ok: false, message: r.error ?? 'Versand fehlgeschlagen' }

@@ -9,12 +9,16 @@ import type { ReactNode } from 'react'
 export function VorgangAkteTab({
   dateien,
   notizen,
+  mails,
 }: {
   dateien: ReactNode
   notizen: ReactNode
+  /** E-Mails zum Vorgang (gesendet + Antworten des Kunden) */
+  mails?: ReactNode
 }) {
   return (
     <div className="vorgang-akte-tab space-y-6">
+      {mails}
       {dateien}
       {notizen}
     </div>

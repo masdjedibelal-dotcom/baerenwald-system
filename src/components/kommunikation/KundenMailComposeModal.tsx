@@ -46,6 +46,7 @@ export function KundenMailComposeModal({
   const [vorlageId, setVorlageId] = useState('')
   const [saveVorlageOpen, setSaveVorlageOpen] = useState(false)
   const [vorlageName, setVorlageName] = useState('')
+  const [antwortAuf, setAntwortAuf] = useState<{ logId: string; betreff: string; von: string; am: string } | null>(null)
 
   useEffect(() => {
     if (!open || !ctx) return
@@ -63,6 +64,7 @@ export function KundenMailComposeModal({
       setTo(parseEmailTokens(draft.to))
       setCc(draft.cc)
       setBetreff(draft.betreff)
+      setAntwortAuf(draft.antwortAuf)
       setBodyHtml(draft.bodyHtml)
       setPreviewHtml('')
     })
@@ -105,6 +107,7 @@ export function KundenMailComposeModal({
         betreff,
         bodyHtml,
         anrede,
+        antwortAufLogId: antwortAuf?.logId ?? null,
       })
       if (!res.ok) {
         toast.systemError(res)
@@ -142,7 +145,7 @@ export function KundenMailComposeModal({
       <EditorSheet
         open={open && !!ctx}
         onClose={onClose}
-        title="Mail"
+        title="E-Mail schreiben"
         context="detail"
         compose
         composeLabel="Senden"
@@ -152,6 +155,24 @@ export function KundenMailComposeModal({
       >
         {ctx ? (
           <div className="space-y-3">
+            {antwortAuf ? (
+              <div className="mail-antwort-hinweis">
+                <span>
+                  Antwort auf „{antwortAuf.betreff || 'Mail'}“
+                  {antwortAuf.am ? ` vom ${new Date(antwortAuf.am).toLocaleDateString('de-DE')}` : ''}
+                </span>
+                <MockBtn
+                  type="button"
+                  kind="ghost"
+                  onClick={() => {
+                    setAntwortAuf(null)
+                    setBetreff('')
+                  }}
+                >
+                  Neue Mail
+                </MockBtn>
+              </div>
+            ) : null}
             <EmailPillsField label="An" emails={to} onChange={setTo} placeholder="kunde@beispiel.de" />
             <EmailPillsField label="CC" emails={cc} onChange={setCc} placeholder="optional" />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">

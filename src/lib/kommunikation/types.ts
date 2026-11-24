@@ -14,6 +14,8 @@ export type MailComposeContext = {
   defaultTo?: string
   defaultCc?: string[]
   statusLink?: string | null
+  /** Antwort auf diese eingegangene Mail (sonst: letzte eingegangene Mail des Vorgangs). */
+  antwortAufLogId?: string | null
 }
 
 export type KommunikationListeZeile = {
