@@ -15,6 +15,8 @@ export type MockTabItem = {
   /** Link-Tab (Einstellungen) — sonst Button + onChange */
   href?: string
   count?: number
+  /** Punkt: hier gibt es Neues */
+  neu?: boolean
   /** MockIcon-Name */
   icon?: string
   /** Fertiges Icon-Element (Lucide etc.) */
@@ -80,6 +82,7 @@ export const MockTabs = forwardRef<HTMLElement, MockTabsProps>(function MockTabs
             {item.count != null ? (
               <span className="tab-count dshell-count">{item.count}</span>
             ) : null}
+            {item.neu ? <span className="tab-neu" aria-label="Neu" /> : null}
           </>
         )
 

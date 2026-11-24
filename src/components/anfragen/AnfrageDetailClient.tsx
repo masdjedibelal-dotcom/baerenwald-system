@@ -1,4 +1,5 @@
 'use client'
+import { useTabNeuigkeiten } from '@/components/vorgang/useTabNeuigkeiten'
 import { useVorgangMail } from '@/components/kommunikation/useVorgangMail'
 import { openDeleteConfirm } from '@/components/ui/ConfirmPopup'
 import { MockBtn } from '@/components/mock-ui'
@@ -284,6 +285,7 @@ export function AnfrageDetailClient({
   const [rechnungWizardKey, ] = useState(0)
 
   const [tab, setTab] = useState<AnfrageDetailTab>(ANFRAGE_DETAIL_DEFAULT_TAB)
+  const tabNeu = useTabNeuigkeiten(`anfrage:${initial.id}`, { leadId: initial.id }, tab)
   const [anfragenOpen, setAnfragenOpen] = useState(false)
   const [hvWarteSheetOpen, setHvWarteSheetOpen] = useState(false)
   const [einholungRows, setEinholungRows] = useState<AnfragePartnerEinholungRow[]>([])
@@ -913,6 +915,7 @@ export function AnfrageDetailClient({
       label: entityDetailTabLabel('akte'),
       icon: 'files',
       count: (dokumenteCount || 0) + (notizenRows.length || 0) || undefined,
+      neu: tabNeu.akte,
       render: () => (
         <VorgangAkteTab
           mails={vorgangMail.mailsCard}

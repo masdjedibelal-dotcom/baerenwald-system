@@ -1,4 +1,5 @@
 'use client'
+import { LadeZeilen } from '@/components/ui/LadeZeilen'
 
 import { MockBtn } from '@/components/mock-ui'
 import { MockIcon } from '@/components/mock-ui/MockIcon'
@@ -94,7 +95,10 @@ export function AuftragBautagebuchSection({
   onAdd,
   onEdit,
   onChanged,
+  laedt = false,
 }: {
+  /** Einträge werden noch geladen → Ladezustand statt „Noch keine Einträge“ */
+  laedt?: boolean
   eintraege: BautagebuchListenEintrag[]
   auftragId: string
   disabled?: boolean
@@ -183,7 +187,9 @@ export function AuftragBautagebuchSection({
         ) : null}
       </div>
 
-      {sorted.length === 0 ? (
+      {laedt && sorted.length === 0 ? (
+        <LadeZeilen anzahl={2} hoehe={88} />
+      ) : sorted.length === 0 ? (
         <div className="bt-feed-empty">
           <MockIcon ctx="empty" n="camera" size={28} />
           <p>Noch keine Einträge.</p>

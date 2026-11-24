@@ -1,4 +1,6 @@
 'use client'
+import { useTabNeuigkeiten } from '@/components/vorgang/useTabNeuigkeiten'
+import { istTeo } from '@/lib/marke'
 import { useVorgangMail } from '@/components/kommunikation/useVorgangMail'
 
 import { ORG_FREIGABE_LABELS } from '@/lib/org/org-portal-helpers'
@@ -416,6 +418,7 @@ export function AuftragDetailClient({
   })
 
   const [mainTab, setMainTab] = useState<AuftragDetailTab>(AUFTRAG_DETAIL_DEFAULT_TAB)
+  const tabNeu = useTabNeuigkeiten(`auftrag:${initial.id}`, { auftragId: initial.id, leadId: initial.lead_id ?? null }, mainTab)
   // vorOrtFocus entfernt — kein Tagebuch-/Vor-Ort-Segment mehr (Phase 6)
 
   const [rechnungAuswahlOpen, setRechnungAuswahlOpen] = useState(false)
@@ -1094,14 +1097,20 @@ export function AuftragDetailClient({
     />
   )
 
-  const zahlungTabInhalt = <div className="space-y-6">{finanzenInhalt}</div>
+  const zahlungTabInhalt = (
+    <div className="space-y-6">
+      {finanzenInhalt}
+      {/* TEO: Partner-Rechnungen gehören zum Geld, nicht in die Akte */}
+      {istTeo ? <EinsatzRechnungenAkte auftragId={detail.id} immerZeigen /> : null}
+    </div>
+  )
 
   const akteInhalt = (
     <VorgangAkteTab
       mails={vorgangMail.mailsCard}
       dateien={
         <div className="space-y-4">
-          <EinsatzRechnungenAkte auftragId={detail.id} />
+          {istTeo ? null : <EinsatzRechnungenAkte auftragId={detail.id} />}
           <AuftragDokumenteTab
             detail={detail}
             rechnungen={rechnungenListe}
@@ -1135,12 +1144,14 @@ export function AuftragDetailClient({
       id: 'tagebuch',
       label: 'Tagebuch',
       icon: 'book',
+      neu: tabNeu.tagebuch,
       render: () => tagebuchTabInhalt,
     },
     {
       id: 'zahlung',
       label: entityDetailTabLabel('zahlung'),
       icon: 'receipt',
+      neu: istTeo ? tabNeu.zahlung : undefined,
       render: () => zahlungTabInhalt,
     },
     {
@@ -1148,6 +1159,7 @@ export function AuftragDetailClient({
       label: entityDetailTabLabel('akte'),
       icon: 'files',
       count: dokumenteCount || undefined,
+      neu: tabNeu.akte,
       render: () => akteInhalt,
     },
   ]

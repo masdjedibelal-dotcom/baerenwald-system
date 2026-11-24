@@ -22931,3 +22931,24 @@ button.dok-gruppe__kopf {
 .vg-mail__meta { font-size: 12px; color: var(--text-tertiary, #6b7280); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vg-mail-inhalt { width: 100%; min-height: 60vh; border: 0; border-radius: var(--r-sm); background: #fff; }
 .btn.vg-mail { height: auto; min-height: 0; justify-content: flex-start; font-weight: 400; box-shadow: none; border: 0; background: none; color: inherit; }
+
+/* Ladezustand für nachgeladene Bereiche */
+.lade-zeilen { display: flex; flex-direction: column; gap: 8px; }
+.lade-zeile { border-radius: var(--r-sm); background: var(--surface-alt, #f3f5f8); animation: vg-puls 1.2s ease-in-out infinite; }
+
+/* Partner-Rechnungen: eine Zeile je Rechnung, antippen = PDF */
+.partner-rechnungen { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.partner-rechnung { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid var(--border); }
+.partner-rechnung:first-child { border-top: 0; padding-top: 0; }
+.partner-rechnung__haupt { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; min-width: 0; }
+.partner-rechnung__haupt[aria-disabled='true'] { pointer-events: none; }
+.partner-rechnung__icon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--surface-alt, #f3f5f8); color: var(--text-2, #4b5563); }
+.partner-rechnung__text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.partner-rechnung__name { font-weight: 600; font-size: var(--fs-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.partner-rechnung__meta { color: var(--text-3); font-size: var(--fs-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.partner-rechnung__rechts { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+.partner-rechnung__betrag { font-weight: 600; font-variant-numeric: tabular-nums; }
+.partner-rechnung__aktion { padding-left: 48px; }
+
+/* Reiter: Punkt für Neues */
+.tab-neu { display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: var(--r-pill); background: var(--accent, #e8a317); vertical-align: middle; flex: none; }

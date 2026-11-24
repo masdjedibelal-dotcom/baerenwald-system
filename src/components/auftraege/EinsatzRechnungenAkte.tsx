@@ -8,15 +8,17 @@ import {
   type EinsatzZeile,
 } from '@/app/(dashboard)/auftraege/einsatz-actions'
 import { MockBadge, MockBtn, MockCard } from '@/components/mock-ui'
+import { MockIcon } from '@/components/mock-ui/MockIcon'
+import { LadeZeilen } from '@/components/ui/LadeZeilen'
 import { toast } from '@/components/ui/app-toast'
 import { safeAction } from '@/lib/actions/safe-action'
-import { formatDatum } from '@/lib/format/geld-datum'
+import { formatDatum, formatEuro } from '@/lib/format/geld-datum'
 
 /**
  * Partner-Rechnungen zum Vorgang (Einsatz-Upload vom Partner oder von Bärenwald).
  * Nur Dokument + Offen/Bezahlt — keine eigene Eingangsrechnungs-Liste mehr (04.10.2026).
  */
-export function EinsatzRechnungenAkte({ auftragId }: { auftragId: string }) {
+export function EinsatzRechnungenAkte({ auftragId, immerZeigen = false }: { auftragId: string; immerZeigen?: boolean }) {
   const [rows, setRows] = useState<EinsatzZeile[] | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -40,42 +42,63 @@ export function EinsatzRechnungenAkte({ auftragId }: { auftragId: string }) {
     await laden()
   }
 
-  if (!rows?.length) return null
+  // Bärenwald: nur anzeigen, wenn vorhanden (Akte). TEO: feste Karte im Reiter Zahlung, mit Ladezustand.
+  if (!immerZeigen && !rows?.length) return null
 
   return (
-    <MockCard title="Partner-Rechnungen" icon="file-invoice">
-      <div className="einsatz-rechnungen">
-        {rows.map((e) => (
-          <div key={e.id} className="einsatz-rechnung-zeile">
-            <div className="einsatz-rechnung-zeile__text">
-              <span className="einsatz-rechnung-zeile__name">{e.partner_name}</span>
-              <span className="einsatz-rechnung-zeile__meta">
-                {[e.titel, e.rechnung_eingereicht_at ? formatDatum(e.rechnung_eingereicht_at) : '']
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-            </div>
-            <div className="einsatz-rechnung-zeile__aktionen">
-              {e.rechnung_pdf_url ? (
-                <a href={e.rechnung_pdf_url} target="_blank" rel="noreferrer" className="einsatz-rechnung-zeile__pdf">
-                  PDF öffnen
+    <MockCard title="Partner-Rechnungen">
+      {rows === null ? (
+        <LadeZeilen anzahl={1} hoehe={56} />
+      ) : rows.length === 0 ? (
+        <p className="empty">Noch keine Rechnung von Partnern.</p>
+      ) : (
+        <ul className="partner-rechnungen">
+          {rows.map((e) => {
+            const bezahlt = Boolean(e.rechnung_bezahlt_at)
+            const meta = [
+              e.titel,
+              e.rechnung_eingereicht_at ? `eingereicht ${formatDatum(e.rechnung_eingereicht_at)}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')
+            return (
+              <li key={e.id} className="partner-rechnung">
+                <a
+                  className="partner-rechnung__haupt"
+                  href={e.rechnung_pdf_url ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-disabled={!e.rechnung_pdf_url}
+                >
+                  <span className="partner-rechnung__icon" aria-hidden>
+                    <MockIcon ctx="default" n="file-invoice" size={18} />
+                  </span>
+                  <span className="partner-rechnung__text">
+                    <span className="partner-rechnung__name">{e.partner_name}</span>
+                    <span className="partner-rechnung__meta">{meta}</span>
+                  </span>
+                  <span className="partner-rechnung__rechts">
+                    {e.rechnung_betrag != null ? (
+                      <span className="partner-rechnung__betrag">{formatEuro(e.rechnung_betrag)}</span>
+                    ) : null}
+                    <MockBadge kind={bezahlt ? 'fertig' : 'warten'}>{bezahlt ? 'Bezahlt' : 'Offen'}</MockBadge>
+                  </span>
                 </a>
-              ) : null}
-              <MockBadge kind={e.rechnung_bezahlt_at ? 'fertig' : 'warten'}>
-                {e.rechnung_bezahlt_at ? 'Bezahlt' : 'Offen'}
-              </MockBadge>
-              <MockBtn
-                sm
-                kind={e.rechnung_bezahlt_at ? 'ghost' : 'secondary'}
-                disabled={busyId === e.id}
-                onClick={() => umschalten(e)}
-              >
-                {e.rechnung_bezahlt_at ? 'Wieder offen' : 'Als bezahlt markieren'}
-              </MockBtn>
-            </div>
-          </div>
-        ))}
-      </div>
+                <div className="partner-rechnung__aktion">
+                  <MockBtn
+                    sm
+                    kind={bezahlt ? 'ghost' : 'secondary'}
+                    disabled={busyId === e.id}
+                    onClick={() => umschalten(e)}
+                  >
+                    {bezahlt ? 'Wieder auf offen' : 'Als bezahlt markieren'}
+                  </MockBtn>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </MockCard>
   )
 }

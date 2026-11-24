@@ -111,6 +111,8 @@ export type DetailShellGroup = {
   label: string
   icon: MockIconName | string
   count?: number
+  /** Punkt am Reiter: hier gibt es Neues seit dem letzten Ansehen */
+  neu?: boolean
   render: () => ReactNode
 }
 
@@ -222,6 +224,7 @@ export function DetailShell({ groups, value, onChange, className }: DetailShellP
           label: gr.label,
           icon: gr.icon,
           count: !isMobile && gr.count != null ? gr.count : undefined,
+          neu: gr.neu,
         }))}
         value={active?.id ?? value}
         onChange={onChange}

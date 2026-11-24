@@ -167,6 +167,7 @@ export function AuftragLeistungenTab({
   const [tagebuchPositionId, setTagebuchPositionId] = useState<string | null>(null)
   const [tagebuchEdit, setTagebuchEdit] = useState<CrmTagebuchEditSeed | null>(null)
   const [bautagebuchEintraege, setBautagebuchEintraege] = useState<BautagebuchListenEintrag[]>([])
+  const [bautagebuchGeladen, setBautagebuchGeladen] = useState(false)
   const [btRefreshKey, setBtRefreshKey] = useState(0)
   const [leistungenView, setLeistungenView] = useState<'leistungen' | 'bautagebuch'>(
     initialLeistungenView
@@ -269,6 +270,7 @@ export function AuftragLeistungenTab({
         })
       }
       setBautagebuchEintraege(enriched)
+      setBautagebuchGeladen(true)
     })
     return () => {
       cancelled = true
@@ -377,6 +379,7 @@ export function AuftragLeistungenTab({
         </>
       ) : (
         <AuftragBautagebuchSection
+          laedt={!bautagebuchGeladen}
           eintraege={bautagebuchEintraege}
           auftragId={detail.id}
           disabled={disabled}

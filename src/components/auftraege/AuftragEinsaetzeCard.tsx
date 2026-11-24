@@ -1,4 +1,5 @@
 'use client'
+import { LadeZeilen } from '@/components/ui/LadeZeilen'
 
 import { mb, UPLOAD_MAX_BYTES, uploadVorbereiten } from '@/lib/upload-grenze'
 import { useCallback,useEffect,useState } from 'react'
@@ -485,7 +486,7 @@ export function AuftragEinsaetzeCard({ auftragId }: { auftragId: string }) {
           </MockBtn>
         }
       >
-        {einsaetze == null ? null : einsaetze.length === 0 ? (
+        {einsaetze == null ? <LadeZeilen anzahl={2} hoehe={56} /> : einsaetze.length === 0 ? (
           <p style={{ margin: 0, color: 'var(--text-3)', fontSize: 'var(--fs-text)' }}>Noch kein Einsatz.</p>
         ) : (
           <div className="einsatz-liste">
