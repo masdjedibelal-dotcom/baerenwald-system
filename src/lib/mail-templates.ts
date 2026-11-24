@@ -141,6 +141,10 @@ export function mailHtmlBase(
           audience: options?.portalAudience ?? 'privat',
         })
 
+  if (istTeo) {
+    return teoMailHuelle({ pre, content: `${content}${psHtml}`, b, websiteKurz, tel, telHref, disclaimerHtml })
+  }
+
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -857,4 +861,55 @@ export function mailHandwerkerAnfrage(
       { skipMeinBaerenwaldPs: true }
     ),
   }
+}
+
+
+/**
+ * Servus TEO: Mail im Website-Look — heller Grund, weiße Karte mit runden Ecken,
+ * Wortmarke, Navy-Überschriften, ruhiger Fuß. Bärenwald nutzt weiter die klassische Hülle.
+ */
+function teoMailHuelle(o: {
+  pre: string
+  content: string
+  b: MailBranding
+  websiteKurz: string
+  tel: string
+  telHref: string
+  disclaimerHtml: string
+}): string {
+  const grund = '#F7F9FC'
+  const rand = '#E6EBF2'
+  const text = '#3B4A5E'
+  const leise = '#7A8699'
+  const schrift = "Manrope,'Helvetica Neue',Arial,Helvetica,sans-serif"
+  const wortmarke = `${MARKE.portalUrl}/brand/teo/logo-wordmark.png`
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="color-scheme" content="light"/>
+</head>
+<body style="margin:0;padding:0;background:${grund};font-family:${schrift};">
+${o.pre ? `<div style="display:none;max-height:0;overflow:hidden;">${o.pre}</div>` : ''}
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${grund};">
+<tr><td align="center" style="padding:32px 12px;">
+<table width="580" cellpadding="0" cellspacing="0" role="presentation" style="max-width:580px;width:100%;">
+<tr><td style="padding:0 8px 20px;">
+  <img src="${esc(wortmarke)}" width="80" height="36" alt="${esc(MAIL_MARKENNAME)}" style="display:block;width:80px;height:auto;border:0;"/>
+</td></tr>
+<tr><td style="background:#FFFFFF;border:1px solid ${rand};border-radius:16px;padding:32px 28px;font-size:15px;color:${text};line-height:1.65;font-family:${schrift};">
+  ${o.content}
+</td></tr>
+<tr><td style="padding:20px 8px 0;">
+  <p style="font-size:12px;color:${leise};margin:0;line-height:1.6;font-family:${schrift};">
+    ${esc(o.b.firmenname)} · ${o.websiteKurz} · <a href="tel:${o.telHref}" style="color:${leise};text-decoration:none;">${o.tel}</a>
+  </p>
+  ${o.disclaimerHtml}
+  <p style="margin:12px 0 0;line-height:0;"><span style="display:inline-block;width:6px;height:6px;border-radius:3px;background:#E8A317;"></span></p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`
 }

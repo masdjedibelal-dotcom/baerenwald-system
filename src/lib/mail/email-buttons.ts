@@ -1,5 +1,6 @@
 /** Markengrün für E-Mail-CTAs (inline styles — E-Mail-Clients unterstützen kein CSS extern). */
 import { C } from '@/lib/tokens/colors'
+import { istTeo } from '@/lib/marke'
 export const MAIL_BTN_GREEN = C.green
 
 function escAttr(s: string): string {
@@ -28,6 +29,15 @@ function buttonBase(
   const fontSize = opts?.size === 'sm' ? '14px' : '15px'
   const margin = opts?.margin ?? '20px 0'
   const textAlign = opts?.block ? 'text-align:center;' : ''
+
+  if (istTeo) {
+    // TEO: runde Knöpfe in Navy wie auf der Website
+    const navy = '#0B1F3A'
+    const schrift = "Manrope,'Helvetica Neue',Arial,Helvetica,sans-serif"
+    return variant === 'primary'
+      ? `<a href="${escAttr(url)}" style="display:${display};background:${navy};color:#FFFFFF;text-decoration:none;padding:${padding};border-radius:999px;font-weight:600;font-size:${fontSize};margin:${margin};border:2px solid ${navy};font-family:${schrift};${textAlign}">${escText(text)}</a>`
+      : `<a href="${escAttr(url)}" style="display:${display};background:#FFFFFF;color:${navy};text-decoration:none;padding:${padding};border-radius:999px;font-weight:600;font-size:${fontSize};margin:${margin};border:1px solid #D5DCE6;font-family:${schrift};${textAlign}">${escText(text)}</a>`
+  }
 
   if (variant === 'primary') {
     return `<a href="${escAttr(url)}" style="display:${display};background:${MAIL_BTN_GREEN};color:${C.white};text-decoration:none;padding:${padding};border-radius:8px;font-weight:600;font-size:${fontSize};margin:${margin};border:2px solid ${MAIL_BTN_GREEN};font-family:Arial,Helvetica,sans-serif;${textAlign}">${escText(text)}</a>`
