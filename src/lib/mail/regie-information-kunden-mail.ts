@@ -7,7 +7,6 @@ import type { MailBranding } from '@/lib/mail-branding'
 import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
-  mailKundenContactLine,
   mailKundenGruss,
   mailKundenPortalTop,
   mailKundenStandardOptions,
@@ -133,7 +132,6 @@ export function buildRegieInformationKundenMail(
       : `Fragen zu dieser Position? Antworten Sie einfach auf diese E-Mail — wir melden uns.`
 
   const portalTop = mailKundenPortalTop(data.statusLink)
-  const contact = mailKundenContactLine(anrede, branding.telefon)
   const gruss = mailKundenGruss(anrede)
 
   const disclaimer =
@@ -151,7 +149,6 @@ export function buildRegieInformationKundenMail(
       ${beschreibungHtml}
       ${gesamtsummeHtml}
       <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${esc(fragenZeile)}</p>
-      <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
       <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     branding,

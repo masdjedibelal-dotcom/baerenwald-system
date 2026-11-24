@@ -1,9 +1,9 @@
+import { RECHNUNG_EINLEITUNG_STANDARD } from '@/lib/rechnungen/rechnung-texte'
 import type { MailBranding } from '@/lib/mail-branding'
 import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import { buildSubject } from '@/lib/mail/build-subject'
 import {
 mailHtmlBase,
-mailKundenContactLine,
 mailKundenGruss,
 mailKundenStandardOptions,
 mailSummaryBlock,
@@ -172,8 +172,10 @@ export function buildRechnungMail(
   const mitStorno = Boolean(data.mitStornoAnhang)
   const istKorrektur = Boolean(data.istKorrektur || mitStorno)
 
+  // Die PDF-Einleitung („Hiermit stellen wir … nachstehend …“) passt nicht in die Mail → Mail-Standard
+  const eigeneEinleitung = data.mailEinleitung?.trim()
   const introRaw =
-    data.mailEinleitung?.trim() ||
+    (eigeneEinleitung && !Object.values(RECHNUNG_EINLEITUNG_STANDARD).includes(eigeneEinleitung) ? eigeneEinleitung : '') ||
     (mitStorno
       ? defaultRechnungKorrekturMitStornoMailEinleitung(anrede, {
           originalNr: data.stornoBezugRechnungsnummer,
@@ -197,9 +199,7 @@ export function buildRechnungMail(
         : data.stornoGutschriftNummer
           ? `Zwei PDFs im Anhang: Storno-Gutschrift ${data.stornoGutschriftNummer} und Rechnung ${data.rechnungsnummer}.`
           : 'Zwei PDFs im Anhang: Storno-Gutschrift und neue Rechnung.'
-      : anrede === 'du'
-        ? 'Alle Positionen, Zahlungsdaten und den Verwendungszweck findest du im PDF-Anhang.'
-        : 'Alle Positionen, Zahlungsdaten und den Verwendungszweck finden Sie im PDF-Anhang.'
+      : ''
 
   const summaryLabel = istKorrektur
     ? data.stornoBezugRechnungsnummer
@@ -216,7 +216,6 @@ export function buildRechnungMail(
     metaHtml: `<p style="font-size:15px;color:${C.gray700};margin:8px 0 0;"><strong>Fällig am:</strong> ${faellig}</p>`,
   })
 
-  const contact = mailKundenContactLine(anrede, b.telefon)
   const gruss = mailKundenGruss(anrede)
 
   const disclaimer =
@@ -230,8 +229,7 @@ export function buildRechnungMail(
     `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
       <div style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</div>
       ${summaryHtml}
-      <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
-      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
+      ${pdfHinweis ? `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>` : ''}
       <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,

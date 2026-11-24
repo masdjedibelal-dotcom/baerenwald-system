@@ -1,5 +1,6 @@
 'use server'
 
+import { mailBegruessungZeile, mailTeamGruss } from '@/lib/mail/anrede'
 import { revalidateAuftragDetail } from '@/lib/crm-revalidate'
 import { logDbError } from '@/lib/errors/log-db-error'
 import { createClient } from '@/lib/supabase-server'
@@ -357,14 +358,14 @@ function defaultAbnahmeprotokollNachricht(
   if (opts?.bitteZurueckUnterschreiben) {
     return mailText(
       anrede,
-      'wir haben das Abnahmeprotokoll zu deinem Projekt erstellt. Das PDF findest du im Anhang. Bitte prüfe es, unterschreibe es und schicke uns die unterschriebene Fassung zurück.',
-      'wir haben das Abnahmeprotokoll zu Ihrem Projekt erstellt. Das PDF finden Sie im Anhang. Bitte prüfen Sie es, unterschreiben Sie es und schicken Sie uns die unterschriebene Fassung zurück.'
+      'anbei das Abnahmeprotokoll zu deinem Projekt. Bitte prüfe es und schick es uns unterschrieben zurück.',
+      'anbei das Abnahmeprotokoll zu Ihrem Projekt. Bitte prüfen Sie es und senden Sie es uns unterschrieben zurück.'
     )
   }
   return mailText(
     anrede,
-    'wir haben das Abnahmeprotokoll zu deinem Projekt erstellt. Das vollständige Protokoll findest du im PDF-Anhang.',
-    'wir haben das Abnahmeprotokoll zu Ihrem Projekt erstellt. Das vollständige Protokoll finden Sie im PDF-Anhang.'
+    'anbei das Abnahmeprotokoll zu deinem Projekt.',
+    'anbei das Abnahmeprotokoll zu Ihrem Projekt.'
   )
 }
 
@@ -445,13 +446,13 @@ async function buildAbnahmeMail(input: {
   if (!kunde?.email?.trim()) return { ok: false as const, message: 'Keine Kunden-E-Mail' }
 
   const vorname = (kunde.name ?? 'Guten Tag').trim().split(/\s+/)[0] || 'Guten Tag'
-  const anredeLine =
-    input.anrede === 'du' ? `Hallo ${vorname},` : `Guten Tag ${kunde.name?.trim() || vorname},`
+  const anredeLine = mailBegruessungZeile(input.anrede, kunde.name?.trim() || '')
   const textHtml = escapeHtml(input.nachricht.trim()).replace(/\n/g, '<br/>')
   const branding = await getMailBranding(supabaseAdmin)
   const html = mailHtmlBase(
     `<p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 14px;">${escapeHtml(anredeLine)}</p>
-    <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0;">${textHtml}</p>`,
+    <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 16px;">${textHtml}</p>
+    <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0;">${mailTeamGruss(input.anrede, branding.firmenname)}</p>`,
     input.betreff.trim(),
     branding,
     undefined,

@@ -3,7 +3,6 @@ import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
-  mailKundenContactLine,
   mailKundenGruss,
   mailKundenStandardOptions,
   mailSummaryBlock,
@@ -53,13 +52,8 @@ export function buildZahlungsbestaetigungMail(
 
   const intro =
     anrede === 'du'
-      ? 'vielen Dank — wir haben deine Zahlung erhalten. Kurz zur Bestätigung:'
-      : 'vielen Dank — wir haben Ihre Zahlung erhalten. Kurz zur Bestätigung:'
-
-  const abschlussHinweis =
-    anrede === 'du'
-      ? 'Damit ist diese Rechnung für uns erledigt. Bei Fragen zum Projekt oder zu weiteren Schritten melde dich gern.'
-      : 'Damit ist diese Rechnung für uns erledigt. Bei Fragen zum Projekt oder zu weiteren Schritten melden Sie sich gern.'
+      ? 'vielen Dank — deine Zahlung ist bei uns eingegangen.'
+      : 'vielen Dank — Ihre Zahlung ist bei uns eingegangen.'
 
   const summaryHtml = mailSummaryBlock({
     label: anrede === 'du' ? `ZAHLUNG ERHALTEN · ${nr}` : `ZAHLUNG ERHALTEN · ${nr}`,
@@ -68,7 +62,6 @@ export function buildZahlungsbestaetigungMail(
     metaHtml: `<p style="font-size:13px;color:${C.gray700};margin:8px 0 0;"><strong>Bezahlt am:</strong> ${bezahltAm}</p>`,
   })
 
-  const contact = mailKundenContactLine(anrede, b.telefon)
   const gruss = mailKundenGruss(anrede)
 
   const disclaimer =
@@ -82,8 +75,6 @@ export function buildZahlungsbestaetigungMail(
     `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
       <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${intro}</p>
       ${summaryHtml}
-      <p style="font-size:14px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${esc(abschlussHinweis)}</p>
-      <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
       <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,

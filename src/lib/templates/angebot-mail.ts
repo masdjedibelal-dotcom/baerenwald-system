@@ -5,7 +5,7 @@ import { mailBetragPriceHtml } from '@/lib/mail/betrag-label'
 import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
-  mailKundenContactLine,mailKundenStandardOptions,
+  mailKundenStandardOptions,
   mailSummaryBlock
 } from '@/lib/mail-templates'
 import { mailKiVisualisierungBlock } from '@/lib/visualize/mail-block'
@@ -103,26 +103,38 @@ export const ANGEBOT_ANNAHME_HINWEIS = {
 
 /** CTA unten in der Mail — Standard (Privat / über Schwelle). */
 export const ANGEBOT_MAIL_CTA_ANNEHMEN = {
-  du: 'Zum Angebot annehmen: Sende uns das unterzeichnete Angebot zurück oder antworte einfach auf diese E-Mail — wir freuen uns von dir zu hören.',
-  sie: 'Zum Angebot annehmen: Senden Sie uns das unterzeichnete Angebot zurück oder antworten Sie einfach auf diese E-Mail — wir freuen uns auf Ihre Rückmeldung.',
+  du: 'Passt alles? Dann antworte einfach kurz auf diese E-Mail oder schick uns das unterschriebene Angebot zurück.',
+  sie: 'Passt alles? Dann antworten Sie einfach kurz auf diese E-Mail oder senden Sie uns das unterschriebene Angebot zurück.',
 } as const
 
 /** CTA unter Freigabeschwelle — kein Annehmen/Ablehnen. */
 export const ANGEBOT_MAIL_CTA_UNTER_SCHWELLE = {
-  du: 'Aufgrund Ihrer erteilten Freigabeschwelle liegt dieses Angebot darunter — wir kümmern uns direkt um den Auftrag. Eine Annahme oder Ablehnung ist nicht nötig; den Stand siehst du jederzeit im Auftraggeber-Portal.',
-sie: 'Aufgrund Ihrer erteilten Freigabeschwelle liegt dieses Angebot darunter — wir kümmern uns direkt um den Auftrag. Eine Annahme oder Ablehnung ist nicht nötig; den Stand sehen Sie jederzeit im Auftraggeber-Portal.',
+  du: 'Das Angebot liegt unter deiner Freigabegrenze — wir kümmern uns direkt darum. Du musst nichts tun.',
+  sie: 'Das Angebot liegt unter Ihrer Freigabegrenze — wir kümmern uns direkt darum. Sie müssen nichts tun.',
 } as const
 
 export const ANGEBOT_MAIL_SCHLUSS_STANDARD = {
-  du: `${ANGEBOT_ANNAHME_HINWEIS.du}\n\nWir freuen uns von dir zu hören.\n\nViele Grüße\nDein ${MARKE.name} Team`,
-  sie: `${ANGEBOT_ANNAHME_HINWEIS.sie}\n\nWir freuen uns auf Ihre Rückmeldung.\n\nMit freundlichen Grüßen\nIhr ${MARKE.name} Team`,
+  du: `Viele Grüße\nDein ${MARKE.name} Team`,
+  sie: `Mit freundlichen Grüßen\nIhr ${MARKE.name} Team`,
 } as const
 
 /** Schluss ohne Annahme-Aufforderung (HV unter Schwelle). */
-export const ANGEBOT_MAIL_SCHLUSS_UNTER_SCHWELLE = {
-  du: `Wir freuen uns, wenn du im Portal mitliest.\n\nViele Grüße\nDein ${MARKE.name} Team`,
-  sie: `Wir freuen uns, wenn Sie im Portal mitlesen.\n\nMit freundlichen Grüßen\nIhr ${MARKE.name} Team`,
-} as const
+export const ANGEBOT_MAIL_SCHLUSS_UNTER_SCHWELLE = ANGEBOT_MAIL_SCHLUSS_STANDARD
+
+/** Frühere Standardtexte (in gespeicherten Angeboten) → werden durch die neuen, kürzeren ersetzt. */
+const ALTE_SCHLUSS_STANDARDS = new Set<string>([
+  `${ANGEBOT_ANNAHME_HINWEIS.du}\n\nWir freuen uns von dir zu hören.\n\nViele Grüße\nDein ${MARKE.name} Team`,
+  `${ANGEBOT_ANNAHME_HINWEIS.sie}\n\nWir freuen uns auf Ihre Rückmeldung.\n\nMit freundlichen Grüßen\nIhr ${MARKE.name} Team`,
+  `Wir freuen uns, wenn du im Portal mitliest.\n\nViele Grüße\nDein ${MARKE.name} Team`,
+  `Wir freuen uns, wenn Sie im Portal mitlesen.\n\nMit freundlichen Grüßen\nIhr ${MARKE.name} Team`,
+])
+
+function alteEinleitungStandards(lu: string): string[] {
+  return [
+    `anbei findest du dein persönliches Angebot für ${lu}. Schau es dir in Ruhe an und melde dich gerne bei uns, wenn du Fragen hast oder einen Termin vereinbaren möchtest.`,
+    `anbei finden Sie Ihr persönliches Angebot für ${lu}. Bitte nehmen Sie sich die Zeit, es in Ruhe zu prüfen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.`,
+  ]
+}
 
 /** Standard-Einleitung (Fließtext nach „Hallo …“) — in Schritt 2 vorausgefüllt und in der Vorschau sichtbar. */
 export function defaultAngebotEinleitungText(
@@ -131,9 +143,9 @@ export function defaultAngebotEinleitungText(
 ): string {
   const lu = leistungsumfang.trim() || 'Ihr Projekt'
   if (anrede === 'du') {
-    return `anbei findest du dein persönliches Angebot für ${lu}. Schau es dir in Ruhe an und melde dich gerne bei uns, wenn du Fragen hast oder einen Termin vereinbaren möchtest.`
+    return `anbei bekommst du unser Angebot für ${lu}.`
   }
-  return `anbei finden Sie Ihr persönliches Angebot für ${lu}. Bitte nehmen Sie sich die Zeit, es in Ruhe zu prüfen. Bei Fragen stehen wir Ihnen gerne zur Verfügung.`
+  return `anbei erhalten Sie unser Angebot für ${lu}.`
 }
 
 export function defaultAngebotSchlussText(
@@ -162,7 +174,7 @@ export function isDefaultAngebotEinleitung(text: string, leistungsumfang: string
   if (t === ANGEBOT_MAIL_EINLEITUNG_STANDARD.du || t === ANGEBOT_MAIL_EINLEITUNG_STANDARD.sie) {
     return true
   }
-  const variants = new Set<string>()
+  const variants = new Set<string>([...alteEinleitungStandards(leistungsumfang), ...alteEinleitungStandards('Ihr Projekt')])
   for (const a of ['du', 'sie'] as const) {
     variants.add(defaultAngebotEinleitungText(a, leistungsumfang).trim())
     variants.add(defaultAngebotEinleitungText(a, 'Ihr Projekt').trim())
@@ -189,7 +201,7 @@ export function resolveAngebotMailEinleitung(
   leistungsumfang: string
 ): string {
   const t = einleitung?.trim()
-  if (t) return t
+  if (t && !alteEinleitungStandards(leistungsumfang.trim() || 'Ihr Projekt').includes(t)) return t
   return defaultAngebotEinleitungText(anrede, leistungsumfang)
 }
 
@@ -199,6 +211,7 @@ export function resolveAngebotMailSchluss(
   ctaMode: 'annehmen' | 'unter_schwelle_direkt' = 'annehmen'
 ): string {
   const t = schluss?.trim()
+  if (t && ALTE_SCHLUSS_STANDARDS.has(t)) return defaultAngebotSchlussText(anrede, ctaMode)
   if (t) {
     // Wizard-Standard mit Annahme-Hinweis → unter Schwelle ersetzen
     if (
@@ -395,10 +408,6 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
   const grussHtml = textToHtmlParagraphs(schlussRaw)
 
   const boxLabel = anrede === 'du' ? 'DEIN ANGEBOT' : 'IHR ANGEBOT'
-  const pdfHinweis =
-    anrede === 'du'
-      ? 'Das detaillierte Angebot findest du im PDF-Anhang.'
-      : 'Das detaillierte Angebot finden Sie im PDF-Anhang.'
   const disclaimer =
     anrede === 'du'
       ? 'Du erhältst diese Mail, weil du ein Angebot von uns erhalten hast.'
@@ -421,12 +430,10 @@ export function buildAngebotMail(data: AngebotMailInput, branding: MailBranding)
       ${einleitungHtml}
       ${summaryHtml}
       ${vizHtml}
-      <p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${pdfHinweis}</p>
       <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">
         ${ctaText}
       </p>
-      ${grussHtml}
-      <p style="font-size:15px;color:${C.gray700};margin:16px 0 0;line-height:1.6;">${mailKundenContactLine(anredeKey, branding.telefon)}</p>`
+      ${grussHtml}`
 
   const preheader = `${angebotsnr} · ${formatEur(gesamt_brutto)} € · gültig bis ${gueltig_bis}`
   return mailHtmlBase(

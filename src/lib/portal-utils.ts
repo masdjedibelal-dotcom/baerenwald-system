@@ -128,15 +128,9 @@ export function buildPartnerAnfragePortalUrl(anfrageId: string): string {
 }
 
 export function buildPartnerPortalButton(portalLink: string): string {
+  // Ein Knopf genügt — die Anmeldehinweise stehen im Text der Mail (Sie-Form)
   return `
 <div style="margin:20px 0 8px;">
   ${mailSecondaryButtonHtml('Zum Partner-Portal →', portalLink, { margin: '0' })}
-</div>
-<p style="font-size:13px;
-  color:#6B7280;
-  margin:0 0 16px;
-  line-height:1.6;
-  font-family:Arial,Helvetica,sans-serif;">
-  Melde dich mit deiner bei ${MARKE.name} hinterlegten Partner-E-Mail an — danach siehst du Auftrag und Leistungen.
-</p>`
+</div>`
 }

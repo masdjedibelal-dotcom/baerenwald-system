@@ -10,7 +10,6 @@ import { richTextToSafePdfHtml } from '@/lib/rich-text'
 import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
-  mailKundenContactLine,
   mailKundenGruss,
   mailKundenStandardOptions,
   mailSummaryBlock,
@@ -181,7 +180,6 @@ export function buildBautagebuchKundenMail(
   const nachrichtHtml = textToHtmlParagraphs(data.nachricht)
   const uebersicht = projektUebersichtBlock(data.positionen, data.gewerke, data.eintrag, anrede)
 
-  const contact = mailKundenContactLine(anrede, b.telefon)
   const gruss = mailKundenGruss(anrede)
 
   const disclaimer =
@@ -195,7 +193,6 @@ export function buildBautagebuchKundenMail(
     `<p style="font-size:15px;color:${C.gray700};margin:0 0 12px;line-height:1.6;">${begr}</p>
       ${nachrichtHtml}
       ${uebersicht}
-      <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
       <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,

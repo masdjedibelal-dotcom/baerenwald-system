@@ -6,7 +6,6 @@ import {
 import { buildSubject } from '@/lib/mail/build-subject'
 import {
   mailHtmlBase,
-  mailKundenContactLine,
   mailKundenGruss,
   mailKundenStandardOptions,
   mailSummaryBlock,
@@ -50,7 +49,8 @@ export function buildAuftragsbestaetigungMail(
 ): { betreff: string; html: string } {
   const anrede = data.anrede
   const begr = esc(data.begruessung.trim() || (anrede === 'du' ? 'Hallo,' : 'Guten Tag,'))
-  const gw = esc(data.gewerke.join(', ') || 'Ihr Projekt')
+  const gewerke = data.gewerke.filter((g) => g.trim() && !/^allgemein$/i.test(g.trim()))
+  const gw = esc(gewerke.join(', '))
   const lu = esc(data.leistungsumfang.trim() || 'Ihr Projekt')
   const start = esc(data.startDatum)
   const end = data.endDatum?.trim() ? esc(data.endDatum.trim()) : null
@@ -59,20 +59,18 @@ export function buildAuftragsbestaetigungMail(
 
   const intro =
     anrede === 'du'
-      ? 'super — dein Auftrag ist bestätigt. Hier eine kurze Übersicht und was als Nächstes passiert:'
-      : 'vielen Dank — Ihr Auftrag ist bestätigt. Hier eine kurze Übersicht und was als Nächstes passiert:'
+      ? 'danke — dein Auftrag ist bestätigt.'
+      : 'vielen Dank — Ihr Auftrag ist bestätigt.'
 
   const stepsDu = [
-    'Wir planen Termine und koordinieren die Gewerke für dich.',
-    `Pro Meilenstein oder abgeschlossenem Gewerk erhältst du per E-Mail ein Update — Details, Fotos und Verlauf siehst du in ${MARKE.portalName}.`,
-    'Wir führen die Arbeiten gemäß Angebot aus.',
-    'Zum Abschluss: Abnahme, Abschlussdokumentation und Rechnung.',
+    'Wir planen die Termine und melden uns, sobald sie feststehen.',
+    'Während der Arbeiten bekommst du kurze Updates per E-Mail.',
+    'Zum Schluss: Abnahme und Rechnung.',
   ]
   const stepsSie = [
-    'Wir planen Termine und koordinieren die Gewerke für Sie.',
-    `Pro Meilenstein oder abgeschlossenem Gewerk erhalten Sie per E-Mail ein Update — Details, Fotos und Verlauf finden Sie in ${MARKE.portalName}.`,
-    'Wir führen die Arbeiten gemäß Angebot aus.',
-    'Zum Abschluss: Abnahme, Abschlussdokumentation und Rechnung.',
+    'Wir planen die Termine und melden uns, sobald sie feststehen.',
+    'Während der Arbeiten erhalten Sie kurze Updates per E-Mail.',
+    'Zum Schluss: Abnahme und Rechnung.',
   ]
   const steps = anrede === 'du' ? stepsDu : stepsSie
   const stepsHtml = steps
@@ -88,10 +86,9 @@ export function buildAuftragsbestaetigungMail(
     priceHtml: brutto
       ? `<p style="font-size:16px;font-weight:700;color:${C.green};margin:0;">${esc(brutto)} <span style="font-size:12px;font-weight:400;color:${C.gray500};">inkl. MwSt.</span></p>`
       : '',
-    metaHtml: `<p style="font-size:13px;color:${C.gray700};margin:8px 0 0;"><strong>Zeitraum:</strong> ${zeitraum}</p><p style="font-size:13px;color:${C.gray700};margin:4px 0 0;"><strong>Gewerke:</strong> ${gw}</p>`,
+    metaHtml: `<p style="font-size:13px;color:${C.gray700};margin:8px 0 0;"><strong>Zeitraum:</strong> ${zeitraum}</p>${gw ? `<p style="font-size:13px;color:${C.gray700};margin:4px 0 0;"><strong>Gewerke:</strong> ${gw}</p>` : ''}`,
   })
 
-  const contact = mailKundenContactLine(anrede, b.telefon)
   const gruss = mailKundenGruss(anrede)
 
   const betreff = auftragsbestaetigungMailBetreff(data.leistungsumfang)
@@ -106,7 +103,6 @@ export function buildAuftragsbestaetigungMail(
       ${summaryHtml}
       <p style="font-size:14px;font-weight:600;color:${C.gray900};margin:0 0 8px;">${stepsTitle}</p>
       <ol style="margin:0 0 16px;padding-left:20px;">${stepsHtml}</ol>
-      <p style="font-size:14px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${contact}</p>
       <p style="font-size:14px;color:${C.gray700};margin:0;line-height:1.6;">${gruss}</p>`,
     preheader,
     b,

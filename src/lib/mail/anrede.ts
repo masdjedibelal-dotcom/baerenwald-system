@@ -28,6 +28,8 @@ export function mailText(anrede: MailAnrede, du: string, sie: string): string {
 }
 
 /** Begrüßungszeile in HTML-Mails (escaping erfolgt beim Einbau). */
+const FIRMA_RE = /\b(gmbh|mbh|ug|ag|gbr|kg|ohg|e\.?\s?v\.?|e\.?k\.?|hausverwaltung|verwaltung|immobilien|weg|eigentümergemeinschaft)\b/i
+
 export function mailBegruessungZeile(
   anrede: MailAnrede,
   displayName: string,
@@ -35,6 +37,8 @@ export function mailBegruessungZeile(
 ): string {
   if (kunde) return kundeAngebotBegruessung(anrede, kunde)
   const name = displayName.trim() || 'Kundin/Kunde'
+  // Firmen nicht mit Namen anreden („Guten Tag Genius Hausverwaltung GmbH,“ wirkt automatisch)
+  if (FIRMA_RE.test(name) || name === 'Kundin/Kunde') return anrede === 'du' ? 'Hallo,' : 'Guten Tag,'
   if (anrede === 'du') {
     const vorname = name.split(/\s+/)[0] || name
     return `Hallo ${vorname},`

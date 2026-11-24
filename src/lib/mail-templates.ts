@@ -102,14 +102,15 @@ export function mailMeinBaerenwaldPsFooter(opts: {
   const audience = opts.audience ?? 'privat'
   const portal = opts.portalLink?.trim() || buildPortalLoginLink()
   const anrede = opts.anrede
-  const text = portalMailPsIntro(audience, anrede)
-  const buttonLabel = portalMailButtonLabel(audience)
+  const kurz =
+    audience === 'organisation'
+      ? 'Alle Vorgänge im Überblick:'
+      : anrede === 'du'
+        ? 'Dein Projekt jederzeit online:'
+        : 'Ihr Projekt jederzeit online:'
+  const linkText = audience === 'organisation' ? 'Auftraggeber-Portal' : MARKE.portalName
   // Marker: sendMail entfernt den Block für Verwaltungen ohne Arbeitsplatz (TEO)
-  return `${MAIL_PORTAL_PS_START}<div style="margin:28px 0 0;padding:16px 0 0;border-top:1px solid ${C.gray200};">
-    <p style="font-size:15px;font-weight:700;color:${C.gray500};margin:0 0 8px;letter-spacing:0.02em;">P.S.</p>
-    <p style="font-size:15px;color:${C.gray700};line-height:1.6;margin:0 0 12px;">${text}</p>
-    ${mailSecondaryButtonHtml(buttonLabel, portal, { margin: '0' })}
-  </div>${MAIL_PORTAL_PS_ENDE}`
+  return `${MAIL_PORTAL_PS_START}<p style="margin:24px 0 0;padding:14px 0 0;border-top:1px solid ${C.gray200};font-size:14px;color:${C.gray500};line-height:1.6;">${kurz} <a href="${esc(portal)}" style="color:${C.green};font-weight:600;text-decoration:none;">${esc(linkText)} →</a></p>${MAIL_PORTAL_PS_ENDE}`
 }
 
 /** Standard-Hülle: durchgehend weiß wie Anfrage-Bestätigung (kein grauer Rand, keine Card). */
@@ -125,9 +126,8 @@ export function mailHtmlBase(
   const tel = esc(b.telefon)
   const telHref = tel.replace(/\s/g, '')
   const logoBlock = mailLogoMitMarkenname(b, 'onLight')
-  const disclaimerHtml = footerDisclaimer?.trim()
-    ? `<p style="font-size:11px;color:${C.gray300};margin:4px 0 0;line-height:1.5;">${esc(footerDisclaimer.trim())}</p>`
-    : ''
+  // „Sie erhalten diese Mail, weil …“ wird nicht mehr angezeigt — bei Vorgangs-Mails überflüssig
+  const disclaimerHtml = ''
   const portalLink =
     options?.portalLink?.trim() ||
     options?.statusLink?.trim() ||
@@ -574,7 +574,6 @@ export function mailAngebot(
       ${hint35a}
       ${data.visualisierung_vorschau_url ? mailKiVisualisierungBlock(anredeKey, data.visualisierung_vorschau_url) : ''}
       ${istTeo && data.statusLink ? `<div style="margin:4px 0 20px;">${mailPrimaryButtonHtml(mailText(anrede, 'Angebot ansehen und annehmen', 'Angebot ansehen und annehmen'), data.statusLink)}</div>` : ''}
-      <p style="font-size:15px;color:${C.gray700};margin:0 0 16px;line-height:1.6;">${mailKundenContactLine(anredeKey, b.telefon)}</p>
       <p style="font-size:15px;color:${C.gray700};margin:0;line-height:1.6;">${mailKundenGruss(anredeKey)}</p>`,
       mailText(anrede, `Dein Angebot: ${betragText}`, `Ihr Angebot: ${betragText}`),
       b,
@@ -864,6 +863,9 @@ export function mailHandwerkerAnfrage(
 }
 
 
+/** Wortmarke als Text — erscheint auch, wenn das Mail-Programm Bilder blockiert. */
+const TEO_WORTMARKE_SCHRIFT = "Manrope,'Helvetica Neue',Arial,Helvetica,sans-serif"
+
 /**
  * Servus TEO: Mail im Website-Look — heller Grund, weiße Karte mit runden Ecken,
  * Wortmarke, Navy-Überschriften, ruhiger Fuß. Bärenwald nutzt weiter die klassische Hülle.
@@ -882,7 +884,6 @@ function teoMailHuelle(o: {
   const text = '#3B4A5E'
   const leise = '#7A8699'
   const schrift = "Manrope,'Helvetica Neue',Arial,Helvetica,sans-serif"
-  const wortmarke = `${MARKE.portalUrl}/brand/teo/logo-wordmark.png`
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -896,7 +897,7 @@ ${o.pre ? `<div style="display:none;max-height:0;overflow:hidden;">${o.pre}</div
 <tr><td align="center" style="padding:32px 12px;">
 <table width="580" cellpadding="0" cellspacing="0" role="presentation" style="max-width:580px;width:100%;">
 <tr><td style="padding:0 8px 20px;">
-  <img src="${esc(wortmarke)}" width="80" height="36" alt="${esc(MAIL_MARKENNAME)}" style="display:block;width:80px;height:auto;border:0;"/>
+  <span style="font-size:28px;font-weight:800;color:#0B1F3A;letter-spacing:-0.03em;line-height:1;font-family:${TEO_WORTMARKE_SCHRIFT};">teo<span style="color:#E8A317;">.</span></span>
 </td></tr>
 <tr><td style="background:#FFFFFF;border:1px solid ${rand};border-radius:16px;padding:32px 28px;font-size:15px;color:${text};line-height:1.65;font-family:${schrift};">
   ${o.content}
